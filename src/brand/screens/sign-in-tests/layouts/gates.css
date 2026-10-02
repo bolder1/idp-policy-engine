@@ -1,0 +1,515 @@
+/* -----------------------------------------------------------------------------
+   The run as gates (GatesLayout.tsx). Lanes and cards in the builder's language
+   (board.css .bb__card): the raised surface, a hairline, radius 8–10, DM Sans,
+   12px the floor. Nothing here puts a transform or a transition on what motion
+   moves (the token, a gate's bar, a turnstile's arms, the door's leaf, the
+   scan light): colour transitions sit on the frames around them only.
+   -------------------------------------------------------------------------- */
+
+.rl-gates__world { position: relative; font-size: var(--fs-md); color: var(--text-body); }
+.rl-gates__slot { position: absolute; width: 120px; height: 120px; pointer-events: none; visibility: hidden; }
+
+/* --- The trail: where the token has walked ---------------------------------------- */
+
+.rl-gates__trail { position: absolute; inset: 0 auto auto 0; z-index: 2; overflow: visible; pointer-events: none; }
+.rl-gates__trail path { fill: none; stroke: var(--border-strong); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0; }
+.rl-gates__trail path.is-positive { stroke: var(--fb-positive-dot); }
+.rl-gates__trail path.is-negative { stroke: var(--fb-negative-dot); }
+.rl-gates__trail path.is-notice { stroke: var(--fb-notice-dot); }
+
+/* --- A card ------------------------------------------------------------------------ */
+
+.rl-gates__card {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  font: inherit;
+  color: var(--text-body);
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+/* --- The sign-in -------------------------------------------------------------------- */
+
+.rl-gates__sign { left: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; cursor: pointer; }
+.rl-gates__sign:hover { border-color: var(--border-strong); }
+.rl-gates__sign:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rl-gates__signhead { display: flex; align-items: center; gap: 10px; min-width: 0; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+.rl-gates__signwho { display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
+.rl-gates__signwho strong { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.rl-gates__signwho span { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.rl-gates__signapp { display: flex; align-items: center; gap: 6px; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.rl-gates__signapp > svg:first-child { color: var(--text-muted); }
+.rl-gates__facts { display: flex; flex-direction: column; gap: 4px; }
+.rl-gates__fact { display: grid; grid-template-columns: 48px 14px 1fr; align-items: start; gap: 4px; font-size: var(--fs-sm); line-height: 16px; }
+.rl-gates__factlabel { color: var(--text-tertiary); }
+.rl-gates__factmark { display: inline-flex; padding-top: 2px; }
+.rl-gates__facttext { color: var(--text-body); }
+.rl-gates__fact.is-unset .rl-gates__facttext { color: var(--text-tertiary); }
+.rl-gates__fact.is-needed .rl-gates__facttext { color: var(--fb-notice-fg); }
+
+/* --- The token ---------------------------------------------------------------------- */
+
+.rl-gates__token {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.rl-gates__tokenface {
+  position: absolute;
+  left: -16px;
+  top: -16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  border: 2px solid var(--text-secondary);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+}
+.rl-gates__token.is-positive .rl-gates__tokenface { border-color: var(--fb-positive-dot); }
+.rl-gates__token.is-negative .rl-gates__tokenface { border-color: var(--fb-negative-dot); }
+.rl-gates__token.is-notice .rl-gates__tokenface { border-color: var(--fb-notice-dot); }
+.rl-gates__tokenname {
+  position: absolute;
+  left: -40px;
+  top: 18px;
+  width: 80px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: 14px;
+  color: var(--text-primary);
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 0 3px var(--surface-raised), 0 0 3px var(--surface-raised);
+}
+
+/* --- A bank of lanes: the policy gates, the rule turnstiles ------------------------------ */
+
+.rl-gates__bank {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.rl-gates__bankhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.rl-gates__bankhead > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rl-gates__count { flex: none; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rl-gates__empty { margin: 0; padding: 12px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* One lane: a hairline over it, its gate at the entry (left), its name over
+   the floor the token walks, why under it. */
+.rl-gates__lane { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border-subtle); transition: background-color 0.2s ease; }
+.rl-gates__lane:last-child { border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }
+.rl-gates__lane.is-noted { z-index: 8; }
+.rl-gates__lanebtn {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-gates__lanebtn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rl-gates__lane:hover { background: var(--surface-sunken); }
+.rl-gates__lanetext {
+  position: absolute;
+  inset: 0 12px 0 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 9px 0 8px;
+  min-width: 0;
+}
+.rl-gates__lane.is-slim .rl-gates__lanetext { justify-content: center; padding: 0; }
+.rl-gates__lanehead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; min-height: 20px; }
+.rl-gates__lane.is-slim .rl-gates__lanehead { align-items: center; }
+.rl-gates__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.rl-gates__name { flex: 1 1 auto; min-width: 0; overflow: hidden; font-weight: var(--fw-semibold); line-height: 20px; color: var(--text-primary); white-space: nowrap; text-overflow: ellipsis; }
+/* A lane the token reaches keeps its whole name: two lines over the floor. */
+.rl-gates__lane.is-tall .rl-gates__name { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 18px; padding-top: 1px; }
+.rl-gates__lanesub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  line-height: 16px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rl-gates__lanesub > svg { flex: none; }
+
+/* Lane states: blue only while asked; green once it lets the token in; amber
+   only for one that would also let them in; grey once passed or never reached. */
+.rl-gates__lane.is-asking { background: var(--accent-soft); }
+.rl-gates__lane.is-open .rl-gates__lanesub { color: var(--fb-positive-fg); font-weight: var(--fw-medium); }
+.rl-gates__lane.is-also .rl-gates__lanesub { color: var(--text-secondary); }
+.rl-gates__lane.is-conflict { background: var(--fb-notice-bg); }
+.rl-gates__lane.is-conflict .rl-gates__lanesub { color: var(--fb-notice-fg); }
+.rl-gates__lane.is-quiet .rl-gates__name,
+.rl-gates__lane.is-quiet .rl-gates__num,
+.rl-gates__lane.is-waiting .rl-gates__name { color: var(--text-muted); font-weight: var(--fw-medium); }
+.rl-gates__lane.is-barred .rl-gates__name { color: var(--text-secondary); }
+
+/* The gate: a slim frame (posts and a lintel), its bar hanging in the middle. */
+.rl-gates__gate {
+  position: absolute;
+  left: 14px;
+  width: 26px;
+  box-sizing: border-box;
+  border: 2px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  transition: border-color 0.2s ease;
+}
+.rl-gates__gate { background: var(--surface-raised); }
+/* The gate's leaf: down, the lane is barred; lifted into the lintel, it is open. */
+.rl-gates__bar {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 1px;
+  bottom: 0;
+  border-radius: 3px 3px 0 0;
+  background: var(--border-default);
+}
+.rl-gates__scan {
+  position: absolute;
+  left: -5px;
+  right: -5px;
+  top: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px 1px var(--accent);
+}
+.rl-gates__scan.is-still { top: 50%; }
+.rl-gates__gate.is-asking { border-color: var(--accent); }
+.rl-gates__gate.is-asking .rl-gates__bar { background: var(--accent-soft); }
+.rl-gates__gate.is-open { border-color: var(--fb-positive-dot); }
+.rl-gates__gate.is-open .rl-gates__bar { background: var(--fb-positive-dot); }
+.rl-gates__gate.is-barred { border-color: var(--text-tertiary); }
+.rl-gates__gate.is-barred .rl-gates__bar { background: var(--border-strong); }
+.rl-gates__gate.is-also { border-color: var(--text-tertiary); }
+.rl-gates__gate.is-also .rl-gates__bar { background: var(--surface-inset); }
+.rl-gates__lane.is-conflict .rl-gates__gate.is-also { border-color: var(--fb-notice-dot); }
+.rl-gates__lane.is-conflict .rl-gates__gate.is-also .rl-gates__bar { background: var(--fb-notice-border); }
+.rl-gates__gate.is-quiet,
+.rl-gates__gate.is-waiting { border-color: var(--border-default); border-style: dashed; }
+.rl-gates__gate.is-waiting { border-style: solid; }
+.rl-gates__gate.is-quiet .rl-gates__bar { visibility: hidden; }
+.rl-gates__gate.is-waiting .rl-gates__bar { background: var(--surface-inset); }
+
+/* The turnstile, from above: its ring, three arms, a hub. */
+.rl-gates__stile { position: absolute; left: 13px; display: block; }
+.rl-gates__stile svg { display: block; overflow: visible; }
+.rl-gates__stilering { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1.5; transition: stroke 0.2s ease; }
+.rl-gates__stilearms { fill: none; stroke: var(--text-tertiary); stroke-width: 2.4; stroke-linecap: round; transition: stroke 0.2s ease; }
+.rl-gates__stilehub { fill: var(--text-tertiary); transition: fill 0.2s ease; }
+.rl-gates__stile.is-reading .rl-gates__stilering { stroke: var(--accent); }
+.rl-gates__stile.is-reading .rl-gates__stilearms { stroke: var(--accent); }
+.rl-gates__stile.is-reading .rl-gates__stilehub { fill: var(--accent); }
+.rl-gates__stile.is-open .rl-gates__stilering { stroke: var(--fb-positive-dot); }
+.rl-gates__stile.is-open .rl-gates__stilearms { stroke: var(--fb-positive-dot); }
+.rl-gates__stile.is-open .rl-gates__stilehub { fill: var(--fb-positive-dot); }
+.rl-gates__stile.is-locked .rl-gates__stilearms { stroke: var(--text-secondary); }
+.rl-gates__stile.is-unknown .rl-gates__stilering { stroke: var(--fb-notice-dot); }
+.rl-gates__lane.is-conflict .rl-gates__stile.is-also .rl-gates__stilering { stroke: var(--fb-notice-dot); }
+.rl-gates__stile.is-also .rl-gates__stilearms { stroke: var(--text-tertiary); }
+.rl-gates__stile:is(.is-quiet, .is-waiting, .is-off) .rl-gates__stilearms { stroke: var(--border-strong); }
+.rl-gates__stile:is(.is-quiet, .is-waiting, .is-off) .rl-gates__stilehub { fill: var(--border-strong); }
+.rl-gates__lane:is(.is-locked, .is-off) .rl-gates__name { color: var(--text-secondary); }
+.rl-gates__lane.is-open .rl-gates__name { color: var(--text-primary); }
+.rl-gates__lane.is-possible .rl-gates__lanesub { color: var(--fb-notice-fg); }
+
+/* The lights on a turnstile's frame: one per check, read one by one. */
+.rl-gates__lights {
+  position: absolute;
+  left: 52px;
+  right: 8px;
+  bottom: 7px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  overflow: visible;
+}
+.rl-gates__lightwrap { position: relative; display: inline-flex; min-width: 0; }
+.rl-gates__light {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  min-width: 0;
+  padding: 0 7px 0 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.rl-gates__light:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rl-gates__light:hover { border-color: var(--border-strong); }
+.rl-gates__light .rl-gates__mark { width: 13px; height: 13px; }
+.rl-gates__lightdot { display: inline-block; width: 7px; height: 7px; margin: 0 3px; border: 1.5px solid var(--border-strong); border-radius: 50%; box-sizing: border-box; }
+.rl-gates__light.is-working { border-color: var(--accent); background: var(--accent-soft); color: var(--text-primary); }
+.rl-gates__light.is-pass { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.rl-gates__light.is-fail { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.rl-gates__light.is-unknown { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.rl-gates__light.is-skip { color: var(--text-muted); }
+.rl-gates__light .tj-spinner, .rl-gates__light [class*='spinner'] { width: 11px; height: 11px; }
+
+/* --- Notes -------------------------------------------------------------------------- */
+
+.rl-gates__note {
+  position: absolute;
+  z-index: 9;
+  width: 300px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-high, var(--el-mid));
+  font-size: var(--fs-sm);
+  line-height: 17px;
+  color: var(--text-secondary);
+  cursor: auto;
+}
+.rl-gates__note.is-wide { width: 360px; }
+.rl-gates__notep { margin: 0; }
+.rl-gates__notep + .rl-gates__notep { margin-top: 4px; }
+.rl-gates__notep.is-lead { color: var(--text-primary); font-weight: var(--fw-medium); }
+.rl-gates__notefix { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.rl-gates__parts { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rl-gates__part { display: grid; grid-template-columns: 56px 1fr 16px; align-items: start; gap: 8px; }
+.rl-gates__cword { color: var(--text-tertiary); }
+.rl-gates__ctext { display: flex; flex-direction: column; min-width: 0; }
+.rl-gates__cfact { color: var(--text-primary); }
+.rl-gates__cvia { color: var(--text-tertiary); }
+.rl-gates__cneed { color: var(--text-tertiary); }
+.rl-gates__notethen { display: flex; gap: 8px; margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.rl-gates__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.rl-gates__mark.is-pass { color: var(--fb-positive-dot); }
+.rl-gates__mark.is-fail { color: var(--fb-negative-dot); }
+.rl-gates__mark.is-unknown { color: var(--fb-notice-dot); }
+.rl-gates__mark.is-skip { color: var(--text-muted); }
+
+/* --- The booths: one per extra factor --------------------------------------------------- */
+
+.rl-gates__booth { position: absolute; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rl-gates__boothframe {
+  position: relative;
+  display: block;
+  width: 44px;
+  box-sizing: border-box;
+  border: 2px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: var(--surface-raised);
+  transition: border-color 0.2s ease;
+}
+.rl-gates__boothicon { position: absolute; left: 50%; top: 4px; margin-left: -6px; color: var(--text-tertiary); }
+.rl-gates__booth.is-passed .rl-gates__boothframe { border-color: var(--fb-positive-dot); }
+.rl-gates__booth.is-passed .rl-gates__boothicon { color: var(--fb-positive-fg); }
+.rl-gates__boothok {
+  position: absolute;
+  right: -9px;
+  top: -9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--fb-positive-dot);
+  color: var(--surface-raised);
+}
+.rl-gates__boothname {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 15px;
+  color: var(--text-secondary);
+  text-align: center;
+  text-overflow: ellipsis;
+}
+.rl-gates__booth.is-passed .rl-gates__boothname { color: var(--text-primary); }
+
+/* --- The door: the outcome ---------------------------------------------------------- */
+
+.rl-gates__doorwrap { position: absolute; z-index: 1; display: flex; flex-direction: column; gap: 8px; }
+.rl-gates__door { position: relative; display: flex; flex-direction: column; padding: 0 14px 12px; }
+.rl-gates__door.is-waiting { border-style: dashed; border-color: var(--border-default); box-shadow: none; padding-bottom: 0; }
+.rl-gates__door.is-landed { border-width: 1.5px; box-shadow: var(--el-mid); }
+.rl-gates__door.is-positive { border-color: var(--fb-positive-dot); }
+.rl-gates__door.is-negative { border-color: var(--fb-negative-dot); }
+.rl-gates__door.is-notice { border-color: var(--fb-notice-dot); }
+.rl-gates__doorhead { display: flex; align-items: flex-start; gap: 12px; min-height: 76px; padding-top: 12px; box-sizing: border-box; }
+.rl-gates__doorframe {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 56px;
+  box-sizing: border-box;
+  border: 2px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--surface-sunken);
+  transition: border-color 0.2s ease;
+}
+.rl-gates__leaf {
+  position: absolute;
+  inset: 1px 1px 0 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-default);
+  border-radius: 4px 4px 0 0;
+  background: var(--surface-raised);
+}
+.rl-gates__door.is-positive .rl-gates__doorframe { border-color: var(--fb-positive-dot); }
+.rl-gates__door.is-negative .rl-gates__doorframe { border-color: var(--fb-negative-dot); }
+.rl-gates__door.is-negative .rl-gates__leaf { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.rl-gates__door.is-notice .rl-gates__doorframe { border-color: var(--fb-notice-dot); }
+.rl-gates__doorwords { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 4px; }
+.rl-gates__word { font-size: 18px; font-weight: var(--fw-semibold); line-height: 24px; color: var(--text-primary); }
+.rl-gates__door.is-positive .rl-gates__word { color: var(--fb-positive-fg); }
+.rl-gates__door.is-negative .rl-gates__word { color: var(--fb-negative-fg); }
+.rl-gates__door.is-notice .rl-gates__word { color: var(--fb-notice-fg); }
+.rl-gates__doorapp { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sm); line-height: 16px; color: var(--text-secondary); }
+.rl-gates__doorapp > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-gates__token.is-inside .rl-gates__tokenname { visibility: hidden; }
+.rl-gates__doorwait { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.rl-gates__expect { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+.rl-gates__doorbody { display: flex; flex-direction: column; gap: 10px; }
+.rl-gates__by { display: flex; flex-direction: column; gap: 2px; margin: 0; font-size: var(--fs-sm); }
+.rl-gates__bylabel { color: var(--text-tertiary); }
+.rl-gates__bylink {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 18px;
+  color: var(--text-link);
+  text-align: left;
+  cursor: pointer;
+}
+.rl-gates__bylink:hover span { text-decoration: underline; }
+.rl-gates__bylink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.rl-gates__bylink > svg { margin-left: 4px; vertical-align: -1px; }
+.rl-gates__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rl-gates__factors li { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); }
+.rl-gates__factor { padding: 1px 8px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--surface-sunken); font-size: var(--fs-sm); line-height: 18px; color: var(--text-primary); }
+.rl-gates__deny { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--fb-negative-bg); font-size: var(--fs-sm); line-height: 17px; color: var(--fb-negative-fg); }
+.rl-gates__ifs { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); }
+.rl-gates__ifs li { display: flex; justify-content: space-between; gap: 8px; }
+.rl-gates__if { color: var(--text-tertiary); }
+.rl-gates__ifword { color: var(--text-primary); font-weight: var(--fw-medium); }
+.rl-gates__needs { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+.rl-gates__vs { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.rl-gates__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: var(--fs-sm); }
+.rl-gates__finding, .rl-gates__seebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.rl-gates__seebtn { margin-left: auto; color: var(--text-primary); font-weight: var(--fw-medium); }
+.rl-gates__finding.is-conflict { color: var(--fb-notice-fg); }
+.rl-gates__finding:hover, .rl-gates__seebtn:hover { background: var(--surface-sunken); }
+.rl-gates__finding:focus-visible, .rl-gates__seebtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rl-gates__changed { color: var(--text-tertiary); }
+.rl-gates__below { position: relative; padding: 12px; }
+.rl-gates__flist { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); line-height: 17px; }
+.rl-gates__flist li { display: flex; flex-direction: column; gap: 2px; }
+.rl-gates__fhead { display: inline-flex; align-items: center; gap: 4px; font-weight: var(--fw-medium); color: var(--text-primary); }
+.rl-gates__flist li.is-conflict .rl-gates__fhead > svg { color: var(--fb-notice-dot); }
+.rl-gates__fline { color: var(--text-secondary); }
+
+/* --- The dock's own controls ------------------------------------------------------------ */
+.rl-gates__dock { display: inline-flex; align-items: center; }
+.rl-gates__walkbtn { display: inline-flex; align-items: center; gap: 6px; width: auto !important; padding: 0 10px; font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); white-space: nowrap; }
+.rl-gates__walkbtn.is-on { color: var(--accent); }
+
+/* Landed: the path's one tone on the gate and the turnstile it passed — never green and red on one path. */
+.rl-gates__world.is-negative .rl-gates__gate.is-open { border-color: var(--fb-negative-dot); }
+.rl-gates__world.is-negative .rl-gates__lane.is-open .rl-gates__lanesub { color: var(--fb-negative-fg); }
+.rl-gates__world.is-negative .rl-gates__stile.is-open .rl-gates__stilering,
+.rl-gates__world.is-negative .rl-gates__stile.is-open .rl-gates__stilearms { stroke: var(--fb-negative-dot); }
+.rl-gates__world.is-negative .rl-gates__stile.is-open .rl-gates__stilehub { fill: var(--fb-negative-dot); }
+.rl-gates__world.is-notice .rl-gates__gate.is-open { border-color: var(--fb-notice-dot); }
+.rl-gates__world.is-notice .rl-gates__lane.is-open .rl-gates__lanesub { color: var(--fb-notice-fg); }
+.rl-gates__world.is-notice .rl-gates__stile.is-open .rl-gates__stilering,
+.rl-gates__world.is-notice .rl-gates__stile.is-open .rl-gates__stilearms { stroke: var(--fb-notice-dot); }
+.rl-gates__world.is-notice .rl-gates__stile.is-open .rl-gates__stilehub { fill: var(--fb-notice-dot); }
+.rl-gates__finding, .rl-gates__seebtn { white-space: nowrap; }
+.rl-gates__lanetext { left: 48px; right: 10px; }
+.rl-gates__bywhere { white-space: nowrap; }
+.rl-gates__door.is-landed { padding-bottom: 0; }
+.rl-gates__doorbody > :last-child { margin-bottom: 12px; }
+.rl-gates__bywhere > svg { margin-left: 3px; vertical-align: -1px; }
+.rl-gates__factors { column-gap: 2px; }
+.rl-gates__factor { padding: 1px 6px; }

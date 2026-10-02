@@ -1,0 +1,595 @@
+/* -----------------------------------------------------------------------------
+   The run as MISSION CONTROL (MissionLayout.tsx): a dark navy control room —
+   the cinematic exception to the light look, as Jarvis's. The main display
+   across the top, the consoles below, the mission log and Ask flight on the
+   floor. Glass panels with hairlines, lamps that glow by box-shadow, never a
+   gradient fill. Text crisp: near-white first, soft grey second, 12px floor.
+   Monospace with tabular numerals for the telemetry readouts only.
+
+   Colour is meaning: the console blue (brightened for the dark) only on what
+   the engine polls now; green GO / matched / an allow; red NO-GO / a scrub;
+   amber also-GO or a hold; grey off or standing by. Brand orange never.
+
+   Nothing motion moves carries a CSS transform or transition: colour
+   transitions sit on parents, the moved children take currentColor.
+   -------------------------------------------------------------------------- */
+
+/* The two stages (stage-theme.tsx): LIGHT is the default and the console's own
+   look — white consoles, hairline bezels, the dotted ground showing through,
+   crisp tinted pills instead of glows; DARK is the dimmed control room. Every
+   rule below reads only these. */
+.rl-mission-root,
+.rl-mission-root[data-stage='light'] {
+  --mx-stage-display: none;
+  --mx-bg: transparent;
+  --mx-text: var(--text-primary);
+  --mx-text-2: var(--text-secondary);
+  --mx-text-3: var(--text-tertiary);
+  --mx-line: var(--border-default);
+  --mx-line-soft: var(--border-subtle);
+  --mx-line-strong: var(--border-strong);
+  --mx-glass: var(--surface-raised);
+  --mx-glass-2: var(--surface-raised);
+  --mx-glass-dim: var(--surface-sunken);
+  --mx-panel: var(--surface-raised);
+  --mx-floor: var(--surface-raised);
+  --mx-chip: var(--surface-raised);
+  --mx-inset-bg: var(--surface-raised);
+  --mx-hover: var(--surface-sunken);
+  --mx-hover-soft: var(--surface-sunken);
+  --mx-work: var(--accent);
+  --mx-work-fg: var(--accent);
+  --mx-work-soft: var(--accent-soft);
+  --mx-work-border: var(--accent-soft-border, var(--accent));
+  --mx-ok: var(--fb-positive-dot);
+  --mx-ok-fg: var(--fb-positive-fg);
+  --mx-ok-soft: var(--fb-positive-bg);
+  --mx-ok-border: var(--fb-positive-border);
+  --mx-ok-chip: color-mix(in srgb, var(--fb-positive-dot) 16%, var(--surface-raised));
+  --mx-bad: var(--fb-negative-dot);
+  --mx-bad-fg: var(--fb-negative-fg);
+  --mx-bad-soft: var(--fb-negative-bg);
+  --mx-bad-border: var(--fb-negative-border);
+  --mx-bad-dim: color-mix(in srgb, var(--fb-negative-dot) 55%, var(--surface-raised));
+  --mx-warn: var(--fb-notice-dot);
+  --mx-warn-fg: var(--fb-notice-fg);
+  --mx-warn-soft: var(--fb-notice-bg);
+  --mx-warn-border: var(--fb-notice-border);
+  --mx-off: var(--text-tertiary);
+  --mx-lamp-off: var(--border-strong);
+  --mx-plan: var(--border-strong);
+  --mx-logo-border: var(--border-subtle);
+  --mx-lit-ring: 0 0 0 2px var(--border-strong);
+  --mx-shadow-card: var(--el-low);
+  --mx-shadow-floor: var(--el-mid);
+  --mx-shadow-pop: var(--el-high);
+  --mx-blur: none;
+  --mx-glow: 0px;
+  --mx-glow-text: 0 0 0;
+  --mx-arc-glow: none;
+  --mx-arc-glow-lit: none;
+  --mx-ring-glow: none;
+  --mx-wire-glow: none;
+  --mx-halo-op: 0.14;
+  --mx-sweep-op: 1;
+  /* The tinted pill a lamp and its call sit in (light only). */
+  --mx-pill-pad: 0 8px 0 6px;
+  --mx-pill-off: var(--surface-sunken);
+  --mx-pill-off-border: var(--border-subtle);
+  --mx-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+}
+
+.rl-mission-root[data-stage='dark'] {
+  --mx-stage-display: block;
+  --mx-bg: #0e1828;
+  --mx-text: #eef3f8;
+  --mx-text-2: #b3c1d1;
+  --mx-text-3: #8798ab;
+  --mx-line: rgba(255, 255, 255, 0.14);
+  --mx-line-soft: rgba(255, 255, 255, 0.07);
+  --mx-line-strong: rgba(255, 255, 255, 0.28);
+  --mx-glass: rgba(22, 35, 54, 0.82);
+  --mx-glass-2: rgba(28, 44, 66, 0.92);
+  --mx-glass-dim: rgba(22, 35, 54, 0.5);
+  --mx-panel: rgba(16, 27, 43, 0.72);
+  --mx-floor: rgba(12, 21, 35, 0.93);
+  --mx-chip: rgba(22, 35, 54, 0.92);
+  --mx-inset-bg: #ffffff;
+  --mx-hover: rgba(255, 255, 255, 0.08);
+  --mx-hover-soft: rgba(255, 255, 255, 0.03);
+  --mx-work: color-mix(in srgb, var(--blue, #0d6efd) 58%, #ffffff);
+  --mx-work-fg: var(--mx-work);
+  --mx-work-soft: color-mix(in srgb, var(--blue, #0d6efd) 24%, transparent);
+  --mx-work-border: color-mix(in srgb, var(--mx-work) 70%, transparent);
+  --mx-ok: color-mix(in srgb, var(--fb-positive-dot, #198754) 55%, #8affc8);
+  --mx-ok-fg: var(--mx-ok);
+  --mx-ok-soft: rgba(60, 207, 142, 0.12);
+  --mx-ok-border: color-mix(in srgb, var(--mx-ok) 45%, transparent);
+  --mx-ok-chip: color-mix(in srgb, var(--mx-ok) 30%, transparent);
+  --mx-bad: color-mix(in srgb, var(--fb-negative-dot, #dc3545) 60%, #ffb3c0);
+  --mx-bad-fg: var(--mx-bad);
+  --mx-bad-soft: rgba(255, 107, 129, 0.12);
+  --mx-bad-border: color-mix(in srgb, var(--mx-bad) 45%, transparent);
+  --mx-bad-dim: color-mix(in srgb, var(--mx-bad) 45%, #6f8294);
+  --mx-warn: color-mix(in srgb, var(--fb-notice-dot, #e0a800) 70%, #ffe6a6);
+  --mx-warn-fg: var(--mx-warn);
+  --mx-warn-soft: rgba(245, 192, 78, 0.12);
+  --mx-warn-border: color-mix(in srgb, var(--mx-warn) 40%, transparent);
+  --mx-off: #64768a;
+  --mx-lamp-off: #3a4b5f;
+  --mx-plan: rgba(255, 255, 255, 0.22);
+  --mx-logo-border: transparent;
+  --mx-lit-ring: 0 0 0 2px rgba(255, 255, 255, 0.28), 0 0 24px rgba(255, 255, 255, 0.08);
+  --mx-shadow-card: none;
+  --mx-shadow-floor: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --mx-shadow-pop: 0 14px 40px rgba(0, 0, 0, 0.45);
+  --mx-blur: blur(6px);
+  --mx-glow: 10px;
+  --mx-glow-text: 0 0 20px;
+  --mx-arc-glow: drop-shadow(0 0 6px color-mix(in srgb, currentColor 55%, transparent));
+  --mx-arc-glow-lit: drop-shadow(0 0 10px currentColor);
+  --mx-ring-glow: drop-shadow(0 0 6px color-mix(in srgb, var(--mx-ok) 60%, transparent));
+  --mx-wire-glow: drop-shadow(0 0 4px color-mix(in srgb, currentColor 50%, transparent));
+  --mx-halo-op: 0;
+  --mx-sweep-op: 0.55;
+  --mx-pill-pad: 0;
+  --mx-pill-off: transparent;
+  --mx-pill-off-border: transparent;
+}
+
+.rl-mission-root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--mx-text);
+  font-family: inherit;
+}
+
+.rl-mission__stage {
+  position: absolute;
+  inset: 0;
+  display: var(--mx-stage-display);
+  background-color: var(--mx-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%23ffffff' stroke-opacity='0.045'/%3E%3C/svg%3E");
+  background-size: calc(32px * var(--bb-z, 1)) calc(32px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0) var(--bb-y, 0);
+  pointer-events: none;
+}
+
+/* The host's engine pill and the dock, in the room's glass. */
+.tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark']) .tj-engine__pill {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(22, 35, 54, 0.9);
+  color: #eef3f8;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark']) .tj-engine.is-done .tj-engine__text,
+.tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark']) .tj-engine.is-running .tj-engine__text { color: #dfe7ef; }
+.tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark']) .tj-engine__done { color: #b3c1d1; }
+.tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark']) .tj-engine__pill button { color: #dfe7ef; }
+.tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark']) .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.rl-mission-root[data-stage='dark'] .rl-mission .bb__dockbar { border-color: var(--mx-line); background: rgba(22, 35, 54, 0.9); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.rl-mission-root[data-stage='dark'] .rl-mission .bb__act { color: var(--mx-text-2); }
+.rl-mission-root[data-stage='dark'] .rl-mission .bb__act:hover { background: var(--mx-hover); color: var(--mx-text); }
+.rl-mission-root[data-stage='dark'] .rl-mission .bb__float__sep { background: var(--mx-line); }
+.rl-mission .rl-mission__voicebtn.is-on { color: var(--mx-text); }
+
+.rl-mission__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.rl-mission__decode { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.rl-mission__decode-ghost { visibility: hidden; }
+.rl-mission__decode-live { position: absolute; inset: 0; overflow: hidden; white-space: inherit; }
+
+.rl-mission-root :focus-visible { outline: 2px solid var(--mx-work); outline-offset: 2px; border-radius: 6px; }
+.rl-mission-root button { font: inherit; color: inherit; }
+
+/* --- The world ------------------------------------------------------------------------------ */
+
+.rl-mission__world { position: relative; display: flex; flex-direction: column; font-size: 13px; line-height: 1.35; color: var(--mx-text); }
+.rl-mission__kicker { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mx-text-3); }
+
+/* --- The main display ------------------------------------------------------------------------ */
+
+.rl-mission__display { position: relative; flex: none; border-radius: 10px; background: var(--mx-panel); box-shadow: var(--mx-shadow-card); }
+.rl-mission__frame { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.rl-mission__frame rect { fill: none; stroke: var(--mx-line); stroke-width: 1; }
+.rl-mission__dtag { position: absolute; right: 14px; top: 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mx-text-3); }
+
+.rl-mission__arc { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.rl-mission__arcplan { fill: none; stroke: var(--mx-plan); stroke-width: 1.5; stroke-dasharray: 2 7; stroke-linecap: round; }
+.rl-mission__arcflown { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; filter: var(--mx-arc-glow); }
+.rl-mission__arcflown.is-dashed { stroke-dasharray: 7 6; }
+.rl-mission__arcahead { fill: none; stroke: var(--mx-warn); stroke-opacity: 0.55; stroke-width: 2; stroke-dasharray: 3 7; stroke-linecap: round; }
+.rl-mission__arc.is-working { color: var(--mx-work-fg); }
+.rl-mission__arc.is-positive { color: var(--mx-ok-fg); }
+.rl-mission__arc.is-negative { color: var(--mx-bad-fg); }
+.rl-mission__arc.is-notice { color: var(--mx-warn-fg); }
+.rl-mission__arc.is-neutral { color: var(--mx-off); }
+.rl-mission__arc.is-lit .rl-mission__arcflown { stroke-width: 3.5; filter: var(--mx-arc-glow-lit); }
+.rl-mission__archalo { fill: none; stroke: currentColor; stroke-width: 9; stroke-linecap: round; stroke-opacity: var(--mx-halo-op); }
+.rl-mission__arc.is-lit .rl-mission__archalo { stroke-width: 13; }
+.rl-mission__padmark { fill: var(--mx-glass); stroke: var(--mx-line-strong); stroke-width: 1.5; }
+.rl-mission__orbitring { fill: none; stroke: var(--mx-line-strong); stroke-width: 1.2; stroke-dasharray: 3 4; }
+.rl-mission__orbitring.is-in { stroke: var(--mx-ok); stroke-dasharray: none; stroke-width: 2; filter: var(--mx-ring-glow); }
+.rl-mission__orbitping { fill: none; stroke: var(--mx-ok); stroke-width: 1.5; }
+.rl-mission__craft { color: inherit; }
+.rl-mission__craft path { fill: currentColor; }
+.rl-mission__crafthalo { fill: currentColor; fill-opacity: 0.16; }
+.rl-mission__scrubmark circle { fill: var(--mx-bad-soft); stroke: var(--mx-bad); stroke-width: 1.5; }
+.rl-mission__scrubmark path { stroke: var(--mx-bad); stroke-width: 2; stroke-linecap: round; }
+
+.rl-mission__routebtn {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 140px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: var(--mx-text-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.rl-mission__routebtn:hover, .rl-mission__routebtn.is-on { border-color: var(--mx-line); background: var(--mx-glass); color: var(--mx-text); }
+
+/* The launch pad and the orbit. */
+.rl-mission__pad { position: absolute; left: 18px; top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.rl-mission__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 -6px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.rl-mission__who:hover { border-color: var(--mx-line); background: var(--mx-hover-soft); }
+.rl-mission__who.is-lit { border-color: var(--mx-line-strong); box-shadow: var(--mx-lit-ring); }
+.rl-mission__face {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid var(--mx-line-strong);
+  border-radius: 50%;
+  background: var(--mx-glass-2);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.rl-mission-root.is-tone-positive .rl-mission__face { border-color: var(--mx-ok); }
+.rl-mission-root.is-tone-negative .rl-mission__face { border-color: var(--mx-bad); }
+.rl-mission-root.is-tone-notice .rl-mission__face { border-color: var(--mx-warn); }
+.rl-mission__whotext { display: flex; flex-direction: column; min-width: 0; }
+.rl-mission__name { overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.rl-mission__groups { font-size: 12px; color: var(--mx-text-2); }
+.rl-mission__padfacts { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.rl-mission__padfact {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  margin: 0 -6px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-mission__padfact:hover { border-color: var(--mx-line); }
+.rl-mission__pflabel { font-size: 12px; color: var(--mx-text-3); }
+.rl-mission__pfvalue { display: -webkit-box; overflow: hidden; font-size: 12.5px; color: var(--mx-text); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.rl-mission__padfact.is-fail .rl-mission__pfvalue { color: var(--mx-bad-fg); }
+.rl-mission__padfact.is-unknown .rl-mission__pfvalue, .rl-mission__padfact.is-needed .rl-mission__pfvalue { color: var(--mx-warn-fg); }
+
+.rl-mission__orbit { position: absolute; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rl-mission__orbitlogo { display: grid; flex: none; place-items: center; box-sizing: border-box; width: 36px; height: 36px; border: 1px solid var(--mx-logo-border); border-radius: 9px; background: #ffffff; }
+.rl-mission__orbittext { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.rl-mission__appname { overflow: hidden; max-width: 100%; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The clock, then the call. */
+.rl-mission__callslot { position: absolute; top: 64px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.rl-mission__clock { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 8px; }
+.rl-mission__clockval { font-family: var(--mx-mono); font-size: 34px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; color: var(--mx-text); }
+.rl-mission-root.is-running .rl-mission__clockval { color: var(--mx-work-fg); text-shadow: var(--mx-glow-text) color-mix(in srgb, var(--mx-work) 45%, transparent); }
+.rl-mission__clocknote { font-size: 12px; color: var(--mx-text-3); }
+.rl-mission__verdict { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; border-radius: 10px; }
+.rl-mission__callword { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 4px 12px; margin: 0; font-size: 32px; font-weight: 700; line-height: 1.1; letter-spacing: 0.005em; }
+.rl-mission__verdict.is-positive .rl-mission__callword { color: var(--mx-ok-fg); text-shadow: var(--mx-glow-text) color-mix(in srgb, var(--mx-ok) 35%, transparent); }
+.rl-mission__verdict.is-negative .rl-mission__callword { color: var(--mx-bad-fg); text-shadow: var(--mx-glow-text) color-mix(in srgb, var(--mx-bad) 35%, transparent); }
+.rl-mission__verdict.is-notice .rl-mission__callword { color: var(--mx-warn-fg); }
+.rl-mission__verdict.is-neutral .rl-mission__callword { color: var(--mx-text-2); }
+.rl-mission__callsub { font-size: 16px; font-weight: 600; color: var(--mx-text); text-shadow: none; }
+.rl-mission__seq { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rl-mission__seqstep { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 4px; border: 1px solid var(--mx-ok-border); border-radius: 13px; background: var(--mx-ok-soft); font-size: 13px; }
+.rl-mission__seqstep + .rl-mission__seqstep::before { content: ''; display: inline-block; width: 10px; height: 1px; margin-left: -19px; margin-right: 8px; background: var(--mx-line-strong); }
+.rl-mission__seqn { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--mx-ok-chip); color: var(--mx-ok-fg); font-family: var(--mx-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rl-mission__deny { max-width: 520px; margin: 0; overflow: hidden; font-size: 13px; color: var(--mx-text); text-overflow: ellipsis; white-space: nowrap; }
+.rl-mission__ifs { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.rl-mission__ifs li { display: flex; justify-content: center; gap: 10px; }
+.rl-mission__ifs li > span:first-child { color: var(--mx-text-2); }
+.rl-mission__ifword.is-positive { color: var(--mx-ok-fg); }
+.rl-mission__ifword.is-negative { color: var(--mx-bad-fg); }
+.rl-mission__callfoot { display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 100%; }
+.rl-mission__by {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--mx-line);
+  border-radius: 8px;
+  background: var(--mx-glass);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.rl-mission__by:hover { border-color: var(--mx-line-strong); }
+.rl-mission__bykick { flex: none; font-size: 12px; color: var(--mx-text-3); }
+.rl-mission__bytext { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.rl-mission__byrule { font-weight: 400; color: var(--mx-text-2); }
+.rl-mission__crewbtn { flex: none; height: 28px; padding: 0 11px; border: 1px solid var(--mx-line); border-radius: 8px; background: none; font-size: 13px; cursor: pointer; }
+.rl-mission__crewbtn:hover, .rl-mission__crewbtn.is-open { border-color: var(--mx-line-strong); background: var(--mx-glass); }
+.rl-mission__finding { max-width: 100%; padding: 3px 10px; border: 1px solid transparent; border-radius: 12px; background: none; font-size: 12.5px; color: var(--mx-text-2); cursor: pointer; }
+.rl-mission__finding.is-notice { border-color: var(--mx-warn-border); background: var(--mx-warn-soft); color: var(--mx-warn-fg); }
+.rl-mission__finding:hover { border-color: var(--mx-line-strong); }
+
+/* --- The consoles ---------------------------------------------------------------------------- */
+
+.rl-mission__rowtag { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 7px; font-size: 13px; font-weight: 600; color: var(--mx-text); }
+.rl-mission__rowhint { font-size: 12px; font-weight: 400; color: var(--mx-text-3); }
+.rl-mission__stations { display: flex; flex-wrap: wrap; gap: 10px; }
+.rl-mission__station { position: relative; flex: 1 1 0; min-width: 170px; overflow: hidden; border: 1px solid var(--mx-line); border-radius: 9px; background: var(--mx-glass); box-shadow: var(--mx-shadow-card); transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease; }
+.rl-mission__sbtn, .rl-mission__rhead { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 9px 12px 10px; border: none; background: none; text-align: left; cursor: pointer; }
+.rl-mission__plate { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.rl-mission__snum { display: inline-grid; flex: none; place-items: center; width: 20px; height: 20px; border: 1px solid var(--mx-line-strong); border-radius: 5px; font-family: var(--mx-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--mx-text-2); }
+.rl-mission__sname { display: -webkit-box; overflow: hidden; font-size: 13.5px; font-weight: 600; line-height: 20px; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+.rl-mission__readout { display: flex; align-items: center; gap: 7px; min-width: 0; height: 18px; padding-left: 28px; }
+.rl-mission__lamp { position: relative; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--mx-lamp-off); color: var(--mx-lamp-off); transition: background-color 0.2s ease, box-shadow 0.2s ease; }
+.rl-mission__lamprecall { position: absolute; inset: -3px; border-radius: 50%; background: var(--mx-work); box-shadow: 0 0 var(--mx-glow) var(--mx-work); }
+.rl-mission__call { flex: none; font-family: var(--mx-mono); font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--mx-text-3); }
+.rl-mission__rwords { overflow: hidden; font-size: 12.5px; color: var(--mx-text-2); text-overflow: ellipsis; white-space: nowrap; }
+.rl-mission__sweep { position: absolute; top: 0; bottom: 0; width: 30%; background: var(--mx-work-soft); opacity: var(--mx-sweep-op); pointer-events: none; }
+
+/* Lamps and calls by state. */
+.is-polling > .rl-mission__lamp, .is-polling .rl-mission__lamp { background: var(--mx-work); box-shadow: 0 0 var(--mx-glow) var(--mx-work); }
+.rl-mission__station.is-polling, .rl-mission__rstation.is-polling { border-color: color-mix(in srgb, var(--mx-work) 70%, transparent); box-shadow: 0 0 0 3px var(--mx-work-soft); }
+.is-polling .rl-mission__call { color: var(--mx-work-fg); }
+.is-go .rl-mission__lamp { background: var(--mx-ok); box-shadow: 0 0 var(--mx-glow) color-mix(in srgb, var(--mx-ok) 70%, transparent); }
+.is-go .rl-mission__call { color: var(--mx-ok-fg); }
+.rl-mission__station.is-go, .rl-mission__rstation.is-go { border-color: color-mix(in srgb, var(--mx-ok) 60%, transparent); background: color-mix(in srgb, var(--mx-ok) 7%, var(--mx-glass)); }
+.is-scrub .rl-mission__lamp { background: var(--mx-bad); box-shadow: 0 0 var(--mx-glow) color-mix(in srgb, var(--mx-bad) 70%, transparent); }
+.is-scrub .rl-mission__call { color: var(--mx-bad-fg); }
+.rl-mission__rstation.is-scrub { border-color: color-mix(in srgb, var(--mx-bad) 60%, transparent); background: color-mix(in srgb, var(--mx-bad) 7%, var(--mx-glass)); }
+.is-nogo .rl-mission__lamp { background: var(--mx-bad-dim); }
+.is-nogo .rl-mission__call { color: var(--mx-bad-fg); }
+.rl-mission__station.is-nogo .rl-mission__sname { color: var(--mx-text-2); }
+.is-also .rl-mission__lamp, .is-hold .rl-mission__lamp, .is-ifnot .rl-mission__lamp { background: var(--mx-warn); box-shadow: 0 0 var(--mx-glow) color-mix(in srgb, var(--mx-warn) 55%, transparent); }
+.is-also .rl-mission__call, .is-hold .rl-mission__call, .is-ifnot .rl-mission__call { color: var(--mx-warn-fg); }
+.rl-mission__station.is-also.is-conflict { border-color: color-mix(in srgb, var(--mx-warn) 55%, transparent); }
+.rl-mission__rstation.is-hold, .rl-mission__rstation.is-ifnot { border-color: color-mix(in srgb, var(--mx-warn) 45%, transparent); }
+.is-off .rl-mission__call { color: var(--mx-off); }
+.rl-mission__station.is-standby, .rl-mission__station.is-unpolled, .rl-mission__station.is-off { background: var(--mx-glass-dim); box-shadow: none; }
+.rl-mission__station.is-standby .rl-mission__sname, .rl-mission__station.is-unpolled .rl-mission__sname, .rl-mission__station.is-off .rl-mission__sname { color: var(--mx-text-2); }
+.rl-mission__station.is-lit, .rl-mission__rstation.is-lit { box-shadow: var(--mx-lit-ring); }
+
+.rl-mission__rulezone { position: relative; flex: none; }
+.rl-mission__rstations { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+.rl-mission__rstation { position: relative; display: flex; flex: 1 1 0; flex-direction: column; min-width: 230px; overflow: hidden; box-sizing: border-box; border: 1px solid var(--mx-line); border-radius: 9px; background: var(--mx-glass); box-shadow: var(--mx-shadow-card); transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease; }
+.rl-mission__rstation.is-last { flex: 0 0 196px; min-width: 196px; }
+.rl-mission__rstation.is-unpolled, .rl-mission__rstation.is-standby { background: var(--mx-glass-dim); box-shadow: none; }
+.rl-mission__rstation.is-unpolled .rl-mission__sname, .rl-mission__rstation.is-standby .rl-mission__sname { color: var(--mx-text-2); }
+.rl-mission__rstation.is-nogo { border-color: color-mix(in srgb, var(--mx-bad) 32%, var(--mx-line)); }
+.rl-mission__sname { min-width: 0; }
+.rl-mission__rstation .rl-mission__sname { -webkit-line-clamp: 2; }
+
+.rl-mission__tele { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0 12px 10px; list-style: none; }
+.rl-mission__folded { padding: 2px 0 4px 28px; font-size: 12px; color: var(--mx-text-3); }
+.rl-mission__tline { display: grid; grid-template-columns: 54px minmax(0, 1fr) 18px auto; align-items: start; gap: 8px; min-height: 36px; padding: 3px 0 3px; border-top: 1px solid var(--mx-line-soft); }
+.rl-mission__tword { padding-top: 1px; font-family: var(--mx-mono); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--mx-text-3); }
+.rl-mission__tbody { display: flex; flex-direction: column; min-width: 0; }
+.rl-mission__tfact { overflow: hidden; font-size: 13px; color: var(--mx-text); text-overflow: ellipsis; white-space: nowrap; }
+.rl-mission__tneed { overflow: hidden; font-size: 12px; line-height: 1.2; color: var(--mx-text-3); text-overflow: ellipsis; white-space: nowrap; }
+.rl-mission__tlead { position: relative; align-self: start; height: 0; margin-top: 9px; border-top: 2px dotted var(--mx-line-strong); }
+.rl-mission__tleadfill { position: absolute; left: 0; top: -1px; height: 3px; background: var(--mx-work); }
+.rl-mission__tcall { padding-top: 1px; font-family: var(--mx-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.rl-mission__tline.is-pass .rl-mission__tcall { color: var(--mx-ok-fg); }
+.rl-mission__tline.is-fail .rl-mission__tcall { color: var(--mx-bad-fg); }
+.rl-mission__tline.is-fail .rl-mission__tfact { color: var(--mx-bad-fg); }
+.rl-mission__tline.is-unknown .rl-mission__tcall, .rl-mission__tline.is-unknown .rl-mission__tfact { color: var(--mx-warn-fg); }
+.rl-mission__tline.is-working .rl-mission__tcall { color: var(--mx-work-fg); }
+.rl-mission__sidle { margin: 0; padding: 0 12px 10px 40px; font-size: 12px; color: var(--mx-text-3); }
+
+/* The host's fade under the engine pill, in the room's navy (a fade of the ground itself, as Jarvis's). */
+.sit__stage .tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark'])::after,
+.tj-canvas.is-mission:has(.rl-mission-root[data-stage='dark'])::after { background: linear-gradient(to bottom, #0e1828 40%, rgba(14, 24, 40, 0)); }
+
+.rl-mission__rowtag.is-dim { color: var(--mx-text-3); font-weight: 500; }
+
+/* --- The inspector, the crew view --------------------------------------------------------------- */
+
+.rl-mission__peek {
+  position: absolute;
+  z-index: 6;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--mx-line-strong);
+  border-radius: 10px;
+  background: var(--mx-glass-2);
+  box-shadow: var(--mx-shadow-pop);
+  backdrop-filter: var(--mx-blur);
+}
+.rl-mission__peeklines { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rl-mission__peeklines li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--mx-text); }
+.rl-mission__peeklines li.is-lead { padding-right: 22px; font-weight: 600; }
+.rl-mission__peeklines li.is-quiet { color: var(--mx-text-2); font-size: 12.5px; }
+.rl-mission__peeklines li.is-indent { padding-left: 14px; font-size: 12.5px; }
+.rl-mission__peeklines li.is-positive .rl-mission__peektext { color: var(--mx-ok-fg); }
+.rl-mission__peeklines li.is-negative .rl-mission__peektext { color: var(--mx-bad-fg); }
+.rl-mission__peeklines li.is-notice .rl-mission__peektext { color: var(--mx-warn-fg); }
+.rl-mission__peeklines li.is-lead .rl-mission__peektext { color: var(--mx-text); }
+.rl-mission__peektext { display: flex; flex-direction: column; min-width: 0; }
+.rl-mission__peeksub { font-size: 12px; font-weight: 400; color: var(--mx-text-3); }
+.rl-mission__peekcall { flex: none; font-family: var(--mx-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--mx-text-3); }
+.rl-mission__peekcall.is-pass, .rl-mission__peekcall.is-positive { color: var(--mx-ok-fg); }
+.rl-mission__peekcall.is-fail, .rl-mission__peekcall.is-negative { color: var(--mx-bad-fg); }
+.rl-mission__peekcall.is-unknown, .rl-mission__peekcall.is-notice { color: var(--mx-warn-fg); }
+.rl-mission__peekx { position: absolute; top: 7px; right: 7px; }
+.rl-mission__x { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 6px; background: none; color: var(--mx-text-2); cursor: pointer; }
+.rl-mission__x:hover { background: var(--mx-hover); color: var(--mx-text); }
+
+.rl-mission__mark { display: inline-grid; flex: none; place-items: center; width: 16px; height: 16px; }
+.rl-mission__mark.is-pass { color: var(--mx-ok-fg); }
+.rl-mission__mark.is-fail { color: var(--mx-bad-fg); }
+.rl-mission__mark.is-unknown { color: var(--mx-warn-fg); }
+
+.rl-mission__crew {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  width: 420px;
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--mx-line-strong);
+  border-radius: 10px;
+  background: var(--mx-glass-2);
+  box-shadow: var(--mx-shadow-pop);
+}
+.rl-mission__crewhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rl-mission__crewinset { overflow: hidden; border-radius: 8px; background: var(--mx-inset-bg); color: var(--text-primary, #1f2937); }
+
+/* --- The floor ------------------------------------------------------------------------------------ */
+
+.rl-mission__deck {
+  position: absolute;
+  left: 50%;
+  bottom: 62px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(1180px, calc(100% - 32px));
+  translate: -50% 0;
+  pointer-events: none;
+}
+.rl-mission__deck > * { pointer-events: auto; }
+
+.rl-mission__log { display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: 100%; height: 32px; padding: 0 6px 0 12px; border: 1px solid var(--mx-line); border-radius: 8px; background: var(--mx-floor); box-shadow: var(--mx-shadow-floor); }
+.rl-mission__logtag { flex: none; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mx-text-3); }
+.rl-mission__logstrip { position: relative; flex: 1; min-width: 0; height: 100%; overflow: hidden; }
+.rl-mission__logrow { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 4px; height: 100%; white-space: nowrap; }
+.rl-mission__logline { display: inline-flex; flex: none; align-items: baseline; gap: 7px; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: none; font-size: 12.5px; line-height: 22px; cursor: pointer; }
+.rl-mission__logline:hover { border-color: var(--mx-line); }
+.rl-mission__met { font-family: var(--mx-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--mx-text-3); }
+.rl-mission__logline.is-positive .rl-mission__logtext { color: var(--mx-ok-fg); }
+.rl-mission__logline.is-negative .rl-mission__logtext { color: var(--mx-bad-fg); }
+.rl-mission__logline.is-notice .rl-mission__logtext { color: var(--mx-warn-fg); }
+.rl-mission__logline.is-working .rl-mission__logtext { color: var(--mx-work-fg); }
+.rl-mission__logline.is-neutral .rl-mission__logtext { color: var(--mx-text-2); }
+.rl-mission__logline.is-recall { border-color: var(--mx-line); }
+
+.rl-mission__askrow { display: flex; align-items: center; gap: 10px; width: 100%; }
+.rl-mission__ask { display: flex; flex: 0 0 320px; align-items: center; gap: 6px; box-sizing: border-box; height: 36px; padding: 0 4px 0 12px; border: 1px solid var(--mx-line-strong); border-radius: 18px; background: var(--mx-floor); box-shadow: var(--mx-shadow-floor); }
+.rl-mission__ask:focus-within { border-color: var(--mx-work); }
+.rl-mission__asktag { flex: none; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--mx-text-2); }
+.rl-mission__input { flex: 1; min-width: 0; height: 100%; padding: 0 4px; border: none; background: none; color: var(--mx-text); font: inherit; font-size: 13px; outline: none; }
+.rl-mission__input::placeholder { color: var(--mx-text-3); }
+.rl-mission-root .rl-mission__input:focus-visible { outline: none; }
+.rl-mission__send { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: none; border-radius: 14px; background: none; color: var(--mx-text-2); cursor: pointer; }
+.rl-mission__send:disabled { opacity: 0.4; cursor: default; }
+.rl-mission__chips { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.rl-mission__chip { height: 28px; padding: 0 11px; border: 1px solid var(--mx-line); border-radius: 14px; background: var(--mx-chip); box-shadow: var(--mx-shadow-floor); font-size: 12.5px; white-space: nowrap; cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease; }
+.rl-mission__chip:hover { border-color: var(--mx-line-strong); background: var(--mx-glass-2); }
+.rl-mission__chip.is-on { border-color: var(--mx-text-2); background: var(--mx-glass-2); }
+
+.rl-mission__answer { box-sizing: border-box; width: min(640px, 100%); padding: 10px 14px 12px; border: 1px solid var(--mx-line-strong); border-radius: 10px; background: var(--mx-glass-2); box-shadow: var(--mx-shadow-pop); }
+.rl-mission__answer.is-positive { border-color: color-mix(in srgb, var(--mx-ok) 50%, transparent); }
+.rl-mission__answer.is-negative { border-color: color-mix(in srgb, var(--mx-bad) 50%, transparent); }
+.rl-mission__answer.is-notice { border-color: color-mix(in srgb, var(--mx-warn) 50%, transparent); }
+.rl-mission__answerhead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.rl-mission__answerkicker { flex: none; font-family: var(--mx-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mx-text-3); }
+.rl-mission__answertitle { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+.rl-mission__answerlines { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.rl-mission__answerlines li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; font-size: 13px; }
+.rl-mission__answerlines li.is-positive .rl-mission__peektext { color: var(--mx-ok-fg); }
+.rl-mission__answerlines li.is-negative .rl-mission__peektext { color: var(--mx-bad-fg); }
+.rl-mission__answerlines li.is-notice .rl-mission__peektext { color: var(--mx-warn-fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-mission__station, .rl-mission__rstation, .rl-mission__lamp, .rl-mission__who, .rl-mission__chip, .rl-mission__routebtn { transition: none; }
+}
+.rl-mission__typed { position: relative; display: inline-block; }
+.rl-mission__typed-live { position: absolute; left: 0; top: 0; white-space: nowrap; }
+.rl-mission__wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.rl-mission__wires path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; filter: var(--mx-wire-glow); }
+.rl-mission__wires.is-working { color: var(--mx-work-fg); }
+.rl-mission__wires.is-positive { color: var(--mx-ok-fg); }
+.rl-mission__wires.is-negative { color: var(--mx-bad-fg); }
+.rl-mission__wires.is-notice { color: var(--mx-warn-fg); }
+.rl-mission__wires.is-neutral { color: var(--mx-off); }
+.rl-mission__seqrow { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.rl-mission__seqrow .rl-mission__crewbtn { height: 26px; }
+
+/* --- The lamp and its call, one pill: tinted by the call on the light stage, bare in the dark -------- */
+.rl-mission__lampill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 20px;
+  padding: var(--mx-pill-pad);
+  border: 1px solid var(--mx-pill-border, var(--mx-pill-off-border));
+  border-radius: 10px;
+  background: var(--mx-pill-bg, var(--mx-pill-off));
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.rl-mission-root:not([data-stage='dark']) :is(.is-polling) > .rl-mission__sbtn .rl-mission__lampill,
+.rl-mission-root:not([data-stage='dark']) :is(.is-polling) > .rl-mission__rhead .rl-mission__lampill { --mx-pill-bg: var(--mx-work-soft); --mx-pill-border: var(--mx-work-border); }
+.rl-mission-root:not([data-stage='dark']) .is-go .rl-mission__lampill { --mx-pill-bg: var(--mx-ok-soft); --mx-pill-border: var(--mx-ok-border); }
+.rl-mission-root:not([data-stage='dark']) :is(.is-scrub, .is-nogo) .rl-mission__lampill { --mx-pill-bg: var(--mx-bad-soft); --mx-pill-border: var(--mx-bad-border); }
+.rl-mission-root:not([data-stage='dark']) :is(.is-also, .is-hold, .is-ifnot) .rl-mission__lampill { --mx-pill-bg: var(--mx-warn-soft); --mx-pill-border: var(--mx-warn-border); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__readout { padding-left: 26px; height: 20px; }
+
+/* Light: the room's surfaces as the console's — no glass, no glow. */
+.rl-mission-root:not([data-stage='dark']) .rl-mission__station.is-polling,
+.rl-mission-root:not([data-stage='dark']) .rl-mission__rstation.is-polling { border-color: var(--mx-work); box-shadow: 0 0 0 3px var(--mx-work-soft); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__station.is-go,
+.rl-mission-root:not([data-stage='dark']) .rl-mission__rstation.is-go { border-color: var(--mx-ok); background: var(--mx-glass); box-shadow: 0 0 0 1px var(--mx-ok), var(--el-mid); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__rstation.is-scrub { border-color: var(--mx-bad); background: var(--mx-glass); box-shadow: 0 0 0 1px var(--mx-bad), var(--el-mid); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__rstation.is-nogo { border-color: var(--mx-line); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__display.is-landed.is-positive .rl-mission__frame rect { stroke: var(--mx-ok-border); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__display.is-landed.is-negative .rl-mission__frame rect { stroke: var(--mx-bad-border); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__display.is-landed.is-notice .rl-mission__frame rect { stroke: var(--mx-warn-border); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__face { background: var(--surface-sunken); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__tlead { border-top-color: var(--border-default); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__routebtn:hover,
+.rl-mission-root:not([data-stage='dark']) .rl-mission__routebtn.is-on { background: var(--surface-raised); box-shadow: var(--el-low); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__chip.is-on { border-color: var(--border-strong); background: var(--surface-sunken); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__by:hover { background: var(--surface-sunken); }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__rowtag:not(.is-dim) { color: var(--text-primary); }
+
+/* The poll's sweep passes UNDER a station's words (they sit above it), so it can be a clear band on white. */
+.rl-mission__sbtn, .rl-mission__rhead, .rl-mission__tele, .rl-mission__sidle { position: relative; z-index: 1; }
+.rl-mission__sweep { z-index: 0; }
+
+/* An answer floats above the floor at one corner (MissionLayout `answerSide`); the floor's own height, and so the framing, never change for it. */
+.rl-mission__answerdock { position: absolute; bottom: calc(100% + 8px); width: min(520px, 100%); }
+.rl-mission__answerdock.is-crew { width: min(420px, 100%); }
+.rl-mission__answerdock.is-left { left: 0; }
+.rl-mission__answerdock.is-right { right: 0; }
+.rl-mission__answerdock .rl-mission__answer { width: 100%; max-height: min(320px, 46vh); overflow: auto; }
+.rl-mission-root:not([data-stage='dark']) .rl-mission__display { box-shadow: var(--el-mid); }
+/* The crew view lives on the floor's right corner (as an answer does), never on the room. */
+.rl-mission__answerdock .rl-mission__crew { position: relative; right: auto; width: 100%; max-height: min(420px, 60vh); overflow: auto; }

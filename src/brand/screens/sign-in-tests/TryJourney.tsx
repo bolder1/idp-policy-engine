@@ -1,5 +1,5 @@
 import { animate, motion, useReducedMotion, type AnimationPlaybackControls } from 'motion/react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type LazyExoticComponent, type PointerEvent } from 'react'
 import { ChevronsDownUp, ChevronsUpDown, Maximize, ZoomIn, ZoomOut } from 'lucide-react'
 
 import type { AccessDecision, Policy } from '../../data'
@@ -19,9 +19,36 @@ import { engineRun } from './engine-run'
 import { Answer, EngineJourney, EngineLine } from './EngineJourney'
 import { HowItWorks } from './HowItWorks'
 import { heroFinding, type FoldAsk, type FoldMode } from './journey'
+import type { RunLayoutProps } from './layouts/types'
+import { OWN_EDIT, type RunLayoutId } from './run-layout'
 import { SignInNode } from './SignInCard'
 import type { TryPage } from './sign-in-card'
 import { useEngineRun } from './use-engine-run'
+
+/* The run's other layouts (run-layout.ts), each loaded only once it is
+   chosen — so a layout being drawn never holds up the column, nor another. */
+const LAYOUTS: Record<Exclude<RunLayoutId, 'column'>, LazyExoticComponent<ComponentType<RunLayoutProps>>> = {
+  line: lazy(() => import('./layouts/LineLayout')),
+  tree: lazy(() => import('./layouts/TreeLayout')),
+  gates: lazy(() => import('./layouts/GatesLayout')),
+  marble: lazy(() => import('./layouts/MarbleLayout')),
+  chat: lazy(() => import('./layouts/ChatLayout')),
+  deck: lazy(() => import('./layouts/DeckLayout')),
+  depth: lazy(() => import('./layouts/DepthLayout')),
+  jarvis: lazy(() => import('./layouts/JarvisLayout')),
+  jarvis2: lazy(() => import('./layouts/Jarvis2Layout')),
+  mission: lazy(() => import('./layouts/MissionLayout')),
+  synapse: lazy(() => import('./layouts/SynapseLayout')),
+  pulse: lazy(() => import('./layouts/PulseLayout')),
+  focus: lazy(() => import('./layouts/FocusLayout')),
+  brief: lazy(() => import('./layouts/BriefLayout')),
+  circuit: lazy(() => import('./layouts/CircuitLayout')),
+  stream: lazy(() => import('./layouts/StreamLayout')),
+  bento: lazy(() => import('./layouts/BentoLayout')),
+  directions: lazy(() => import('./layouts/DirectionsLayout')),
+  explainer: lazy(() => import('./layouts/ExplainerLayout')),
+  pass: lazy(() => import('./layouts/PassLayout')),
+}
 
 /* -----------------------------------------------------------------------------
    The canvas of the Sign-in tests page (TESTING-V4 §14.3): an ENGINE RUN
@@ -188,6 +215,15 @@ export interface TryJourneyProps {
      stands beside a run that is over — the why, the attempts — as every
      other run does (SignInTests.tsx `start`). */
   onReplay?: () => void
+  /* Edit sign-in on the run's line, in every layout (owner, 2 Oct 2026:
+     "I can't see an option to find the edit in some canvases"): the form's
+     panel, and whether it is open; `unrun`, the form has changes Run has not
+     checked yet. Absent, no button. */
+  onEdit?: () => void
+  editing?: boolean
+  unrun?: boolean
+  /** Which layout the run is drawn in (run-layout.ts). Absent, the column. */
+  layout?: RunLayoutId
 }
 
 export function TryJourney({
@@ -212,6 +248,10 @@ export function TryJourney({
   breakIn = null,
   onReviewBreakIn,
   onReplay,
+  onEdit,
+  editing = false,
+  unrun = false,
+  layout = 'column',
 }: TryJourneyProps) {
   const store = useBrand()
   const { users, groups, apps, zones, fingerprints, policies, methods, defaultMethodId } = store
@@ -620,9 +660,11 @@ export function TryJourney({
     zoomLatest.current = (z, at) => zoomTo(z, at, true)
     stopLatest.current = stopView
   })
+  /* Another layout has its own ground (layouts/RunStage.tsx), which zooms itself. */
+  const asColumn = layout === 'column'
   useEffect(() => {
     const el = canvasRef.current
-    if (!el || !journey) return
+    if (!el || !journey || !asColumn) return
     const onWheel = (e: WheelEvent) => {
       stopLatest.current()
       if (!(e.ctrlKey || e.metaKey)) return
@@ -631,7 +673,7 @@ export function TryJourney({
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [journey])
+  }, [journey, asColumn])
 
   /* A drag on the ground pans the canvas, as the builder's does: a mouse's,
      from anywhere that is not a card or a control. Touch scrolls natively. */
@@ -676,7 +718,7 @@ export function TryJourney({
         <div ref={canvasRef} className="tj-canvas">
           <div className="tj-scroll">
             <div className="tj-empty">
-              <HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} open={panel} primary={!policy} />
+              <HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} open={panel} primary={!policy} doorWhileOpen={!!policy} />
             </div>
           </div>
         </div>
@@ -685,6 +727,70 @@ export function TryJourney({
   }
 
   // --- The journey ---
+
+  const startNode = <SignInNode form={form} rows={rows} asGroup={asGroup} onPress={onPressNode} />
+  const answerNode = (
+    <Answer view={shown.outcome.view} columns={columns} changed={running ? null : changed} reduced={reduced} screens={screens} appId={form.appId} expected={expected} weaker={weaker} />
+  )
+  const engineLine = (
+    <EngineLine
+      text={clock.text}
+      running={running}
+      notice={running && shown.steps[s]?.notice === true}
+      arrive={moving}
+      smooth={!reduced && !jumped}
+      progress={clock.progress}
+      inert={false}
+      onSkip={skip}
+      onReplay={replay}
+      skipRef={skipRef}
+      replayRef={replayRef}
+      edit={onEdit ? { onPress: OWN_EDIT.includes(layout) ? undefined : onEdit, open: editing, unrun } : undefined}
+    />
+  )
+
+  /* Another layout of the same run (run-layout.ts): the engine line over it,
+     as over the column; the layout lays the run out on its own ground. */
+  if (!asColumn) {
+    const Layout = LAYOUTS[layout as Exclude<RunLayoutId, 'column'>]
+    return (
+      <div ref={root} className="tj">
+        <div ref={canvasRef} className={`tj-canvas is-layout is-${layout}`} tabIndex={-1} aria-label="Sign-in run">
+          {engineLine}
+          <Suspense fallback={null}>
+            <Layout
+              plan={shown}
+              s={s}
+              running={running}
+              animate={moving}
+              reduced={reduced}
+              jumped={jumped}
+              runKey={page.played}
+              form={form}
+              rows={rows}
+              asGroup={asGroupName}
+              policies={cardPolicies}
+              start={startNode}
+              answer={answerNode}
+              screens={screens}
+              columns={columns}
+              changed={running ? null : changed}
+              expected={expected}
+              weaker={weaker}
+              onPressPerson={onPressNode}
+              onAdd={onAddField}
+              onOpenPolicy={openPolicy}
+              onOpenRule={openRule}
+              onAsGroup={onAsGroup}
+              why={why}
+              breakIn={breakIn}
+              onReviewBreakIn={onReviewBreakIn}
+            />
+          </Suspense>
+        </div>
+      </div>
+    )
+  }
 
   /* One labelled button, the builder's: it says what it will do. */
   const foldNext: FoldMode = fold.mode === 'expand' ? 'collapse' : 'expand'
@@ -701,19 +807,7 @@ export function TryJourney({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <EngineLine
-          text={clock.text}
-          running={running}
-          notice={running && shown.steps[s]?.notice === true}
-          arrive={moving}
-          smooth={!reduced && !jumped}
-          progress={clock.progress}
-          inert={false}
-          onSkip={skip}
-          onReplay={replay}
-          skipRef={skipRef}
-          replayRef={replayRef}
-        />
+        {engineLine}
         <EngineJourney
           plan={shown}
           s={s}
@@ -727,9 +821,9 @@ export function TryJourney({
           onShowAll={clock.onShowAll}
           jumped={jumped}
           orientation="vertical"
-          start={<SignInNode form={form} rows={rows} asGroup={asGroup} onPress={onPressNode} />}
+          start={startNode}
           editCard={null}
-          outcome={<Answer view={shown.outcome.view} columns={columns} changed={running ? null : changed} reduced={reduced} screens={screens} appId={form.appId} expected={expected} weaker={weaker} />}
+          outcome={answerNode}
           onOpenPolicy={openPolicy}
           onOpenRule={openRule}
           onAdd={onAddField}

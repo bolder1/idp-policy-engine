@@ -84,7 +84,10 @@ import { SAVED_SIGN_INS } from './phase'
    Run is the page's one orange button, in the foot where the Inspector keeps
    Save rule. Never disabled: pressed with a person or an application missing,
    that row says why under it and takes the focus. Save sign-in, secondary,
-   joins it once there is a run to save.
+   joins it once there is a run to save. Only Run runs (owner, 2 Oct 2026): a
+   change waits for it, and while the form differs from the run on the
+   canvas the foot says so in Save sign-in's place — that saves the run on
+   the canvas, which is no longer what the form says.
 
    Shut until it is asked for (owner, 30 Sep: "the right side thing is very
    permanent"): the bar's Try a sign-in, the person node, Choose a person and
@@ -122,6 +125,8 @@ export interface TryPanelProps {
   onPerson: (value: string) => void
   onPatch: (p: Partial<SignInForm>, field: FormField) => void
   onRun: () => void
+  /** The form has changes the run on the canvas has not checked: said beside Run. */
+  unrun?: boolean
   saved: readonly SavedSignIn[]
   onUseSaved: (s: SavedSignIn) => void
   /** The Saved sign-ins picker, opened from the panel's own row. */
@@ -159,7 +164,7 @@ const FACT: Partial<Record<TokenId, { label: string; icon: LucideIcon }>> = {
 
 export function TryPanel(props: TryPanelProps) {
   const { title, form, rows, issues, boundaries, tips, reduced, asGroup, onPerson, onPatch, onRun, saved, onUseSaved, savedOpen, onSavedOpen } = props
-  const { ran, saveOpen, onSaveOpen, wide, onToggleWidth, onClose, scope = GLOBAL_SCOPE } = props
+  const { ran, saveOpen, onSaveOpen, wide, onToggleWidth, onClose, scope = GLOBAL_SCOPE, unrun = false } = props
   /* On its way out (AnimatePresence): inert, so it keeps no focus and takes no press. */
   const present = useIsPresent()
   const { users, groups, apps } = useBrand()
@@ -302,7 +307,12 @@ export function TryPanel(props: TryPanelProps) {
       </div>
 
       <div className="bb__inspfoot sit-panel__foot">
-        {SAVED_SIGN_INS && ran && (
+        {unrun && (
+          <span className="sit-panel__unrun" role="status">
+            Changes not run yet
+          </span>
+        )}
+        {SAVED_SIGN_INS && ran && !unrun && (
           <>
             <span ref={saveAnchor} className="sit-panel__savewrap">
               <button

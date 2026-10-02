@@ -194,6 +194,26 @@
 .tj-engine.is-notice .tj-engine__text { color: var(--fb-notice-fg); }
 .tj-engine__act { display: inline-flex; flex: none; justify-content: flex-end; min-width: 86px; }
 .tj-engine__replay { display: inline-flex; }
+/* Edit sign-in, after Skip or Replay: the pencil alone, a hairline apart,
+   pressed — the active blue — while the form's panel is open; "Not run"
+   while the form has changes Run has not checked. */
+.tj-engine__edit { display: inline-flex; flex: none; align-items: center; gap: var(--space-2); padding-left: var(--space-2); border-left: var(--bw-thin) solid var(--border-subtle); }
+.tj-engine__edit .tj-engine__pencil.bx-btn { width: 32px; height: 30px; padding: 0; justify-content: center; }
+.tj-engine__pencil svg { flex: none; }
+.tj-engine__edit .bx-btn[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-border);
+  color: var(--accent-strong);
+}
+.tj-engine__unrun {
+  margin-left: var(--space-1);
+  padding: 0 6px;
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-full);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  color: var(--text-secondary);
+}
 .tj-canvas.is-editing .tj-engine { opacity: 0.4; }
 /* The hairline under the words: how far through its plan the run is. The
    bar is motion's (its scaleX), the track motion's too (it fades as the run

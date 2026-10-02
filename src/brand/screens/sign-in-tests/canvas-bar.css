@@ -1,0 +1,139 @@
+/* -----------------------------------------------------------------------------
+   The page bar's comparison tools, while the run's layouts are compared:
+   the Canvas switch's shelf divider, the Reasoning button and its panel
+   (CanvasReasoning.tsx) and the Guided tour to come (GuidedTourSoon.tsx).
+   The Jarvis button is jarvis-mode/jarvis-mode.css's.
+   -------------------------------------------------------------------------- */
+
+/* The two dropdowns, Show and Canvas, side by side. */
+.sit__canvassw { display: inline-flex; align-items: center; gap: var(--space-3); flex: none; }
+.sit .bbtop__acts { gap: var(--space-4); }
+.sit-bar__sep { flex: none; width: 1px; height: 20px; background: var(--border-subtle); }
+
+/* The dedicated views, Focus and Brief: two quiet buttons, the pressed one in the selected blue. */
+.sit-views { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.sit-views__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 30px;
+  padding: 0 10px;
+  border: var(--bw-thin) solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.sit-views__btn:hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+.sit-views__btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.sit-views__btn.is-on { background: var(--accent-soft); border-color: var(--accent-soft-border); color: var(--accent-strong); }
+.sit-reason__btn { display: inline-flex; flex: none; }
+
+/* The guided tour, to come: a quiet button with a small tag. */
+.sit-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-md, 6px);
+  background: none;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: default;
+}
+.sit-soon:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.sit-soon__tag {
+  padding: 1px 6px;
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  color: var(--text-tertiary);
+}
+
+/* The Reasoning panel: under the bar, at its right, over the canvas. */
+.sit { position: relative; }
+.sit-reason {
+  position: absolute;
+  z-index: 60;
+  top: 52px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100% - 72px);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-high, 0 12px 32px rgba(15, 23, 42, 0.16));
+  color: var(--text-primary);
+}
+.sit-reason__bar { display: flex; align-items: center; justify-content: space-between; padding: var(--space-6) var(--space-7) var(--space-3); }
+.sit-reason__title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.sit-reason__title:focus { outline: none; }
+.sit-reason__x,
+.sit-reason__step,
+.sit-reason__star {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.sit-reason__x:hover,
+.sit-reason__step:hover,
+.sit-reason__star:hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+.sit-reason__x:focus-visible,
+.sit-reason__step:focus-visible,
+.sit-reason__star:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.sit-reason__star.is-on { color: var(--accent); }
+.sit-reason__star.is-on svg { fill: var(--accent); }
+.sit-reason__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 var(--space-6);
+  padding: var(--space-3) var(--space-2);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+}
+.sit-reason__name { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; padding: 0 var(--space-2); }
+.sit-reason__name strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.sit-reason__name span { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.sit-reason__body { overflow-y: auto; padding: var(--space-6) var(--space-7); scrollbar-width: thin; }
+.sit-reason__idea { margin: 0; font-size: var(--fs-sm); line-height: 20px; color: var(--text-secondary); }
+.sit-reason__early { margin: var(--space-3) 0 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.sit-reason__list { margin-top: var(--space-6); }
+.sit-reason__label { display: block; margin-bottom: var(--space-2); font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.sit-reason__list ul { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.sit-reason__list li { display: flex; gap: var(--space-3); font-size: var(--fs-sm); line-height: 19px; }
+.sit-reason__list li svg { flex: none; margin-top: 3px; }
+.sit-reason__list .is-good { color: var(--fb-positive-fg); }
+.sit-reason__list .is-bad { color: var(--fb-negative-fg); }
+.sit-reason__mine { display: block; margin-top: var(--space-7); }
+.sit-reason__mine textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 84px;
+  padding: var(--space-3) var(--space-4);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 20px;
+  resize: vertical;
+}
+.sit-reason__mine textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sit-reason__foot { display: flex; justify-content: flex-end; padding: var(--space-4) var(--space-7) var(--space-6); border-top: var(--bw-thin) solid var(--border-subtle); }

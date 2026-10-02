@@ -1,0 +1,137 @@
+/* -----------------------------------------------------------------------------
+   Pulse's cards (pulse-cards.tsx, pulse-ends.tsx): the small card pinned to
+   each beat, the sign-in the line leaves from and the answer it runs into.
+   Colours only through the stage's --pl-* properties (pulse.css). Colour,
+   size and shadow transitions sit on the card button, never on the slot
+   that motion moves.
+   -------------------------------------------------------------------------- */
+
+.rl-pulse__slot { position: absolute; z-index: 3; }
+.rl-pulse__slot.is-above { display: flex; flex-direction: column; justify-content: flex-end; }
+.rl-pulse__slot.is-focus { z-index: 6; }
+.rl-pulse__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 9px 12px 10px;
+  border: 1px solid var(--pl-line);
+  border-radius: 10px;
+  background: var(--pl-surface);
+  box-shadow: var(--pl-el-1);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--pl-body);
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, width 0.2s ease, opacity 0.2s ease;
+}
+button.rl-pulse__card { cursor: pointer; }
+button.rl-pulse__card:hover { border-color: var(--pl-line-2); }
+button.rl-pulse__card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--pl-focus), var(--pl-el-1); }
+/* Where the playhead stands: a little bigger, its detail open. */
+.rl-pulse__card.is-focus { width: calc(100% + 16px); box-shadow: var(--pl-el-3); border-color: var(--pl-line-3); }
+.rl-pulse__cardhead { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 22px; }
+.rl-pulse__name { display: -webkit-box; flex: 1 1 auto; min-width: 0; overflow: hidden; font-weight: 600; color: var(--pl-text); overflow-wrap: anywhere; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rl-pulse__card.is-focus .rl-pulse__name { -webkit-line-clamp: 4; }
+.rl-pulse__cardhead > :is(.rl-pulse__num, .rl-pulse__mark, .tj-spin) { align-self: flex-start; margin-top: 0; }
+.rl-pulse__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--pl-inset);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-text-2);
+  font-variant-numeric: tabular-nums;
+}
+.rl-pulse__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.rl-pulse__mark.is-pass { color: var(--pl-pass); }
+.rl-pulse__mark.is-fail { color: var(--pl-fail); }
+.rl-pulse__mark.is-unknown { color: var(--pl-notice); }
+.rl-pulse__sub { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; padding-left: 28px; font-size: 12px; line-height: 17px; color: var(--pl-text-3); white-space: nowrap; text-overflow: ellipsis; }
+.rl-pulse__sub.is-pass { color: var(--pl-text-2); }
+.rl-pulse__sub.is-tag svg { flex: none; }
+.rl-pulse__checks { display: flex; flex-direction: column; gap: 1px; padding-left: 28px; }
+.rl-pulse__check { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 19px; color: var(--pl-text-2); }
+.rl-pulse__check > :is(.rl-pulse__mark, .tj-spin) { flex: none; }
+.rl-pulse__ctext { display: -webkit-box; min-width: 0; overflow: hidden; overflow-wrap: anywhere; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rl-pulse__check { align-items: flex-start; }
+.rl-pulse__check > :is(.rl-pulse__mark, .tj-spin) { margin-top: 1px; }
+.rl-pulse__check.is-fail .rl-pulse__ctext { color: var(--pl-fail-fg); font-weight: 500; }
+.rl-pulse__check.is-unknown .rl-pulse__ctext { color: var(--pl-notice-fg); font-weight: 500; }
+.rl-pulse__check.is-working .rl-pulse__ctext { color: var(--pl-text-3); }
+.rl-pulse__card.is-focus .rl-pulse__checks { display: none; }
+
+/* Working: the one blue thing on a card. */
+.rl-pulse__card.is-working { border-color: var(--pl-work); box-shadow: 0 0 0 3px var(--pl-work-soft), var(--pl-el-1); }
+/* On the decided path: firm, then the answer's tone once it lands. */
+.rl-pulse__card.is-path { border-color: var(--pl-line-3); box-shadow: var(--pl-el-2); }
+.rl-pulse__card.is-path.is-positive { border-color: var(--pl-pass); }
+.rl-pulse__card.is-path.is-negative { border-color: var(--pl-fail); }
+.rl-pulse__card.is-path.is-notice { border-color: var(--pl-notice); }
+/* Read and passed over: grey. */
+.rl-pulse__card:is(.is-passed, .is-missed) { background: var(--pl-sunken); box-shadow: none; }
+.rl-pulse__card.is-passed .rl-pulse__name { font-weight: 500; color: var(--pl-text-2); }
+.rl-pulse__card.is-off { opacity: 0.7; }
+/* Also covers / also applies: quiet, amber when it is a conflict. */
+.rl-pulse__card.is-also { box-shadow: none; }
+.rl-pulse__card.is-also .rl-pulse__name { font-weight: 500; color: var(--pl-text-2); }
+.rl-pulse__card.is-conflict { border-color: var(--pl-notice-border); background: var(--pl-notice-bg); }
+.rl-pulse__card.is-conflict .rl-pulse__name { color: var(--pl-text); }
+.rl-pulse__card.is-conflict .rl-pulse__sub { color: var(--pl-notice-fg); font-weight: 500; }
+.rl-pulse__card.is-conflict .rl-pulse__sub svg { color: var(--pl-notice); }
+.rl-pulse__card.is-unknown { border-color: var(--pl-notice-border); }
+
+/* A card's detail: each fact and what the rule needs, apart; a policy's reason. */
+.rl-pulse__detail { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--pl-line); }
+.rl-pulse__fact { display: grid; grid-template-columns: 54px minmax(0, 1fr) 16px; align-items: start; gap: 8px; padding: 3px 0; }
+.rl-pulse__fword { font-size: 12px; font-weight: 500; color: var(--pl-text-3); line-height: 18px; }
+.rl-pulse__ftext { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.rl-pulse__fval { font-weight: 500; color: var(--pl-text); }
+.rl-pulse__fvia { font-weight: 400; color: var(--pl-text-2); }
+.rl-pulse__fneed { font-size: 12px; line-height: 16px; color: var(--pl-text-2); }
+.rl-pulse__fact.is-fail .rl-pulse__fval { color: var(--pl-fail-fg); }
+.rl-pulse__fact.is-unknown .rl-pulse__fval { color: var(--pl-notice-fg); }
+.rl-pulse__fact > .rl-pulse__mark { margin-top: 1px; }
+.rl-pulse__parts { display: flex; flex-direction: column; margin: 0 0 2px 16px; padding-left: 8px; border-left: 1px solid var(--pl-line); }
+.rl-pulse__parts .rl-pulse__fact { grid-template-columns: 46px minmax(0, 1fr) 16px; padding: 1px 0; font-size: 12px; line-height: 16px; }
+.rl-pulse__dthen { display: grid; grid-template-columns: 54px auto minmax(0, 1fr); gap: 0 8px; align-items: baseline; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--pl-line); color: var(--pl-text); }
+.rl-pulse__dquiet { color: var(--pl-text-3); }
+.rl-pulse__dline { font-size: 12px; line-height: 17px; color: var(--pl-text-2); overflow-wrap: anywhere; }
+.rl-pulse__dline.is-lead { font-size: 13px; line-height: 18px; color: var(--pl-text); }
+.rl-pulse__dfix { display: block; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--pl-line); font-size: 12px; line-height: 17px; color: var(--pl-text-2); overflow-wrap: anywhere; }
+
+/* What was never read, opened at the playhead. */
+.rl-pulse__unread { position: absolute; z-index: 6; width: 236px; gap: 4px; }
+.rl-pulse__uline { display: flex; justify-content: space-between; gap: 8px; min-width: 0; font-size: 12px; line-height: 17px; }
+.rl-pulse__uname { min-width: 0; overflow: hidden; color: var(--pl-text-2); white-space: nowrap; text-overflow: ellipsis; }
+.rl-pulse__ureason { flex: none; color: var(--pl-text-3); }
+
+/* --- The sign-in -------------------------------------------------------------------------- */
+
+.rl-pulse__signslot { position: absolute; z-index: 3; translate: 0 -50%; }
+.rl-pulse__sign { gap: 0; padding-bottom: 10px; box-shadow: var(--pl-el-2); border-color: var(--pl-line-2); }
+.rl-pulse__signhead { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; }
+.rl-pulse__signwho { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.rl-pulse__signwho strong { overflow: hidden; font-size: 14px; font-weight: 600; color: var(--pl-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-pulse__signwho span { overflow: hidden; font-size: 12px; color: var(--pl-text-3); white-space: nowrap; text-overflow: ellipsis; }
+.rl-pulse__signapp { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 4px; padding: 8px 0; border-top: 1px solid var(--pl-line); font-weight: 600; color: var(--pl-text); }
+.rl-pulse__signapp > span:last-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-pulse__signto { flex: none; color: var(--pl-muted); }
+.rl-pulse__facts { display: flex; flex-direction: column; gap: 5px; }
+.rl-pulse__sfact { display: grid; grid-template-columns: 44px 14px minmax(0, 1fr); align-items: start; gap: 6px; font-size: 12px; line-height: 16px; }
+.rl-pulse__sfact > * { display: flex; align-items: center; min-height: 16px; }
+.rl-pulse__sflabel { color: var(--pl-text-3); }
+.rl-pulse__sfmark { color: var(--pl-text-2); }
+.rl-pulse__sftext { display: block !important; min-width: 0; color: var(--pl-body); overflow-wrap: anywhere; }
+.rl-pulse__sfact.is-unset .rl-pulse__sftext { color: var(--pl-muted); }
+.rl-pulse__sfact.is-needed .rl-pulse__sftext { color: var(--pl-notice-fg); font-weight: 500; }

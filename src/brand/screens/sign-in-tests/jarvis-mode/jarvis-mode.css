@@ -1,0 +1,307 @@
+/* -----------------------------------------------------------------------------
+   Jarvis's own way in (JarvisMode.tsx): the bar's button, and the transition
+   over the stage — the suit's HUD coming online. Its beats are
+   jarvis-timing.ts's (MID 820 the swap, the dissolve from 1080, END 1700);
+   every keyframe below is a share of the 1700. Only transform, opacity and
+   clip-path move.
+   -------------------------------------------------------------------------- */
+
+.sit-jx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border: var(--bw-thin) solid var(--accent-soft-border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
+}
+.sit-jx-btn:hover { border-color: var(--accent); }
+.sit-jx-btn:focus-visible { outline: none; box-shadow: var(--focus-ring, 0 0 0 3px var(--accent-soft)); }
+.sit-jx-btn.is-on { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
+.sit-jx-mark { overflow: visible; }
+.sit-jx-mark circle { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.sit-jx-mark .sit-jx-mark__core { fill: var(--accent); stroke: none; }
+.sit-jx-btn.is-on .sit-jx-mark circle { stroke: #7ae6ff; }
+.sit-jx-btn.is-on .sit-jx-mark .sit-jx-mark__core { fill: #bff4ff; stroke: none; }
+
+/* --- The transition: over the stage region, under nothing, never taking input --------------- */
+
+.sit-jx {
+  --jx-navy: #050c18;
+  --jx-cyan: #3cc8f5;
+  --jx-cyan-hi: #7ae6ff;
+  --jx-ice: #dff8ff;
+  --jx-ox: 100%;
+  --jx-oy: 0px;
+  --jx-reach: 150%;
+  --jx-ring: 75vmax;
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+/* The cover: the navy, opened from the Jarvis button's corner (in) and closed back into it (out). */
+.sit-jx__cover { position: absolute; inset: 0; will-change: clip-path; }
+.sit-jx.is-enter .sit-jx__cover { animation: sit-jx-open 1700ms linear both; }
+.sit-jx.is-exit .sit-jx__cover { animation: sit-jx-close 1700ms linear both; }
+@keyframes sit-jx-open {
+  0% { clip-path: circle(0px at var(--jx-ox) var(--jx-oy)); animation-timing-function: cubic-bezier(0.62, 0, 0.3, 1); }
+  31% { clip-path: circle(var(--jx-reach) at var(--jx-ox) var(--jx-oy)); }
+  100% { clip-path: circle(var(--jx-reach) at var(--jx-ox) var(--jx-oy)); }
+}
+@keyframes sit-jx-close {
+  0%, 69% { clip-path: circle(var(--jx-reach) at var(--jx-ox) var(--jx-oy)); animation-timing-function: cubic-bezier(0.62, 0, 0.3, 1); }
+  100% { clip-path: circle(0px at var(--jx-ox) var(--jx-oy)); }
+}
+
+/* The rings it dissolves in: annuli round the centre, each its own layer (a border, so only opacity moves).
+   Each overlaps the next by 2px, so no seam shows while they are whole. */
+.sit-jx__band {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  box-sizing: border-box;
+  width: calc(2 * var(--jx-ring) * var(--b-out) + 4px);
+  height: calc(2 * var(--jx-ring) * var(--b-out) + 4px);
+  translate: -50% -50%;
+  border: calc(var(--jx-ring) * (var(--b-out) - var(--b-in)) + 4px) solid var(--jx-navy);
+  border-radius: 50%;
+}
+.sit-jx__band.is-core { background: var(--jx-navy); }
+.sit-jx.is-enter .sit-jx__band { animation: sit-jx-fade-out 260ms cubic-bezier(0.3, 0, 0.3, 1) calc(var(--jx-dissolve) + var(--b-i) * 50ms) both; }
+.sit-jx.is-exit .sit-jx__band { animation: sit-jx-fade-in 280ms cubic-bezier(0.4, 0, 0.6, 1) calc(var(--b-ri) * 58ms) both; }
+@keyframes sit-jx-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sit-jx-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* The grid field: the ground's own grid, brighter as it comes up, then settling into the ground under it
+   (the region's --bb-x / --bb-y / --bb-z, so the two line up). */
+.sit-jx__grid {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%2370d6ff' stroke-opacity='0.2' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1.1' fill='%2370d6ff' fill-opacity='0.5'/%3E%3C/svg%3E");
+  background-size: calc(32px * var(--bb-z, 1)) calc(32px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0px) var(--bb-y, 0px);
+  opacity: 0;
+}
+.sit-jx.is-enter .sit-jx__grid { animation: sit-jx-grid-in 1700ms linear both; }
+.sit-jx.is-exit .sit-jx__grid { animation: sit-jx-grid-out 1700ms linear both; }
+@keyframes sit-jx-grid-in {
+  0%, 14% { opacity: 0; }
+  34% { opacity: 1; }
+  62% { opacity: 0.55; }
+  88%, 100% { opacity: 0; }
+}
+@keyframes sit-jx-grid-out {
+  0% { opacity: 0; }
+  30%, 70% { opacity: 0.55; }
+  100% { opacity: 0.55; }
+}
+
+/* The scan: one line of light across the region, a faint wake behind it. Its box is the region, so 100% is the region's height. */
+.sit-jx__scan { position: absolute; inset: 0; opacity: 0; will-change: transform, opacity; }
+.sit-jx__scan::before,
+.sit-jx__scan::after { content: ''; position: absolute; left: 0; right: 0; }
+.sit-jx__scan::before { top: -64px; height: 64px; background: rgba(60, 200, 245, 0.06); }
+.sit-jx__scan::after { top: -1px; height: 1px; background: var(--jx-cyan-hi); box-shadow: 0 0 10px 1px rgba(122, 230, 255, 0.85), 0 0 34px 4px rgba(60, 200, 245, 0.35); }
+.sit-jx.is-enter .sit-jx__scan { animation: sit-jx-scan-down 1700ms linear both; }
+.sit-jx.is-exit .sit-jx__scan { animation: sit-jx-scan-up 1700ms linear both; }
+@keyframes sit-jx-scan-down {
+  0%, 21% { transform: translateY(0%); opacity: 0; animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1); }
+  24% { opacity: 1; }
+  56% { opacity: 0.85; }
+  60% { transform: translateY(104%); opacity: 0; }
+  100% { transform: translateY(104%); opacity: 0; }
+}
+@keyframes sit-jx-scan-up {
+  0%, 10% { transform: translateY(104%); opacity: 0; animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1); }
+  13% { opacity: 0.9; }
+  44% { opacity: 0.8; }
+  47% { transform: translateY(0%); opacity: 0; }
+  100% { transform: translateY(0%); opacity: 0; }
+}
+
+/* The shock rings: thin outlines out from the centre as it dissolves (in), closing in on it (out). */
+.sit-jx__shock {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: calc(2 * var(--jx-ring));
+  height: calc(2 * var(--jx-ring));
+  margin: calc(-1 * var(--jx-ring)) 0 0 calc(-1 * var(--jx-ring));
+  box-sizing: border-box;
+  border: 2px solid rgba(122, 230, 255, 0.85);
+  border-radius: 50%;
+  /* A second, fainter rim just inside: the glow, without a blur to raster at this size. */
+  outline: 6px solid rgba(60, 200, 245, 0.12);
+  outline-offset: -9px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.sit-jx.is-enter .sit-jx__shock { animation: sit-jx-shock-out 640ms cubic-bezier(0.2, 0.6, 0.3, 1) calc(var(--jx-dissolve) - 40ms + var(--k) * 95ms) both; }
+.sit-jx.is-exit .sit-jx__shock { animation: sit-jx-shock-in 560ms cubic-bezier(0.6, 0, 0.8, 0.4) calc(var(--k) * 95ms) both; }
+@keyframes sit-jx-shock-out {
+  0% { transform: scale(0.1); opacity: 0; }
+  12% { opacity: 0.9; }
+  100% { transform: scale(1.02); opacity: 0; }
+}
+@keyframes sit-jx-shock-in {
+  0% { transform: scale(1.02); opacity: 0; }
+  30% { opacity: 0.8; }
+  100% { transform: scale(0.1); opacity: 0; }
+}
+
+/* --- The iris: the arc reactor, at the region's centre ------------------------------------- */
+
+.sit-jx__iris {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 300px;
+  height: 300px;
+  margin: -150px 0 0 -150px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.sit-jx.is-enter .sit-jx__iris { animation: sit-jx-iris-in 1700ms linear both; }
+.sit-jx.is-exit .sit-jx__iris { animation: sit-jx-iris-out 1700ms linear both; }
+@keyframes sit-jx-iris-in {
+  0%, 13% { transform: scale(0.5); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.25, 1); }
+  38% { transform: scale(1); opacity: 1; }
+  63% { transform: scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 0.6); }
+  77%, 100% { transform: scale(1.8); opacity: 0; }
+}
+@keyframes sit-jx-iris-out {
+  0%, 12% { transform: scale(1.7); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.25, 1); }
+  38% { transform: scale(1); opacity: 1; }
+  62% { transform: scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3); }
+  77%, 100% { transform: scale(0.02); opacity: 0; }
+}
+.sit-jx__irisin { position: absolute; inset: 0; }
+.sit-jx__r { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; will-change: transform; }
+.sit-jx__r circle { fill: none; }
+.sit-jx__r.is-r1 circle { stroke: rgba(122, 230, 255, 0.55); stroke-width: 2; }
+.sit-jx__r.is-r2 circle { stroke: var(--jx-cyan); stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(60, 200, 245, 0.7)); }
+.sit-jx__r.is-r3 line { stroke: rgba(122, 230, 255, 0.5); stroke-width: 1.2; }
+.sit-jx__r.is-r3 line.is-long { stroke: var(--jx-cyan-hi); stroke-width: 2; }
+.sit-jx__r.is-r4 .is-track { stroke: rgba(60, 200, 245, 0.22); stroke-width: 1; }
+.sit-jx__r.is-r4 .is-lit { stroke: var(--jx-cyan-hi); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 5px rgba(122, 230, 255, 0.9)); }
+.sit-jx__r.is-r5 circle { stroke: rgba(122, 230, 255, 0.75); stroke-width: 11; }
+/* Each ring turns at its own speed, its own way; and comes in at its own moment. */
+.sit-jx__r.is-r1 { animation: sit-jx-spin 22s linear infinite, sit-jx-appear 360ms ease-out 240ms both; }
+.sit-jx__r.is-r2 { animation: sit-jx-spin-back 5.5s linear infinite, sit-jx-appear 360ms ease-out 300ms both; }
+.sit-jx__r.is-r3 { animation: sit-jx-spin 30s linear infinite; }
+.sit-jx__r.is-r4 { animation: sit-jx-spin 2.6s linear infinite, sit-jx-appear 300ms ease-out 380ms both; }
+.sit-jx__r.is-r5 { animation: sit-jx-spin-back 9s linear infinite, sit-jx-appear 300ms ease-out 330ms both; }
+.sit-jx.is-exit .sit-jx__r.is-r1 { animation-delay: 0s, 220ms; }
+.sit-jx.is-exit .sit-jx__r.is-r2 { animation-delay: 0s, 260ms; }
+.sit-jx.is-exit .sit-jx__r.is-r4 { animation-delay: 0s, 320ms; }
+.sit-jx.is-exit .sit-jx__r.is-r5 { animation-delay: 0s, 290ms; }
+/* The ticks spin in and lock. */
+.sit-jx__tickspin { position: absolute; inset: 0; will-change: transform, opacity; animation: sit-jx-tickspin 760ms cubic-bezier(0.16, 0.9, 0.3, 1) 260ms both; }
+.sit-jx.is-exit .sit-jx__tickspin { animation-delay: 220ms; }
+@keyframes sit-jx-tickspin {
+  from { transform: rotate(-160deg) scale(1.3); opacity: 0; }
+  to { transform: rotate(0deg) scale(1); opacity: 1; }
+}
+@keyframes sit-jx-spin { to { transform: rotate(360deg); } }
+@keyframes sit-jx-spin-back { to { transform: rotate(-360deg); } }
+@keyframes sit-jx-appear { from { opacity: 0; } to { opacity: 1; } }
+
+/* The core: a bright disc that kindles, its bloom a shadow (no gradient). */
+.sit-jx__core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  background: #c8f6ff;
+  box-shadow: 0 0 0 5px rgba(60, 200, 245, 0.35), 0 0 22px 8px rgba(122, 230, 255, 0.7), 0 0 70px 24px rgba(60, 200, 245, 0.32);
+  will-change: transform, opacity;
+  animation: sit-jx-core 620ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 300ms both;
+}
+.sit-jx.is-exit .sit-jx__core { animation-delay: 260ms; }
+@keyframes sit-jx-core {
+  0% { transform: scale(0); opacity: 0; }
+  55% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* --- The wordmark: JARVIS decoding, and its status line ------------------------------------- */
+
+.sit-jx__brand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(46% + 172px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  will-change: opacity, transform;
+}
+.sit-jx.is-enter .sit-jx__brand { animation: sit-jx-brand-in 1700ms linear both; }
+.sit-jx.is-exit .sit-jx__brand { animation: sit-jx-brand-out 1700ms linear both; }
+@keyframes sit-jx-brand-in {
+  0%, 25% { opacity: 0; }
+  29%, 64% { opacity: 1; transform: none; }
+  76%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes sit-jx-brand-out {
+  0%, 16% { opacity: 0; }
+  21%, 64% { opacity: 1; transform: none; }
+  74%, 100% { opacity: 0; transform: translateY(6px); }
+}
+.sit-jx__word {
+  display: flex;
+  gap: 0.36em;
+  margin-left: 0.36em;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 40px;
+  color: var(--jx-ice);
+  text-shadow: 0 0 14px rgba(122, 230, 255, 0.75), 0 0 36px rgba(60, 200, 245, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+.sit-jx__letter { display: inline-block; width: 0.78em; text-align: center; }
+.sit-jx__rule {
+  display: block;
+  width: 220px;
+  height: 1px;
+  background: var(--jx-cyan);
+  box-shadow: 0 0 8px rgba(60, 200, 245, 0.8);
+  transform: scaleX(0);
+  will-change: transform;
+}
+.sit-jx.is-enter .sit-jx__rule { animation: sit-jx-rule 420ms cubic-bezier(0.3, 0, 0.2, 1) 760ms both; }
+.sit-jx.is-exit .sit-jx__rule { animation: sit-jx-rule 420ms cubic-bezier(0.3, 0, 0.2, 1) 520ms both; }
+@keyframes sit-jx-rule { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.sit-jx__status {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: #9fe6fb;
+  clip-path: inset(0 100% 0 0);
+  will-change: clip-path;
+}
+.sit-jx.is-enter .sit-jx__status { animation: sit-jx-type 360ms steps(22, end) 880ms both; }
+.sit-jx.is-exit .sit-jx__status { animation: sit-jx-type 300ms steps(13, end) 620ms both; }
+@keyframes sit-jx-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sit-jx { display: none; }
+  .sit-jx-btn { transition: none; }
+}

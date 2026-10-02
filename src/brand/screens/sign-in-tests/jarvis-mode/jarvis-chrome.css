@@ -1,0 +1,206 @@
+/* -----------------------------------------------------------------------------
+   The page while Jarvis is on (`.sit.is-jarvis`, SignInTests.tsx): not only the
+   canvas — the bar, the ground and the Configure panel wear the HUD too (owner,
+   2 Oct 2026: "a special experience, specific to Jarvis only … colour,
+   experience, everything").
+
+   · The BAR is a HUD strip: deep navy, a cyan hairline, its controls in soft
+     light tones (the console's dark tokens, redeclared for it), the Jarvis
+     button glowing like an arc reactor while pressed.
+   · The GROUND under the canvas and the panel is Jarvis's: deep navy, a faint
+     luminous grid that follows the pan and zoom (the canvas writes --bb-x/y/z
+     here), the same grid the HUD's own stage draws (jarvis.css).
+   · The CONFIGURE PANEL keeps panel-stage.css's dark tokens and gains Jarvis's
+     glass: a translucent navy surface, a cyan edge glow, and a thin scan that
+     runs once along its head as it opens.
+
+   Tokens and a few accents, never the controls one by one. No transform or
+   transition on anything motion moves (the panel is slid by motion: only its
+   own pseudo-elements and children move here).
+   -------------------------------------------------------------------------- */
+
+.sit.is-jarvis {
+  --jx-navy: #050c18;
+  --jx-navy-2: #081426;
+  --jx-navy-3: #0b1a30;
+  --jx-cyan: #3cc8f5;
+  --jx-cyan-hi: #7ae6ff;
+  --jx-cyan-line: rgba(60, 200, 245, 0.32);
+  --jx-cyan-faint: rgba(60, 200, 245, 0.14);
+  --jx-text: #e6f3ff;
+  --jx-text-2: #a9c0da;
+  --jx-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%2370d6ff' stroke-opacity='0.075' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1' fill='%2370d6ff' fill-opacity='0.22'/%3E%3C/svg%3E");
+}
+
+/* The console's dark tokens, for the bar and the empty canvas: every control in
+   them turns dark by what it already reads (the values are panel-stage.css's,
+   the surfaces Jarvis's navy). */
+.sit.is-jarvis > .bbtop,
+.sit.is-jarvis .sit__stage .hiw,
+.sit.is-jarvis .sit-reason {
+  --surface-page: var(--jx-navy);
+  --surface-raised: var(--jx-navy-3);
+  --surface-sunken: #06101e;
+  --surface-inset: #0e2038;
+  --surface-overlay: var(--jx-navy-3);
+  --surface-inverse: #f8fafb;
+  --border-subtle: rgba(130, 200, 255, 0.14);
+  --border-default: rgba(130, 200, 255, 0.24);
+  --border-strong: rgba(150, 210, 255, 0.4);
+  --text-primary: var(--jx-text);
+  --text-body: #d2e2f2;
+  --text-secondary: var(--jx-text-2);
+  --text-tertiary: #8ca5c2;
+  --text-muted: #6f87a3;
+  --text-disabled: #4d6380;
+  --text-inverse: var(--jx-navy);
+  --int-neutral-bg: rgba(12, 30, 52, 0.9);
+  --int-neutral-bg-hover: rgba(22, 48, 78, 0.95);
+  --int-neutral-bg-active: rgba(30, 62, 98, 0.95);
+  --int-neutral-border: rgba(130, 200, 255, 0.22);
+  --int-neutral-border-hover: rgba(130, 200, 255, 0.4);
+  --int-neutral-text: var(--jx-text);
+  --int-ghost-bg-hover: rgba(130, 200, 255, 0.1);
+  --int-ghost-bg-active: rgba(130, 200, 255, 0.16);
+  --int-ghost-text: var(--jx-text-2);
+  --ctl-bg: rgba(10, 26, 46, 0.9);
+  --ctl-bg-hover: rgba(16, 38, 64, 0.95);
+  --ctl-border: rgba(130, 200, 255, 0.22);
+  --ctl-border-hover: rgba(130, 200, 255, 0.4);
+  --ctl-border-focus: var(--jx-cyan);
+  --text-placeholder: #8ca5c2;
+  --accent: var(--jx-cyan);
+  --accent-hover: var(--jx-cyan-hi);
+  --accent-strong: #a8eeff;
+  --accent-soft: rgba(60, 200, 245, 0.14);
+  --accent-soft-border: rgba(60, 200, 245, 0.45);
+  --focus-ring: var(--jx-cyan);
+  --focus-halo: rgba(60, 200, 245, 0.22);
+  color-scheme: dark;
+}
+
+/* --- The bar: a HUD strip ------------------------------------------------------------- */
+
+.sit.is-jarvis > .bbtop {
+  position: relative;
+  background: var(--jx-navy-2);
+  border-bottom-color: var(--jx-cyan-line);
+  box-shadow: 0 1px 0 rgba(60, 200, 245, 0.08), 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: var(--jx-text);
+}
+.sit.is-jarvis > .bbtop .bbtop__title { color: var(--jx-text); }
+.sit.is-jarvis > .bbtop .bbtop__sl { color: rgba(150, 210, 255, 0.4); }
+.sit.is-jarvis .sit-bar__sep { background: var(--jx-cyan-faint); }
+
+/* The Jarvis button, pressed: an arc reactor — a navy core, a cyan rim, a glow. */
+.sit.is-jarvis .sit-jx-btn.is-on {
+  border-color: rgba(122, 230, 255, 0.7);
+  background: #0a2440;
+  color: #dff8ff;
+  box-shadow: 0 0 0 1px rgba(60, 200, 245, 0.25), 0 0 14px rgba(60, 200, 245, 0.45), inset 0 0 10px rgba(60, 200, 245, 0.25);
+}
+.sit.is-jarvis .sit-jx-btn.is-on:hover { border-color: var(--jx-cyan-hi); }
+.sit.is-jarvis .sit-jx-btn.is-on .sit-jx-mark { filter: drop-shadow(0 0 4px rgba(122, 230, 255, 0.9)); }
+.sit.is-jarvis .sit-jx-btn.is-on .sit-jx-mark__outer { animation: sit-jx-mark-spin 6s linear infinite; transform-origin: 12px 12px; stroke-dasharray: 10 4.9; }
+
+/* Which Jarvis: v1 / v2 beside the button, the HUD's cyan for the one on. */
+.sit-jx-ver { flex: none; flex-wrap: nowrap; margin-left: var(--space-2); }
+.sit.is-jarvis .sit-jx-ver button { color: var(--jx-text-2); }
+.sit.is-jarvis .sit-jx-ver button:hover { color: var(--jx-text); }
+.sit.is-jarvis .sit-jx-ver button.is-on { background: rgba(60, 200, 245, 0.16); color: var(--jx-cyan-hi); }
+
+/* --- The ground: deep navy, a faint luminous grid --------------------------------------- */
+
+.sit.is-jarvis > .sit__bb {
+  --bb-stage: var(--jx-navy);
+  --bb-dot: transparent;
+  background-color: var(--jx-navy);
+  background-image: var(--jx-grid);
+  background-size: calc(32px * var(--bb-z, 1)) calc(32px * var(--bb-z, 1));
+}
+/* The host's fade under the engine pill, in the ground's navy. */
+.sit.is-jarvis .sit__stage .tj-canvas::after { background: linear-gradient(to bottom, var(--jx-navy) 40%, rgba(5, 12, 24, 0)); }
+
+/* The empty canvas on the HUD's ground: its illustration in the HUD's lines. */
+.sit.is-jarvis .sit__stage .hiw__ill-win,
+.sit.is-jarvis .sit__stage .hiw__ill-field { fill: rgba(12, 30, 52, 0.9); stroke: var(--jx-cyan-line); }
+.sit.is-jarvis .sit__stage .hiw__ill-rule { stroke: var(--jx-cyan-line); }
+.sit.is-jarvis .sit__stage .hiw__ill-addr { fill: rgba(60, 200, 245, 0.08); stroke: var(--jx-cyan-faint); }
+.sit.is-jarvis .sit__stage .hiw__ill-bar { fill: rgba(60, 200, 245, 0.28); }
+.sit.is-jarvis .sit__stage .hiw__ill-bar.is-soft { fill: rgba(60, 200, 245, 0.14); }
+.sit.is-jarvis .sit__stage .hiw__ill-gap { fill: var(--jx-navy); stroke: var(--jx-navy); }
+
+/* --- The Configure panel: Jarvis's glass ------------------------------------------------ */
+
+.sit.is-jarvis[data-stage] .bb__insp.sit-panel {
+  --surface-raised: rgba(9, 22, 40, 0.8);
+  --surface-sunken: rgba(5, 14, 27, 0.7);
+  --surface-inset: rgba(14, 32, 56, 0.9);
+  --ctl-bg: rgba(8, 20, 37, 0.85);
+  --ctl-bg-hover: rgba(14, 32, 56, 0.95);
+  --ctl-border: rgba(130, 200, 255, 0.2);
+  --ctl-border-hover: rgba(130, 200, 255, 0.38);
+  --ctl-border-focus: var(--jx-cyan);
+  --border-subtle: rgba(130, 200, 255, 0.14);
+  --border-default: rgba(130, 200, 255, 0.22);
+  --accent: var(--jx-cyan);
+  --accent-soft: rgba(60, 200, 245, 0.14);
+  --accent-soft-border: rgba(60, 200, 245, 0.45);
+  --accent-strong: #a8eeff;
+  /* The panel's one action and its section marks take the HUD's cyan, not the console's orange: inside Jarvis
+     the reactor is the colour you press. */
+  --brand: var(--jx-cyan);
+  --brand-text: var(--jx-cyan-hi);
+  --brand-on-fill: #0a7aa8;
+  --brand-hover: #0c8cc0;
+  --brand-active: #0e9bd3;
+  --int-brand-bg: #0a7aa8;
+  --int-brand-bg-hover: #0c8cc0;
+  --int-brand-bg-active: #0e9bd3;
+  --int-brand-text: #ffffff;
+  --text-on-brand: #ffffff;
+  --rb-cta: #0a7aa8;
+  --rb-cta-hover: #0c8cc0;
+  --rb-cta-active: #0e9bd3;
+  position: relative;
+  border-color: var(--jx-cyan-line);
+  background: rgba(9, 22, 40, 0.8);
+  box-shadow: 0 0 0 1px rgba(60, 200, 245, 0.12), 0 0 34px rgba(60, 200, 245, 0.16), inset 0 1px 0 rgba(140, 220, 255, 0.1), 0 18px 48px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+/* The head: a cyan rule, and a scan that runs once along it as the panel opens. */
+.sit.is-jarvis .sit-panel .bb__inspbar {
+  position: relative;
+  overflow: hidden;
+  border-bottom-color: var(--jx-cyan-faint);
+}
+.sit.is-jarvis .sit-panel .bb__inspbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 38%;
+  height: 1px;
+  background: var(--jx-cyan-hi);
+  box-shadow: 0 0 8px rgba(122, 230, 255, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  animation: sit-jx-headscan 1.1s cubic-bezier(0.3, 0, 0.2, 1) 0.15s 1 both;
+}
+.sit.is-jarvis .sit-panel .bb__inspfoot { border-top-color: var(--jx-cyan-faint); }
+
+@keyframes sit-jx-headscan {
+  0% { transform: translateX(-100%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(270%); opacity: 0; }
+}
+@keyframes sit-jx-mark-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sit.is-jarvis .sit-panel .bb__inspbar::after { animation: none; opacity: 0; }
+  .sit.is-jarvis .sit-jx-btn.is-on .sit-jx-mark__outer { animation: none; }
+}
+
+/* The panel's Run: the reactor's button — a cyan rim of light round it. */
+.sit.is-jarvis .sit-panel .bb__inspfoot .bx-btn--brand { box-shadow: 0 0 0 1px rgba(122, 230, 255, 0.35), 0 0 16px rgba(60, 200, 245, 0.35); }

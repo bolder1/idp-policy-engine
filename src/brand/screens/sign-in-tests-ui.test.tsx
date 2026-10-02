@@ -11,6 +11,7 @@ import { attemptPlay, runBreakInOnApp } from './break-in-app'
 import { ATTEMPTS_PANEL_ID } from './sign-in-tests/attempts'
 import { BreakInPanel, type BreakInPanelProps } from './sign-in-tests/BreakInPanel'
 import { readersOf } from './sign-in-tests/engine-run'
+import { HowItWorks } from './sign-in-tests/HowItWorks'
 import { defaultPeopleContext, firstDecidedApp } from './sign-in-tests/library'
 import { TryJourney } from './sign-in-tests/TryJourney'
 import { TryPanel, type TryPanelProps } from './sign-in-tests/TryPanel'
@@ -171,7 +172,7 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
   const out = page('try')
 
   it('is the builder’s two bands: its bar, then its region — no page head, no crumb row, no tabs', () => {
-    expect(out.startsWith('<div class="sit">')).toBe(true)
+    expect(out).toMatch(/^<div class="sit[^"]*" data-stage="(light|dark)">/)
     const bar = out.indexOf('<header class="bbtop">')
     const region = out.indexOf('<div class="bb sit__bb')
     expect(bar).toBeGreaterThan(-1)
@@ -199,24 +200,57 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
 
   /* The page's ways in moved into the canvas (owner, 1 Oct 2026: "move these
      two buttons inside the canvas as the two main buttons"), and Saved
-     sign-ins went to a later phase: the bar is where you are, and nothing else. */
-  it('the bar holds no buttons: the way in is the canvas’s Check access, the page’s one orange while the panel is shut', () => {
+     sign-ins went to a later phase: the bar is where you are, and nothing
+     else. Then the form came open on arrival (owner, the same day: "when we
+     come inside I don't want the button, so by default open the right side
+     as the first-time view"): the canvas draws no Check access while it is. */
+  it('the bar holds no buttons, and on arrival nor does the canvas: the form is open beside it, Run its one orange', () => {
     const bar = block(out, 'header', 'bbtop')
-    expect(bar).not.toContain('bx-btn')
     expect(bar).not.toContain('sit__savedbtn')
-    expect(pageSrc).toContain('<BoardBarPlain title={ACCESS_CHECKS} />')
-    const go = block(out, 'div', 'hiw__act')
+    /* While the run's layouts are compared (phase.ts), the bar carries only the comparison tools: the Canvas
+       dropdowns, the dedicated views, Reasoning and the Guided tour to come — never an orange button. */
+    expect(bar).not.toContain('bx-btn--brand')
+    expect(bar).toContain('aria-label="Dedicated views"')
+    expect(pageSrc).toContain('CANVAS_OPTIONS ? (')
+    expect(out).not.toContain('hiw__act')
+    expect(out).toContain('<aside class="bb__insp sit-panel"')
+    const orange = out.match(/<button[^>]*bx-btn--brand[^>]*>[\s\S]*?<\/button>/g) ?? []
+    expect(orange.map(text)).toEqual(['Run'])
+    /* The door stays in the code: shut, the panel's way back; inside a policy, pressed while the form is open. */
+    expect(hiwSrc).toContain("const door = doorWhileOpen || open !== 'form'")
+    expect(hiwSrc).toContain("variant={primary && open !== 'form' ? 'brand' : 'secondary'}")
+    expect(hiwSrc).toContain("pressed={open === 'form'}")
+    expect(tryPageSrc).toContain(
+      '<HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} open={panel} primary={!policy} doorWhileOpen={!!policy} />',
+    )
+    expect(rules(pageCss)).toMatch(/\.hiw__act \.bx-btn\[aria-pressed='true'\] \{\s+background: var\(--accent-soft\);/)
+  })
+
+  it('shut before a run, the empty canvas draws Check access again: the page’s one orange, the way back to the form', () => {
+    const shut = canvas(initialTryPage(1, TODAY, '09:30'), emptyDraft(TODAY, '09:30'), 1)
+    const go = block(shut, 'div', 'hiw__act')
     expect(text(go)).toBe('Check access')
     expect(go).toMatch(/class="bx-btn bx-btn--brand/)
     expect(go).toContain('aria-pressed="false"')
     expect(go).toContain('lucide-log-in')
     expect(go).not.toContain('disabled')
-    expect(out.match(/bx-btn--brand/g) ?? []).toHaveLength(1)
-    /* Open, it is pressed and secondary — Run in the panel's foot is then the one orange. */
-    expect(hiwSrc).toContain("variant={primary && open !== 'form' ? 'brand' : 'secondary'}")
-    expect(hiwSrc).toContain("pressed={open === 'form'}")
-    expect(tryPageSrc).toContain('<HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} open={panel} primary={!policy} />')
-    expect(rules(pageCss)).toMatch(/\.hiw__act \.bx-btn\[aria-pressed='true'\] \{\s+background: var\(--accent-soft\);/)
+    /* Inside a policy the door stays while the form is open, pressed and secondary. */
+    const inPolicy = renderToStaticMarkup(
+      <BrandProvider>
+        <HowItWorks onCheck={() => {}} open="form" primary={false} />
+      </BrandProvider>,
+    )
+    const pressed = block(inPolicy, 'div', 'hiw__act')
+    expect(pressed).toContain('aria-pressed="true"')
+    expect(pressed).not.toContain('bx-btn--brand')
+    /* On the page, open: no door at all, and no empty row where it stood. */
+    const open = renderToStaticMarkup(
+      <BrandProvider>
+        <HowItWorks onCheck={() => {}} open="form" doorWhileOpen={false} />
+      </BrandProvider>,
+    )
+    expect(open).not.toContain('hiw__act')
+    expect(open).not.toContain('bx-btn')
   })
 
   it('Run is the one orange in the panel’s foot: never disabled, with its shortcut', () => {
@@ -232,17 +266,18 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
     expect(o).not.toContain('Save sign-in')
   })
 
-  it('the region is the builder’s: the canvas in the middle track, the panel’s track closed on arrival — the canvas alone', () => {
+  it('the region is the builder’s: the canvas in the middle track, the panel open on the form in the right one on arrival', () => {
     const region = block(out, 'div', 'bb sit__bb')
-    expect(region).toMatch(/^<div class="bb sit__bb is-insp-closed" style="--bb-insp:560px;--bb-z:1">/)
+    expect(region).toMatch(/^<div class="bb sit__bb" style="--bb-insp:560px;--bb-z:1">/)
     expect(region).toContain('<div class="sit__stage">')
-    expect(region).not.toContain('sit-panel')
-    /* Opened, the panel floats in the right-hand track, after the stage, under AnimatePresence. */
+    expect(region).toContain('<aside class="bb__insp sit-panel"')
+    expect(region.indexOf('<div class="sit__stage">')).toBeLessThan(region.indexOf('sit-panel'))
+    /* Shut, its track closes and the canvas has the whole width; the panel floats in the right-hand track, after the stage, under AnimatePresence. */
     expect(pageSrc).toContain("className={`bb sit__bb${anyPanel ? '' : ' is-insp-closed'}`}")
     expect(pageSrc).toMatch(/<AnimatePresence initial=\{false\}>\s+\{panelOpen && \(\s+<TryPanel\s+key="panel"/)
     expect(pageSrc.indexOf('<div className="sit__stage">')).toBeLessThan(pageSrc.indexOf('<AnimatePresence'))
-    /* The form, or (a later phase) the saved sign-ins: one panel at a time. */
-    expect(pageSrc).toContain("const [panel, setPanel] = useState<'form' | 'saved' | 'why' | 'break-in' | null>(null)")
+    /* The form, or (a later phase) the saved sign-ins: one panel at a time — the form on an empty canvas's arrival, none on a revisit's run. */
+    expect(pageSrc).toContain("const [panel, setPanel] = useState<'form' | 'saved' | 'why' | 'break-in' | null>(() => (tryPage.mode === 'form' ? 'form' : null))")
     expect(pageSrc).toContain("const panelOpen = panel === 'form'")
     expect(rules(pageCss)).toMatch(/\.sit__stage \{[^}]*grid-column: 2;[^}]*grid-row: 1;[^}]*position: relative;/)
     /* The journey's canvas stands on the region's ground, not a frame of its own.
@@ -266,7 +301,8 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
     for (const kept of ['<SavedTable', '<PeopleTable', '<RunsReport onTry={tryForm} />']) expect(pageSrc).toContain(kept)
     for (const tab of [undefined, 'try', 'saved', 'people', 'runs'] as const) {
       const o = page(tab)
-      expect(o, String(tab)).toContain('class="hiw__act"')
+      expect(o, String(tab)).toContain('<section class="hiw"')
+      expect(o, String(tab)).toContain('<aside class="bb__insp sit-panel"')
       expect(o, String(tab)).toContain('class="tj-canvas"')
       expect(o, String(tab)).not.toContain('sitl')
     }
@@ -397,13 +433,13 @@ describe('Sign-in tests — the panel (§14.2)', () => {
     const foot = block(o, 'div', 'bb__inspfoot sit-panel__foot')
     expect(foot).not.toContain('Save sign-in')
     expect(o.match(/bx-btn--brand/g) ?? []).toHaveLength(1)
-    expect(panelSrc).toContain('{SAVED_SIGN_INS && ran && (')
+    expect(panelSrc).toContain('{SAVED_SIGN_INS && ran && !unrun && (')
     /* Kept for the phase that brings it back: the Inspector tints its foot's secondary with the brand; here it stays neutral. */
     expect(rules(pageCss)).toMatch(/\.sit-panel \.bb__inspfoot \.bx-btn--neutral \{\s+background: var\(--int-neutral-bg\);/)
   })
 
   it('on demand: Run and a saved sign-in shut it and hand the focus to the canvas; its X and Escape shut it', () => {
-    expect(pageSrc).toMatch(/const f = forRun\(draft, rows\)\s+const askSaveFor = tryPage\.askSaveFor\s+toCanvas\(\(\) => start\(f, 'full', \{ askSaveFor \}\)\)/)
+    expect(pageSrc).toMatch(/const f = loaded && same\(draft, loaded\.form\) \? loaded\.form : forRun\(draft, rows\)\s+const prev = tryPage\.mode === 'journey' && !same\(f, session\.form\) \? session\.form : null\s+const askSaveFor = tryPage\.askSaveFor\s+toCanvas\(\(\) => start\(f, 'full', \{ askSaveFor, prev \}\)\)/)
     /* The panel slides out first; the run begins on the whole canvas once it has gone. */
     expect(pageSrc).toMatch(/const toCanvas = \(begin: \(\) => void\) => \{\s+const wasOpen = panel !== null\s+setPanel\(null\)\s+setSaveOpen\(false\)\s+setSavedAt\(null\)/)
     expect(pageSrc).toMatch(/const go = \(keepFocus: boolean\) => \{\s+begin\(\)\s+if \(!keepFocus\) setFocusRun\(\(n\) => n \+ 1\)\s+\}/)
@@ -437,8 +473,12 @@ describe('Sign-in tests — the panel (§14.2)', () => {
     expect(pageSrc).toContain("document.addEventListener('keydown', onKey, true)")
   })
 
-  it('a saved sign-in — a later phase: its panel and the form’s row — fills the panel, names it, and runs', () => {
-    expect(pageSrc).toMatch(/const trySaved = \(sv: SavedSignIn\) => \{\s+const f = formOf\(sv\.facts, zones\)\s+setAsGroup\(null\)\s+setLoaded\(\{ name: sv\.name, form: f, expected: sv\.expected \}\)\s+toCanvas\(\(\) => start\(f, 'full', \{ draft: f, touched: \[\] \}\)\)/)
+  it('a saved sign-in — its panel and the form’s row — fills the panel and names it, and Run takes the focus (only Run runs, 2 Oct)', () => {
+    const tried = pageSrc.slice(pageSrc.indexOf('const trySaved = (sv: SavedSignIn) => {'), pageSrc.indexOf('/* The form has changes'))
+    expect(tried).toMatch(/const f = formOf\(sv\.facts, zones\)\s+setAsGroup\(null\)\s+setLoaded\(\{ name: sv\.name, form: f, expected: sv\.expected \}\)\s+setTryPage\(\(pg\) => \(\{ \.\.\.pg, draft: f, touched: \[\] \}\)\)/)
+    expect(tried).toContain('openPanel(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))')
+    expect(tried).not.toContain('start(')
+    expect(tried).not.toContain('toCanvas(')
     expect(pageSrc).toContain("savedOpen={savedAt === 'panel'}")
     expect(pageSrc).toMatch(/\{panel === 'saved' && \(\s+<SavedPanel/)
     expect(pageSrc).toContain('const anySaved = SAVED_SIGN_INS && savedSignIns.some((sv) => !sv.generated)')
@@ -493,7 +533,7 @@ describe('Sign-in tests — the Person picker (§13.3)', () => {
     expect(ident).toContain(`<div id="${rowId('person')}" class="bb__whorow is-set">`)
     expect(text(ident)).toContain('Finance')
     expect(text(ident)).toMatch(/Tested as \S/)
-    expect(pageSrc).toMatch(/const pickPerson = \(value: string\) => \{\s+const pick = personPick\(value, users\)\s+setAsGroup\(pick\.asGroup\)\s+patch\(\{ personId: pick\.personId \}, 'person'\)/)
+    expect(pageSrc).toMatch(/const pickPerson = \(value: string, now = false\) => \{\s+const pick = personPick\(value, users\)\s+setAsGroup\(pick\.asGroup\)\s+patch\(\{ personId: pick\.personId \}, 'person', now\)/)
   })
 })
 
@@ -501,15 +541,19 @@ describe('Sign-in tests — the canvas before the first run (§12.3, §14.3)', (
   const out = page('try')
   const empty = block(out, 'div', 'sit__stage')
 
-  /* What an access check is, and the one way in (owner, 1 Oct 2026: "a
-     better state, a better layout and a better experience"); the run in
-     miniature that stood over it went the same day ("remove"). */
-  it('says what an access check is, centred in the whole canvas — no panel on arrival: the headline, one line, Check access, what the run shows', () => {
+  /* What an access check is (owner, 1 Oct 2026: "a better state, a better
+     layout and a better experience"); the run in miniature that stood over
+     it went the same day ("remove"), and a spot illustration came instead
+     ("add a good empty state with an illustration") — with the form open
+     beside it, no button. */
+  it('says what an access check is, centred in the canvas beside the open form: the picture, the headline, one line, what the run shows', () => {
     expect(empty).toContain('class="tj-empty"')
     const hiw = block(empty, 'section', 'hiw')
-    expect(hiw).toMatch(/^<section class="hiw" aria-labelledby="[^"]+"><h2 id="[^"]+" class="hiw__head">Check what access someone gets<\/h2>/)
+    expect(hiw).toMatch(
+      /^<section class="hiw" aria-labelledby="[^"]+"><svg class="hiw__ill" viewBox="0 0 220 136" role="img" aria-label="A sign-in screen, its access checked">[\s\S]*?<\/svg><h2 id="[^"]+" class="hiw__head">Check what access someone gets<\/h2>/,
+    )
     expect(text(hiw)).toBe(
-      'Check what access someone gets Choose who signs in, to which application, and from where. Your policies are checked in order, as a real sign-in is. Check access Which policy decides Which rule matched, and why What the person sees',
+      'Check what access someone gets Choose who signs in, to which application, and from where. Your policies are checked in order, as a real sign-in is. Which policy decides Which rule matched, and why What the person sees',
     )
     const gets = [...hiw.matchAll(/<li><svg[^>]*class="lucide lucide-([a-z-]+)/g)].map((m) => m[1])
     expect(gets).toEqual(['layers', 'list-checks', 'monitor-smartphone'])
@@ -520,14 +564,47 @@ describe('Sign-in tests — the canvas before the first run (§12.3, §14.3)', (
     expect(rules(pageCss)).toMatch(/\.hiw \{[^}]*width: min\(520px, 100%\);[^}]*text-align: center;/)
   })
 
+  /* The house language (BoardEmpty.tsx): a grey skeleton of the sign-in a
+     person meets, and one colour where the colour is the meaning — the
+     shield, in the allow ramp. Never the brand, never the accent. */
+  it('the picture is a grey sign-in screen and one colour, its shield in the allow ramp', () => {
+    const art = block(empty, 'svg', 'hiw__ill')
+    expect([...art.matchAll(/class="(hiw__ill-[a-z]+)/g)].map((m) => m[1])).toEqual([
+      'hiw__ill-win',
+      'hiw__ill-rule',
+      'hiw__ill-addr',
+      'hiw__ill-bar',
+      'hiw__ill-field',
+      'hiw__ill-bar',
+      'hiw__ill-bar',
+      'hiw__ill-field',
+      'hiw__ill-bar',
+      'hiw__ill-field',
+      'hiw__ill-bar',
+      'hiw__ill-bar',
+      'hiw__ill-gap',
+      'hiw__ill-shield',
+      'hiw__ill-tick',
+    ])
+    const css = rules(pageCss)
+    const ill = [...css.matchAll(/\.hiw__ill[^{]*\{[^}]*\}/g)].map((m) => m[0]).join('\n')
+    expect(ill).toContain('.hiw__ill-shield { fill: var(--fb-positive-bg); stroke: var(--fb-positive-border);')
+    expect(ill).toContain('.hiw__ill-tick { fill: none; stroke: var(--fb-positive-dot);')
+    expect(ill).not.toMatch(/--brand|--accent|--fb-negative|--fb-notice/)
+    /* A short canvas draws it smaller. */
+    expect(css).toMatch(/@container tj \(max-height: 520px\) \{[^}]*\}\s*\.hiw__ill \{ width: 176px; height: 109px;/)
+  })
+
   it('no dock on the empty canvas, as the builder’s empty policy has none', () => {
     expect(empty).not.toContain('bb__dock')
   })
 
-  it('Check access opens the panel on the form, its Person row focused — the road the sentence takes; no Saved sign-ins in this phase', () => {
-    const go = block(empty, 'div', 'hiw__act')
+  it('Check access, once the panel is shut, opens it on the form, its Person row focused — the road the sentence takes; no Saved sign-ins in this phase', () => {
+    const shut = canvas(initialTryPage(1, TODAY, '09:30'), emptyDraft(TODAY, '09:30'), 1)
+    const go = block(shut, 'div', 'hiw__act')
     expect([...go.matchAll(/<button/g)]).toHaveLength(1)
     expect(empty).not.toContain('Saved sign-ins')
+    expect(shut).not.toContain('Saved sign-ins')
     expect(pageSrc).toContain("onNode={() => openPanel(() => focusRow('person'))}")
     expect(tryPageSrc).toContain('const onPressNode = useCallback(() => latest.current.onNode(), [])')
     /* The panel opens first, and the row takes the focus once it has slid in. */
@@ -629,14 +706,18 @@ describe('Sign-in tests — the run on the canvas (§14.3)', () => {
     expect(nodeSrc).not.toMatch(/Pencil|BookmarkPlus/)
   })
 
-  it('every run on the page begins with the engine; a changed field after a run re-runs at the edit pace', () => {
+  it('every run on the page begins with the engine; only Run runs — a changed field waits for it, "Run as" runs at once at the edit pace', () => {
     /* With, inside a policy (1 Oct, the builder's Check access), its draft standing in and its own trace. */
     expect(tryPageSrc).toContain("engineRun({ res, policies, form, facts, env, ctx, names, intro: 'none', substitute, focus })")
-    const door = pageSrc.slice(pageSrc.indexOf('const patch = (p: Partial<SignInForm>, field: FormField) => {'), pageSrc.indexOf('/* The Person picker'))
-    expect(door).toContain("if (tryPage.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return")
+    const door = pageSrc.slice(pageSrc.indexOf('const patch = (p: Partial<SignInForm>, field: FormField, now = false) => {'), pageSrc.indexOf('/* The Person picker'))
+    expect(door).toContain("if (!now || tryPage.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return")
     expect(door).toContain('if (same(f, session.form)) return')
     expect(door).toContain("start(f, 'edit', { prev: session.form })")
-    expect(pageSrc).toContain("toCanvas(() => start(f, 'full', { askSaveFor }))")
+    expect(pageSrc).toContain('onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}')
+    expect(pageSrc).toContain("toCanvas(() => start(f, 'full', { askSaveFor, prev }))")
+    /* Changes not run yet: in the facts the application's rules read; said in the foot and on Edit sign-in. */
+    expect(pageSrc).toContain("const unrun = tryPage.mode === 'journey' && !same(forRun(draft, rows), forRun(session.form, rows))")
+    expect(pageSrc).toContain('unrun={unrun}')
     expect(pageSrc).toMatch(/const start = [\s\S]*?session\.load\(f\)/)
     expect(pageSrc).not.toContain('session.patch(')
     expect(tryPageSrc).not.toContain('session.patch(')

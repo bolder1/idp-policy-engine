@@ -1,0 +1,429 @@
+/* -----------------------------------------------------------------------------
+   The run as a line (LineLayout.tsx). Stage columns on the run's ground, the
+   chosen card of each on one horizontal line; cards in the builder's language
+   (board.css .bb__card): the raised surface, a hairline, radius 10, DM Sans,
+   12px the floor. Nothing here puts a transform or a transition on what
+   motion moves (the stacks, the path's segments, the answer): the colour
+   transitions below sit on the cards inside a stack, never on the stack.
+   -------------------------------------------------------------------------- */
+
+.rl-line__world {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  padding-bottom: 8px;
+}
+
+/* --- Columns ------------------------------------------------------------------------ */
+
+.rl-line__col { flex: none; position: relative; min-width: 0; }
+/* The column's one label: sentence case, quiet, the only count after it. */
+.rl-line__head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  height: 20px;
+  margin: 0 0 14px;
+  padding: 0 2px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 20px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.rl-line__headtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rl-line__count { flex: none; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rl-line__body { position: relative; }
+.rl-line__stack { display: flex; flex-direction: column; gap: 8px; }
+
+/* Where each column's chosen card stands: what the camera follows. */
+.rl-line__slot { position: absolute; pointer-events: none; visibility: hidden; }
+
+/* --- The path ------------------------------------------------------------------------- */
+
+.rl-line__seg {
+  position: absolute;
+  z-index: 0;
+  height: 2px;
+  border-radius: 1px;
+  background-color: var(--border-strong);
+  pointer-events: none;
+}
+.rl-line__seg.is-working { background-color: var(--accent); }
+.rl-line__seg.is-positive { background-color: var(--fb-positive-dot); }
+.rl-line__seg.is-negative { background-color: var(--fb-negative-dot); }
+.rl-line__seg.is-notice { background-color: var(--fb-notice-dot); }
+.rl-line__seg.is-neutral { background-color: var(--border-strong); }
+
+/* --- A card --------------------------------------------------------------------------- */
+
+.rl-line__card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-body);
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+}
+/* The head row: ROW tall on every card, so the line crosses each at its middle. */
+.rl-line__cardhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 52px;
+}
+/* A folded card's two lines share the 52px: the name, then why. A policy on
+   the line may wrap its name; its first line stays where the line crosses. */
+.rl-line__card.is-above,
+.rl-line__card.is-also { height: 52px; justify-content: center; gap: 2px; }
+.rl-line__pol.is-line { min-height: 52px; justify-content: center; gap: 2px; padding-block: 8px; }
+.rl-line__card.is-above > .rl-line__cardhead,
+.rl-line__card.is-also > .rl-line__cardhead,
+.rl-line__pol.is-line > .rl-line__cardhead { min-height: 0; }
+.rl-line__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rl-line__pol.is-chosen .rl-line__name { white-space: normal; line-height: 18px; }
+/* The rule on the line keeps its whole name too: two lines still fit its head row. */
+.rl-line__rule.is-open > .rl-line__cardhead > .rl-line__name { white-space: normal; line-height: 18px; padding-block: 8px; }
+.rl-line__pol.is-chosen > .rl-line__cardhead { align-items: flex-start; }
+.rl-line__pol.is-chosen > .rl-line__cardhead > :is(.rl-line__num, .rl-line__mark) { margin-top: 0; }
+.rl-line__sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 28px;
+  font-size: var(--fs-sm);
+  line-height: 16px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rl-line__sub .tj-skel { flex: 1 1 auto; max-width: 96px; height: 8px; }
+.rl-line__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.rl-line__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.rl-line__mark.is-pass { color: var(--fb-positive-dot); }
+.rl-line__mark.is-fail { color: var(--fb-negative-dot); }
+.rl-line__mark.is-unknown { color: var(--fb-notice-dot); }
+
+/* Where the engine works now: the one blue thing. */
+.rl-line__card.is-working { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-low); }
+/* Chosen, before the answer lands: firm, not yet a colour. */
+.rl-line__card.is-chosen { border-color: var(--border-strong); box-shadow: var(--el-mid); }
+/* Landed: the path's one tone — a hairline on the cards it runs through, the answer's twice as firm. */
+.rl-line__card.is-chosen.is-positive { border-color: var(--fb-positive-dot); }
+.rl-line__card.is-chosen.is-negative { border-color: var(--fb-negative-dot); }
+.rl-line__card.is-chosen.is-notice { border-color: var(--fb-notice-dot); }
+.rl-line__out.is-positive { border-color: var(--fb-positive-dot); box-shadow: 0 0 0 1px var(--fb-positive-dot), var(--el-mid); }
+.rl-line__out.is-negative { border-color: var(--fb-negative-dot); box-shadow: 0 0 0 1px var(--fb-negative-dot), var(--el-mid); }
+.rl-line__out.is-notice { border-color: var(--fb-notice-dot); box-shadow: 0 0 0 1px var(--fb-notice-dot), var(--el-mid); }
+.rl-line__out.is-neutral { border-color: var(--border-strong); box-shadow: var(--el-mid); }
+
+/* Above the line: read and passed over — grey, its reason in a few words. */
+.rl-line__card.is-passed { background: var(--surface-sunken); box-shadow: none; }
+.rl-line__card.is-passed .rl-line__name { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.rl-line__rule.is-passed.is-fail .rl-line__sub { color: var(--text-secondary); }
+.rl-line__rule.is-passed.is-off { opacity: 0.62; }
+/* Below the line: never needed. */
+.rl-line__card.is-dim { opacity: 0.4; box-shadow: none; }
+.rl-line__card.is-dim > .rl-line__cardhead { min-height: 36px; }
+.rl-line__card.is-dim .rl-line__name { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.rl-line__card.is-skel { box-shadow: none; }
+.rl-line__card.is-skel.is-below { opacity: 0.55; }
+.rl-line__card.is-skel.is-below > .rl-line__cardhead { min-height: 36px; }
+.rl-line__card.is-skel .tj-skel { flex: 1 1 auto; }
+/* Below, and also covering the person: amber when it is a conflict; quiet when only worth knowing. */
+.rl-line__card.is-also { box-shadow: none; }
+.rl-line__card.is-also .rl-line__name { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.rl-line__card.is-conflict { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.rl-line__card.is-conflict .rl-line__name { color: var(--text-primary); }
+.rl-line__card.is-conflict .rl-line__tag { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+.rl-line__card.is-conflict .rl-line__tag svg { flex: none; color: var(--fb-notice-dot); }
+/* Its branch off the line, in the gap before the policies: dashed, never a second path. */
+.rl-line__branches { position: absolute; z-index: 0; overflow: visible; pointer-events: none; }
+.rl-line__branches path { fill: none; stroke: var(--fb-notice-dot); stroke-width: 1.5; stroke-dasharray: 3 3; }
+
+/* The ghost: the slot a stage fills — the answer's from the first frame. */
+.rl-line__ghost { border-style: dashed; border-color: var(--border-default); background: transparent; box-shadow: none; }
+.rl-line__ghost .rl-line__name { font-weight: var(--fw-medium); color: var(--text-muted); }
+.rl-line__ghost.is-working { border-style: solid; background: var(--surface-raised); }
+.rl-line__ghost.is-empty { height: 52px; }
+.rl-line__ghost.is-working > .rl-line__cardhead { justify-content: center; }
+
+/* --- The sign-in ----------------------------------------------------------------------- */
+
+.rl-line__sign { padding-bottom: 12px; cursor: pointer; }
+.rl-line__sign:hover { border-color: var(--border-default); }
+.rl-line__sign.is-chosen:hover { border-color: var(--border-strong); }
+.rl-line__sign:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo), var(--el-mid); }
+.rl-line__signhead { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 52px; }
+.rl-line__signwho { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.rl-line__signwho strong { overflow: hidden; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); white-space: nowrap; text-overflow: ellipsis; }
+.rl-line__signwho span { overflow: hidden; font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; text-overflow: ellipsis; }
+.rl-line__signapp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 0 10px;
+  border-top: 1px solid var(--border-subtle);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+.rl-line__signapp > span:last-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-line__signto { flex: none; color: var(--text-muted); }
+.rl-line__facts { display: flex; flex-direction: column; gap: 6px; }
+.rl-line__fact { display: grid; grid-template-columns: 44px 14px minmax(0, 1fr); align-items: start; gap: 6px; font-size: var(--fs-sm); line-height: 16px; }
+.rl-line__fact > * { min-height: 16px; display: flex; align-items: center; }
+.rl-line__factlabel { color: var(--text-tertiary); }
+.rl-line__factmark { display: inline-flex; color: var(--text-secondary); }
+.rl-line__facttext { display: block !important; min-width: 0; color: var(--text-body); overflow-wrap: anywhere; }
+.rl-line__fact.is-unset .rl-line__facttext { color: var(--text-muted); }
+/* Not stated, and the answer hangs on it: what can't be told. */
+.rl-line__fact.is-needed .rl-line__facttext { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+
+/* --- The rule on the line ----------------------------------------------------------------- */
+
+.rl-line__rule.is-open { padding-bottom: 6px; }
+.rl-line__checks { display: flex; flex-direction: column; margin: 0; padding: 4px 0 2px; border-top: 1px solid var(--border-subtle); list-style: none; }
+.rl-line__check { position: relative; margin: 0; padding: 0; }
+.rl-line__check.is-working,
+.rl-line__crow,
+.rl-line__part,
+.rl-line__then {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 16px;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 0;
+  font-size: var(--fs-md);
+  line-height: 18px;
+}
+.rl-line__check + .rl-line__check { border-top: 1px dashed var(--border-subtle); }
+:is(.rl-line__check, .rl-line__crow, .rl-line__part) > :is(.rl-line__mark, .tj-spin) { align-self: start; margin-top: 1px; }
+.rl-line__cword { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+/* The fact, and under it what the rule needs: never one run-on claim. */
+.rl-line__ctext { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.rl-line__cval { font-weight: var(--fw-medium); color: var(--text-primary); }
+.rl-line__cvia { color: var(--text-secondary); }
+.rl-line__cneed { font-size: var(--fs-sm); line-height: 17px; color: var(--text-secondary); }
+.rl-line__cjoin { color: var(--text-muted); }
+:is(.rl-line__check, .rl-line__part).is-fail .rl-line__cval { color: var(--fb-negative-fg); }
+:is(.rl-line__check, .rl-line__part).is-unknown .rl-line__cval { color: var(--fb-notice-fg); }
+.rl-line__check.is-working .rl-line__cneed,
+.rl-line__check.is-working .rl-line__cval { color: var(--text-tertiary); }
+/* A read check is a button: a press says how it was read. */
+.rl-line__crow {
+  width: calc(100% + 12px);
+  margin-inline: -6px;
+  padding-inline: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-md);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.rl-line__crow:hover,
+.rl-line__crow.is-pressed { background: var(--surface-sunken); }
+.rl-line__crow:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.rl-line__then { grid-template-columns: 58px minmax(0, 1fr); border-top: 1px solid var(--border-subtle); padding-top: 8px; }
+.rl-line__thenword { color: var(--text-secondary); }
+
+/* --- Press to see why ------------------------------------------------------------------------ */
+
+.rl-line__poke { position: relative; }
+.rl-line__poke.is-open { z-index: 5; }
+.rl-line__card.is-poke { cursor: pointer; }
+.rl-line__card.is-poke:hover { border-color: var(--border-default); }
+.rl-line__card.is-poke.is-chosen:hover { border-color: var(--border-strong); }
+.rl-line__card.is-poke.is-chosen.is-positive:hover { border-color: var(--fb-positive-dot); }
+.rl-line__card.is-poke.is-chosen.is-negative:hover { border-color: var(--fb-negative-dot); }
+.rl-line__card.is-poke.is-chosen.is-notice:hover { border-color: var(--fb-notice-dot); }
+.rl-line__card.is-poke.is-conflict:hover { border-color: var(--fb-notice-dot); }
+.rl-line__card.is-dim.is-poke:hover,
+.rl-line__card.is-dim.is-pressed { opacity: 0.75; }
+.rl-line__card.is-pressed:not(.is-chosen):not(.is-conflict) { border-color: var(--border-strong); }
+.rl-line__card.is-poke:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.rl-line__card.is-dim.is-poke:focus-visible { opacity: 0.75; }
+/* The note: under what was pressed, over what follows; out of the flow. */
+.rl-line__note {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-high);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+  color: var(--text-secondary);
+  cursor: auto;
+}
+.rl-line__crow + .rl-line__note,
+.rl-line__check .rl-line__note { top: calc(100% + 2px); left: -6px; right: -6px; }
+.rl-line__notep { margin: 0; overflow-wrap: anywhere; }
+.rl-line__notep.is-lead { font-weight: var(--fw-medium); color: var(--text-primary); }
+.rl-line__notefix { display: block; margin: 4px 0 0; padding-top: 6px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); overflow-wrap: anywhere; }
+.rl-line__parts { display: flex; flex-direction: column; margin: -4px 0 0; padding: 0; list-style: none; }
+.rl-line__part { padding: 5px 0; font-size: var(--fs-sm); line-height: 17px; }
+.rl-line__part + .rl-line__part { border-top: 1px dashed var(--border-subtle); }
+.rl-line__part .rl-line__cneed { font-size: var(--fs-sm); }
+.rl-line__notethen { display: grid; grid-template-columns: 58px auto minmax(0, 1fr); gap: 0 8px; align-items: baseline; margin: 2px 0 0; padding-top: 6px; border-top: 1px solid var(--border-subtle); color: var(--text-primary); }
+.rl-line__notequiet { color: var(--text-tertiary); }
+
+/* --- The answer ------------------------------------------------------------------------------ */
+
+.rl-line__out { --tone-fg: var(--text-primary); --tone-bg: var(--surface-inset); --tone-dot: var(--text-tertiary); padding-bottom: 12px; }
+.rl-line__out.is-positive { --tone-fg: var(--fb-positive-fg); --tone-bg: var(--fb-positive-bg); --tone-dot: var(--fb-positive-dot); }
+.rl-line__out.is-negative { --tone-fg: var(--fb-negative-fg); --tone-bg: var(--fb-negative-bg); --tone-dot: var(--fb-negative-dot); }
+.rl-line__out.is-notice { --tone-fg: var(--fb-notice-fg); --tone-bg: var(--fb-notice-bg); --tone-dot: var(--fb-notice-dot); }
+.rl-line__outin { display: flex; flex-direction: column; gap: 8px; }
+.rl-line__verdict { gap: 10px; }
+.rl-line__tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--tone-bg);
+  color: var(--tone-dot);
+}
+.rl-line__word { flex: 1 1 auto; min-width: 0; font-size: var(--fs-2xl); font-weight: var(--fw-semibold); line-height: 1.2; color: var(--tone-fg); }
+.rl-line__expect { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fb-notice-fg); }
+.rl-line__expect svg { color: var(--fb-notice-dot); }
+.rl-line__by { display: flex; flex-direction: column; gap: 0; margin: -4px 0 0; padding-left: 42px; font-size: var(--fs-sm); line-height: 18px; }
+.rl-line__bylabel { color: var(--text-tertiary); }
+.rl-line__bylink {
+  display: inline;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  text-align: left;
+  cursor: pointer;
+}
+.rl-line__bylink:hover span { text-decoration: underline; }
+.rl-line__bylink:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--focus-halo); }
+.rl-line__bylink svg { display: inline-block; margin-left: 3px; vertical-align: -1px; }
+.rl-line__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding: 0 0 0 42px; list-style: none; }
+.rl-line__factors li { display: inline-flex; align-items: center; gap: 4px; }
+.rl-line__factor {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.rl-line__then-arrow { color: var(--text-muted); }
+.rl-line__deny {
+  display: -webkit-box;
+  margin: 0;
+  padding-left: 42px;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  line-height: 17px;
+  color: var(--text-secondary);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.rl-line__ifs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0 0 0 42px; list-style: none; font-size: var(--fs-sm); }
+.rl-line__ifs li { display: flex; justify-content: space-between; gap: 8px; }
+.rl-line__if { color: var(--text-tertiary); }
+.rl-line__ifword { font-weight: var(--fw-medium); color: var(--text-primary); }
+.rl-line__needs { display: flex; align-items: center; gap: 4px; margin: 0; padding-left: 42px; font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+.rl-line__needs svg { color: var(--fb-notice-dot); }
+.rl-line__vs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding-left: 42px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.rl-line__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 2px 0 0; padding: 8px 0 0 42px; border-top: 1px solid var(--border-subtle); font-size: var(--fs-sm); }
+.rl-line__finding { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: var(--text-tertiary); cursor: pointer; }
+.rl-line__finding:hover { text-decoration: underline; text-underline-offset: 2px; }
+.rl-line__finding:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--focus-halo); }
+.rl-line__finding.is-conflict { color: var(--fb-notice-fg); }
+.rl-line__finding.is-conflict svg { color: var(--fb-notice-dot); }
+.rl-line__changed { color: var(--text-tertiary); }
+.rl-line__seebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.rl-line__seebtn:hover,
+.rl-line__seebtn.is-open { color: var(--text-primary); }
+.rl-line__seebtn:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* What they see, on demand, under the answer: out of the flow, so opening it
+   never grows the world (and re-centres the line); the ground pans to it. */
+.rl-line__see { position: absolute; top: calc(100% + 8px); left: 0; z-index: 2; padding: 10px; }
+.rl-line__see .tsee__title { display: none; }
+.rl-line__see .tsee { margin: 0; }
+
+/* The answer's findings, on demand, where What they see opens. */
+.rl-line__findings { padding: 10px 12px; }
+.rl-line__flist { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); line-height: 17px; }
+.rl-line__flist li { display: flex; flex-direction: column; gap: 2px; }
+.rl-line__fhead { display: flex; align-items: flex-start; gap: 6px; font-weight: var(--fw-medium); color: var(--text-primary); }
+.rl-line__fhead svg { flex: none; margin-top: 2px; color: var(--text-tertiary); }
+.rl-line__flist li.is-conflict .rl-line__fhead svg { color: var(--fb-notice-dot); }
+.rl-line__fline { padding-left: 18px; color: var(--text-secondary); }
+.rl-line__flist .rl-line__notefix { margin-left: 18px; }

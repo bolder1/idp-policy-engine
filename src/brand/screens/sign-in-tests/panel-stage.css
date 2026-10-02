@@ -1,0 +1,290 @@
+/* -----------------------------------------------------------------------------
+   The Configure panel beside a DARK stage (owner, 2 Oct 2026: "all the places
+   we have dark mode, I want to treat the Configure panel that way as well — as
+   we have in light mode, the same way it should be in dark mode").
+
+   The page puts the stage on `.sit` (`data-stage`, SignInTests.tsx) — dark only
+   for a layout that has a dark stage and is showing it — and on the app root
+   (`data-check-stage`), because the panel's pickers, popovers and its Who
+   dialog open there, outside the page. Under it the console's own dark tokens
+   are redeclared for the panels on the right (`.bb__insp`: Check access, Why,
+   Break-in attempts) and for the layers THEY opened alone, so every control in
+   them — fields, pickers, buttons, chips, the foot — turns dark by the tokens
+   it already reads, and nothing else on the page changes; in light nothing
+   here applies at all.
+
+   Which layers are the panel's: a list, popover or menu is portalled to the
+   root and carries nothing of where it came from, so it is matched while a
+   control in a dark-stage panel is expanded (`aria-expanded`, set by Picker,
+   the condition rows and the row menus) — a picker opened from the page's bar
+   at the same stage stays light. The Who dialog has no expanded trigger; it is
+   matched by its own list (`.sit-ident__list`, IdentityField.tsx).
+
+   Two layers of values. First the console's dark theme (tokens.css,
+   console-theme.css `:root[data-theme='dark']`), for the console's own look.
+   Then, under the rebrand (`data-brand='rebrand'`, rebrand.css — the live
+   console's look, light only there), the rebrand's light tokens one for one in
+   dark: transparent fields on the panel, one blue for state and focus, the
+   Bootstrap grey ramp stepped for a dark ground with every text step at AA.
+   The one orange button stays the console's orange in both.
+   -------------------------------------------------------------------------- */
+
+/* Where the tokens are redeclared: the panels, and their layers — and
+   Edit sign-in on the run's line, pressed while the panel is open. */
+.sit[data-stage='dark'] .bb__insp,
+.sit[data-stage='dark'] .tj-engine__edit,
+.brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop),
+.brand-root[data-check-stage='dark'] .bx-modal:has(.sit-ident__list) {
+  --surface-page: #131922;
+  --surface-raised: #1a212a;
+  --surface-sunken: #0d1218;
+  --surface-inset: #19212b;
+  --surface-overlay: #1a212a;
+  --surface-inverse: #f8fafb;
+  --border-subtle: #262e38;
+  --border-default: #45505d;
+  --border-strong: #7e8b9a;
+  --text-primary: #f8fafb;
+  --text-body: #d2dae3;
+  --text-secondary: #aeb9c6;
+  --text-tertiary: #97a3b0;
+  --text-muted: #8a96a3;
+  --text-disabled: #56616d;
+  --text-inverse: #0d1218;
+  --text-on-brand: #ffffff;
+  --text-link: #6ea8fe;
+  --text-placeholder: #8a95a1;
+  --brand-text: #f08a68;
+  --brand-subtle-bg: #2e0f06;
+  --brand-subtle-border: #63230f;
+  --int-neutral-bg: #1a212a;
+  --int-neutral-bg-hover: #232d39;
+  --int-neutral-bg-active: #33404e;
+  --int-neutral-border: #45505d;
+  --int-neutral-border-hover: #5a6775;
+  --int-neutral-text: #f8fafb;
+  --int-danger-bg: #e0245c;
+  --int-danger-bg-hover: #c8103d;
+  --int-danger-text: #ffffff;
+  --int-ghost-bg-hover: #232d39;
+  --int-ghost-bg-active: #33404e;
+  --int-ghost-text: #aeb9c6;
+  --state-hover-bg: #232d39;
+  --state-press-bg: #2b3644;
+  --fb-positive-bg: #0a3319;
+  --fb-positive-border: #166f38;
+  --fb-positive-fg: #4cc47c;
+  --fb-positive-dot: #2fb463;
+  --fb-negative-bg: #3d0a12;
+  --fb-negative-border: #a81f38;
+  --fb-negative-fg: #ff7f9e;
+  --fb-negative-dot: #f04d78;
+  --fb-notice-bg: #3a2705;
+  --fb-notice-border: #a87b12;
+  --fb-notice-fg: #f5c452;
+  --fb-notice-dot: #e8ae2b;
+  --fb-info-bg: #0a2242;
+  --fb-info-border: #1f4f9a;
+  --fb-info-fg: #8bb8ff;
+  --fb-info-dot: #4d94ff;
+  --fb-neutral-bg: #222a34;
+  --fb-neutral-border: #333e4a;
+  --fb-neutral-fg: #b9c3ce;
+  --fb-neutral-dot: #7e8b9a;
+  --fb-accent-bg: #221a3d;
+  --fb-accent-border: #5a45a8;
+  --fb-accent-fg: #b4a0f5;
+  --fb-accent-dot: #8b6ef0;
+  --fb-lime-bg: #1e2a08;
+  --fb-lime-border: #5c8215;
+  --fb-lime-fg: #a8ce56;
+  --fb-lime-dot: #8ab52c;
+  --fb-magenta-bg: #330d2f;
+  --fb-magenta-border: #973a8d;
+  --fb-magenta-fg: #e79ade;
+  --fb-magenta-dot: #cf5cc2;
+  --focus-ring: #93a0ae;
+  --focus-ring-danger: #ff6b6b;
+  --focus-halo: rgba(147, 160, 174, 0.24);
+  --tint-slate-bg: #232a33;
+  --tint-slate-fg: #93a1b3;
+  --tint-teal-bg: #16292b;
+  --tint-teal-fg: #4dada9;
+  --tint-green-bg: #172a20;
+  --tint-green-fg: #4fa877;
+  --tint-blue-bg: #1a2634;
+  --tint-blue-fg: #6d9fd8;
+  --tint-indigo-bg: #222235;
+  --tint-indigo-fg: #8f89e0;
+  --tint-amber-bg: #2b2418;
+  --tint-amber-fg: #c39a4e;
+  --pri-1-bg: #1e242c;
+  --pri-1-fg: #7d8894;
+  --pri-2-bg: #1b2c44;
+  --pri-2-fg: #7fa6db;
+  --pri-3-bg: #1c3a5e;
+  --pri-3-fg: #a9caf7;
+  --card-dot: rgba(255, 255, 255, 0.1);
+  --accent: #4d94ff;
+  --accent-hover: #6ea8fe;
+  --accent-strong: #9ec5fe;
+  --accent-soft: rgba(77, 148, 255, 0.16);
+  --accent-soft-border: rgba(110, 168, 254, 0.45);
+  --blue: #4d94ff;
+  --blue-hover: #6ea8fe;
+  --blue-strong: #9ec5fe;
+  --blue-soft: rgba(77, 148, 255, 0.16);
+  --blue-soft-hover: rgba(77, 148, 255, 0.24);
+  --ctl-bg: #161d26;
+  --ctl-bg-hover: #1b232d;
+  --ctl-border: #3a4552;
+  --ctl-border-hover: #56626f;
+  --ctl-border-focus: #7f8c9a;
+  --table-head-bg: var(--surface-sunken);
+  --table-head-fg: var(--text-secondary);
+  --table-head-rule: var(--border-default);
+  --table-rule: var(--border-subtle);
+  --table-row-hover: var(--surface-inset);
+  /* Shadows read as edges on a dark ground only when they are deep. */
+  --el-mid: 0 2px 8px rgba(0, 0, 0, 0.32);
+  --el-high: 0 8px 24px rgba(0, 0, 0, 0.44);
+  --el-overlay: 0 16px 48px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+  color: var(--text-primary);
+}
+
+/* The rebrand's light tokens, one for one, in dark (rebrand.css `:root`). */
+[data-brand='rebrand'] .sit[data-stage='dark'] .bb__insp,
+[data-brand='rebrand'] .sit[data-stage='dark'] .tj-engine__edit,
+[data-brand='rebrand'] .brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop),
+[data-brand='rebrand'] .brand-root[data-check-stage='dark'] .bx-modal:has(.sit-ident__list) {
+  /* #fff / #f8f9fa / #f1f3f5 → the panel, a step down, a step up. */
+  --surface-page: #161c24;
+  --surface-raised: #1d242d;
+  --surface-overlay: #222a34;
+  --surface-sunken: #181e26;
+  --surface-inset: #262f3a;
+  --surface-inverse: #f1f4f7;
+  /* #eef0f2 / #dee2e6 / #ced4da */
+  --border-subtle: #2d3641;
+  --border-default: #3d4855;
+  --border-strong: #58646f;
+  /* #212529 · #495057 · #5c636a · #646c75 · #6c757d · #adb5bd */
+  --text-primary: #e9edf1;
+  --text-body: #dce2e8;
+  --text-secondary: #bcc5cf;
+  --text-tertiary: #a6b0bc;
+  --text-muted: #9aa5b1;
+  --text-placeholder: #8d98a5;
+  --text-disabled: #5d6875;
+  --text-inverse: #10151c;
+  --text-link: #6ea8fe;
+  /* One blue for state: #0d6efd lifted for a dark ground. */
+  --blue: #5b9dff;
+  --blue-hover: #7ab0ff;
+  --blue-strong: #a8cbff;
+  --blue-soft: rgba(77, 148, 255, 0.18);
+  --blue-soft-hover: rgba(77, 148, 255, 0.26);
+  --accent: #5b9dff;
+  --accent-hover: #7ab0ff;
+  --accent-strong: #a8cbff;
+  --accent-soft: rgba(77, 148, 255, 0.18);
+  --accent-soft-border: rgba(110, 168, 254, 0.5);
+  --focus-ring: #6ea8fe;
+  --focus-halo: rgba(110, 168, 254, 0.3);
+  --focus-ring-danger: #ff7a85;
+  /* Fields: an edge on the panel, nothing behind them. */
+  --ctl-bg: transparent;
+  --ctl-bg-hover: transparent;
+  --ctl-border: #3d4855;
+  --ctl-border-hover: #58646f;
+  --ctl-border-focus: #5b9dff;
+  --int-neutral-text: #f1f4f7;
+  --int-ghost-text: #bcc5cf;
+  --int-ghost-bg-hover: #29323d;
+  --int-ghost-bg-active: #313b47;
+  --int-danger-bg: #e5484d;
+  --int-danger-bg-hover: #cf3d42;
+  --state-hover-bg: #29323d;
+  --state-press-bg: #313b47;
+  /* The orange is the console's, in both. */
+  --brand: #eb5424;
+  --brand-hover: #d64c21;
+  --brand-active: #a73c1a;
+  --brand-on-fill: #eb5424;
+  --int-brand-bg: #eb5424;
+  --int-brand-bg-hover: #d64c21;
+  --int-brand-bg-active: #a73c1a;
+  --int-brand-text: #ffffff;
+  --rb-cta: #eb5424;
+  --rb-cta-hover: #d64c21;
+  --rb-cta-active: #a73c1a;
+  /* The states keep the rebrand's quiet: a tinted ground, an edge one step
+     off it (light: #e8f5ee on #bcdfca), and the ink at AA on both. */
+  --fb-positive-bg: #12301f;
+  --fb-positive-border: #1f5a37;
+  --fb-positive-fg: #5fd08e;
+  --fb-positive-dot: #34b86a;
+  --fb-negative-bg: #3a141b;
+  --fb-negative-border: #8c2d43;
+  --fb-negative-fg: #ff8fa6;
+  --fb-negative-dot: #f04d6c;
+  --fb-notice-bg: #33270d;
+  --fb-notice-border: #6e5416;
+  --fb-notice-fg: #f2c55c;
+  --fb-notice-dot: #e3ab2b;
+  --fb-info-bg: #13263f;
+  --fb-info-border: #24497a;
+  --fb-info-fg: #92bcff;
+  --fb-info-dot: #5b9dff;
+  --fb-neutral-bg: #29323d;
+  --fb-neutral-border: #3d4855;
+  --fb-neutral-fg: #bcc5cf;
+  --fb-neutral-dot: #8d98a5;
+  --table-head-bg: #181e26;
+  --table-head-fg: #bcc5cf;
+  --table-head-rule: #2d3641;
+  --table-rule: #2d3641;
+  --table-row-hover: #222a34;
+}
+
+/* The panel's own ground and edge on the dark stage. */
+.sit[data-stage='dark'] .bb__insp {
+  background: var(--surface-raised);
+  border-color: var(--border-subtle);
+}
+
+/* Fetched app logos are drawn for a light ground — GitHub's mark is black —
+   so on the dark panel and in its lists each sits on a small light tile, the
+   way a dark console shows a brand mark, and keeps its own colours. */
+.sit[data-stage='dark'] .bb__insp .applogo--img,
+.brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop) .applogo--img {
+  background: #f1f4f7;
+  border-color: transparent;
+  padding: 1px;
+}
+
+/* A row in the Who dialog lifts on hover, as a row on a dark ground does;
+   in light it dips to the sunken grey, which on dark reads as a hole. */
+.brand-root[data-check-stage='dark'] .bx-modal:has(.sit-ident__list) .bb__whoitem:hover {
+  background: var(--state-hover-bg);
+}
+
+/* Jarvis's panel wears its own navy glass (jarvis-mode/jarvis-chrome.css); the
+   lists, popovers and Who dialog it opens take the same navy, solid, so a
+   list never opens grey out of a navy panel. */
+.brand-root[data-check-stage='dark']:has(.sit.is-jarvis[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop),
+.brand-root[data-check-stage='dark']:has(.sit.is-jarvis[data-stage='dark']) .bx-modal:has(.sit-ident__list) {
+  --surface-raised: #0a1729;
+  --surface-overlay: #0a1729;
+  --surface-sunken: #07111f;
+  --surface-inset: #0f2038;
+  --state-hover-bg: #12253f;
+  --state-press-bg: #17304f;
+  --int-ghost-bg-hover: #12253f;
+  --int-ghost-bg-active: #17304f;
+  --border-subtle: rgba(130, 200, 255, 0.16);
+  --border-default: rgba(130, 200, 255, 0.24);
+  --ctl-border: rgba(130, 200, 255, 0.22);
+  --ctl-border-hover: rgba(130, 200, 255, 0.4);
+}

@@ -43,7 +43,14 @@ import { tokenDomId, tokenOfField, type TokenId } from './testing/sign-in-senten
 /* The builder's sheet: the page wears its bar, region, dock and panel, and
    may be the first of the two opened in a visit. */
 import './board/board.css'
-import { BREAK_IN_ATTEMPTS, SAVED_SIGN_INS } from './sign-in-tests/phase'
+import { BREAK_IN_ATTEMPTS, CANVAS_OPTIONS, SAVED_SIGN_INS } from './sign-in-tests/phase'
+import { CanvasSwitch, DedicatedViews } from './sign-in-tests/CanvasSwitch'
+import { CanvasReasoning } from './sign-in-tests/CanvasReasoning'
+import { useCheckStage, useFavourites } from './sign-in-tests/canvas-shelf'
+import { JARVIS_END_MS, JARVIS_MID_MS, JarvisButton, JarvisTransition, JarvisVersion, type JarvisPhase } from './sign-in-tests/jarvis-mode/JarvisMode'
+import { GuidedTourSoon } from './sign-in-tests/GuidedTourSoon'
+import { DARK_ONLY, FIRST_LAYOUT, JARVIS, JARVIS2, JARVIS_VERSION_KEY, STAGED_LAYOUTS, isJarvis, useRunLayout, type RunLayoutId } from './sign-in-tests/run-layout'
+import './sign-in-tests/panel-stage.css'
 
 /* -----------------------------------------------------------------------------
    Sign-in tests: the tenant's page, in the policy builder's layout
@@ -79,19 +86,23 @@ import { BREAK_IN_ATTEMPTS, SAVED_SIGN_INS } from './sign-in-tests/phase'
    form (TryPanel.tsx), in the rule Inspector's chrome, or the saved
    sign-ins (`SavedPanel`), in the same chrome.
 
-   The panel is ON DEMAND (owner, 30 Sep: "when the user comes the first
-   time, don't show the configuration on the right side; first the user
-   should click on the button, then it appears; and after configuration and
-   the run it should close and we should focus on the main canvas"). A visit
-   opens on the canvas alone, its track closed (`.bb.is-insp-closed`), so the
-   canvas has the whole width. What opens it on the form: Check access on the
-   empty canvas — the page's orange while the panel is shut, pressed and
-   secondary while it is open, when Run in the panel's foot is the one
-   orange; the sentence at the top of a run; Add on a Not stated row; Run
-   with something missing. On the saved sign-ins: Saved sign-ins on the empty
-   canvas, and a route to them (the board's link). What shuts it: Run, or a
-   saved sign-in picked, which hand the focus to the canvas — the run begins
-   once the panel has slid out, on the whole canvas; its X; Escape.
+   The panel is OPEN on a first visit (owner, 1 Oct 2026: "when we come
+   inside I don't want the button, so by default open the right side as the
+   first-time view" — it was on demand from 30 Sep, behind Check access on
+   the empty canvas). A visit that lands on an empty canvas opens with the
+   form beside it, already there rather than slid in, and the empty canvas
+   draws no button while the form is open: Run in the panel's foot is the
+   one orange. A revisit lands on its run, settled, the panel shut and its
+   track closed (`.bb.is-insp-closed`), so the canvas has the whole width.
+   What opens it on the form again: Check access on the empty canvas, drawn
+   only once the panel has been shut — the page's orange then; the sentence
+   at the top of a run; Add on a Not stated row; Run with something missing.
+   On the saved sign-ins: Saved sign-ins on the empty canvas, and a route to
+   them (the board's link). What shuts it: Run, or a saved sign-in picked,
+   which hand the focus to the canvas — the run begins once the panel has
+   slid out, on the whole canvas (owner, 30 Sep: "after configuration and the
+   run it should close and we should focus on the main canvas"); its X;
+   Escape.
 
    No tabs. People, Runs and the Saved sign-ins table are locked off by one
    constant (`TABLES`), their code and tests kept; saved sign-ins are
@@ -106,13 +117,17 @@ import { BREAK_IN_ATTEMPTS, SAVED_SIGN_INS } from './sign-in-tests/phase'
      application missing opens the panel, says why under that row and takes
      the focus there. Otherwise it is a `load`: the run plays at full pace —
      again, if nothing changed.
-   - After a run, a changed field IS a run, at the edit pace: Run is not
-     needed again. A change the facts object to (an address that is not one)
-     waits, marked, until it is right.
-   - A saved sign-in fills the panel, names it, and runs, the panel shut.
-   - The sentence on the canvas, and Check access on the empty canvas, open
-     the panel on its Person picker; Add on a Not stated row opens that
-     fact's row.
+   - Only Run runs (owner, 2 Oct 2026: "unless I click the run button,
+     don't run"). A changed field changes the form; the run on the canvas
+     stays as it was, and the panel's foot says the changes are not run yet,
+     as Edit sign-in on the run's line does with the panel shut. Run then
+     plays them, and the answer says what the change did. Presses that say
+     they run — Replay, "Run as Engineering only", a break-in attempt's
+     Run this sign-in — still run.
+   - A saved sign-in fills the panel and names it; Run takes the focus.
+   - The sentence on the canvas, Edit sign-in on the run's line (every
+     layout's), and Check access on the empty canvas open the panel on its
+     Person picker; Add on a Not stated row opens that fact's row.
    - Open policy, from the journey, is the journey's own (TryJourney.tsx).
 
    Break-in attempts (owner, 1 Oct 2026: "can we implement it in the check
@@ -165,6 +180,9 @@ const LEAVE_MS = 260
    attempts' strip or link, which open the attempts. */
 const WHY_DOOR = '.sit__stage .tj-hero__whybtn:not(.tj-hero__attempts), .sit__stage button.tj-hero__strip:not(.tj-hero__attempts)'
 
+/** The form's Run, which a loaded saved sign-in hands the focus to. */
+const RUN_BUTTON = '.sit-panel__foot .bx-btn--brand'
+
 /** Two sign-ins are the same run when every fact is. */
 const same = (a: SignInForm, b: SignInForm) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -198,11 +216,14 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
      failed (break-in-app.ts `attemptPlay`). */
   const [loaded, setLoaded] = useState<{ name: string; form: SignInForm; expected: SavedSignIn['expected']; weaker?: string | null } | null>(null)
   const [wide, setWide] = useState(true)
-  /* The panel: shut on arrival — the canvas alone — until it is asked for;
-     then the sign-in's form, or the saved sign-ins, the why, or the
-     break-in attempts. A route to Saved sign-ins (the board's link) opens on
-     them. */
-  const [panel, setPanel] = useState<'form' | 'saved' | 'why' | 'break-in' | null>(null)
+  /* The panel: open on the form when the visit lands on an empty canvas —
+     the form is the first thing a check needs (owner, 1 Oct 2026: "when we
+     come inside I don't want the button, so by default open the right side
+     as the first-time view") — and shut on a revisit, which shows the run
+     where it was. Then the sign-in's form, or the saved sign-ins, the why,
+     or the break-in attempts. A route to Saved sign-ins (the board's link)
+     opens on them. */
+  const [panel, setPanel] = useState<'form' | 'saved' | 'why' | 'break-in' | null>(() => (tryPage.mode === 'form' ? 'form' : null))
   /* The why's panel body, for the run to draw the why into. */
   const [whySlot, setWhySlot] = useState<HTMLDivElement | null>(null)
   /* Where the attempts were opened from: the why's section gives them a way back to it. */
@@ -226,6 +247,66 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   const [focusRun, setFocusRun] = useState(0)
   /* The canvas's zoom, from the dock: the run's column scaled, the dots with it. */
   const [zoom, setZoom] = useState(1)
+  /* The layout the run is drawn in, while the layouts are compared (phase.ts `CANVAS_OPTIONS`). */
+  const [layout, setLayout] = useRunLayout()
+  /* The owner's shelves (canvas-shelf.ts): his favourites, the rest the archive. */
+  const [favourites, toggleFavourite] = useFavourites()
+  /* The Configure panel follows the stage of a layout that has one (owner, 2 Oct
+     2026: "all the places we have dark mode, I want to treat the Configure panel
+     that way as well") — dark beside a dark stage, as it is light beside a light
+     one. Its pickers' lists open outside the page, under the app root, so the
+     root carries the stage too (panel-stage.css). */
+  const checkStage = useCheckStage()
+  const panelStage: 'light' | 'dark' = DARK_ONLY.includes(layout) || (STAGED_LAYOUTS.includes(layout) && checkStage === 'dark') ? 'dark' : 'light'
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>('.brand-root')
+    if (!root) return
+    root.dataset.checkStage = panelStage
+    return () => {
+      delete root.dataset.checkStage
+    }
+  }, [panelStage])
+  /* Jarvis's own way in (jarvis-mode/JarvisMode.tsx): the bar's button plays
+     the transition over the stage, the run is redrawn as Jarvis at its middle,
+     and pressed again goes back to the layout it came from, the same way out.
+     Two versions (2 Oct 2026): the first Jarvis, and v2 the Reactor — the switch
+     beside the button picks, and the button enters the one picked last. */
+  const [jarvisPhase, setJarvisPhase] = useState<JarvisPhase | null>(null)
+  const onJarvis = isJarvis(layout)
+  const beforeJarvis = useRef<RunLayoutId>(onJarvis ? FIRST_LAYOUT : layout)
+  const [jarvisVersion, setJarvisVersion] = useState<RunLayoutId>(() => {
+    try {
+      return window.localStorage.getItem(JARVIS_VERSION_KEY) === JARVIS2 ? JARVIS2 : JARVIS
+    } catch {
+      return JARVIS
+    }
+  })
+  const pickJarvisVersion = (v: RunLayoutId) => {
+    setJarvisVersion(v)
+    setLayout(v)
+    try {
+      window.localStorage.setItem(JARVIS_VERSION_KEY, v)
+    } catch {
+      /* Not remembered: the next visit enters the first Jarvis. */
+    }
+  }
+  const jarvisTimers = useRef<number[]>([])
+  useEffect(() => () => jarvisTimers.current.forEach((t) => window.clearTimeout(t)), [])
+  const toggleJarvis = () => {
+    if (jarvisPhase) return
+    const entering = !onJarvis
+    const next = entering ? jarvisVersion : beforeJarvis.current
+    if (entering) beforeJarvis.current = layout
+    if (reduced) {
+      setLayout(next)
+      return
+    }
+    setJarvisPhase(entering ? 'enter' : 'exit')
+    jarvisTimers.current = [
+      window.setTimeout(() => setLayout(next), JARVIS_MID_MS),
+      window.setTimeout(() => setJarvisPhase(null), JARVIS_END_MS),
+    ]
+  }
 
   // --- The panel's sign-in ---
 
@@ -426,15 +507,20 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     shutBeside()
     session.load(f)
   }
+  /* Run: the form as it stands. After a run, the answer says what a change
+     did to it, as an edit's re-run did before Run became the only way in. A
+     saved sign-in loaded and left as it was runs as it was saved, so the
+     answer can set what it expects beside what it got. */
   const run = () => {
     if (found.length > 0) {
       setSubmitted(true)
       openPanel(() => focusRow(issueToken(found)))
       return
     }
-    const f = forRun(draft, rows)
+    const f = loaded && same(draft, loaded.form) ? loaded.form : forRun(draft, rows)
+    const prev = tryPage.mode === 'journey' && !same(f, session.form) ? session.form : null
     const askSaveFor = tryPage.askSaveFor
-    toCanvas(() => start(f, 'full', { askSaveFor }))
+    toCanvas(() => start(f, 'full', { askSaveFor, prev }))
   }
   const runLatest = useRef(run)
   useEffect(() => {
@@ -455,36 +541,49 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   }, [])
 
   /* A field changed. The application brings the facts its rules read, filled
-     with defaults where nothing was set by hand. After a run, the change is a
-     run of its own, at the edit pace, once the facts are right. */
-  const patch = (p: Partial<SignInForm>, field: FormField) => {
+     with defaults where nothing was set by hand. It changes the form and
+     nothing else: Run runs it (owner, 2 Oct 2026: "unless I click the run
+     button, don't run — now if I make any change it runs automatically").
+     `now` is a press that says it runs — the canvas's "Run as Engineering
+     only" — and that runs at once, at the edit pace, once the facts are right. */
+  const patch = (p: Partial<SignInForm>, field: FormField, now = false) => {
     const touched = tryPage.touched.includes(field) ? tryPage.touched : [...tryPage.touched, field]
     let next = { ...tryPage.draft, ...p }
     const nextRows = field === 'app' ? rowsRead(policies, null, next.appId, lib) : rows
     if (field === 'app') next = withDefaults(next, nextRows, touched, todayIn(), nowIn())
     setTryPage((pg) => ({ ...pg, draft: next, touched }))
     setLoaded(null)
-    if (tryPage.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return
+    if (!now || tryPage.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return
     const f = forRun(next, nextRows)
     if (same(f, session.form)) return
     start(f, 'edit', { prev: session.form })
   }
 
   /* The Person picker: a person, or a group — its member runs (§13.3). */
-  const pickPerson = (value: string) => {
+  const pickPerson = (value: string, now = false) => {
     const pick = personPick(value, users)
     setAsGroup(pick.asGroup)
-    patch({ personId: pick.personId }, 'person')
+    patch({ personId: pick.personId }, 'person', now)
   }
 
-  /* A saved sign-in fills the panel, names it, and runs, at full pace —
-     with the panel shut: the run is what was asked for. */
+  /* A saved sign-in fills the form and names it — from the form's Use a
+     saved sign-in, or the Saved sign-ins panel, which gives way to the form
+     — and waits for Run, which takes the focus. */
   const trySaved = (sv: SavedSignIn) => {
     const f = formOf(sv.facts, zones)
     setAsGroup(null)
     setLoaded({ name: sv.name, form: f, expected: sv.expected })
-    toCanvas(() => start(f, 'full', { draft: f, touched: [] }))
+    setTryPage((pg) => ({ ...pg, draft: f, touched: [] }))
+    setSubmitted(false)
+    setSavedAt(null)
+    openPanel(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))
   }
+  /* The form has changes the run on the canvas has not checked — in the
+     facts the application's rules read: a device on an application no rule
+     asks about changes no answer. */
+  const unrun = tryPage.mode === 'journey' && !same(forRun(draft, rows), forRun(session.form, rows))
+  /* Edit sign-in, on the run's line: the form, on its Person row; pressed again, shut. */
+  const editSignIn = () => (panelOpen ? closePanel(true) : openPanel(() => focusRow('person')))
 
   /* A break-in attempt pressed plays as a saved sign-in does: the form
      filled with it on this application (break-in-app.ts `attemptPlay`, the
@@ -571,12 +670,31 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
      (phase.ts) — and the empty canvas leaves Saved sign-ins out. */
   const anySaved = SAVED_SIGN_INS && savedSignIns.some((sv) => !sv.generated)
   return (
-    <div className="sit">
+    <div className={`sit${onJarvis ? ' is-jarvis' : ''}${layout === JARVIS2 ? ' is-jarvis2' : ''}`} data-stage={panelStage}>
       {/* The builder's bar: where you are, and nothing else — the page's two
           ways in, Check access and Saved sign-ins, are the canvas's (owner,
           1 Oct 2026: "move these two buttons inside the canvas"). Named once
           (names.ts; "something related to access"). */}
-      <BoardBarPlain title={ACCESS_CHECKS} />
+      {/* While the run's layouts are compared (phase.ts): the Canvas switch with
+          its two shelves, the reasoning behind each layout, the guided tour to
+          come, and Jarvis's own button. */}
+      <BoardBarPlain
+        title={ACCESS_CHECKS}
+        actions={
+          CANVAS_OPTIONS ? (
+            <>
+              <CanvasSwitch value={layout} onChange={setLayout} favourites={favourites} />
+              <span className="sit-bar__sep" aria-hidden />
+              <DedicatedViews value={layout} onChange={setLayout} />
+              <JarvisButton on={onJarvis} onPress={toggleJarvis} busy={jarvisPhase !== null} />
+              {onJarvis && !jarvisPhase && <JarvisVersion value={layout === JARVIS2 ? JARVIS2 : JARVIS} onChange={pickJarvisVersion} />}
+              <span className="sit-bar__sep" aria-hidden />
+              <CanvasReasoning layout={layout} favourites={favourites} onToggleFavourite={toggleFavourite} />
+              <GuidedTourSoon />
+            </>
+          ) : undefined
+        }
+      />
       {/* The builder's region: the dotted ground under the canvas and the
           panel alike, the canvas in the middle track, the panel floating in
           the right one — a track closed to nothing while the panel is shut,
@@ -599,11 +717,15 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
             focusRun={focusRun}
             panel={panel === 'form' || panel === 'saved' ? panel : null}
             why={why}
-            onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`)}
+            onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}
             loaded={loaded}
             breakIn={breakIn}
             onReviewBreakIn={reviewBreakIn}
             onReplay={shutBeside}
+            onEdit={editSignIn}
+            editing={panelOpen}
+            unrun={unrun}
+            layout={layout}
           />
         </div>
         <AnimatePresence initial={false}>
@@ -621,6 +743,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
               onPerson={pickPerson}
               onPatch={patch}
               onRun={run}
+              unrun={unrun}
               saved={savedSignIns}
               onUseSaved={trySaved}
               savedOpen={savedAt === 'panel'}
@@ -664,6 +787,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
             />
           )}
         </AnimatePresence>
+        {jarvisPhase && <JarvisTransition phase={jarvisPhase} stage="dark" />}
       </div>
     </div>
   )

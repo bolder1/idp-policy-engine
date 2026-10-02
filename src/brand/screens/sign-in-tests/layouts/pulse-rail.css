@@ -1,0 +1,42 @@
+/* -----------------------------------------------------------------------------
+   Pulse's rail and playhead (pulse-rail.tsx), and its dock button. Motion
+   moves the playhead, the knob and the blue rail cursor (left), so none of
+   them carries a CSS transform or transition.
+   -------------------------------------------------------------------------- */
+
+.rl-pulse__rail { position: absolute; left: 0; z-index: 4; cursor: ew-resize; touch-action: none; }
+.rl-pulse__railline { position: absolute; top: 9px; height: 0; border-top: 1px solid var(--pl-line-2); pointer-events: none; }
+.rl-pulse__sec { position: absolute; top: 0; height: 100%; pointer-events: none; }
+.rl-pulse__secedge { position: absolute; left: 0; top: 4px; height: 11px; border-left: 1px solid var(--pl-line-3); }
+.rl-pulse__seclabel { position: absolute; left: 0; right: 4px; top: 22px; display: flex; align-items: baseline; gap: 6px; min-width: 0; padding-left: 6px; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--pl-text-3); white-space: nowrap; }
+.rl-pulse__sectext { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rl-pulse__seccount { flex: none; color: var(--pl-muted); font-variant-numeric: tabular-nums; }
+/* A tick for each stop, in its meaning's colour. */
+.rl-pulse__tick { position: absolute; top: 5px; width: 2px; height: 9px; border-radius: 1px; background: var(--pl-line-3); pointer-events: none; }
+.rl-pulse__tick.is-positive { background: var(--pl-pass); }
+.rl-pulse__tick.is-negative { background: var(--pl-fail); }
+.rl-pulse__tick.is-notice { background: var(--pl-notice); }
+/* While the engine works: the blue cursor on the rail, with the tip. */
+.rl-pulse__railtip { position: absolute; top: 3px; width: 2px; height: 13px; margin-left: -1px; border-radius: 1px; background: var(--pl-work); box-shadow: 0 0 0 3px var(--pl-work-soft); pointer-events: none; }
+/* The playhead: a hairline up through the trace, and its knob on the rail. */
+.rl-pulse__play { position: absolute; z-index: 1; width: 0; margin-left: -0.5px; border-left: 1px dashed var(--pl-text-3); pointer-events: none; }
+.rl-pulse__play.is-drag { border-left-style: solid; }
+.rl-pulse__knob {
+  position: absolute;
+  top: 1px;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 2px solid var(--pl-text-2);
+  border-radius: 50%;
+  background: var(--pl-surface);
+  box-shadow: var(--pl-el-2);
+  cursor: grab;
+}
+.rl-pulse__knob:hover { border-color: var(--pl-text); }
+.rl-pulse__knob:active { cursor: grabbing; }
+.rl-pulse__knob:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--pl-focus), var(--pl-el-2); }
+
+/* The dock's word button. */
+.bb__act.rl-pulse__dockbtn { width: auto; padding: 0 8px; font: inherit; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.bb__act.rl-pulse__dockbtn.is-on { background: var(--pl-inset); color: var(--pl-text); }

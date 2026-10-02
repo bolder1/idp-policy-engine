@@ -684,7 +684,7 @@ describe('As each group runs again as the group', () => {
     expect(whySrc).toContain('onClick={() => onAsGroup(g.groupId!)}')
     expect(journeySrc).toContain('onAsGroup={onAsGroup}')
     expect(tryJourneySrc).toContain('onAsGroup={onAsGroup}')
-    expect(pageSrc).toContain('onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`)}')
+    expect(pageSrc).toContain('onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}')
   })
 })
 

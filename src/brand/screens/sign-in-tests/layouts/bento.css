@@ -1,0 +1,591 @@
+/* -----------------------------------------------------------------------------
+   The run as a BENTO board (BentoLayout.tsx): tiles of different sizes on the
+   canvas, each one idea. Light is the console's own look (white raised
+   tiles, hairlines, the dotted ground showing through); dark is the dimmed
+   stage behind the dock's toggle. Every colour is a custom property of the
+   stage, set per stage.
+
+   Colour is meaning: the console blue only on what the engine works on now
+   (the working edge, a row being read, the sweep); green covers / matches /
+   ✓ / an allow; red ✕ / a deny; amber a conflict or can't tell; grey not
+   reached. The tile's face is moved by motion alone — its colours live on
+   the skin under it, which is the only thing with CSS transitions.
+   -------------------------------------------------------------------------- */
+
+.rl-bento-root[data-stage='light'] {
+  --bt-backdrop: transparent;
+  --bt-text: var(--text-primary);
+  --bt-text-2: var(--text-secondary);
+  --bt-text-3: var(--text-tertiary);
+  --bt-card: var(--surface-raised);
+  --bt-card-wait: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+  --bt-sunken: var(--surface-sunken);
+  --bt-inset: var(--surface-inset);
+  --bt-line: var(--border-subtle);
+  --bt-line-2: var(--border-default);
+  --bt-line-3: var(--border-strong);
+  --bt-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px rgba(16, 24, 40, 0.05);
+  --bt-shadow-up: 0 2px 4px rgba(16, 24, 40, 0.06), 0 14px 32px rgba(16, 24, 40, 0.1);
+  --bt-blank: color-mix(in srgb, var(--text-tertiary) 14%, transparent);
+  --bt-work: var(--accent);
+  --bt-work-soft: var(--accent-soft);
+  --bt-work-line: var(--accent-soft-border);
+  --bt-sweep: color-mix(in srgb, var(--accent) 14%, transparent);
+  --bt-ok: var(--fb-positive-fg);
+  --bt-ok-dot: var(--fb-positive-dot);
+  --bt-ok-bg: var(--fb-positive-bg);
+  --bt-ok-line: var(--fb-positive-border);
+  --bt-bad: var(--fb-negative-fg);
+  --bt-bad-dot: var(--fb-negative-dot);
+  --bt-bad-bg: var(--fb-negative-bg);
+  --bt-bad-line: var(--fb-negative-border);
+  --bt-warn: var(--fb-notice-fg);
+  --bt-warn-dot: var(--fb-notice-dot);
+  --bt-warn-bg: var(--fb-notice-bg);
+  --bt-warn-line: var(--fb-notice-border);
+  --bt-ink: var(--text-primary);
+  --bt-ink-on: var(--surface-raised);
+  --bt-hl: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --bt-wire: color-mix(in srgb, var(--text-primary) 38%, transparent);
+  --bt-focus: var(--focus-ring, var(--accent));
+}
+
+.rl-bento-root[data-stage='dark'] {
+  --bt-backdrop: #121d26;
+  --bt-text: #eef3f8;
+  --bt-text-2: #c4d0db;
+  --bt-text-3: #98a9b8;
+  --bt-card: rgba(28, 42, 56, 0.96);
+  --bt-card-wait: rgba(28, 42, 56, 0.55);
+  --bt-sunken: rgba(255, 255, 255, 0.05);
+  --bt-inset: rgba(255, 255, 255, 0.08);
+  --bt-line: rgba(255, 255, 255, 0.1);
+  --bt-line-2: rgba(255, 255, 255, 0.16);
+  --bt-line-3: rgba(255, 255, 255, 0.3);
+  --bt-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  --bt-shadow-up: 0 16px 44px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --bt-blank: rgba(255, 255, 255, 0.08);
+  --bt-work: #6ea8ff;
+  --bt-work-soft: rgba(110, 168, 255, 0.14);
+  --bt-work-line: rgba(110, 168, 255, 0.5);
+  --bt-sweep: rgba(110, 168, 255, 0.16);
+  --bt-ok: #8be3b2;
+  --bt-ok-dot: #4fd18b;
+  --bt-ok-bg: rgba(79, 209, 139, 0.12);
+  --bt-ok-line: rgba(79, 209, 139, 0.45);
+  --bt-bad: #ffa3ae;
+  --bt-bad-dot: #ff6b7d;
+  --bt-bad-bg: rgba(255, 107, 125, 0.12);
+  --bt-bad-line: rgba(255, 107, 125, 0.45);
+  --bt-warn: #f6d58a;
+  --bt-warn-dot: #f2c14e;
+  --bt-warn-bg: rgba(242, 193, 78, 0.12);
+  --bt-warn-line: rgba(242, 193, 78, 0.45);
+  --bt-ink: #eef3f8;
+  --bt-ink-on: #142029;
+  --bt-hl: rgba(255, 255, 255, 0.1);
+  --bt-wire: rgba(238, 243, 248, 0.42);
+  --bt-focus: #8fbcff;
+}
+
+.rl-bento-root { position: absolute; inset: 0; color: var(--bt-text); }
+.rl-bento__backdrop { position: absolute; inset: 0; background-color: var(--bt-backdrop); pointer-events: none; }
+.rl-bento-root[data-stage='dark'] .rl-bento__backdrop {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='1' cy='1' r='0.9' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E");
+  background-size: calc(24px * var(--bb-z, 1)) calc(24px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0) var(--bb-y, 0);
+}
+
+/* The host's engine pill and the dock, on the dark stage. */
+.tj-canvas.is-bento:has(.rl-bento-root[data-stage='dark']) .tj-engine__pill { border-color: rgba(255, 255, 255, 0.16); background: rgba(28, 42, 56, 0.94); color: #eef3f8; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.tj-canvas.is-bento:has(.rl-bento-root[data-stage='dark']) :is(.tj-engine__text, .tj-engine__done, .tj-engine__pill button) { color: #dfe7ef; }
+.tj-canvas.is-bento:has(.rl-bento-root[data-stage='dark']) .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.sit__stage .tj-canvas.is-bento:has(.rl-bento-root[data-stage='dark'])::after,
+.tj-canvas.is-bento:has(.rl-bento-root[data-stage='dark'])::after { content: none; }
+.rl-bento-root[data-stage='dark'] .bb__dockbar { border-color: var(--bt-line-2); background: rgba(28, 42, 56, 0.94); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.rl-bento-root[data-stage='dark'] .bb__act { color: var(--bt-text-2); }
+.rl-bento-root[data-stage='dark'] .bb__act:hover { background: rgba(255, 255, 255, 0.08); color: var(--bt-text); }
+.rl-bento-root[data-stage='dark'] .bb__act:disabled { color: var(--bt-text-3); opacity: 0.6; }
+.rl-bento-root[data-stage='dark'] .bb__float__sep { background: var(--bt-line-2); }
+.rl-bento-root .bb__act[aria-pressed='true'] { color: var(--bt-text); background: var(--bt-inset); }
+.rl-bento__stepno { min-width: 132px; color: var(--bt-text-2); font-size: 12px; font-weight: 500; text-align: center; white-space: nowrap; }
+
+/* --- The board --------------------------------------------------------------------------- */
+
+.rl-bento {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1.08fr) minmax(0, 0.92fr) minmax(0, 0.92fr);
+  gap: 12px;
+  box-sizing: border-box;
+  color: var(--bt-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.rl-bento button { font: inherit; color: inherit; }
+.rl-bento :is(button, [tabindex]):focus-visible { outline: none; }
+.rl-bento button:focus-visible { box-shadow: 0 0 0 2px var(--bt-focus); border-radius: 6px; }
+.rl-bento p, .rl-bento ol, .rl-bento ul, .rl-bento h4 { margin: 0; }
+.rl-bento ol, .rl-bento ul { padding: 0; list-style: none; }
+.rl-bento__ell { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* A tile: the section holds its grid place; the face glides; the skin carries the colour. */
+.rl-bento__tile { position: relative; min-width: 0; min-height: 0; border-radius: 12px; cursor: pointer; }
+.rl-bento__face { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; }
+.rl-bento__skin {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--bt-line);
+  border-radius: 12px;
+  background: var(--bt-card);
+  box-shadow: var(--bt-shadow);
+  transition: border-color 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease;
+}
+.rl-bento__inner { position: relative; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; padding: 12px 14px 12px; overflow: hidden; }
+.rl-bento__body { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; }
+.rl-bento__tile.is-open .rl-bento__body { overflow-y: auto; padding-right: 2px; scrollbar-width: thin; }
+.rl-bento__tile.is-open .rl-bento__inner { padding: 16px 18px; }
+.rl-bento__tile.is-mini .rl-bento__inner { padding: 10px 12px; }
+.rl-bento__tile.is-mini .rl-bento__head { margin-bottom: 4px; }
+
+.rl-bento__tile.is-waiting .rl-bento__skin { background: var(--bt-card-wait); box-shadow: none; }
+.rl-bento__tile.is-working .rl-bento__skin { border-color: var(--bt-work-line); box-shadow: 0 0 0 3px var(--bt-work-soft), var(--bt-shadow); }
+.rl-bento__tile.is-hot .rl-bento__skin { border-color: var(--bt-line-3); box-shadow: var(--bt-shadow-up); }
+.rl-bento__tile:focus-visible .rl-bento__skin { box-shadow: 0 0 0 2px var(--bt-focus), var(--bt-shadow-up); }
+.rl-bento__tile.is-open .rl-bento__skin { border-color: var(--bt-line-2); box-shadow: var(--bt-shadow-up); }
+.rl-bento__tile.is-hero.is-positive .rl-bento__skin { border-color: var(--bt-ok-line); box-shadow: 0 0 0 1px var(--bt-ok-line), var(--bt-shadow-up); }
+.rl-bento__tile.is-hero.is-negative .rl-bento__skin { border-color: var(--bt-bad-line); box-shadow: 0 0 0 1px var(--bt-bad-line), var(--bt-shadow-up); }
+.rl-bento__tile.is-hero.is-notice .rl-bento__skin { border-color: var(--bt-warn-line); box-shadow: 0 0 0 1px var(--bt-warn-line), var(--bt-shadow-up); }
+.rl-bento__tile.is-hero:focus-visible .rl-bento__skin { box-shadow: 0 0 0 2px var(--bt-focus), var(--bt-shadow-up); }
+.rl-bento__tile.is-conflict.is-settled .rl-bento__skin { border-color: var(--bt-warn-line); }
+.rl-bento__tile.is-conflict.is-settled .rl-bento__label { color: var(--bt-warn); }
+
+.rl-bento__head { display: flex; flex: none; align-items: center; gap: 8px; min-height: 22px; margin-bottom: 8px; }
+.rl-bento__label { flex: 1; min-width: 0; overflow: hidden; color: var(--bt-text-3); font-size: 12px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__tile.is-working .rl-bento__label { color: var(--bt-work); }
+.rl-bento__open {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bt-text-3);
+  opacity: 0;
+  cursor: pointer;
+}
+.rl-bento__tile:hover .rl-bento__open,
+.rl-bento__tile:focus-visible .rl-bento__open,
+.rl-bento__tile.is-open .rl-bento__open { opacity: 1; }
+.rl-bento__open:hover { background: var(--bt-sunken); color: var(--bt-text); }
+@media (pointer: coarse) { .rl-bento__open { opacity: 1; } }
+
+/* The hover link: one line from the tile to its phrase in the hero, and the phrase lit. */
+.rl-bento__link { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 3; }
+.rl-bento__link path { fill: none; stroke: var(--bt-wire); stroke-width: 1.5; stroke-linecap: round; }
+.rl-bento [data-link] { border-radius: 4px; transition: background-color 0.18s ease, box-shadow 0.18s ease; }
+.rl-bento:is([data-hot='who'], [data-hot='policy'], [data-hot='rule'], [data-hot='checks'], [data-hot='see'], [data-hot='conflict'], [data-hot='change']) .is-hero [data-link] { transition: background-color 0.18s ease, box-shadow 0.18s ease; }
+.rl-bento[data-hot='who'] .is-hero [data-link='who'],
+.rl-bento[data-hot='policy'] .is-hero [data-link='policy'],
+.rl-bento[data-hot='rule'] .is-hero [data-link='rule'],
+.rl-bento[data-hot='checks'] .is-hero [data-link='checks'],
+.rl-bento[data-hot='see'] .is-hero [data-link='see'],
+.rl-bento[data-hot='conflict'] .is-hero [data-link='conflict'],
+.rl-bento[data-hot='change'] .is-hero [data-link='change'] { background-color: var(--bt-hl); box-shadow: 0 0 0 4px var(--bt-hl); }
+
+/* --- Small pieces ------------------------------------------------------------------------ */
+
+.rl-bento__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; }
+.rl-bento__mark.is-big { width: 20px; height: 20px; }
+.rl-bento__mark.is-pass { background: var(--bt-ok-bg); color: var(--bt-ok); box-shadow: inset 0 0 0 1px var(--bt-ok-line); }
+.rl-bento__mark.is-fail { background: var(--bt-bad-bg); color: var(--bt-bad); box-shadow: inset 0 0 0 1px var(--bt-bad-line); }
+.rl-bento__mark.is-unknown { background: var(--bt-warn-bg); color: var(--bt-warn); box-shadow: inset 0 0 0 1px var(--bt-warn-line); }
+.rl-bento__mark.is-none { background: var(--bt-sunken); color: var(--bt-text-3); }
+.rl-bento__spin { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--bt-work); }
+.rl-bento__markslot { display: inline-block; flex: none; width: 16px; height: 16px; }
+.rl-bento__num { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; background: var(--bt-sunken); box-shadow: inset 0 0 0 1px var(--bt-line); color: var(--bt-text-2); font-size: 12px; font-weight: 600; }
+.rl-bento__num.is-positive { background: var(--bt-ok-dot); box-shadow: none; color: var(--bt-ink-on); }
+.rl-bento__num.is-working { background: var(--bt-work); box-shadow: none; color: var(--bt-ink-on); }
+.rl-bento__num.is-negative { background: var(--bt-bad-bg); box-shadow: inset 0 0 0 1px var(--bt-bad-line); color: var(--bt-bad); }
+.rl-bento__skel { display: block; flex: none; max-width: 100%; border-radius: 6px; background: var(--bt-blank); }
+.rl-bento__more { color: var(--bt-text-3); font-size: 12px; }
+.rl-bento__arrow { flex: none; color: var(--bt-text-3); }
+.rl-bento__klabel { color: var(--bt-text-3); font-size: 12px; font-weight: 500; }
+.rl-bento__foot { margin-top: auto; color: var(--bt-text-3); font-size: 12px; }
+.rl-bento__btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 28px;
+  box-sizing: border-box;
+  padding: 3px 10px;
+  border: 1px solid var(--bt-line-2);
+  border-radius: 8px;
+  background: var(--bt-card);
+  color: var(--bt-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.rl-bento__btn:hover { background: var(--bt-sunken); }
+.rl-bento__btn.is-quiet { margin-top: auto; border-color: var(--bt-line); color: var(--bt-text-2); }
+.rl-bento__icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 6px; background: transparent; color: var(--bt-text-3); cursor: pointer; }
+.rl-bento__icon:hover { background: var(--bt-sunken); color: var(--bt-text); }
+.rl-bento__detail { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--bt-line); }
+.rl-bento__sub { color: var(--bt-text-2); font-size: 12px; font-weight: 600; }
+.rl-bento__list { display: flex; flex-direction: column; gap: 6px; }
+.rl-bento__fix { color: var(--bt-text); font-size: 13px; }
+.rl-bento__caution { color: var(--bt-warn); font-size: 12px; }
+.rl-bento__stack { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+
+/* Mini: one line, while another tile is open. */
+.rl-bento__mini { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--bt-text); font-size: 13px; }
+.rl-bento__mini.is-notice { color: var(--bt-warn); }
+.rl-bento__mini.is-pips { flex-wrap: wrap; gap: 4px 10px; }
+.rl-bento__pip { display: inline-flex; align-items: center; gap: 4px; color: var(--bt-text-2); font-size: 12px; }
+.rl-bento__minitext { display: flex; flex-direction: column; min-width: 0; }
+.rl-bento__minitext > span { color: var(--bt-text-2); font-size: 12px; }
+.rl-bento__minivword { font-size: 16px; font-weight: 600; }
+
+/* --- The hero ---------------------------------------------------------------------------- */
+
+.rl-bento__hero { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; }
+.rl-bento__journey { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--bt-text); font-size: 15px; font-weight: 600; }
+.rl-bento__facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px !important; }
+.rl-bento__fact-chip { padding: 1px 8px; border-radius: 999px; background: var(--bt-sunken); color: var(--bt-text-2); font-size: 12px; line-height: 20px; white-space: nowrap; }
+.rl-bento__fact-chip.is-unset { background: var(--bt-warn-bg); color: var(--bt-warn); }
+.rl-bento__verdict { display: flex; align-items: center; gap: 14px; min-height: 56px; margin-top: 2px; }
+.rl-bento__vtile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 54px; height: 54px; border-radius: 14px; }
+.rl-bento__vtile.is-small { width: 30px; height: 30px; border-radius: 8px; }
+.rl-bento__vtile.is-positive { background: var(--bt-ok-bg); color: var(--bt-ok); box-shadow: inset 0 0 0 1px var(--bt-ok-line); }
+.rl-bento__vtile.is-negative { background: var(--bt-bad-bg); color: var(--bt-bad); box-shadow: inset 0 0 0 1px var(--bt-bad-line); }
+.rl-bento__vtile.is-notice { background: var(--bt-warn-bg); color: var(--bt-warn); box-shadow: inset 0 0 0 1px var(--bt-warn-line); }
+.rl-bento__vtile.is-neutral,
+.rl-bento__vtile.is-wait { background: var(--bt-sunken); color: var(--bt-text-3); box-shadow: inset 0 0 0 1px var(--bt-line); }
+.rl-bento__vtile.is-working { background: var(--bt-work-soft); color: var(--bt-work); box-shadow: inset 0 0 0 1px var(--bt-work-line); }
+.rl-bento__vword { color: var(--bt-text); font-size: 34px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; }
+.rl-bento__vword.is-positive, .rl-bento__minivword.is-positive { color: var(--bt-ok); }
+.rl-bento__vword.is-negative, .rl-bento__minivword.is-negative { color: var(--bt-bad); }
+.rl-bento__vword.is-notice, .rl-bento__minivword.is-notice { color: var(--bt-warn); }
+.rl-bento__vwait { display: flex; flex: 1; flex-direction: column; gap: 8px; min-width: 0; }
+.rl-bento__vhint { color: var(--bt-text-3); font-size: 13px; }
+.rl-bento__vhint.is-working { color: var(--bt-work); font-weight: 500; }
+.rl-bento__expect { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--bt-warn-bg); color: var(--bt-warn); font-size: 12px; font-weight: 500; }
+
+.rl-bento__by,
+.rl-bento__because,
+.rl-bento__asked { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: baseline; column-gap: 8px; row-gap: 2px; }
+.rl-bento__by > .rl-bento__skel { align-self: center; }
+.rl-bento__bylink {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--bt-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-bento__bylink > span:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__bylink:hover > span { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--bt-line-3); }
+.rl-bento__bylink > svg { flex: none; color: var(--bt-text-3); }
+.rl-bento__dot { color: var(--bt-text-3); font-weight: 400; }
+.rl-bento__byrule { grid-column: 2; overflow: hidden; color: var(--bt-text-2); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__heroafter { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.rl-bento__because { color: var(--bt-text); font-size: 13px; }
+.rl-bento__because > span:last-child, .rl-bento__because { overflow-wrap: anywhere; }
+.rl-bento__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rl-bento__factors > li { display: inline-flex; align-items: center; gap: 4px; }
+.rl-bento__factor { padding: 1px 8px; border: 1px solid var(--bt-line-2); border-radius: 6px; background: var(--bt-card); color: var(--bt-text); font-size: 13px; line-height: 20px; }
+.rl-bento__deny { padding: 6px 10px; border-radius: 8px; background: var(--bt-bad-bg); color: var(--bt-text); font-size: 13px; }
+.rl-bento__ifs { display: flex; flex-direction: column; gap: 4px; }
+.rl-bento__ifs ul { display: flex; flex-direction: column; gap: 2px; }
+.rl-bento__ifs li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; border-bottom: 1px solid var(--bt-line); font-size: 13px; }
+.rl-bento__ifs li > span { color: var(--bt-text-2); }
+.rl-bento__ifs strong { font-weight: 600; }
+.rl-bento__ifs strong.is-positive { color: var(--bt-ok); }
+.rl-bento__ifs strong.is-negative { color: var(--bt-bad); }
+.rl-bento__needsline { display: flex; align-items: center; gap: 6px; color: var(--bt-warn); font-size: 13px; font-weight: 500; }
+.rl-bento__versus { display: flex; align-items: center; gap: 6px; color: var(--bt-text-2); font-size: 12px; }
+.rl-bento__finding {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--bt-line);
+  border-radius: 8px;
+  background: var(--bt-sunken);
+  color: var(--bt-text-2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-bento__finding:disabled { cursor: default; }
+.rl-bento__finding > svg { flex: none; margin-top: 2px; }
+.rl-bento__finding.is-conflict,
+.rl-bento__finding.is-depends { border-color: var(--bt-warn-line); background: var(--bt-warn-bg); color: var(--bt-text); }
+.rl-bento__finding.is-conflict > svg,
+.rl-bento__finding.is-depends > svg { color: var(--bt-warn); }
+.rl-bento__quietrow { margin-top: auto !important; }
+.rl-bento__quiet { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: var(--bt-text-2); font-size: 12px; cursor: pointer; }
+.rl-bento__quiet:hover { color: var(--bt-text); }
+.rl-bento__note { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-bottom: 1px solid var(--bt-line); font-size: 13px; }
+.rl-bento__note > span { color: var(--bt-text-2); }
+.rl-bento__note.is-conflict > strong { color: var(--bt-warn); }
+
+/* --- Who ----------------------------------------------------------------------------------- */
+
+.rl-bento__who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rl-bento__whoname { display: flex; flex-direction: column; min-width: 0; }
+.rl-bento__whoname strong { font-size: 15px; font-weight: 600; }
+.rl-bento__whoname > span { color: var(--bt-text-3); font-size: 12px; }
+.rl-bento__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rl-bento__chip { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; box-sizing: border-box; padding: 1px 8px; border: 1px solid var(--bt-line-2); border-radius: 999px; color: var(--bt-text-2); font-size: 12px; }
+.rl-bento__chip.is-on { border-color: var(--bt-ok-line); background: var(--bt-ok-bg); color: var(--bt-text); font-weight: 500; }
+.rl-bento__chip.is-also { border-color: var(--bt-warn-line); background: var(--bt-warn-bg); color: var(--bt-text); }
+.rl-bento__chip.is-also > svg { color: var(--bt-warn); }
+.rl-bento__via { color: var(--bt-ok); font-size: 12px; font-weight: 600; }
+.rl-bento__grow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 6px 0; border-bottom: 1px solid var(--bt-line); }
+.rl-bento__grow.is-current .rl-bento__growlabel { font-weight: 600; }
+.rl-bento__growlabel { color: var(--bt-text); }
+.rl-bento__growword { font-weight: 600; }
+.rl-bento__growword.is-positive { color: var(--bt-ok); }
+.rl-bento__growword.is-negative { color: var(--bt-bad); }
+.rl-bento__growword.is-notice { color: var(--bt-warn); }
+.rl-bento__growsrc { grid-column: 1 / -1; color: var(--bt-text-3); font-size: 12px; }
+.rl-bento__grow > .rl-bento__btn { grid-column: 1 / -1; margin-top: 4px; }
+
+/* --- Rows: the policies; the rules ------------------------------------------------------- */
+
+.rl-bento__rows, .rl-bento__rules { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+.rl-bento__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.rl-bento__row.is-decider { min-height: 46px; }
+.rl-bento__rowtext { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.rl-bento__rowname { min-width: 0; overflow: hidden; color: var(--bt-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__rowname.is-blank { align-self: flex-start; border-radius: 6px; background: var(--bt-blank); color: transparent; }
+.rl-bento__rowsub { min-width: 0; overflow: hidden; color: var(--bt-text-3); font-size: 12px; line-height: 16px; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__row.is-working { border-color: var(--bt-work-line); background: var(--bt-work-soft); }
+.rl-bento__row.is-pass { border-color: var(--bt-ok-line); background: var(--bt-ok-bg); }
+.rl-bento__row.is-pass .rl-bento__rowname { font-weight: 600; }
+.rl-bento__row.is-pass .rl-bento__rowsub { color: var(--bt-text-2); }
+.rl-bento__row.is-dim .rl-bento__rowname { color: var(--bt-text-3); }
+.rl-bento__row.is-also { border-color: var(--bt-line-2); }
+.rl-bento__row.is-also.is-conflict { border-color: var(--bt-warn-line); background: var(--bt-warn-bg); }
+.rl-bento__word { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--bt-text-3); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.rl-bento__word.is-positive { color: var(--bt-ok); font-weight: 600; }
+.rl-bento__word.is-negative { color: var(--bt-bad); font-weight: 600; }
+.rl-bento__word.is-notice { color: var(--bt-warn); font-weight: 600; }
+.rl-bento__sweep { position: absolute; top: 0; bottom: 0; width: 14%; background: var(--bt-sweep); pointer-events: none; }
+.rl-bento__ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.rl-bento__ring rect { width: calc(100% - 2px); height: calc(100% - 2px); fill: none; stroke: var(--bt-work); stroke-width: 1.5; }
+.rl-bento__pips { display: inline-flex; flex: none; align-items: center; gap: 3px; }
+
+.rl-bento__rule { box-sizing: border-box; padding: 5px 8px; border: 1px solid transparent; border-radius: 8px; transition: border-color 0.2s ease, background-color 0.2s ease; }
+.rl-bento__rulehead { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.rl-bento__rule.is-featured { padding: 8px 10px; border-color: var(--bt-line); background: var(--bt-card); }
+.rl-bento__rule.is-working { border-color: var(--bt-work-line); background: var(--bt-work-soft); }
+.rl-bento__rule.is-pass { border-color: var(--bt-ok-line); background: var(--bt-ok-bg); }
+.rl-bento__rule.is-pass .rl-bento__rowname { font-weight: 600; }
+.rl-bento__rule.is-unknown.is-featured { border-color: var(--bt-warn-line); background: var(--bt-warn-bg); }
+.rl-bento__rule.is-dim .rl-bento__rowname, .rl-bento__rule.is-dim .rl-bento__num { color: var(--bt-text-3); }
+.rl-bento__rule.is-last.is-negative { border-color: var(--bt-bad-line); background: var(--bt-bad-bg); }
+.rl-bento__rule.is-last.is-positive { border-color: var(--bt-ok-line); background: var(--bt-ok-bg); }
+.rl-bento__rule.is-last.is-notice { border-color: var(--bt-warn-line); background: var(--bt-warn-bg); }
+.rl-bento__rowsub.is-miss { color: var(--bt-text-2); }
+.rl-bento__wit { display: grid; grid-template-columns: 40px minmax(0, 1fr) 16px; align-items: center; gap: 5px 10px; margin: 8px 0 2px 28px; }
+.rl-bento__witrow { display: contents; }
+.rl-bento__witlabel { color: var(--bt-text-3); font-size: 12px; font-weight: 600; }
+.rl-bento__witreq { min-width: 0; overflow: hidden; color: var(--bt-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__witrow.is-working .rl-bento__witreq { color: var(--bt-work); }
+.rl-bento__witreq.is-positive { color: var(--bt-ok); font-weight: 600; }
+.rl-bento__witreq.is-negative { color: var(--bt-bad); font-weight: 600; }
+
+/* --- Checks -------------------------------------------------------------------------------- */
+
+.rl-bento__checks { display: flex; flex-direction: column; min-height: 0; }
+.rl-bento__check { display: grid; grid-template-columns: 52px minmax(0, 1fr) 20px; align-items: start; gap: 2px 8px; padding: 5px 0; border-top: 1px solid var(--bt-line); }
+.rl-bento__check:first-child { padding-top: 0; border-top: none; }
+.rl-bento__check.is-none { display: flex; align-items: center; gap: 6px; color: var(--bt-text-3); }
+.rl-bento__checkword { padding-top: 1px; color: var(--bt-text-3); font-size: 12px; font-weight: 600; }
+.rl-bento__checkvals { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rl-bento__fact { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; color: var(--bt-text); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__needs { overflow: hidden; color: var(--bt-text-3); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__check.is-working .rl-bento__fact { color: var(--bt-work); }
+.rl-bento__add { display: inline-flex; flex: none; align-items: center; gap: 3px; padding: 0 6px; border: 1px solid var(--bt-warn-line); border-radius: 6px; background: var(--bt-warn-bg); color: var(--bt-warn); font-size: 12px; cursor: pointer; }
+.rl-bento__subs { display: flex; grid-column: 2 / -1; flex-direction: column; gap: 3px; margin-top: 4px !important; }
+.rl-bento__subs li { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) 16px; align-items: center; gap: 8px; font-size: 12px; }
+.rl-bento__sublabel { color: var(--bt-text-2); }
+.rl-bento__subval { overflow: hidden; color: var(--bt-text-3); white-space: nowrap; text-overflow: ellipsis; }
+
+/* --- What they see ----------------------------------------------------------------------- */
+
+.rl-bento__see { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.rl-bento__see .tsee { margin: 0; }
+.rl-bento__see:not(.is-open) .tsee__caption { display: none; }
+.rl-bento__seewait { display: flex; flex-direction: column; gap: 10px; padding: 10px; border: 1px solid var(--bt-line); border-radius: 10px; }
+.rl-bento__seebar { display: block; height: 14px; border-radius: 6px; background: var(--bt-blank); }
+.rl-bento__seebar i { display: none; }
+.rl-bento-root[data-stage='dark'] .rl-bento .tsee__title { color: var(--bt-text-2); }
+.rl-bento-root[data-stage='dark'] .rl-bento .tsee__caption { color: var(--bt-text-3); }
+.rl-bento-root[data-stage='dark'] .rl-bento .tplay__chip { border-color: var(--bt-line-2); background: var(--bt-sunken); color: var(--bt-text-2); }
+.rl-bento-root[data-stage='dark'] .rl-bento .tplay__chip.is-on { border-color: var(--bt-line-3); color: var(--bt-text); }
+.rl-bento-root[data-stage='dark'] .rl-bento .tplay__replay { color: var(--bt-text-2); }
+
+/* --- Conflict; what would change it -------------------------------------------------------- */
+
+.rl-bento__conflict { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rl-bento__chead { overflow: hidden; color: var(--bt-text); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__cline { color: var(--bt-text-2); }
+.rl-bento__cwould { color: var(--bt-text); font-weight: 500; }
+.rl-bento__cwhy { color: var(--bt-text-3); font-size: 12px; }
+.rl-bento__conflict .rl-bento__detail { margin-top: 8px; }
+.rl-bento__flips { display: flex; flex-direction: column; gap: 6px; }
+.rl-bento__flip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border: 1px solid var(--bt-line);
+  border-radius: 8px;
+  background: var(--bt-card);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-bento__flip:hover { border-color: var(--bt-line-2); background: var(--bt-sunken); }
+.rl-bento__flipif { min-width: 0; overflow: hidden; color: var(--bt-text-2); white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__flipthen { font-weight: 600; white-space: nowrap; }
+.rl-bento__flipthen.is-positive { color: var(--bt-ok); }
+.rl-bento__flipthen.is-negative { color: var(--bt-bad); }
+.rl-bento__flipthen.is-notice { color: var(--bt-warn); }
+.rl-bento__flipthen.is-neutral { color: var(--bt-text-3); font-weight: 500; }
+.rl-bento__flipsrc { width: 100%; color: var(--bt-text-3); font-size: 12px; }
+.rl-bento__whatif { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.rl-bento__wtag { padding: 1px 8px; border-radius: 999px; background: var(--bt-ink); color: var(--bt-ink-on); font-size: 12px; font-weight: 600; }
+.rl-bento.is-whatif .is-hero .rl-bento__label { color: var(--bt-text); }
+
+/* Policy rows: two lines each, the state under the name; the deciding one may wrap. */
+.rl-bento__row { min-height: 42px; }
+.rl-bento__row.is-decider .rl-bento__rowname { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rl-bento__rowsub.is-notice { color: var(--bt-warn); font-weight: 500; }
+.rl-bento__rowsub.is-tip { white-space: normal; }
+.rl-bento__warnmark { flex: none; color: var(--bt-warn); }
+.rl-bento__fact { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rl-bento__fact > .rl-bento__add { margin-left: 6px; vertical-align: 1px; }
+
+/* A rule's who / if / then opens as it is read and folds as the engine leaves it (motion animates the wrap's height). */
+.rl-bento__witwrap { overflow: hidden; }
+.rl-bento__wit { margin: 0 0 0 28px; padding: 8px 0 2px; }
+.rl-bento__witrow.is-unread .rl-bento__witreq, .rl-bento__witrow.is-unread .rl-bento__witlabel { color: var(--bt-text-3); opacity: 0.7; }
+.rl-bento__rule.is-miss.is-featured { border-color: var(--bt-line); background: var(--bt-card); }
+.rl-bento__wit.has-facts { grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.2fr) 16px; }
+.rl-bento__witfact { min-width: 0; overflow: hidden; color: var(--bt-text-2); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+.rl-bento__fact-chip.is-changed { background: var(--bt-ink); color: var(--bt-ink-on); font-weight: 500; }
+/* A mini tile in the open board's side column: its face is absolute, so the section holds the height. */
+.rl-bento__tile.is-mini { min-height: 70px; }
+.rl-bento__tile.is-mini.is-hero { min-height: 82px; }
+
+/* What they see, fitted to its tile: a shorter stage, the steps close under it. */
+.rl-bento__see:not(.is-open) .tplay { gap: 8px; }
+.rl-bento__see:not(.is-open) .tplay.is-compact .tplay__stage { height: 190px; --tp-h-phone: 178px; --tp-w-phone: 98px; }
+.rl-bento__see:not(.is-open) .tplay__chips { gap: 4px; }
+.rl-bento__see.is-wide .tplay.is-compact .tplay__stage { height: 200px; }
+/* Three checks or more: one line each, so all of them show. */
+.rl-bento__checks.is-dense .rl-bento__fact { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rl-bento__checks.is-dense .rl-bento__check { padding: 4px 0; }
+.rl-bento__checks.is-dense .rl-bento__check:first-child { padding-top: 0; }
+
+/* A rule that matched into a Deny: the Deny's tone, its held checks in ink — never green beside red. */
+.rl-bento__rule.is-pass.is-deny { border-color: var(--bt-bad-line); background: var(--bt-bad-bg); }
+:is(.rl-bento__rule.is-deny, .rl-bento__checks.is-deny) .rl-bento__mark.is-pass { background: var(--bt-sunken); color: var(--bt-text); box-shadow: inset 0 0 0 1px var(--bt-line-3); }
+
+/* The hero's first line: who → what, then the sign-in's facts on the same line. */
+.rl-bento__journey { flex-wrap: wrap; row-gap: 6px; }
+.rl-bento__facts { display: inline-flex; flex-wrap: wrap; gap: 6px; margin: 0 0 0 6px !important; font-weight: 400; }
+.rl-bento__hero { gap: 11px; }
+
+/* A short canvas (1280 × 800): the same board, tighter, so it fits at full size. */
+.rl-bento.is-tight { gap: 10px; }
+.rl-bento.is-tight .rl-bento__inner { padding: 10px 12px; }
+.rl-bento.is-tight .rl-bento__head { min-height: 20px; margin-bottom: 6px; }
+.rl-bento.is-tight .rl-bento__hero { gap: 8px; }
+.rl-bento.is-tight .rl-bento__verdict { min-height: 48px; margin-top: 0; }
+.rl-bento.is-tight .rl-bento__vtile { width: 46px; height: 46px; border-radius: 12px; }
+.rl-bento.is-tight .rl-bento__vword { font-size: 30px; }
+.rl-bento.is-tight .rl-bento__heroafter { gap: 7px; }
+.rl-bento.is-tight .rl-bento__finding { padding: 5px 10px; }
+.rl-bento.is-tight .is-who .rl-bento__foot { display: none; }
+.rl-bento.is-tight .rl-bento__who { gap: 8px; }
+.rl-bento.is-tight .rl-bento__body { gap: 6px; }
+.rl-bento.is-tight .rl-bento__check { padding: 3px 0; }
+.rl-bento.is-tight .rl-bento__rules { gap: 3px; }
+.rl-bento.is-tight .rl-bento__rule { padding-block: 3px; }
+.rl-bento.is-tight .rl-bento__rule.is-featured { padding: 6px 10px; }
+.rl-bento.is-tight .rl-bento__wit { padding-top: 5px; row-gap: 3px; }
+.rl-bento.is-tight .rl-bento__row { min-height: 38px; padding-block: 3px; }
+.rl-bento.is-tight .rl-bento__flips { gap: 4px; }
+.rl-bento.is-tight .rl-bento__flip { padding: 4px 10px; }
+
+/* Lit: the tile a phrase cites (or the one hovered), and the phrase it is cited by — in the hero and in the tile. */
+.rl-bento__tile.is-hot .rl-bento__skin { border-color: var(--bt-line-3); box-shadow: 0 0 0 1px var(--bt-line-3), var(--bt-shadow-up); }
+.rl-bento[data-hot='who'] .is-who [data-link='who'],
+.rl-bento[data-hot='policy'] .is-policy [data-link='policy'],
+.rl-bento[data-hot='rule'] .is-rule [data-link='rule'] { background-color: var(--bt-hl); box-shadow: 0 0 0 3px var(--bt-hl); }
+.rl-bento__witcols { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.2fr) 16px; gap: 0 10px; margin: 0 19px 2px 47px; color: var(--bt-text-3); font-size: 12px; font-weight: 500; }
+.rl-bento__rule.is-also { border-color: var(--bt-warn-line); background: var(--bt-warn-bg); }
+.rl-bento__chead { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* Review fixes, 2 Oct. The deciding policy's line wraps rather than cut "first that covers …". */
+.rl-bento__row.is-decider .rl-bento__rowsub { white-space: normal; }
+/* The playing step's fill on the dark stage: the console's pale blue would hide its light words. */
+.rl-bento-root[data-stage='dark'] .rl-bento .tplay__fill { background: var(--bt-work-soft); }
+.rl-bento-root[data-stage='dark'] .rl-bento .tplay__chip.is-on { border-color: var(--bt-work-line); }
+/* What a rule needs wraps rather than cut "Not in Corporate offic…"; one line only where the tile is dense. */
+.rl-bento__needs { white-space: normal; }
+.rl-bento__checks.is-dense .rl-bento__needs { white-space: nowrap; }
+/* A Depends picks its answer above the mock: each answer on one line, the three in the tile's width. */
+.rl-bento__see .bb__seg { flex-wrap: wrap; }
+.rl-bento__see .bb__seg > button { flex: 1 1 auto; padding-inline: 6px; white-space: nowrap; }
+/* A short canvas (1280 × 800): who rides in the hero's line, the checks take its column, a little more width to the right. */
+.rl-bento.is-tight { grid-template-columns: minmax(0, 1.04fr) minmax(0, 1.04fr) minmax(0, 0.98fr) minmax(0, 0.94fr); }
+.rl-bento__fact-chip.is-via { background: var(--bt-ok-bg); color: var(--bt-ok); font-weight: 500; }
+/* The rules read past, one line each where the name and its reason fit side by side. */
+.rl-bento.is-tight .rl-bento__rule:not(.is-featured) .rl-bento__rowtext { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+.rl-bento.is-tight .rl-bento__see:not(.is-open) .tplay.is-compact .tplay__stage { height: 168px; --tp-h-phone: 156px; }
+.rl-bento.is-tight .rl-bento__see:not(.is-open):has(.tplay__chip:nth-child(3)) .tplay.is-compact .tplay__stage { height: 146px; --tp-h-phone: 136px; }
+.rl-bento.is-tight .rl-bento__see:not(.is-open):has(.bb__seg) .tplay.is-compact .tplay__stage { height: 124px; --tp-h-phone: 116px; }
+/* The hero on a short canvas: who rides in its line, so the rest closes up a little. */
+.rl-bento.is-tight .rl-bento__hero { gap: 6px; }
+.rl-bento.is-tight .rl-bento__journey { row-gap: 4px; }
+.rl-bento.is-tight .rl-bento__verdict { min-height: 42px; }
+.rl-bento.is-tight .rl-bento__vtile { width: 42px; height: 42px; }
+.rl-bento.is-tight .rl-bento__vword { font-size: 28px; }
+.rl-bento.is-tight .rl-bento__heroafter { gap: 5px; }

@@ -1,0 +1,594 @@
+/* -----------------------------------------------------------------------------
+   The run as a STREAM (StreamLayout.tsx). LIGHT by default — the console's
+   own look: white raised channels on the canvas's dotted ground, sunken
+   grooves, hairline borders, DM Sans, 12px the floor — and DARK, the dimmed
+   stage, behind the dock's toggle (stage-theme.tsx). Every colour below
+   comes from the custom properties on the root, set per stage; the canvas
+   reads its inks from them too (stream-flow.tsx).
+
+   Colour is meaning: blue only where the engine works now; green an allow
+   (any number of factors), ✓, the gate that opens; red a failed check ✕ and
+   a deny; amber only a conflict or a can't-tell; grey what was never needed.
+   Brand orange never. No gradients.
+
+   Nothing motion moves carries a CSS transform or transition: the gate
+   leaves, the pool's fill and the notes are motion's; colour transitions sit
+   on the cards, which motion never moves.
+   -------------------------------------------------------------------------- */
+
+.rl-stream-root {
+  --st-text: var(--text-primary);
+  --st-text-2: var(--text-secondary);
+  --st-text-3: var(--text-tertiary);
+  --st-body: var(--text-body);
+  --st-card: var(--surface-raised);
+  --st-sunken: var(--surface-sunken);
+  --st-inset: var(--surface-inset);
+  --st-line: var(--border-subtle);
+  --st-line-2: var(--border-default);
+  --st-line-3: var(--border-strong);
+  --st-pipe: var(--border-default);
+  --st-groove: var(--surface-inset);
+  --st-shadow: var(--el-low);
+  --st-shadow-2: var(--el-mid);
+  --st-box: color-mix(in srgb, var(--surface-sunken) 70%, transparent);
+  --st-work: var(--accent);
+  --st-work-soft: var(--accent-soft);
+  --st-work-line: var(--accent-soft-border);
+  --st-ok: var(--fb-positive-dot);
+  --st-ok-fg: var(--fb-positive-fg);
+  --st-ok-soft: var(--fb-positive-bg);
+  --st-ok-line: var(--fb-positive-border);
+  --st-bad: var(--fb-negative-dot);
+  --st-bad-fg: var(--fb-negative-fg);
+  --st-bad-soft: var(--fb-negative-bg);
+  --st-bad-line: var(--fb-negative-border);
+  --st-warn: var(--fb-notice-dot);
+  --st-warn-fg: var(--fb-notice-fg);
+  --st-warn-soft: var(--fb-notice-bg);
+  --st-warn-line: var(--fb-notice-border);
+  --st-off: var(--text-muted);
+  --st-note: var(--surface-raised);
+  --st-note-shadow: var(--el-high);
+  --st-backdrop: transparent;
+  position: absolute;
+  inset: 0;
+  color: var(--st-body);
+}
+
+.rl-stream-root[data-stage='dark'] {
+  --st-text: #eef3f8;
+  --st-text-2: #c3cfdb;
+  --st-text-3: #93a4b4;
+  --st-body: #dfe7ef;
+  --st-card: rgba(28, 42, 55, 0.92);
+  --st-sunken: rgba(255, 255, 255, 0.04);
+  --st-inset: rgba(255, 255, 255, 0.08);
+  --st-line: rgba(255, 255, 255, 0.12);
+  --st-line-2: rgba(255, 255, 255, 0.18);
+  --st-line-3: rgba(255, 255, 255, 0.3);
+  --st-pipe: rgba(255, 255, 255, 0.14);
+  --st-groove: rgba(0, 0, 0, 0.32);
+  --st-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+  --st-shadow-2: 0 8px 28px rgba(0, 0, 0, 0.36);
+  --st-box: rgba(255, 255, 255, 0.03);
+  --st-work: color-mix(in srgb, var(--blue, #0d6efd) 58%, #ffffff);
+  --st-work-soft: rgba(110, 168, 254, 0.14);
+  --st-work-line: rgba(110, 168, 254, 0.45);
+  --st-ok: #4fd18b;
+  --st-ok-fg: #8ee6b4;
+  --st-ok-soft: rgba(79, 209, 139, 0.14);
+  --st-ok-line: rgba(79, 209, 139, 0.5);
+  --st-bad: #ff6b7d;
+  --st-bad-fg: #ffa3ae;
+  --st-bad-soft: rgba(255, 107, 125, 0.14);
+  --st-bad-line: rgba(255, 107, 125, 0.5);
+  --st-warn: #f2c14e;
+  --st-warn-fg: #f7d98c;
+  --st-warn-soft: rgba(242, 193, 78, 0.14);
+  --st-warn-line: rgba(242, 193, 78, 0.5);
+  --st-off: #6f8294;
+  --st-note: #1f2f3d;
+  --st-note-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+  --st-backdrop: #121d26;
+}
+
+/* The dark stage: its own ground, the dots following the pan and the zoom. Light lets the canvas's own show. */
+.rl-stream__backdrop { position: absolute; inset: 0; pointer-events: none; background-color: var(--st-backdrop); }
+.rl-stream-root[data-stage='dark'] .rl-stream__backdrop {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='1' cy='1' r='0.9' fill='%23ffffff' fill-opacity='0.08'/%3E%3C/svg%3E");
+  background-size: calc(24px * var(--bb-z, 1)) calc(24px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0) var(--bb-y, 0);
+}
+/* The host's engine pill and the dock, on the dark stage. */
+.tj-canvas.is-stream:has(.rl-stream-root[data-stage='dark']) .tj-engine__pill {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(28, 42, 55, 0.94);
+  color: #eef3f8;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.tj-canvas.is-stream:has(.rl-stream-root[data-stage='dark']) :is(.tj-engine__text, .tj-engine__pill button) { color: #dfe7ef; }
+.tj-canvas.is-stream:has(.rl-stream-root[data-stage='dark']) .tj-engine__done { color: #b3c1ce; }
+.tj-canvas.is-stream:has(.rl-stream-root[data-stage='dark']) .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.rl-stream-root[data-stage='dark'] .bb__dockbar { border-color: var(--st-line); background: rgba(28, 42, 55, 0.94); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.rl-stream-root[data-stage='dark'] .bb__act { color: var(--st-text-2); }
+.rl-stream-root[data-stage='dark'] .bb__act:hover { background: rgba(255, 255, 255, 0.08); color: var(--st-text); }
+.rl-stream-root[data-stage='dark'] .bb__act[aria-pressed='true'] { background: rgba(255, 255, 255, 0.1); color: var(--st-text); }
+.rl-stream-root[data-stage='dark'] .bb__float__sep { background: var(--st-line); }
+
+/* --- The world ------------------------------------------------------------------------ */
+
+.rl-stream__world { position: relative; font-family: inherit; font-size: 13px; line-height: 1.3; color: var(--st-body); }
+.rl-stream__world > * { position: absolute; }
+.rl-stream__ink { width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.rl-stream__ink.is-work { color: var(--st-work); }
+.rl-stream__ink.is-positive { color: var(--st-ok); }
+.rl-stream__ink.is-negative { color: var(--st-bad); }
+.rl-stream__ink.is-notice { color: var(--st-warn); }
+.rl-stream__ink.is-neutral { color: var(--st-line-3); }
+
+.rl-stream__pipes, .rl-stream__flow, .rl-stream__trickles, .rl-stream__dragwire { left: 0; top: 0; pointer-events: none; }
+.rl-stream__pipes { z-index: 0; overflow: visible; }
+.rl-stream__pipes path { fill: none; stroke: var(--st-pipe); stroke-width: 2; stroke-linecap: round; }
+.rl-stream__flow { z-index: 5; }
+.rl-stream__trickles { z-index: 6; overflow: visible; }
+.rl-stream__trickles path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 3 5; animation: rl-stream-trickle 900ms linear 4; }
+.rl-stream__trickles path.is-notice { stroke: var(--st-warn); }
+.rl-stream__trickles path.is-quiet { stroke: var(--st-line-3); }
+@keyframes rl-stream-trickle { to { stroke-dashoffset: -16; } }
+.rl-stream__dragwire { z-index: 40; overflow: visible; }
+.rl-stream__dragwire path { fill: none; stroke: var(--st-text-2); stroke-width: 2; stroke-dasharray: 4 4; }
+.rl-stream__dragwire circle { fill: var(--st-card); stroke: var(--st-text-2); stroke-width: 2; }
+.rl-stream__which { pointer-events: none; }
+
+.rl-stream__colhead,
+.rl-stream__boxhead {
+  height: 20px;
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--st-text-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rl-stream__count { margin-left: 6px; color: var(--st-off); font-variant-numeric: tabular-nums; }
+
+/* --- A card: a channel, a gate, a pool ------------------------------------------------------- */
+
+.rl-stream__chan, .rl-stream__rule, .rl-stream__pool { z-index: 2; }
+.rl-stream__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 8px 12px 0;
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+  background: var(--st-card);
+  box-shadow: var(--st-shadow);
+  font: inherit;
+  font-size: 13px;
+  color: var(--st-body);
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+}
+button.rl-stream__card { cursor: pointer; }
+.rl-stream__card:focus-visible,
+.rl-stream__crow:focus-visible,
+.rl-stream__chip:focus-visible,
+.rl-stream__srcbtn:focus-visible,
+.rl-stream__handle:focus-visible { outline: 2px solid var(--st-work); outline-offset: 2px; }
+.rl-stream__peek:hover { border-color: var(--st-line-2); }
+.rl-stream__peek.is-pinned { border-color: var(--st-line-3); }
+.rl-stream__head { display: flex; align-items: center; gap: 8px; min-width: 0; height: 20px; }
+.rl-stream__name { flex: 1 1 auto; min-width: 0; overflow: hidden; font-weight: 600; color: var(--st-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__name.is-quiet { font-weight: 500; color: var(--st-text-3); }
+.rl-stream__sub { display: flex; align-items: center; gap: 6px; min-width: 0; height: 16px; margin-top: 3px; padding-left: 28px; font-size: 12px; line-height: 16px; color: var(--st-text-3); }
+.rl-stream__subtext { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__subtext.is-quiet { color: var(--st-off); }
+.rl-stream__leads { flex: none; color: var(--st-off); white-space: nowrap; }
+.rl-stream__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--st-inset);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--st-text-2);
+  font-variant-numeric: tabular-nums;
+}
+.rl-stream__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.rl-stream__mark.is-pass { color: var(--st-ok); }
+.rl-stream__mark.is-fail { color: var(--st-bad); }
+.rl-stream__mark.is-unknown { color: var(--st-warn); }
+
+/* The groove: the channel the stream runs through, under the words. */
+.rl-stream__groove { position: absolute; left: 0; right: 0; top: 46px; box-sizing: border-box; height: 10px; border-top: 1px solid var(--st-line); border-bottom: 1px solid var(--st-line); background: var(--st-groove); pointer-events: none; }
+.rl-stream__card > .rl-stream__groove { left: -1px; right: -1px; }
+
+/* --- The gate: two leaves at a channel's inlet --------------------------------------------------- */
+
+.rl-stream__gate { position: absolute; z-index: 3; left: -4px; width: 6px; height: 22px; pointer-events: none; }
+.rl-stream__leaf { position: absolute; left: 0; width: 6px; height: 11px; background: var(--st-off); }
+.rl-stream__leaf.is-top { top: 0; border-radius: 3px 3px 1px 1px; }
+.rl-stream__leaf.is-bottom { bottom: 0; border-radius: 1px 1px 3px 3px; }
+.rl-stream__gate.is-idle .rl-stream__leaf { background: var(--st-line-2); }
+.rl-stream__gate.is-working .rl-stream__leaf { background: var(--st-work); }
+.rl-stream__gate.is-open .rl-stream__leaf { background: var(--st-text-2); }
+.rl-stream__gate.is-open.is-positive .rl-stream__leaf { background: var(--st-ok); }
+.rl-stream__gate.is-open.is-negative .rl-stream__leaf { background: var(--st-bad); }
+.rl-stream__gate.is-open.is-notice .rl-stream__leaf,
+.rl-stream__gate.is-ajar .rl-stream__leaf { background: var(--st-warn); }
+.rl-stream__chan.is-also:not(.is-conflict) .rl-stream__gate.is-ajar .rl-stream__leaf,
+.rl-stream__rule.is-also:not(.is-conflict) .rl-stream__gate.is-ajar .rl-stream__leaf { background: var(--st-line-3); }
+
+/* --- Policy channels ----------------------------------------------------------------------- */
+
+.rl-stream__chan.is-waiting .rl-stream__card { box-shadow: none; }
+.rl-stream__chan.is-waiting .rl-stream__name { color: var(--st-text-3); font-weight: 500; }
+.rl-stream__chan.is-working .rl-stream__card,
+.rl-stream__rule.is-working .rl-stream__card { border-color: var(--st-work-line); box-shadow: 0 0 0 3px var(--st-work-soft), var(--st-shadow); }
+.rl-stream__chan.is-working .rl-stream__groove,
+.rl-stream__rule.is-working .rl-stream__groove { border-color: var(--st-work-line); }
+.rl-stream__chan.is-shut .rl-stream__card { box-shadow: none; }
+.rl-stream__chan.is-shut .rl-stream__name { color: var(--st-text-2); }
+.rl-stream__chan.is-open .rl-stream__card,
+.rl-stream__rule.is-open .rl-stream__card { border-color: var(--st-line-3); box-shadow: var(--st-shadow-2); }
+.rl-stream__chan.is-open.is-positive .rl-stream__card,
+.rl-stream__rule.is-open.is-positive .rl-stream__card { border-color: var(--st-ok); box-shadow: 0 0 0 3px var(--st-ok-soft), var(--st-shadow); }
+.rl-stream__chan.is-open.is-negative .rl-stream__card,
+.rl-stream__rule.is-open.is-negative .rl-stream__card { border-color: var(--st-bad); box-shadow: 0 0 0 3px var(--st-bad-soft), var(--st-shadow); }
+.rl-stream__chan.is-open.is-notice .rl-stream__card,
+.rl-stream__rule.is-open.is-notice .rl-stream__card { border-color: var(--st-warn); box-shadow: 0 0 0 3px var(--st-warn-soft), var(--st-shadow); }
+.rl-stream__chan.is-open .rl-stream__sub,
+.rl-stream__rule.is-open .rl-stream__sub { color: var(--st-text-2); }
+.rl-stream__chan.is-quiet,
+.rl-stream__rule.is-quiet { opacity: 0.6; }
+.rl-stream__chan.is-quiet .rl-stream__card,
+.rl-stream__rule.is-quiet .rl-stream__card { box-shadow: none; }
+.rl-stream__chan.is-quiet .rl-stream__name,
+.rl-stream__rule.is-quiet .rl-stream__name { color: var(--st-text-3); font-weight: 500; }
+.rl-stream__chan.is-also .rl-stream__card,
+.rl-stream__rule.is-also .rl-stream__card { box-shadow: none; }
+.rl-stream__chan.is-also .rl-stream__sub,
+.rl-stream__rule.is-also .rl-stream__sub { color: var(--st-text-2); }
+.rl-stream__chan.is-also.is-conflict .rl-stream__card,
+.rl-stream__rule.is-also.is-conflict .rl-stream__card { border-color: var(--st-warn-line); background: color-mix(in srgb, var(--st-warn-soft) 55%, var(--st-card)); }
+.rl-stream__chan.is-also.is-conflict .rl-stream__sub,
+.rl-stream__rule.is-also.is-conflict .rl-stream__sub { color: var(--st-warn-fg); }
+
+/* --- The rules box: inside the open channel ------------------------------------------------------- */
+
+.rl-stream__box { z-index: 1; box-sizing: border-box; padding: 8px 12px 0 40px; border: 1px solid var(--st-line); border-radius: 12px; background: var(--st-box); }
+.rl-stream__box.is-positive { border-color: var(--st-ok-line); }
+.rl-stream__box.is-negative { border-color: var(--st-bad-line); }
+.rl-stream__box.is-notice { border-color: var(--st-warn-line); }
+
+/* --- Rule gates ------------------------------------------------------------------------------- */
+
+.rl-stream__rule.is-waiting .rl-stream__card { box-shadow: none; }
+.rl-stream__rule.is-waiting .rl-stream__name { color: var(--st-text-2); font-weight: 500; }
+.rl-stream__rule.is-shut .rl-stream__card { box-shadow: none; }
+.rl-stream__rule.is-shut .rl-stream__name { color: var(--st-text-2); }
+.rl-stream__rule.is-shut.is-fail .rl-stream__subtext { color: var(--st-text-2); }
+.rl-stream__rule.is-shut.is-unknown .rl-stream__subtext { color: var(--st-warn-fg); }
+.rl-stream__sensors { display: inline-flex; flex: none; gap: 4px; }
+.rl-stream__sensor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+  padding: 0 4px;
+  border: 1px solid var(--st-line);
+  border-radius: 5px;
+  background: var(--st-card);
+  color: var(--st-off);
+}
+.rl-stream__sensor.is-skipped { border-style: dashed; opacity: 0.7; }
+.rl-stream__sensor.is-working { border-color: var(--st-work); color: var(--st-work); background: var(--st-work-soft); }
+.rl-stream__sensor.is-pass { border-color: var(--st-ok-line); color: var(--st-ok-fg); background: var(--st-ok-soft); }
+.rl-stream__sensor.is-fail { border-color: var(--st-bad-line); color: var(--st-bad-fg); background: var(--st-bad-soft); animation: rl-stream-glint 900ms ease-out 1; }
+.rl-stream__sensor.is-unknown { border-color: var(--st-warn-line); color: var(--st-warn-fg); background: var(--st-warn-soft); }
+.rl-stream__sensormark { display: inline-flex; }
+@keyframes rl-stream-glint {
+  0% { box-shadow: 0 0 0 0 var(--st-bad-line); }
+  35% { box-shadow: 0 0 0 5px var(--st-bad-soft); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rl-stream__sensor.is-fail, .rl-stream__trickles path { animation: none; }
+}
+
+/* The rule the stream passes through, open: what the sign-in showed against what the rule needs. */
+.rl-stream__open { position: absolute; z-index: 3; left: 1px; right: 1px; padding: 4px 12px 0; pointer-events: none; }
+.rl-stream__checks { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; pointer-events: auto; }
+.rl-stream__check { position: relative; height: 46px; border-bottom: 1px solid var(--st-line); }
+.rl-stream__check:last-child { border-bottom: 0; }
+.rl-stream__crow,
+.rl-stream__check.is-working {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.rl-stream__crow { cursor: pointer; }
+.rl-stream__crow:hover, .rl-stream__crow.is-peeked { background: var(--st-sunken); }
+.rl-stream__cword, .rl-stream__fnword { font-size: 12px; color: var(--st-text-3); }
+.rl-stream__ctext { display: flex; flex-direction: column; min-width: 0; }
+.rl-stream__cfact, .rl-stream__cneed { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__cfact { font-size: 13px; color: var(--st-text); }
+.rl-stream__cneed { font-size: 12px; color: var(--st-text-3); }
+.rl-stream__fnjoin { color: var(--st-off); }
+.rl-stream__fnvia { color: var(--st-text-3); font-size: 12px; }
+.rl-stream__then { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; align-items: center; height: 36px; margin: 0; padding: 0 2px; border-top: 1px solid var(--st-line); }
+.rl-stream__thenword { font-weight: 600; color: var(--st-text); }
+.rl-stream__rule.is-open.is-positive .rl-stream__thenword { color: var(--st-ok-fg); }
+.rl-stream__rule.is-open.is-negative .rl-stream__thenword { color: var(--st-bad-fg); }
+
+/* --- Pools ------------------------------------------------------------------------------- */
+
+.rl-stream__inlet { position: absolute; z-index: 3; left: -3px; width: 4px; height: 10px; border-radius: 2px; background: var(--st-line-2); pointer-events: none; }
+.rl-stream__pool.is-landed.is-positive .rl-stream__inlet { background: var(--st-ok); }
+.rl-stream__pool.is-landed.is-negative .rl-stream__inlet { background: var(--st-bad); }
+.rl-stream__pool.is-landed.is-notice .rl-stream__inlet,
+.rl-stream__pool.is-possible .rl-stream__inlet { background: var(--st-warn); }
+.rl-stream__pool.is-working .rl-stream__inlet { background: var(--st-work); }
+.rl-stream__tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--st-inset);
+  color: var(--st-text-3);
+}
+.rl-stream__pool .rl-stream__head { height: 28px; }
+.rl-stream__pool .rl-stream__sub.is-pool { padding-left: 36px; }
+.rl-stream__pool.is-empty .rl-stream__card { box-shadow: none; border-style: dashed; background: color-mix(in srgb, var(--st-card) 70%, transparent); }
+.rl-stream__pool.is-empty .rl-stream__name { font-weight: 500; color: var(--st-text-2); }
+.rl-stream__pool.is-possible .rl-stream__card { border-color: var(--st-warn-line); }
+.rl-stream__pool.is-possible .rl-stream__subtext { color: var(--st-warn-fg); }
+.rl-stream__pool.is-pending .rl-stream__card { box-shadow: none; border-style: dashed; }
+.rl-stream__pool.is-working .rl-stream__card { border-style: solid; border-color: var(--st-work-line); box-shadow: 0 0 0 3px var(--st-work-soft); }
+.rl-stream__poolcard { overflow: hidden; padding-top: 8px; }
+.rl-stream__fill { position: absolute; left: 0; right: 0; bottom: 0; z-index: 0; border-top: 2px solid transparent; pointer-events: none; }
+.rl-stream__pool.is-positive .rl-stream__fill { background: var(--st-ok-soft); border-top-color: var(--st-ok-line); }
+.rl-stream__pool.is-negative .rl-stream__fill { background: var(--st-bad-soft); border-top-color: var(--st-bad-line); }
+.rl-stream__pool.is-notice .rl-stream__fill { background: var(--st-warn-soft); border-top-color: var(--st-warn-line); }
+.rl-stream__pool.is-landed .rl-stream__card { border-width: 1px; }
+.rl-stream__pool.is-landed.is-positive .rl-stream__card { border-color: var(--st-ok); box-shadow: 0 0 0 3px var(--st-ok-soft), var(--st-shadow-2); }
+.rl-stream__pool.is-landed.is-negative .rl-stream__card { border-color: var(--st-bad); box-shadow: 0 0 0 3px var(--st-bad-soft), var(--st-shadow-2); }
+.rl-stream__pool.is-landed.is-notice .rl-stream__card { border-color: var(--st-warn); box-shadow: 0 0 0 3px var(--st-warn-soft), var(--st-shadow-2); }
+.rl-stream__pool.is-landed .rl-stream__head,
+.rl-stream__poolbody { position: relative; z-index: 1; }
+.rl-stream__head.is-verdict { gap: 10px; }
+.rl-stream__pool.is-landed.is-positive .rl-stream__tile { background: var(--st-ok-soft); color: var(--st-ok-fg); }
+.rl-stream__pool.is-landed.is-negative .rl-stream__tile { background: var(--st-bad-soft); color: var(--st-bad-fg); }
+.rl-stream__pool.is-landed.is-notice .rl-stream__tile { background: var(--st-warn-soft); color: var(--st-warn-fg); }
+.rl-stream__word { flex: 1 1 auto; min-width: 0; overflow: hidden; font-size: 17px; font-weight: 600; color: var(--st-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__pool.is-positive .rl-stream__word { color: var(--st-ok-fg); }
+.rl-stream__pool.is-negative .rl-stream__word { color: var(--st-bad-fg); }
+.rl-stream__pool.is-notice .rl-stream__word { color: var(--st-warn-fg); }
+.rl-stream__expect { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: 12px; color: var(--st-warn-fg); }
+.rl-stream__poolbody { display: flex; flex-direction: column; gap: 8px; padding: 12px 0 0 38px; }
+.rl-stream__foot { margin-left: -6px !important; }
+.rl-stream__by { display: flex; flex-direction: column; gap: 1px; margin: 0; min-width: 0; }
+.rl-stream__bylabel { font-size: 12px; color: var(--st-text-3); }
+.rl-stream__bylink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-link, var(--st-text));
+  text-align: left;
+  cursor: pointer;
+}
+.rl-stream-root[data-stage='dark'] .rl-stream__bylink { color: #9ec5fe; }
+.rl-stream__bylink > span { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rl-stream__bylink > svg { flex: none; align-self: flex-end; margin-bottom: 3px; }
+.rl-stream__bylink:hover > span { text-decoration: underline; }
+.rl-stream__byrule { overflow: hidden; font-size: 12px; color: var(--st-text-2); white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__factors { display: flex; flex-wrap: nowrap; overflow: hidden; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--st-text-3); }
+.rl-stream__factors li { display: inline-flex; align-items: center; gap: 4px; }
+.rl-stream__dependsline { margin: 0; font-size: 12px; color: var(--st-text-3); }
+.rl-stream__factor { white-space: nowrap; padding: 2px 8px; border: 1px solid var(--st-line-2); border-radius: 6px; background: var(--st-card); font-size: 12px; color: var(--st-text); }
+.rl-stream__deny { display: -webkit-box; margin: 0; overflow: hidden; font-size: 13px; color: var(--st-text-2); -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rl-stream__ifs { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.rl-stream__ifs li { display: flex; justify-content: space-between; gap: 8px; height: 20px; align-items: center; }
+.rl-stream__if { color: var(--st-text-3); }
+.rl-stream__ifword { font-weight: 600; color: var(--st-text); }
+.rl-stream__vs { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--st-text-2); }
+.rl-stream__foot { display: flex; align-items: center; gap: 10px; min-height: 22px; margin: 0; font-size: 12px; }
+.rl-stream__footpeek { position: relative; }
+.rl-stream__footpeek.is-end { margin-left: auto; }
+.rl-stream__finding,
+.rl-stream__seebtn,
+.rl-stream__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--st-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rl-stream__finding:hover, .rl-stream__seebtn:hover, .rl-stream__add:hover,
+.rl-stream__finding.is-peeked, .rl-stream__seebtn.is-peeked { background: var(--st-inset); color: var(--st-text); }
+.rl-stream__finding.is-conflict { color: var(--st-warn-fg); }
+.rl-stream__add { color: var(--st-warn-fg); }
+.rl-stream__changed, .rl-stream__needs { color: var(--st-text-3); }
+.rl-stream__would { display: flex; flex-direction: column; gap: 10px; }
+
+/* --- The source -------------------------------------------------------------------------------- */
+
+.rl-stream__srcwrap { left: 0; z-index: 3; }
+.rl-stream__src { display: flex; flex-direction: column; gap: 12px; }
+.rl-stream__srccard { position: relative; }
+.rl-stream__srcbtn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 1px solid var(--st-line-3);
+  border-radius: 10px;
+  background: var(--st-card);
+  box-shadow: var(--st-shadow-2);
+  font: inherit;
+  color: var(--st-body);
+  text-align: left;
+  cursor: pointer;
+}
+.rl-stream__srchead { display: flex; align-items: center; gap: 10px; min-width: 0; height: 40px; }
+.rl-stream__srcwho { display: flex; flex-direction: column; min-width: 0; }
+.rl-stream__srcwho strong { overflow: hidden; font-size: 14px; font-weight: 600; color: var(--st-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__srcwho span { overflow: hidden; font-size: 12px; color: var(--st-text-3); white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__srcapp { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; font-weight: 600; color: var(--st-text); }
+.rl-stream__srcapp > svg:first-child { color: var(--st-text-3); }
+.rl-stream__srcapp > span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__facts { display: flex; flex-direction: column; gap: 2px; }
+.rl-stream__fact { display: grid; grid-template-columns: 44px 14px minmax(0, 1fr); align-items: center; gap: 6px; height: 20px; padding: 0 4px; margin: 0 -4px; border: 1px solid transparent; border-radius: 6px; font-size: 12px; }
+.rl-stream__factlabel { color: var(--st-text-3); }
+.rl-stream__factmark { display: inline-flex; color: var(--st-text-3); }
+.rl-stream__facttext { overflow: hidden; font-size: 13px; color: var(--st-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__fact.is-unset .rl-stream__facttext { color: var(--st-off); }
+.rl-stream__fact.is-needed { border-color: var(--st-warn-line); background: var(--st-warn-soft); }
+.rl-stream__fact.is-needed .rl-stream__facttext { color: var(--st-warn-fg); }
+.rl-stream__fact.is-whatif { border-style: dashed; border-color: var(--st-line-3); background: var(--st-sunken); }
+
+/* The handle the stream leaves by: a what-if is dragged out of it. */
+.rl-stream__handle {
+  position: absolute;
+  z-index: 4;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid var(--st-line-3);
+  border-radius: 50%;
+  background: var(--st-card);
+  touch-action: none;
+}
+.rl-stream__handle.is-live { border-color: var(--st-text-2); cursor: grab; }
+.rl-stream__handle.is-live:hover { border-color: var(--st-text); box-shadow: 0 0 0 4px var(--st-inset); }
+.rl-stream__handle.is-dragging { cursor: grabbing; border-color: var(--st-text); }
+.rl-stream__handle:disabled { cursor: default; }
+
+.rl-stream__tray { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px dashed var(--st-line-2); border-radius: 10px; background: color-mix(in srgb, var(--st-card) 60%, transparent); }
+.rl-stream__trayhead { margin: 0; font-size: 12px; font-weight: 600; color: var(--st-text-2); }
+.rl-stream__trayhead span { font-weight: 400; color: var(--st-text-3); }
+.rl-stream__chipset { display: flex; flex-direction: column; gap: 4px; }
+.rl-stream__chiplabel { font-size: 12px; color: var(--st-text-3); }
+.rl-stream__chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.rl-stream__chip {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--st-line-2);
+  border-radius: 6px;
+  background: var(--st-card);
+  font: inherit;
+  font-size: 12px;
+  color: var(--st-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rl-stream__chip:hover { border-color: var(--st-line-3); color: var(--st-text); }
+.rl-stream__chip.is-on { border-color: var(--st-text-2); background: var(--st-inset); color: var(--st-text); font-weight: 600; }
+.rl-stream__chip.is-own:not(.is-on) { border-style: dashed; }
+.rl-stream__chip.is-over { border-color: var(--st-text); box-shadow: 0 0 0 3px var(--st-inset); color: var(--st-text); }
+
+/* The what-if's mark, over the source: what changed, and the way back. */
+.rl-stream__whatif { left: 0; z-index: 6; display: flex; align-items: center; gap: 6px; height: 28px; font-size: 12px; }
+.rl-stream__whatiftag { flex: none; padding: 1px 6px; border: 1px dashed var(--st-text-2); border-radius: 5px; font-weight: 600; color: var(--st-text); }
+.rl-stream__whatifwords { min-width: 0; overflow: hidden; color: var(--st-text-2); white-space: nowrap; text-overflow: ellipsis; }
+.rl-stream__back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--st-line-2);
+  border-radius: 6px;
+  background: var(--st-card);
+  font: inherit;
+  font-size: 12px;
+  color: var(--st-text);
+  cursor: pointer;
+}
+.rl-stream__back:hover { border-color: var(--st-line-3); }
+.rl-stream__back:focus-visible { outline: 2px solid var(--st-work); outline-offset: 2px; }
+
+/* --- The peek's note ------------------------------------------------------------------------- */
+
+.rl-stream__note {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  width: 300px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-line-2);
+  border-radius: 10px;
+  background: var(--st-note);
+  box-shadow: var(--st-note-shadow);
+  font-size: 13px;
+  color: var(--st-body);
+}
+.rl-stream__note.is-below { left: 0; top: calc(100% + 6px); }
+.rl-stream__note.is-below-end { right: 0; top: calc(100% + 6px); }
+.rl-stream__note.is-right { left: calc(100% + 10px); top: 0; }
+.rl-stream__note.is-left { right: calc(100% + 10px); top: 0; }
+.rl-stream__note.is-wide { width: 340px; }
+.rl-stream__note.is-see { width: 380px; padding: 8px; }
+.rl-stream__notep { margin: 0 0 4px; font-size: 12px; line-height: 1.4; color: var(--st-text-2); }
+.rl-stream__notep.is-lead { font-size: 13px; color: var(--st-text); }
+.rl-stream__notep:last-child { margin-bottom: 0; }
+.rl-stream__notefix { margin: 6px 0 0; font-size: 12px; color: var(--st-text-2); }
+.rl-stream__notequiet { margin: 2px 0 0; font-size: 12px; color: var(--st-text-3); }
+.rl-stream__notethen { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; margin: 6px 0 0; font-size: 13px; color: var(--st-text); }
+.rl-stream__parts { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rl-stream__fn { display: grid; grid-template-columns: 56px minmax(0, 1fr) 16px; gap: 8px; align-items: start; }
+.rl-stream__fntext { display: flex; flex-direction: column; min-width: 0; }
+.rl-stream__fnfact { font-size: 13px; color: var(--st-text); overflow-wrap: anywhere; }
+.rl-stream__fnneed { font-size: 12px; color: var(--st-text-3); }
+.rl-stream__flist { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rl-stream__flist li { display: flex; flex-direction: column; gap: 2px; }
+.rl-stream__fhead { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--st-text); }
+.rl-stream__flist li.is-conflict .rl-stream__fhead svg { color: var(--st-warn); }
+.rl-stream__fline { font-size: 12px; color: var(--st-text-2); }

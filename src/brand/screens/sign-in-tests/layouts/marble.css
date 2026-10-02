@@ -1,0 +1,431 @@
+/* -----------------------------------------------------------------------------
+   The run as a sorting machine (MarbleLayout.tsx): the frame in one SVG under
+   the cards — the rail, the funnels and their lids, the pipe, the gutter and
+   the chute, the bins — the cards over it, the marble over everything.
+
+   Colour is meaning, one each: --accent while the engine works on a part;
+   the route its tone (--rm-*) once the answer lands — green any allow, red a
+   Deny, amber Depends; red a failed check; amber a conflict or a can't-tell;
+   grey the rest. Motion owns the marble's place and spin, the plates' tilt
+   and opacity, the lids' flaps and the answer's rise — nothing here
+   transitions or transforms those elements (.rl-marble__ball,
+   .rl-marble__plateslot, .rl-marble__lid, .rl-marble__outslot,
+   .rl-marble__ghost); borders and strokes ease in CSS on the elements inside.
+   -------------------------------------------------------------------------- */
+
+.rl-marble {
+  --rm-dot: var(--text-secondary);
+  --rm-fg: var(--text-primary);
+  --rm-bg: var(--surface-inset);
+  --rm-border: var(--border-default);
+  --rm-line: var(--border-strong);
+  --rm-quiet: var(--border-default);
+}
+.rl-marble.is-landed.is-positive { --rm-dot: var(--fb-positive-dot); --rm-fg: var(--fb-positive-fg); --rm-bg: var(--fb-positive-bg); --rm-border: var(--fb-positive-border); }
+.rl-marble.is-landed.is-negative { --rm-dot: var(--fb-negative-dot); --rm-fg: var(--fb-negative-fg); --rm-bg: var(--fb-negative-bg); --rm-border: var(--fb-negative-border); }
+.rl-marble.is-landed.is-notice { --rm-dot: var(--fb-notice-dot); --rm-fg: var(--fb-notice-fg); --rm-bg: var(--fb-notice-bg); --rm-border: var(--fb-notice-border); }
+
+.rl-marble__map { position: relative; font-family: inherit; color: var(--text-primary); }
+
+/* --- The frame --- */
+.rl-marble__frame { position: absolute; left: 0; top: 0; z-index: 0; overflow: visible; pointer-events: none; }
+.rl-marble__frame line, .rl-marble__frame path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.rl-marble__rail { stroke: var(--rm-line); stroke-width: 2; }
+.rl-marble__rail.is-stop { stroke-width: 2; }
+.rl-marble__hopper path { stroke: var(--border-strong); stroke-width: 1.5; transition: stroke 0.14s ease; }
+.rl-marble__hopper.is-working path { stroke: var(--accent); stroke-width: 2; }
+.rl-marble__hopper.is-route path { stroke: var(--rm-dot); stroke-width: 2.25; }
+.rl-marble__hopper.is-also path { stroke: var(--fb-notice-dot); stroke-dasharray: 5 4; }
+.rl-marble__hopper.is-also-info path { stroke-dasharray: 5 4; }
+.rl-marble__hopper.is-quiet path, .rl-marble__hopper.is-off path { stroke: var(--border-default); }
+.rl-marble__neckcap { stroke: var(--border-strong); stroke-width: 1.5; }
+.rl-marble__hopper.is-quiet .rl-marble__neckcap, .rl-marble__hopper.is-off .rl-marble__neckcap { stroke: var(--border-default); }
+
+/* The lids: part of the rail while shut; the engine's blue while it asks; the route's tone once open. */
+.rl-marble__lid { stroke: var(--rm-line); stroke-width: 2.5; transition: stroke 0.14s ease; }
+.rl-marble__lid.is-working { stroke: var(--accent); stroke-width: 3; }
+.rl-marble__lid.is-route { stroke: var(--rm-dot); }
+.rl-marble__lid.is-also { stroke: var(--fb-notice-dot); }
+
+/* The incline from a funnel's neck to the tower, when the tower had to stand aside. */
+.rl-marble__incline { stroke: var(--rm-line); stroke-width: 2; }
+.rl-marble__neckrun { stroke: var(--border-strong); stroke-width: 1.5; }
+.rl-marble.is-landed .rl-marble__neckrun { stroke: var(--rm-dot); stroke-width: 2; }
+.rl-marble__wall { stroke: var(--border-strong); stroke-width: 1.5; }
+.rl-marble__housing { fill: var(--surface-sunken) !important; stroke: var(--border-subtle); stroke-width: 1; }
+
+.rl-marble__cup { stroke: var(--border-strong); stroke-width: 1.5; fill: var(--surface-raised) !important; transition: stroke 0.14s ease, fill 0.14s ease; }
+.rl-marble__bin.is-lit .rl-marble__cup { stroke: var(--rm-dot); stroke-width: 2.25; fill: var(--rm-bg) !important; }
+.rl-marble__bin.is-maybe .rl-marble__cup { stroke: var(--fb-notice-dot); stroke-dasharray: 5 4; fill: var(--fb-notice-bg) !important; }
+
+/* The way the marble came, once it has landed: faint, in the answer's tone. */
+.rl-marble__traceg { opacity: 1; }
+.rl-marble__trace { stroke: var(--rm-dot); stroke-width: 2.5; stroke-opacity: 0.45; stroke-dasharray: 0.5 7; stroke-linecap: round; }
+.rl-marble__conn { stroke: var(--rm-dot); stroke-width: 1.5; }
+
+/* --- Cards: the console's --- */
+.rl-marble__card {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  color: var(--text-primary);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, opacity 0.2s ease, background-color 0.12s ease;
+}
+.rl-marble__num {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.rl-marble__go {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.rl-marble__card:hover .rl-marble__go, .rl-marble__go:focus-visible { opacity: 1; }
+.rl-marble__go:hover { background: var(--surface-inset); color: var(--text-primary); }
+.rl-marble__go:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* A press target inside a card: the whole of it, a focus ring of its own. */
+.rl-marble__hit {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.rl-marble__hit:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 6px; }
+.rl-marble__card.is-peek { box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-tertiary) 22%, transparent), var(--el-low); }
+
+/* --- The sign-in --- */
+.rl-marble__signin { padding: 0; z-index: 2; }
+.rl-marble__signbtn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.rl-marble__signbtn:hover { background: var(--surface-sunken); }
+.rl-marble__signbtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.rl-marble__who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rl-marble__whotext { display: flex; flex-direction: column; min-width: 0; }
+.rl-marble__whotext strong { font-size: var(--fs-base); line-height: 18px; font-weight: var(--fw-semibold); }
+.rl-marble__whotext span { font-size: var(--fs-sm); line-height: 16px; color: var(--text-tertiary); }
+.rl-marble__app { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); }
+.rl-marble__app > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-marble__to { flex: none; color: var(--text-tertiary); }
+.rl-marble__facts { display: flex; flex-direction: column; gap: 3px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.rl-marble__fact { display: flex; align-items: flex-start; gap: 7px; min-width: 0; color: var(--text-secondary); font-size: var(--fs-sm); line-height: 17px; }
+.rl-marble__fmark { display: grid; flex: none; place-items: center; width: 16px; height: 17px; color: var(--text-tertiary); }
+.rl-marble__fact.is-unset, .rl-marble__fact.is-unset .rl-marble__fmark { color: var(--fb-notice-fg); }
+
+/* --- The policies' labels, over their funnels --- */
+.rl-marble__labels { position: absolute; z-index: 1; }
+.rl-marble__label { top: 0; padding: 0; }
+.rl-marble__lhit { display: flex; flex-direction: column; gap: 3px; width: 100%; height: 100%; box-sizing: border-box; padding: 7px 10px 7px; }
+.rl-marble__lhead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.rl-marble__lname {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--fs-md);
+  line-height: 18px;
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.rl-marble__lline { display: block; min-height: 16px; padding-left: 1px; overflow: hidden; font-size: var(--fs-sm); line-height: 16px; color: var(--text-tertiary); white-space: nowrap; text-overflow: ellipsis; }
+.rl-marble__label.is-working { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-low); }
+.rl-marble__label.is-working .rl-marble__num { background: var(--accent-soft); color: var(--accent); }
+.rl-marble__label.is-route { border-color: var(--rm-dot); box-shadow: 0 0 0 1px var(--rm-dot), var(--el-low); }
+.rl-marble__label.is-route .rl-marble__num { background: var(--rm-bg); color: var(--rm-fg); }
+.rl-marble__label.is-route .rl-marble__lname { font-weight: var(--fw-semibold); }
+.rl-marble__label.is-route .rl-marble__lline { color: var(--text-primary); }
+.rl-marble__label.is-passed .rl-marble__lname { color: var(--text-secondary); }
+.rl-marble__label.is-also { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.rl-marble__label.is-also .rl-marble__num { background: var(--surface-raised); color: var(--fb-notice-fg); }
+.rl-marble__label.is-also .rl-marble__lline { color: var(--fb-notice-fg); }
+.rl-marble__label.is-also-info { border-style: dashed; border-color: var(--border-default); }
+.rl-marble__label.is-quiet, .rl-marble__label.is-off { opacity: 0.55; box-shadow: none; }
+.rl-marble__label.is-idle { box-shadow: none; }
+.rl-marble__label.is-idle .rl-marble__lname { color: var(--text-secondary); }
+.rl-marble__label.is-peek.is-quiet, .rl-marble__label.is-peek.is-off { opacity: 0.9; }
+
+/* --- The plates --- */
+.rl-marble__plateslot { position: absolute; z-index: 1; }
+.rl-marble__plateslot[aria-hidden='true'] { pointer-events: none; }
+.rl-marble__plate { position: relative; inset: auto; width: 100%; height: 100%; padding: 6px 12px 0; border-top: 3px solid var(--border-strong); }
+.rl-marble__plate.is-route { border-top-color: var(--rm-dot); }
+.rl-marble__plate.is-working, .rl-marble__plate.is-live { border-top-color: var(--accent); }
+.rl-marble__plate.is-fail { border-top-color: var(--fb-negative-border); }
+.rl-marble__plate.is-unknown { border-top-color: var(--fb-notice-dot); }
+.rl-marble__plate.is-quiet, .rl-marble__plate.is-idle { border-top-color: var(--border-default); }
+.rl-marble__plate.is-last { border-style: dashed; border-top-style: solid; border-color: var(--border-default); box-shadow: none; }
+.rl-marble__phead { position: relative; display: flex; align-items: center; gap: 8px; min-height: 20px; }
+.rl-marble__phit { display: flex; flex: 1 1 auto; align-items: center; gap: 8px; min-width: 0; }
+.rl-marble__pname { flex: 1 1 auto; min-width: 0; overflow: hidden; font-size: var(--fs-md); line-height: 20px; font-weight: var(--fw-medium); white-space: nowrap; text-overflow: ellipsis; }
+.rl-marble__then { flex: none; color: var(--text-tertiary); font-size: var(--fs-sm); line-height: 16px; }
+.rl-marble__plate .rl-marble__go { position: static; margin-right: -4px; }
+.rl-marble__plate.is-working, .rl-marble__plate.is-live { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-low); }
+.rl-marble__plate.is-working .rl-marble__num { background: var(--accent-soft); color: var(--accent); }
+.rl-marble__plate.is-route { border-style: solid; border-color: var(--rm-dot); background: var(--surface-raised); box-shadow: 0 0 0 1px var(--rm-dot), var(--el-low); }
+.rl-marble__plate.is-route .rl-marble__num { background: var(--rm-bg); color: var(--rm-fg); }
+.rl-marble__plate.is-route .rl-marble__pname { font-weight: var(--fw-semibold); }
+.rl-marble__plate.is-route .rl-marble__then { color: var(--rm-fg); font-weight: var(--fw-medium); }
+.rl-marble__plate.is-fail .rl-marble__num { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.rl-marble__plate.is-fail .rl-marble__pname { color: var(--text-secondary); }
+.rl-marble__plate.is-unknown { border-color: var(--fb-notice-border); }
+.rl-marble__plate.is-unknown .rl-marble__num, .rl-marble__plate.is-also .rl-marble__num { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.rl-marble__plate.is-also { border-style: dashed; border-color: var(--fb-notice-border); }
+.rl-marble__plate.is-also .rl-marble__then { color: var(--fb-notice-fg); }
+.rl-marble__plate.is-quiet, .rl-marble__plate.is-off { opacity: 0.5; box-shadow: none; }
+.rl-marble__plate.is-idle { box-shadow: none; }
+.rl-marble__plate.is-idle .rl-marble__pname { color: var(--text-secondary); }
+.rl-marble__plate.is-peek.is-quiet { opacity: 0.85; }
+
+/* A plate's checks: one slot each, read left to right as the marble rolls over them. */
+.rl-marble__slots { display: flex; gap: 6px; margin-top: 5px; }
+.rl-marble.is-tight .rl-marble__slots { margin-top: 4px; }
+.rl-marble.is-tight .rl-marble__plate { padding-top: 5px; }
+.rl-marble.is-tight .rl-marble__lname { line-height: 17px; }
+.rl-marble.is-tight .rl-marble__lhit { padding: 6px 10px; }
+.rl-marble__slot {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+.rl-marble__shit { display: flex; flex: 1 1 auto; align-items: center; gap: 5px; min-width: 0; height: 100%; padding: 0 7px; box-sizing: border-box; font-size: var(--fs-sm); line-height: 16px; }
+.rl-marble__sicon { flex: none; color: var(--text-tertiary); }
+.rl-marble__sword { flex: none; color: var(--text-tertiary); }
+.rl-marble__stext { flex: 1 1 auto; min-width: 0; overflow: hidden; color: var(--text-secondary); white-space: nowrap; text-overflow: ellipsis; }
+.rl-marble__smark { display: grid; flex: none; place-items: center; width: 14px; height: 14px; margin-left: auto; }
+.rl-marble__slot.is-compact .rl-marble__shit { justify-content: space-between; gap: 2px; padding: 0 6px; }
+.rl-marble__slot.is-working { border-color: var(--accent); background: var(--accent-soft); }
+.rl-marble__slot.is-working .rl-marble__sicon { color: var(--accent); }
+.rl-marble__slot.is-pass { border-color: var(--fb-positive-border); background: var(--surface-raised); }
+.rl-marble__slot.is-pass .rl-marble__stext { color: var(--text-primary); }
+.rl-marble__slot.is-fail { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.rl-marble__slot.is-fail .rl-marble__stext, .rl-marble__slot.is-fail .rl-marble__sicon { color: var(--fb-negative-fg); }
+.rl-marble__slot.is-unknown { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.rl-marble__slot.is-unknown .rl-marble__stext, .rl-marble__slot.is-unknown .rl-marble__sicon { color: var(--fb-notice-fg); }
+.rl-marble__slot.is-skip { border-style: dashed; background: none; }
+.rl-marble__slot.is-skip .rl-marble__stext { color: var(--text-tertiary); }
+.rl-marble__slot.is-idle .rl-marble__stext { color: var(--text-tertiary); }
+.rl-marble__slot.is-peek { box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-tertiary) 22%, transparent); }
+.rl-marble__add {
+  flex: none;
+  margin-right: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 16px;
+}
+.rl-marble__add:hover { background: var(--surface-inset); }
+.rl-marble__add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.rl-marble__mark { display: grid; place-items: center; }
+.rl-marble__mark.is-pass { color: var(--fb-positive-fg); }
+.rl-marble__mark.is-fail { color: var(--fb-negative-fg); }
+.rl-marble__mark.is-unknown { color: var(--fb-notice-fg); }
+.rl-marble__q { font-size: var(--fs-sm); line-height: 14px; font-weight: var(--fw-semibold); }
+
+/* --- The bins' words --- */
+.rl-marble__binlabel { position: absolute; z-index: 1; display: flex; align-items: flex-end; justify-content: center; }
+.rl-marble__bhit { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 100%; }
+.rl-marble__bword { font-size: var(--fs-sm); line-height: 16px; color: var(--text-tertiary); white-space: nowrap; }
+.rl-marble__binlabel.is-lit .rl-marble__bword { color: var(--rm-fg); font-weight: var(--fw-semibold); }
+.rl-marble__binlabel.is-maybe .rl-marble__bword { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+
+/* --- The answer --- */
+.rl-marble__outslot { position: absolute; z-index: 2; }
+.rl-marble__outslot[aria-hidden='true'] { pointer-events: none; }
+.rl-marble__outslot[aria-hidden='true'] > * { visibility: hidden; }
+.rl-marble__out { position: relative; padding: 12px 14px; }
+.rl-marble__out.is-positive { --o-fg: var(--fb-positive-fg); --o-bg: var(--fb-positive-bg); --o-dot: var(--fb-positive-dot); }
+.rl-marble__out.is-negative { --o-fg: var(--fb-negative-fg); --o-bg: var(--fb-negative-bg); --o-dot: var(--fb-negative-dot); }
+.rl-marble__out.is-notice { --o-fg: var(--fb-notice-fg); --o-bg: var(--fb-notice-bg); --o-dot: var(--fb-notice-dot); }
+.rl-marble__out.is-neutral { --o-fg: var(--text-primary); --o-bg: var(--surface-inset); --o-dot: var(--text-tertiary); }
+.rl-marble__out { border-color: var(--o-dot); box-shadow: 0 0 0 1px var(--o-dot), var(--el-low); }
+.rl-marble__verdict { display: flex; align-items: center; gap: 10px; }
+.rl-marble__vicon { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--o-bg); color: var(--o-fg); }
+.rl-marble__vword { font-size: var(--fs-xl, 20px); line-height: 24px; font-weight: var(--fw-semibold); color: var(--o-fg); }
+.rl-marble__by { display: flex; flex-direction: column; margin: 10px 0 0; font-size: var(--fs-md); line-height: 18px; }
+.rl-marble__bylabel { color: var(--text-tertiary); font-size: var(--fs-sm); line-height: 16px; }
+.rl-marble__byrule { white-space: nowrap; }
+.rl-marble__bylink { padding: 0; border: 0; background: none; color: var(--text-primary); font: inherit; font-weight: var(--fw-medium); text-align: left; }
+.rl-marble__bylink:hover { text-decoration: underline; text-underline-offset: 2px; }
+.rl-marble__bylink:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+.rl-marble__chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 10px 0 0; font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); }
+.rl-marble__step { display: inline-flex; align-items: center; }
+.rl-marble__step .is-end { color: var(--text-primary); font-weight: var(--fw-medium); }
+.rl-marble__arrow { margin: 0 5px; color: var(--text-tertiary); }
+.rl-marble__deny { margin: 8px 0 0; font-size: var(--fs-sm); line-height: 16px; color: var(--text-secondary); }
+.rl-marble__ifs { display: flex; flex-direction: column; gap: 3px; margin: 10px 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); line-height: 16px; }
+.rl-marble__ifs li { display: flex; justify-content: space-between; gap: 8px; }
+.rl-marble__ifs span { color: var(--text-tertiary); }
+.rl-marble__ifs strong { font-weight: var(--fw-medium); color: var(--text-primary); text-align: right; }
+.rl-marble__needs { margin: 8px 0 0; font-size: var(--fs-sm); line-height: 16px; color: var(--fb-notice-fg); }
+.rl-marble__also { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: var(--fs-sm); line-height: 16px; color: var(--text-tertiary); }
+.rl-marble__also.is-conflict { color: var(--fb-notice-fg); }
+.rl-marble__expect { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+.rl-marble__changed { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.rl-marble__see { margin-top: 10px; }
+
+/* --- The marble --- */
+.rl-marble__ball {
+  position: absolute;
+  z-index: 3;
+  box-sizing: border-box;
+  border: 1.5px solid var(--text-secondary);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  box-shadow: 0 2px 6px rgba(20, 30, 40, 0.18), inset 0 -3px 0 color-mix(in srgb, var(--text-tertiary) 14%, transparent);
+  pointer-events: auto;
+}
+.rl-marble__ball.is-positive { border-color: var(--fb-positive-dot); background: var(--fb-positive-bg); }
+.rl-marble__ball.is-negative { border-color: var(--fb-negative-dot); background: var(--fb-negative-bg); }
+.rl-marble__ball.is-notice { border-color: var(--fb-notice-dot); background: var(--fb-notice-bg); }
+/* Its spin: a short arc of its rim, turned by how far it has rolled. */
+.rl-marble__spin {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: color-mix(in srgb, var(--text-tertiary) 55%, transparent);
+  pointer-events: none;
+}
+.rl-marble__ballbtn { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; }
+.rl-marble__ballbtn.rl-marble__hit:focus-visible { border-radius: 50%; outline-offset: 2px; }
+.rl-marble__init { font-size: var(--fs-sm); line-height: 1; font-weight: var(--fw-semibold); letter-spacing: 0.02em; color: var(--text-primary); }
+.rl-marble__ballapp {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+  pointer-events: none;
+}
+.rl-marble__ballq {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--fb-notice-dot);
+  color: var(--surface-raised);
+  font-size: var(--fs-sm);
+  line-height: 1;
+  font-weight: var(--fw-semibold);
+  pointer-events: none;
+}
+.rl-marble__ghost {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--fb-notice-dot);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fb-notice-bg) 70%, transparent);
+  pointer-events: none;
+}
+
+/* --- Why --- */
+.rl-marble__why {
+  pointer-events: none;
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-high, 0 8px 24px rgb(0 0 0 / 0.12));
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+.rl-marble__wtitle { margin: 0; font-size: var(--fs-md); line-height: 18px; font-weight: var(--fw-semibold); }
+.rl-marble__why.is-positive .rl-marble__wtitle { color: var(--fb-positive-fg); }
+.rl-marble__why.is-negative .rl-marble__wtitle { color: var(--fb-negative-fg); }
+.rl-marble__why.is-notice .rl-marble__wtitle { color: var(--fb-notice-fg); }
+.rl-marble__wpairs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.rl-marble__wpair { display: flex; align-items: flex-start; gap: 8px; }
+.rl-marble__wword { flex: none; width: 52px; color: var(--text-tertiary); }
+.rl-marble__wvals { display: grid; flex: 1 1 0; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; min-width: 0; overflow-wrap: anywhere; }
+.rl-marble__wlab { color: var(--text-tertiary); }
+.rl-marble__wneed { color: var(--text-secondary); }
+.rl-marble__whas { color: var(--text-primary); }
+.rl-marble__wpair.is-fail .rl-marble__whas { color: var(--fb-negative-fg); }
+.rl-marble__wpair.is-unknown .rl-marble__whas { color: var(--fb-notice-fg); }
+.rl-marble__wmark { display: grid; flex: none; place-items: center; width: 16px; height: 17px; }
+.rl-marble__wline { margin: 8px 0 0; color: var(--text-secondary); }
+.rl-marble__wline + .rl-marble__wline { margin-top: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-marble__card, .rl-marble__go, .rl-marble__slot, .rl-marble__hopper path, .rl-marble__lid, .rl-marble__cup { transition: none; }
+}
+
+/* The sign-in's face, its initials at the type floor. */
+.rl-marble__who .bx-face.is-md { width: 30px; height: 30px; font-size: var(--fs-sm); }
+
+/* --- Review pass, 2 Oct --- */
+/* The bins are trays in the machine, not cards: open on the housing's ground, each with its outcome's mark until the marble lands in one. */
+.rl-marble__cup { fill: var(--surface-raised) !important; stroke: var(--border-default); }
+.rl-marble__bin.is-idle .rl-marble__cup { fill: color-mix(in srgb, var(--surface-raised) 55%, transparent) !important; }
+.rl-marble__bicon { position: absolute; top: 0; left: 0; right: 0; display: grid; place-items: center; color: var(--text-tertiary); opacity: 0.7; pointer-events: none; }
+.rl-marble__binlabel.is-maybe .rl-marble__bicon { color: var(--fb-notice-fg); opacity: 1; }
+/* The marble's app badge sits off its rim, clear of the initials. */
+.rl-marble__ballapp { right: -7px; bottom: -6px; width: 15px; height: 15px; border-radius: 4px; }
+.rl-marble__init { letter-spacing: 0; }
+/* Before the answer lands the chosen route is a quiet grey, as Line's chosen cards are — not near-black; it takes the answer's colour as the marble drops in. */
+.rl-marble { --rm-dot: color-mix(in srgb, var(--text-tertiary) 45%, var(--border-strong)); }

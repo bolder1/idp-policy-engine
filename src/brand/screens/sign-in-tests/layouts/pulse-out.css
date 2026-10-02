@@ -1,0 +1,72 @@
+/* -----------------------------------------------------------------------------
+   Pulse's answer (pulse-ends.tsx `OutcomeEnd`, pulse-extras.tsx): the
+   biggest card, at the end of the line, in the answer's one tone. Motion
+   springs it in, so it carries no CSS transition of its own.
+   -------------------------------------------------------------------------- */
+
+.rl-pulse__outslot { position: absolute; z-index: 4; }
+.rl-pulse__out {
+  --tone-fg: var(--pl-text);
+  --tone-bg: var(--pl-inset);
+  --tone-dot: var(--pl-text-3);
+  padding: 12px 14px 12px;
+  border-width: 1px;
+  box-shadow: var(--pl-el-2);
+  transition: none;
+  cursor: default;
+}
+.rl-pulse__out.is-focus { width: 100%; }
+.rl-pulse__out.is-positive { --tone-fg: var(--pl-pass-fg); --tone-bg: var(--pl-pass-bg); --tone-dot: var(--pl-pass); border-color: var(--pl-pass); box-shadow: 0 0 0 1px var(--pl-pass), var(--pl-el-2); }
+.rl-pulse__out.is-negative { --tone-fg: var(--pl-fail-fg); --tone-bg: var(--pl-fail-bg); --tone-dot: var(--pl-fail); border-color: var(--pl-fail); box-shadow: 0 0 0 1px var(--pl-fail), var(--pl-el-2); }
+.rl-pulse__out.is-notice { --tone-fg: var(--pl-notice-fg); --tone-bg: var(--pl-notice-bg); --tone-dot: var(--pl-notice); border-color: var(--pl-notice); box-shadow: 0 0 0 1px var(--pl-notice), var(--pl-el-2); }
+.rl-pulse__out.is-neutral { border-color: var(--pl-line-3); }
+.rl-pulse__outin { display: flex; flex-direction: column; gap: 8px; }
+.rl-pulse__verdict { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rl-pulse__tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: var(--tone-bg); color: var(--tone-dot); }
+.rl-pulse__word { flex: 1 1 auto; min-width: 0; font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--tone-fg); }
+.rl-pulse__expect { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--pl-notice-fg); }
+.rl-pulse__expect svg { color: var(--pl-notice); }
+.rl-pulse__by { display: flex; flex-direction: column; margin: -2px 0 0; padding-left: 42px; font-size: 12px; line-height: 18px; }
+.rl-pulse__bylabel { color: var(--pl-text-3); }
+.rl-pulse__bylink { display: inline; min-width: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 500; color: var(--pl-link); text-align: left; cursor: pointer; }
+.rl-pulse__bylink:hover span { text-decoration: underline; }
+.rl-pulse__bylink:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--pl-focus); }
+.rl-pulse__bylink svg { display: inline-block; margin-left: 3px; vertical-align: -1px; }
+.rl-pulse__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding: 0 0 0 42px; list-style: none; }
+.rl-pulse__factors li { display: inline-flex; align-items: center; gap: 4px; }
+.rl-pulse__factor { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid var(--pl-line); border-radius: 999px; background: var(--pl-sunken); font-size: 12px; font-weight: 500; color: var(--pl-text); }
+.rl-pulse__farrow { color: var(--pl-muted); }
+.rl-pulse__deny { display: -webkit-box; margin: 0; padding-left: 42px; overflow: hidden; font-size: 12px; line-height: 17px; color: var(--pl-text-2); -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.rl-pulse__ifs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0 0 0 42px; list-style: none; font-size: 12px; }
+.rl-pulse__ifs li { display: flex; justify-content: space-between; gap: 8px; }
+.rl-pulse__if { color: var(--pl-text-3); }
+.rl-pulse__ifword { font-weight: 500; color: var(--pl-text); }
+.rl-pulse__needs { display: flex; align-items: center; gap: 4px; margin: 0; padding-left: 42px; font-size: 12px; color: var(--pl-notice-fg); }
+.rl-pulse__needs svg { color: var(--pl-notice); }
+.rl-pulse__vs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding-left: 42px; font-size: 12px; color: var(--pl-text-2); }
+.rl-pulse__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 2px 0 0; padding: 8px 0 0 42px; border-top: 1px solid var(--pl-line); font-size: 12px; }
+.rl-pulse__finding { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: var(--pl-text-3); cursor: pointer; }
+.rl-pulse__finding:hover { text-decoration: underline; text-underline-offset: 2px; }
+.rl-pulse__finding:focus-visible, .rl-pulse__seebtn:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--pl-focus); }
+.rl-pulse__finding.is-conflict { color: var(--pl-notice-fg); }
+.rl-pulse__finding.is-conflict svg { color: var(--pl-notice); }
+.rl-pulse__changed { color: var(--pl-text-3); }
+.rl-pulse__seebtn { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding: 0; border: 0; background: none; font: inherit; font-weight: 500; color: var(--pl-text-2); cursor: pointer; }
+.rl-pulse__seebtn:hover, .rl-pulse__seebtn.is-open { color: var(--pl-text); }
+
+/* The slot it lands in: dashed, waiting; blue while the engine decides. */
+.rl-pulse__ghost { height: 64px; border-style: dashed; border-color: var(--pl-line-2); background: transparent; box-shadow: none; }
+.rl-pulse__ghost.is-working { border-style: solid; border-color: var(--pl-work); box-shadow: 0 0 0 3px var(--pl-work-soft); }
+
+/* Under it, on demand: the findings, or What they see. */
+.rl-pulse__extra { margin-top: 8px; padding: 10px 12px; }
+.rl-pulse__extra.is-see { padding: 10px; }
+.rl-pulse__extra .tsee__title { display: none; }
+.rl-pulse__extra .tsee { margin: 0; }
+.rl-pulse__flist { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 17px; }
+.rl-pulse__flist li { display: flex; flex-direction: column; gap: 2px; }
+.rl-pulse__fhead { display: flex; align-items: flex-start; gap: 6px; font-weight: 500; color: var(--pl-text); }
+.rl-pulse__fhead svg { flex: none; margin-top: 2px; color: var(--pl-text-3); }
+.rl-pulse__flist li.is-conflict .rl-pulse__fhead svg { color: var(--pl-notice); }
+.rl-pulse__fline { padding-left: 18px; color: var(--pl-text-2); }
+.rl-pulse__flist .rl-pulse__dfix { margin-left: 18px; }

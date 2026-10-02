@@ -1,0 +1,696 @@
+/* -----------------------------------------------------------------------------
+   The run as FOCUS (FocusLayout.tsx): a spatial carousel of large cards over
+   a ribbon of the whole run. LIGHT is the console's own look — white raised
+   cards, hairlines, sunken fills, the canvas's dotted ground showing through;
+   DARK is the dimmed stage, behind the dock's toggle (stage-theme.tsx).
+   Every colour is a variable on the root, set per stage; the rules use only
+   those.
+
+   Colour is meaning: blue (--fc-work) only on what the engine works on now;
+   green ✓ / applies / an allow; red ✕ / a deny; amber only a conflict or a
+   can't-tell; grey passed over or not reached. Brand orange never.
+
+   Nothing motion moves (.rl-focus__slot, the marks, the sweep) carries a CSS
+   transform or transition: the colour transitions sit on the card inside.
+   -------------------------------------------------------------------------- */
+
+.rl-focus-root {
+  --fc-backdrop: transparent;
+  --fc-surface: var(--surface-raised);
+  --fc-sunken: var(--surface-sunken);
+  --fc-inset: var(--surface-inset);
+  --fc-line: var(--border-subtle);
+  --fc-line-2: var(--border-default);
+  --fc-line-3: var(--border-strong);
+  --fc-text: var(--text-primary);
+  --fc-text-2: var(--text-secondary);
+  --fc-text-3: var(--text-tertiary);
+  --fc-text-4: var(--text-muted);
+  --fc-work: var(--accent);
+  --fc-work-soft: var(--accent-soft);
+  --fc-work-line: var(--accent-soft-border);
+  --fc-ok: var(--fb-positive-dot);
+  --fc-ok-fg: var(--fb-positive-fg);
+  --fc-ok-bg: var(--fb-positive-bg);
+  --fc-ok-line: var(--fb-positive-border);
+  --fc-bad: var(--fb-negative-dot);
+  --fc-bad-fg: var(--fb-negative-fg);
+  --fc-bad-bg: var(--fb-negative-bg);
+  --fc-bad-line: var(--fb-negative-border);
+  --fc-warn: var(--fb-notice-dot);
+  --fc-warn-fg: var(--fb-notice-fg);
+  --fc-warn-bg: var(--fb-notice-bg);
+  --fc-warn-line: var(--fb-notice-border);
+  --fc-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px rgba(16, 24, 40, 0.05);
+  --fc-shadow-focus: 0 2px 4px rgba(16, 24, 40, 0.05), 0 12px 32px rgba(16, 24, 40, 0.1);
+  --fc-skel: var(--surface-inset);
+  --fc-pick-hover: rgba(16, 24, 40, 0.025);
+  --fc-link: var(--text-link);
+  position: absolute;
+  inset: 0;
+  color: var(--fc-text);
+}
+.rl-focus-root[data-stage='dark'] {
+  --fc-backdrop: #121d26;
+  --fc-surface: rgba(28, 42, 56, 0.96);
+  --fc-sunken: rgba(255, 255, 255, 0.045);
+  --fc-inset: rgba(255, 255, 255, 0.08);
+  --fc-line: rgba(255, 255, 255, 0.1);
+  --fc-line-2: rgba(255, 255, 255, 0.16);
+  --fc-line-3: rgba(255, 255, 255, 0.26);
+  --fc-text: #eef3f8;
+  --fc-text-2: #c4d0db;
+  --fc-text-3: #98a9b8;
+  --fc-text-4: #7d8fa0;
+  --fc-work: #6ea8ff;
+  --fc-work-soft: rgba(110, 168, 255, 0.14);
+  --fc-work-line: rgba(110, 168, 255, 0.45);
+  --fc-ok: #4fd18b;
+  --fc-ok-fg: #8be3b2;
+  --fc-ok-bg: rgba(79, 209, 139, 0.12);
+  --fc-ok-line: rgba(79, 209, 139, 0.42);
+  --fc-bad: #ff6b7d;
+  --fc-bad-fg: #ffa3ae;
+  --fc-bad-bg: rgba(255, 107, 125, 0.12);
+  --fc-bad-line: rgba(255, 107, 125, 0.42);
+  --fc-warn: #f2c14e;
+  --fc-warn-fg: #f6d58a;
+  --fc-warn-bg: rgba(242, 193, 78, 0.12);
+  --fc-warn-line: rgba(242, 193, 78, 0.42);
+  --fc-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  --fc-shadow-focus: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --fc-skel: rgba(255, 255, 255, 0.08);
+  --fc-pick-hover: rgba(255, 255, 255, 0.03);
+  --fc-link: #8fbcff;
+}
+
+/* The dark stage's ground: its own dots, with the view (RunStage paints --bb-*). */
+.rl-focus__backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: var(--fc-backdrop);
+  pointer-events: none;
+}
+.rl-focus-root[data-stage='dark'] .rl-focus__backdrop {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='1' cy='1' r='0.9' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E");
+  background-size: calc(24px * var(--bb-z, 1)) calc(24px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0) var(--bb-y, 0);
+}
+
+/* The host's engine pill and the dock, on the dark stage. */
+.tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark']) .tj-engine__pill {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(28, 42, 56, 0.94);
+  color: #eef3f8;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark']) :is(.tj-engine__text, .tj-engine__done, .tj-engine__pill button) { color: #dfe7ef; }
+.tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark']) .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.rl-focus-root[data-stage='dark'] .bb__dockbar { border-color: var(--fc-line-2); background: rgba(28, 42, 56, 0.94); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.rl-focus-root[data-stage='dark'] .bb__act { color: var(--fc-text-2); }
+.rl-focus-root[data-stage='dark'] .bb__act:hover { background: rgba(255, 255, 255, 0.08); color: var(--fc-text); }
+.rl-focus-root[data-stage='dark'] .bb__act:disabled { color: var(--fc-text-4); }
+.rl-focus-root[data-stage='dark'] .bb__float__sep { background: var(--fc-line-2); }
+.rl-focus .bb__act.is-on,
+.rl-focus .bb__act[aria-pressed='true'] { color: var(--fc-work); background: var(--fc-work-soft); }
+
+/* --- The world: the band of cards, the ribbon under it --------------------------------- */
+
+.rl-focus__world { position: relative; isolation: isolate; font-size: var(--fs-md); line-height: 1.35; color: var(--fc-text); }
+.rl-focus__band { position: relative; overflow: visible; touch-action: pan-y; cursor: grab; user-select: none; }
+.rl-focus__band.is-dragging { cursor: grabbing; }
+.rl-focus__slot { position: absolute; left: 0; top: 0; }
+.rl-focus__slot.is-hidden { pointer-events: none; }
+.rl-focus__content { position: relative; }
+.rl-focus__content[inert] { user-select: none; }
+
+/* A receded card is one button: press to bring it into focus. */
+.rl-focus__pick {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.rl-focus__pick:hover { background: var(--fc-pick-hover); box-shadow: 0 0 0 1px var(--fc-line-3); }
+.rl-focus__pick:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--fc-work); }
+
+/* --- A card ------------------------------------------------------------------------------ */
+
+.rl-focus__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 18px 20px 18px;
+  border: 1px solid var(--fc-line);
+  border-radius: 12px;
+  background: var(--fc-surface);
+  box-shadow: var(--fc-shadow);
+  color: var(--fc-text-2);
+  text-align: left;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+}
+.rl-focus__slot.is-focus .rl-focus__card { box-shadow: var(--fc-shadow-focus); border-color: var(--fc-line-2); }
+/* The engine at work on it: the console blue, a crisp ring and a soft halo. */
+.rl-focus__slot.is-focus .rl-focus__card.is-working { border-color: var(--fc-work); box-shadow: 0 0 0 3px var(--fc-work-soft), var(--fc-shadow-focus); }
+.rl-focus__card.is-positive { border-color: var(--fc-ok-line); }
+.rl-focus__card.is-negative,
+.rl-focus__card.is-fail { border-color: var(--fc-bad-line); }
+.rl-focus__card.is-notice { border-color: var(--fc-warn-line); }
+.rl-focus__slot.is-focus .rl-focus__card.is-positive { border-color: var(--fc-ok); box-shadow: 0 0 0 3px var(--fc-ok-bg), var(--fc-shadow-focus); }
+.rl-focus__slot.is-focus .rl-focus__card.is-negative { border-color: var(--fc-bad); box-shadow: 0 0 0 3px var(--fc-bad-bg), var(--fc-shadow-focus); }
+.rl-focus__slot.is-focus .rl-focus__card.is-notice { border-color: var(--fc-warn); box-shadow: 0 0 0 3px var(--fc-warn-bg), var(--fc-shadow-focus); }
+.rl-focus__card.is-ghost { min-height: 260px; border-style: dashed; border-color: var(--fc-line-2); background: var(--fc-sunken); box-shadow: none; }
+.rl-focus__slot.is-focus .rl-focus__card.is-ghost.is-working { border-style: solid; }
+.rl-focus__ghostline { display: block; height: 10px; margin: 18px 0 0 52px; background: var(--fc-skel); }
+.rl-focus__ghostline.is-short { width: 40%; margin-top: 10px; }
+
+.rl-focus__head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.rl-focus__heading { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
+.rl-focus__kicker { font-size: var(--fs-sm); font-weight: var(--fw-medium); line-height: 18px; color: var(--fc-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rl-focus__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--fw-semibold);
+  line-height: 24px;
+  color: var(--fc-text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rl-focus__title.is-quiet { color: var(--fc-text-3); font-weight: var(--fw-medium); }
+.rl-focus__sub { margin: 8px 0 0 52px; font-size: var(--fs-sm); line-height: 18px; color: var(--fc-text-3); }
+.rl-focus__sub:empty { display: none; }
+.rl-focus__tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--fc-inset);
+  color: var(--fc-text-2);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.rl-focus__tile.is-face { background: transparent; }
+.rl-focus__tile.is-working { background: var(--fc-work-soft); color: var(--fc-work); }
+.rl-focus__tile.is-positive { background: var(--fc-ok-bg); color: var(--fc-ok-fg); }
+.rl-focus__tile.is-negative,
+.rl-focus__tile.is-fail { background: var(--fc-bad-bg); color: var(--fc-bad-fg); }
+.rl-focus__tile.is-notice { background: var(--fc-warn-bg); color: var(--fc-warn-fg); }
+.rl-focus__tile.is-num .rl-focus__num { width: auto; height: auto; background: transparent; color: inherit; font-size: 17px; }
+.rl-focus__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--fc-inset);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--fc-text-2);
+  font-variant-numeric: tabular-nums;
+}
+.rl-focus__num.is-working { background: var(--fc-work-soft); color: var(--fc-work); }
+.rl-focus__num.is-positive { background: var(--fc-ok-bg); color: var(--fc-ok-fg); }
+
+.rl-focus__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 18px; height: 18px; color: var(--fc-text-4); }
+.rl-focus__mark.is-big { width: 28px; height: 28px; border-radius: 8px; }
+.rl-focus__mark.is-pass { color: var(--fc-ok); }
+.rl-focus__mark.is-fail { color: var(--fc-bad); }
+.rl-focus__mark.is-unknown { color: var(--fc-warn); }
+.rl-focus__mark.is-big.is-pass { background: var(--fc-ok-bg); }
+.rl-focus__mark.is-big.is-fail { background: var(--fc-bad-bg); }
+.rl-focus__mark.is-big.is-unknown { background: var(--fc-warn-bg); }
+.rl-focus__offword { font-size: var(--fs-sm); color: var(--fc-text-3); }
+.rl-focus .tj-spin { border-color: var(--fc-work-line); border-top-color: var(--fc-work); }
+
+.rl-focus__iconbtn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fc-text-3);
+  cursor: pointer;
+}
+.rl-focus__iconbtn:hover { border-color: var(--fc-line); background: var(--fc-sunken); color: var(--fc-text); }
+.rl-focus__iconbtn:focus-visible,
+.rl-focus .is-poke:focus-visible,
+.rl-focus__bylink:focus-visible,
+.rl-focus__findbtn:focus-visible,
+.rl-focus__quietlink:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 1px; }
+
+/* --- The sign-in -------------------------------------------------------------------------- */
+
+.rl-focus__to { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-sunken); font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--fc-text); }
+.rl-focus__toarrow { flex: none; color: var(--fc-text-3); }
+.rl-focus__facts { display: flex; flex-direction: column; gap: 0; margin: 10px 0 0; }
+.rl-focus__fact { display: grid; grid-template-columns: 64px 1fr; align-items: start; gap: 8px; padding: 8px 2px; border-top: 1px solid var(--fc-line); }
+.rl-focus__fact:first-child { border-top: 0; }
+.rl-focus__fact dt { font-size: var(--fs-sm); line-height: 20px; color: var(--fc-text-3); }
+.rl-focus__fact dd { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: var(--fs-md); line-height: 20px; color: var(--fc-text); }
+.rl-focus__factmark { display: inline-flex; flex: none; align-items: center; height: 20px; color: var(--fc-text-3); }
+.rl-focus__fact.is-unset dd { color: var(--fc-text-3); }
+.rl-focus__fact.is-needed dd { color: var(--fc-warn-fg); }
+.rl-focus .tj-skel { background-color: var(--fc-skel); }
+
+/* --- Press for why ------------------------------------------------------------------------ */
+
+.rl-focus__poke { position: relative; min-width: 0; }
+.rl-focus .is-poke { cursor: pointer; }
+.rl-focus__note {
+  margin: 4px 0 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  background: var(--fc-sunken);
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  color: var(--fc-text-2);
+}
+.rl-focus__notep { margin: 0; }
+.rl-focus__notep + .rl-focus__notep { margin-top: 4px; }
+.rl-focus__notep.is-lead { color: var(--fc-text); font-weight: var(--fw-medium); }
+.rl-focus__notefix { display: block; margin: 6px 0 0; color: var(--fc-text-2); }
+.rl-focus__notefix::before { content: 'Fix · '; color: var(--fc-text-3); }
+.rl-focus__parts { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rl-focus__part { display: grid; grid-template-columns: 84px 1fr auto; align-items: start; gap: 8px; }
+
+/* --- The policies -------------------------------------------------------------------------- */
+
+.rl-focus__plist { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; counter-reset: none; }
+.rl-focus__prow { position: relative; min-width: 0; }
+.rl-focus__pbtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  background: var(--fc-surface);
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--fc-text-2);
+  text-align: left;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+button.rl-focus__pbtn:hover { border-color: var(--fc-line-3); }
+.rl-focus__pname { flex: 1 1 auto; min-width: 0; overflow: hidden; font-weight: var(--fw-medium); white-space: nowrap; text-overflow: ellipsis; position: relative; }
+.rl-focus__pstate { display: inline-flex; flex: none; align-items: center; gap: 6px; max-width: 52%; overflow: hidden; font-size: var(--fs-sm); color: var(--fc-text-3); white-space: nowrap; text-overflow: ellipsis; position: relative; }
+.rl-focus__pstate.is-positive { color: var(--fc-ok-fg); font-weight: var(--fw-medium); }
+.rl-focus__pstate.is-notice { color: var(--fc-warn-fg); }
+.rl-focus__prow.is-skeleton .rl-focus__pbtn { background: var(--fc-sunken); border-color: transparent; }
+.rl-focus__prow.is-skeleton .tj-skel { flex: 1 1 auto; max-width: 60%; }
+.rl-focus__prow.is-asking .rl-focus__pbtn { border-color: var(--fc-work-line); background: var(--fc-surface); color: var(--fc-text); }
+.rl-focus__prow.is-found .rl-focus__pbtn { border-color: var(--fc-work); color: var(--fc-text); }
+.rl-focus__prow.is-found .rl-focus__pstate { color: var(--fc-work); font-weight: var(--fw-medium); }
+.rl-focus__prow.is-applies .rl-focus__pbtn { border-color: var(--fc-ok); background: var(--fc-ok-bg); color: var(--fc-text); }
+.rl-focus__prow.is-applies .rl-focus__pname { font-weight: var(--fw-semibold); }
+.rl-focus__prow.is-passed .rl-focus__pbtn { background: var(--fc-sunken); border-color: transparent; color: var(--fc-text-3); }
+.rl-focus__prow.is-also .rl-focus__pbtn { border-color: var(--fc-warn-line); background: var(--fc-warn-bg); color: var(--fc-text); }
+.rl-focus__prow.is-not-read .rl-focus__pbtn { border-style: dashed; border-color: var(--fc-line); background: transparent; color: var(--fc-text-4); }
+.rl-focus__prow.is-not-read .rl-focus__pname { font-weight: var(--fw-regular); }
+/* The engine asking a policy: a tinted band sweeps once across its row, as long as its step. */
+.rl-focus__sweep { position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: var(--fc-work-soft); pointer-events: none; }
+/* The one that covers, found: a ring locks onto it. */
+.rl-focus__lock { position: absolute; inset: -1px; border: 2px solid var(--fc-work); border-radius: 8px; pointer-events: none; }
+
+/* --- A rule's checks ------------------------------------------------------------------------ */
+
+.rl-focus__checks { display: flex; flex-direction: column; margin: 14px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--fc-line); }
+.rl-focus__check { min-width: 0; border-bottom: 1px solid var(--fc-line); }
+.rl-focus__crow {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+button.rl-focus__crow:hover { background: var(--fc-sunken); }
+.rl-focus__cword { font-size: var(--fs-sm); line-height: 20px; color: var(--fc-text-3); }
+.rl-focus__ctext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rl-focus__cfact { font-size: var(--fs-md); line-height: 20px; color: var(--fc-text); overflow-wrap: anywhere; }
+.rl-focus__cval { font-weight: var(--fw-medium); }
+.rl-focus__cvia { color: var(--fc-text-3); }
+.rl-focus__cneed { font-size: var(--fs-sm); line-height: 18px; color: var(--fc-text-3); overflow-wrap: anywhere; }
+.rl-focus__cjoin { color: var(--fc-text-4); }
+.rl-focus__check .rl-focus__mark { margin-top: 1px; }
+.rl-focus__check.is-working .rl-focus__crow { background: var(--fc-work-soft); }
+.rl-focus__check.is-working .tj-spin { margin-top: 4px; }
+.rl-focus__check.is-fail .rl-focus__cval { color: var(--fc-bad-fg); }
+.rl-focus__check.is-unknown .rl-focus__cval { color: var(--fc-warn-fg); }
+.rl-focus__check.is-unread .rl-focus__crow { opacity: 0.6; }
+.rl-focus__check.is-unread .rl-focus__cval { font-weight: var(--fw-regular); color: var(--fc-text-3); }
+
+.rl-focus__then { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-sunken); font-size: var(--fs-md); }
+.rl-focus__then .rl-focus__cword { flex: none; width: 54px; }
+.rl-focus__thenword { font-weight: var(--fw-semibold); color: var(--fc-text); }
+.rl-focus__thenquiet { font-size: var(--fs-sm); color: var(--fc-text-3); }
+.rl-focus__then.is-quiet .rl-focus__thenword { font-weight: var(--fw-medium); color: var(--fc-text-3); }
+.rl-focus__then.is-positive { background: var(--fc-ok-bg); }
+.rl-focus__then.is-positive .rl-focus__thenword { color: var(--fc-ok-fg); }
+.rl-focus__then.is-negative { background: var(--fc-bad-bg); }
+.rl-focus__then.is-negative .rl-focus__thenword { color: var(--fc-bad-fg); }
+.rl-focus__then.is-notice { background: var(--fc-warn-bg); }
+.rl-focus__clash { margin-top: 8px; }
+.rl-focus__clashbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--fc-text-2);
+  text-align: left;
+}
+.rl-focus__clash.is-conflict .rl-focus__clashbtn { border-color: var(--fc-warn-line); background: var(--fc-warn-bg); color: var(--fc-warn-fg); }
+
+/* --- The outcome ------------------------------------------------------------------------- */
+
+.rl-focus__outin { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rl-focus__who { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; font-size: var(--fs-sm); color: var(--fc-text-2); }
+.rl-focus__whoname { min-width: 0; overflow: hidden; font-weight: var(--fw-medium); white-space: nowrap; text-overflow: ellipsis; }
+.rl-focus__verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.rl-focus__vtile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: var(--fc-inset); color: var(--fc-text-2); }
+.rl-focus__vtile.is-positive { background: var(--fc-ok-bg); color: var(--fc-ok-fg); }
+.rl-focus__vtile.is-negative { background: var(--fc-bad-bg); color: var(--fc-bad-fg); }
+.rl-focus__vtile.is-notice { background: var(--fc-warn-bg); color: var(--fc-warn-fg); }
+.rl-focus__vword { font-size: 24px; font-weight: var(--fw-semibold); line-height: 32px; letter-spacing: -0.01em; color: var(--fc-text); }
+.rl-focus__card.is-positive .rl-focus__vword { color: var(--fc-ok-fg); }
+.rl-focus__card.is-negative .rl-focus__vword { color: var(--fc-bad-fg); }
+.rl-focus__card.is-notice .rl-focus__vword { color: var(--fc-warn-fg); }
+.rl-focus__expect { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid var(--fc-warn-line); border-radius: 6px; background: var(--fc-warn-bg); font-size: var(--fs-xs); color: var(--fc-warn-fg); }
+.rl-focus__label { display: block; margin-bottom: 4px; font-size: var(--fs-sm); color: var(--fc-text-3); }
+.rl-focus__by { min-width: 0; }
+.rl-focus__bylink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--fc-link);
+  text-align: left;
+  cursor: pointer;
+}
+.rl-focus__bylink span { overflow-wrap: anywhere; }
+.rl-focus__bylink:hover span { text-decoration: underline; text-underline-offset: 2px; }
+.rl-focus__byrule { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--fc-text-2); }
+.rl-focus__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rl-focus__factors li { display: inline-flex; align-items: center; gap: 4px; }
+.rl-focus__factor { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--fc-line-2); border-radius: 6px; background: var(--fc-surface); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fc-text); }
+.rl-focus__factorarrow { color: var(--fc-text-4); }
+.rl-focus__deny { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-bad-bg); font-size: var(--fs-md); color: var(--fc-bad-fg); }
+.rl-focus__ifs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rl-focus__ifs li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; background: var(--fc-sunken); font-size: var(--fs-sm); }
+.rl-focus__if { color: var(--fc-text-3); }
+.rl-focus__ifword { font-weight: var(--fw-medium); color: var(--fc-text); }
+.rl-focus__needs { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); color: var(--fc-warn-fg); }
+.rl-focus__vs,
+.rl-focus__changed { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); color: var(--fc-text-2); }
+.rl-focus__finding { border: 1px solid var(--fc-line); border-radius: 8px; background: var(--fc-sunken); }
+.rl-focus__finding.is-conflict { border-color: var(--fc-warn-line); background: var(--fc-warn-bg); }
+.rl-focus__findbtn { display: flex; align-items: flex-start; gap: 8px; box-sizing: border-box; width: 100%; margin: 0; padding: 9px 12px; border: 0; background: transparent; font: inherit; font-size: var(--fs-sm); line-height: 18px; color: var(--fc-text-2); text-align: left; cursor: pointer; }
+.rl-focus__findbtn > svg { flex: none; margin-top: 2px; }
+.rl-focus__finding.is-conflict .rl-focus__findbtn { color: var(--fc-warn-fg); }
+.rl-focus__findtext { flex: 1 1 auto; min-width: 0; }
+.rl-focus__flist { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 12px 10px 33px; list-style: none; font-size: var(--fs-sm); line-height: 18px; color: var(--fc-text-2); }
+.rl-focus__fhead { display: block; font-weight: var(--fw-medium); color: var(--fc-text); }
+.rl-focus__fline { display: block; }
+.rl-focus__see { min-width: 0; }
+.rl-focus__attempts { margin: -4px 0 0; }
+.rl-focus__quietlink { display: inline-flex; align-items: center; gap: 2px; margin: 0; padding: 0; border: 0; background: transparent; font: inherit; font-size: var(--fs-sm); color: var(--fc-text-3); cursor: pointer; }
+.rl-focus__quietlink:hover { color: var(--fc-text); }
+
+/* --- The ribbon -------------------------------------------------------------------------- */
+
+.rl-focus__ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 52px;
+  z-index: 30;
+}
+.rl-focus__chips { display: flex; align-items: center; min-width: 0; max-width: 100%; margin: 0; padding: 4px 6px; overflow-x: auto; list-style: none; scrollbar-width: none; }
+.rl-focus__chips::-webkit-scrollbar { display: none; }
+.rl-focus__chipwrap { display: flex; flex: none; align-items: center; }
+.rl-focus__link { display: block; width: 18px; height: 2px; border-radius: 1px; background: var(--fc-line-2); }
+.rl-focus__link.is-reached { background: var(--fc-work-line); }
+.rl-focus__link.is-positive { background: var(--fc-ok-line); }
+.rl-focus__link.is-negative { background: var(--fc-bad-line); }
+.rl-focus__link.is-notice { background: var(--fc-warn-line); }
+.rl-focus__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  background: var(--fc-surface);
+  box-shadow: var(--fc-shadow);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--fc-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.rl-focus__chip:hover:not(:disabled) { border-color: var(--fc-line-3); color: var(--fc-text); }
+.rl-focus__chip:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 2px; }
+.rl-focus__chip > svg { flex: none; }
+.rl-focus__chip.is-ahead { border-style: dashed; background: transparent; box-shadow: none; color: var(--fc-text-4); cursor: default; }
+.rl-focus__chip.is-working { border-color: var(--fc-work-line); color: var(--fc-work); }
+.rl-focus__chip.is-pass .rl-focus__chipmark,
+.rl-focus__chip.is-positive > svg { color: var(--fc-ok); }
+.rl-focus__chip.is-fail .rl-focus__chipmark,
+.rl-focus__chip.is-negative > svg { color: var(--fc-bad); }
+.rl-focus__chip.is-unknown .rl-focus__chipmark,
+.rl-focus__chip.is-notice > svg { color: var(--fc-warn); }
+.rl-focus__chip.is-positive { border-color: var(--fc-ok-line); background: var(--fc-ok-bg); color: var(--fc-ok-fg); }
+.rl-focus__chip.is-negative { border-color: var(--fc-bad-line); background: var(--fc-bad-bg); color: var(--fc-bad-fg); }
+.rl-focus__chip.is-notice { border-color: var(--fc-warn-line); background: var(--fc-warn-bg); color: var(--fc-warn-fg); }
+.rl-focus__chip.is-off { color: var(--fc-text-4); }
+/* The one in focus: raised, a firm ring in its own colour. */
+.rl-focus__chip.is-focus { border-color: var(--fc-text-2); color: var(--fc-text); box-shadow: 0 0 0 1px var(--fc-text-2), var(--fc-shadow-focus); }
+.rl-focus__chip.is-focus.is-working { border-color: var(--fc-work); color: var(--fc-work); box-shadow: 0 0 0 1px var(--fc-work), 0 0 0 4px var(--fc-work-soft); }
+.rl-focus__chip.is-focus.is-positive { border-color: var(--fc-ok); box-shadow: 0 0 0 1px var(--fc-ok), var(--fc-shadow-focus); color: var(--fc-ok-fg); }
+.rl-focus__chip.is-focus.is-negative { border-color: var(--fc-bad); box-shadow: 0 0 0 1px var(--fc-bad), var(--fc-shadow-focus); color: var(--fc-bad-fg); }
+.rl-focus__chip.is-focus.is-notice { border-color: var(--fc-warn); box-shadow: 0 0 0 1px var(--fc-warn), var(--fc-shadow-focus); color: var(--fc-warn-fg); }
+.rl-focus__walk,
+.rl-focus__live {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--fc-text-2);
+  cursor: pointer;
+}
+.rl-focus__walk:hover,
+.rl-focus__live:hover { border-color: var(--fc-line-3); color: var(--fc-text); background: var(--fc-surface); }
+.rl-focus__walk.is-on { color: var(--fc-text); background: var(--fc-surface); border-color: var(--fc-line-3); }
+.rl-focus__live { color: var(--fc-work); border-color: var(--fc-work-line); }
+.rl-focus__walk:focus-visible,
+.rl-focus__live:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 2px; }
+
+.rl-focus__world.is-overview .rl-focus__pick:hover { box-shadow: 0 0 0 2px var(--fc-line-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-focus__card,
+  .rl-focus__chip,
+  .rl-focus__pick { transition: none; }
+}
+.rl-focus__outgrid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.rl-focus__outgrid > .rl-focus__see { padding-left: 20px; border-left: 1px solid var(--fc-line); }
+.rl-focus__track { position: absolute; inset: 0; }
+
+/* --- The dark stage: the host's fade under the pill, and What they see's words --------- */
+
+.sit__stage .tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark'])::after,
+.tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark'])::after { content: none; }
+.rl-focus-root[data-stage='dark'] .tsee__title { color: var(--fc-text-2); }
+.rl-focus-root[data-stage='dark'] .tsee__caption { color: var(--fc-text-3); }
+.rl-focus-root[data-stage='dark'] .tplay__chip { border-color: var(--fc-line-2); background: var(--fc-sunken); color: var(--fc-text-2); }
+.rl-focus-root[data-stage='dark'] .tplay__chip.is-on { border-color: var(--fc-work); color: var(--fc-text); }
+.rl-focus-root[data-stage='dark'] .tplay__replay { color: var(--fc-text-2); }
+.rl-focus-root[data-stage='dark'] .tplay__replay:hover { background: var(--fc-inset); color: var(--fc-text); }
+.rl-focus-root[data-stage='dark'] .tplay__fill { background: var(--fc-work-soft); }
+.rl-focus__see .tsee__title { margin-top: 0; }
+
+/* A policy that also covers the person: its name whole, the flag under it. */
+.rl-focus__prow.is-also .rl-focus__pbtn { flex-wrap: wrap; row-gap: 2px; }
+.rl-focus__prow.is-also .rl-focus__pstate { flex-basis: 100%; max-width: none; padding-left: 32px; }
+/* The ribbon follows the cards' bottom when a note opens or the answer lands. */
+.rl-focus__ribbon { transition: top 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease; }
+/* Overview: small cards, so their titles are set larger to stay legible. */
+.rl-focus__world.is-overview .rl-focus__slot:not(:last-child) .rl-focus__title { font-size: 24px; line-height: 30px; }
+.rl-focus__world.is-overview .rl-focus__slot:not(:last-child) .rl-focus__kicker { font-size: 17px; line-height: 22px; }
+@media (prefers-reduced-motion: reduce) { .rl-focus__ribbon { transition: none; } }
+
+/* --- The assistant pointing (LitCtx): what an answer is about draws lit -------------------
+   In its own meaning colour — a ring and a soft wash on the row, landing once (opacity only:
+   nothing here moves). Never blue: blue is only the engine at work. */
+
+.rl-focus-root { --fc-lit: var(--fc-text-2); --fc-lit-bg: var(--fc-sunken); }
+.rl-focus__check.is-lit.is-fail,
+.rl-focus__prow.is-lit.is-passed { --fc-lit: var(--fc-bad); --fc-lit-bg: var(--fc-bad-bg); }
+.rl-focus__check.is-lit.is-pass,
+.rl-focus__prow.is-lit.is-applies { --fc-lit: var(--fc-ok); --fc-lit-bg: var(--fc-ok-bg); }
+.rl-focus__check.is-lit.is-unknown,
+.rl-focus__prow.is-lit.is-also { --fc-lit: var(--fc-warn); --fc-lit-bg: var(--fc-warn-bg); }
+.rl-focus__prow.is-lit.is-passed { --fc-lit: var(--fc-text-3); --fc-lit-bg: var(--fc-sunken); }
+
+.rl-focus__check.is-lit .rl-focus__crow { position: relative; background: var(--fc-lit-bg); box-shadow: 0 0 0 2px var(--fc-lit); }
+.rl-focus__prow.is-lit .rl-focus__pbtn { box-shadow: 0 0 0 2px var(--fc-lit); }
+.rl-focus__check.is-lit .rl-focus__crow::after,
+.rl-focus__prow.is-lit .rl-focus__pbtn::after,
+.rl-focus__see.is-lit::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--fc-lit);
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0;
+  animation: rl-focus-lit 0.9s cubic-bezier(0.2, 0, 0, 1) 1;
+}
+.rl-focus__prow.is-lit .rl-focus__pbtn { overflow: visible; }
+.rl-focus__see { position: relative; }
+.rl-focus__see.is-lit { --fc-lit: var(--fc-text-2); }
+.rl-focus__see.is-lit .tsee { border-radius: 10px; outline: 2px solid var(--fc-lit); outline-offset: 6px; }
+.rl-focus__see.is-lit::after { inset: -10px; border-radius: 14px; }
+@keyframes rl-focus-lit {
+  0% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+/* In Overview the cards are small: the one an answer is about wears the ring. */
+.rl-focus__world.is-overview .rl-focus__card.is-lit { box-shadow: 0 0 0 3px var(--fc-text-2), var(--fc-shadow-focus); }
+
+/* --- The subtitle under the card in focus -------------------------------------------------- */
+
+.rl-focus__subtitle { position: absolute; z-index: 25; display: flex; justify-content: center; pointer-events: none; transition: left 0.45s cubic-bezier(0.2, 0, 0, 1), width 0.45s cubic-bezier(0.2, 0, 0, 1); }
+.rl-focus__subline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 4px;
+  font-size: var(--fs-md);
+  line-height: 20px;
+  font-weight: var(--fw-medium);
+  color: var(--fc-text-2);
+  text-align: center;
+  text-wrap: balance;
+}
+.rl-focus__subline.is-positive { color: var(--fc-ok-fg); }
+.rl-focus__subline.is-negative { color: var(--fc-bad-fg); }
+.rl-focus__subline.is-notice { color: var(--fc-warn-fg); }
+.rl-focus__subwords { min-width: 0; }
+.rl-focus__subw { display: inline-block; }
+.rl-focus__wave { display: inline-flex; flex: none; align-items: center; gap: 2px; height: 14px; }
+.rl-focus__wave i { display: block; width: 2px; height: 100%; border-radius: 1px; background: currentColor; opacity: 0.7; transform-origin: 50% 50%; animation: rl-focus-wave 0.9s ease-in-out infinite; }
+.rl-focus__wave i:nth-child(2) { animation-delay: -0.3s; }
+.rl-focus__wave i:nth-child(3) { animation-delay: -0.6s; }
+.rl-focus__wave i:nth-child(4) { animation-delay: -0.15s; }
+@keyframes rl-focus-wave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.rl-focus__substop {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--fc-line-2);
+  border-radius: 6px;
+  background: var(--fc-surface);
+  color: var(--fc-text-3);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.rl-focus__substop:hover { color: var(--fc-text); border-color: var(--fc-line-3); }
+.rl-focus__substop:focus-visible { outline: 2px solid var(--fc-text-2); outline-offset: 2px; }
+
+/* The assistant dock on the dark stage takes the dock's own dark look (data-stage is passed). */
+.rl-focus__caption .ad-ans__sentence { font-size: var(--fs-md); }
+/* The answer being said: the waveform leads it, Stop ends it (the subtitle's own pieces). */
+.rl-focus__capwave { margin-right: 8px; vertical-align: -2px; color: var(--fc-text-3); }
+.rl-focus__capstop { margin-left: 8px; vertical-align: -4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-focus__subtitle { transition: none; }
+  .rl-focus__wave i { animation: none; transform: scaleY(0.6); }
+  .rl-focus__check.is-lit .rl-focus__crow::after,
+  .rl-focus__prow.is-lit .rl-focus__pbtn::after,
+  .rl-focus__see.is-lit::after { animation: none; }
+}
+
+/* The assistant dock floats over the world, its thread over the lower cards while it is open. */
+.rl-focus-root .ad.rl-focus__dock { z-index: 40; }
+/* Asking: the cards rise above the open thread (focus-geometry.ts liftPlaces) and the ribbon, under the thread, steps back — ‹ › in the dock still move the focus. */
+.rl-focus__world.is-asking .rl-focus__ribbon { opacity: 0; pointer-events: none; visibility: hidden; transition: top 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease, visibility 0s linear 0.2s; }
+@media (prefers-reduced-motion: reduce) {
+  .rl-focus__world.is-asking .rl-focus__ribbon { transition: none; }
+}
+
+/* The row takes the keyboard on a press (← →); a mouse press draws no ring. */
+.rl-focus__band:focus:not(:focus-visible) { outline: none; }

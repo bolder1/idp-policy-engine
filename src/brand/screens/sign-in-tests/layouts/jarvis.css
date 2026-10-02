@@ -1,0 +1,991 @@
+/* -----------------------------------------------------------------------------
+   The run as JARVIS (JarvisLayout.tsx): the access assistant's HUD. Only ever
+   dark (owner, 2 Oct 2026: "Jarvis only available in dark mode … a special
+   experience"): the luminous cyan of the HUD on deep navy, with a faint grid,
+   a vignette and depth. Every colour below is a variable; the rules use only
+   those.
+
+   Two families, each with a job:
+   · the HUD's CHROME (ring tracks, ticks, frames, connectors, the core) in a
+     cool azure / cyan, calm and low while settled (it is structure), bright
+     only on what the engine works on now (--jv-work);
+   · the MEANING inks, vivid and clean: emerald covers / matches / ✓ / an
+     allow; rose a failed check ✕ / a deny; amber only a conflict or can't
+     tell; slate not reached. Each has an ink (text, AA on its tint) and a
+     vivid stroke (-hi) for arcs, wires and glows.
+   Depth: soft radial glows behind the core, the lock and the verdict; tails
+   on what moves. Text surfaces stay flat. Brand orange never. 12px floor.
+
+   Nothing motion moves carries a CSS transform or transition: colour
+   transitions sit on parents (the moved children take currentColor).
+   -------------------------------------------------------------------------- */
+
+/* The one stage: the luminous cyan of the HUD on deep navy. */
+.rl-jarvis-root {
+  --jv-ground: #050c18;
+  /* The ground's grid: hairlines every 32px, a brighter node at each crossing (jarvis-chrome.css draws the same on the page). */
+  --jv-ground-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%2370d6ff' stroke-opacity='0.075' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1' fill='%2370d6ff' fill-opacity='0.22'/%3E%3C/svg%3E");
+  --jv-bg: #0a1729;
+  --jv-text: #e9f4ff;
+  --jv-text-2: #a9c0da;
+  --jv-text-3: #8ca5c2;
+  --jv-line: rgba(130, 200, 255, 0.17);
+  --jv-line-soft: rgba(130, 200, 255, 0.09);
+  --jv-line-strong: rgba(150, 210, 255, 0.3);
+  --jv-hud: #3cc8f5;
+  --jv-hud-line: rgba(60, 200, 245, 0.34);
+  --jv-hud-faint: rgba(60, 200, 245, 0.17);
+  --jv-hud-ghost: rgba(60, 200, 245, 0.1);
+  --jv-edge: rgba(60, 200, 245, 0.3);
+  --jv-glass: rgba(11, 29, 52, 0.8);
+  --jv-glass-2: rgba(13, 34, 60, 0.94);
+  --jv-work: #5fd3ff;
+  --jv-work-ink: #86dfff;
+  --jv-work-soft: rgba(60, 200, 245, 0.14);
+  --jv-halo: rgba(90, 215, 255, 0.75);
+  --jv-glow-core: rgba(60, 200, 245, 0.22);
+  --jv-ok: #3ddba0;
+  --jv-ok-hi: #34e3a4;
+  --jv-ok-soft: rgba(52, 227, 164, 0.14);
+  --jv-ok-faint: rgba(52, 227, 164, 0.06);
+  --jv-bad: #ff8197;
+  --jv-bad-hi: #ff6482;
+  --jv-bad-soft: rgba(255, 100, 130, 0.15);
+  --jv-bad-faint: rgba(255, 100, 130, 0.06);
+  --jv-warn: #fcc645;
+  --jv-warn-hi: #ffc93d;
+  --jv-warn-soft: rgba(252, 198, 69, 0.14);
+  --jv-warn-faint: rgba(252, 198, 69, 0.06);
+  --jv-off: #7d93ad;
+  --jv-hover: rgba(130, 200, 255, 0.1);
+  --jv-hover-soft: rgba(130, 200, 255, 0.05);
+  --jv-ring-fill: rgba(60, 200, 245, 0.04);
+  --jv-seg-ghost: rgba(60, 200, 245, 0.24);
+  --jv-seg-passed: rgba(170, 200, 230, 0.34);
+  --jv-seg-quiet: rgba(170, 200, 230, 0.18);
+  --jv-seg-lit: rgba(220, 235, 255, 0.6);
+  --jv-face-bg: rgba(60, 200, 245, 0.08);
+  --jv-row: rgba(130, 200, 255, 0.03);
+  --jv-panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(140, 220, 255, 0.07);
+  --jv-verdict-shadow: 0 14px 44px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(140, 220, 255, 0.08);
+  --jv-float-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+  --jv-pop-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  --jv-answer-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+  --jv-see-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --jv-peek-bg: #0e2038;
+  --jv-answer-bg: rgba(12, 30, 52, 0.96);
+  --jv-chip-bg: rgba(12, 30, 52, 0.88);
+  --jv-chip-hover: rgba(22, 48, 78, 0.95);
+  --jv-cond-bg: rgba(12, 30, 52, 0.82);
+  --jv-ask-bg: rgba(10, 26, 46, 0.94);
+  --jv-ask-ring: rgba(60, 200, 245, 0.12);
+  --jv-caption-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+  --jv-inset-border: transparent;
+  --jv-glow-k: 1.4;
+  --jv-quiet-op: 0.92;
+  --jv-pnum-op: 0.9;
+}
+
+.rl-jarvis-root {
+  --jv-tone: var(--jv-text-2);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--jv-text);
+  font-family: inherit;
+}
+
+/* The stage: deep navy and a faint luminous grid that follows the pan and zoom, under a soft vignette. */
+.rl-jarvis__stage {
+  position: absolute;
+  inset: 0;
+  background-color: var(--jv-ground);
+  background-image: var(--jv-ground-dots);
+  background-size: calc(32px * var(--bb-z, 1)) calc(32px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0) var(--bb-y, 0);
+  pointer-events: none;
+}
+/* The vignette: the room's corners fall away (an inset shadow, no gradient). */
+.rl-jarvis__vignette {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 180px 40px rgba(1, 5, 12, 0.72);
+  pointer-events: none;
+}
+
+/* --- The way in and out (jarvis-mode/) -------------------------------------------------------
+   Booting: the HUD fades up under the overlay as it dissolves; standing down, it fades into the navy as the
+   rings close in. Opacity alone (one composited layer — no transform, so RunStage measures its world true,
+   and no clip, so nothing re-rasterises the HUD per frame). */
+.rl-jarvis-root.is-booting { will-change: opacity; animation: rl-jarvis-boot 520ms cubic-bezier(0.3, 0, 0.3, 1) var(--jv-boot-delay, 0ms) both; }
+.rl-jarvis-root[data-jv-mode='down'] { will-change: opacity; animation: rl-jarvis-down 560ms cubic-bezier(0.5, 0, 0.75, 0.4) both; pointer-events: none; }
+@keyframes rl-jarvis-boot { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rl-jarvis-down { from { opacity: 1; } to { opacity: 0; } }
+
+/* --- Depth: the far rings ---------------------------------------------------------------------- */
+
+.rl-jarvis__far { position: absolute; left: 0; top: 0; z-index: 0; overflow: visible; pointer-events: none; }
+.rl-jarvis__fartrack { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1; stroke-dasharray: 3 6; }
+.rl-jarvis__fartrack.is-inner { stroke: var(--jv-hud-ghost); stroke-dasharray: none; }
+.rl-jarvis__farline { fill: none; stroke: var(--jv-hud-ghost); stroke-width: 1; }
+.rl-jarvis__farticks line { stroke: var(--jv-hud-faint); stroke-width: 1; }
+.rl-jarvis__farticks line.is-major { stroke: var(--jv-hud-line); stroke-width: 1.4; }
+/* While the engine works the readout drifts; landed, it holds where it is. */
+.rl-jarvis__farticks { animation: rl-jarvis-drift 5.2s ease-in-out infinite alternate; animation-play-state: paused; }
+.rl-jarvis__far.is-idle .rl-jarvis__farticks { animation-play-state: running; }
+@keyframes rl-jarvis-drift { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+
+/* The host's engine pill and the ground's dock, in the HUD's glass. */
+.tj-canvas.is-jarvis .tj-engine__pill {
+  border-color: rgba(60, 200, 245, 0.28);
+  background: rgba(10, 26, 46, 0.9);
+  color: #e9f4ff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.tj-canvas.is-jarvis .tj-engine.is-done .tj-engine__text,
+.tj-canvas.is-jarvis .tj-engine.is-running .tj-engine__text { color: #dfe7ef; }
+.tj-canvas.is-jarvis .tj-engine__done { color: #aebdcb; }
+.tj-canvas.is-jarvis .tj-engine__pill button { color: #dfe7ef; }
+.tj-canvas.is-jarvis .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+
+.rl-jarvis-root .rl-jarvis .bb__dockbar {
+  border-color: var(--jv-line);
+  background: rgba(10, 26, 46, 0.9);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.rl-jarvis-root .rl-jarvis .bb__act { color: var(--jv-text-2); }
+.rl-jarvis-root .rl-jarvis .bb__act:hover { background: var(--jv-hover); color: var(--jv-text); }
+.rl-jarvis-root .rl-jarvis .bb__float__sep { background: var(--jv-line); }
+.rl-jarvis .rl-jarvis__voicebtn.is-on { color: var(--jv-text); }
+
+.rl-jarvis__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- The decode, the typed line ------------------------------------------------------- */
+
+.rl-jarvis__decode { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.rl-jarvis__decode-ghost { visibility: hidden; }
+.rl-jarvis__decode-live { position: absolute; inset: 0; overflow: hidden; white-space: inherit; }
+.rl-jarvis__typed { white-space: normal; }
+
+/* --- The world -------------------------------------------------------------------------- */
+
+.rl-jarvis__world { position: relative; font-size: 13px; line-height: 1.35; color: var(--jv-text); }
+.rl-jarvis__slot { position: absolute; pointer-events: none; visibility: hidden; }
+
+.rl-jarvis__busy { display: inline-grid; flex: none; place-items: center; width: 14px; height: 14px; color: var(--jv-work); }
+.rl-jarvis__busy svg { animation: rl-jarvis-spin 0.9s linear infinite; }
+@keyframes rl-jarvis-spin { to { transform: rotate(360deg); } }
+
+/* --- Row 1: who ----------------------------------------------------------------------------- */
+
+.rl-jarvis__id { position: absolute; z-index: 3; display: flex; align-items: center; gap: 14px; pointer-events: none; }
+.rl-jarvis__id > * { pointer-events: auto; }
+.rl-jarvis__face {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  margin: 0 0 0 5px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--jv-face-bg);
+  color: var(--jv-text);
+  font: inherit;
+  cursor: pointer;
+  /* The ring's colour (its arc takes currentColor through --jv-face-ring). */
+  --jv-face-ring: var(--jv-hud);
+  transition: box-shadow 0.25s ease;
+}
+.rl-jarvis__facering { position: absolute; left: -5px; top: -5px; overflow: visible; rotate: -90deg; pointer-events: none; }
+.rl-jarvis__facetrack { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1; }
+.rl-jarvis__facearc { fill: none; stroke: var(--jv-face-ring); stroke-width: 2; stroke-linecap: round; transition: stroke 0.25s ease; }
+.rl-jarvis__face:hover { box-shadow: 0 0 0 4px var(--jv-hud-ghost); }
+.rl-jarvis__face:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 7px; }
+.rl-jarvis__face.is-working { --jv-face-ring: var(--jv-work); box-shadow: 0 0 0 5px var(--jv-work-soft), 0 0 22px var(--jv-halo); }
+.rl-jarvis__face.is-flash.is-pass { --jv-face-ring: var(--jv-ok-hi); box-shadow: 0 0 0 5px var(--jv-ok-soft), 0 0 20px color-mix(in srgb, var(--jv-ok-hi) 45%, transparent); }
+.rl-jarvis__face.is-flash.is-fail { --jv-face-ring: var(--jv-bad-hi); box-shadow: 0 0 0 5px var(--jv-bad-soft), 0 0 20px color-mix(in srgb, var(--jv-bad-hi) 45%, transparent); }
+.rl-jarvis__face.is-flash.is-unknown { --jv-face-ring: var(--jv-warn-hi); box-shadow: 0 0 0 5px var(--jv-warn-soft); }
+.rl-jarvis__face.is-lit { box-shadow: 0 0 0 4px var(--jv-hud-faint); }
+.rl-jarvis__initials { font-size: 16px; font-weight: 600; letter-spacing: 0.04em; color: var(--jv-text); }
+
+.rl-jarvis__idtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rl-jarvis__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.rl-jarvis__status.is-working { color: var(--jv-work-ink); }
+.rl-jarvis__status.is-done { color: var(--jv-text-3); }
+.rl-jarvis__statusdone { color: var(--jv-hud); }
+.rl-jarvis__idline { display: flex; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
+.rl-jarvis__name { max-width: 300px; overflow: hidden; font-size: 19px; font-weight: 600; line-height: 26px; letter-spacing: -0.01em; color: var(--jv-text); text-overflow: ellipsis; }
+.rl-jarvis__gchips { display: inline-flex; gap: 6px; }
+.rl-jarvis__gchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--jv-edge);
+  border-radius: 11px;
+  background: var(--jv-hover-soft);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--jv-text-2);
+}
+.rl-jarvis__gchip.is-via { border-color: color-mix(in srgb, var(--jv-ok-hi) 45%, transparent); background: var(--jv-ok-soft); color: var(--jv-ok); }
+.rl-jarvis__id.is-working .rl-jarvis__gchip { border-color: color-mix(in srgb, var(--jv-work) 50%, transparent); color: var(--jv-work-ink); }
+.rl-jarvis__tested { font-size: 12px; color: var(--jv-text-3); }
+.rl-jarvis__target { display: inline-flex; align-items: center; gap: 7px; margin-left: 4px; font-size: 14px; font-weight: 600; color: var(--jv-text); }
+.rl-jarvis__to { font-weight: 400; color: var(--jv-text-3); }
+
+/* --- Row 2: the conditions ------------------------------------------------------------------ */
+
+.rl-jarvis__strip { position: absolute; z-index: 3; display: flex; align-items: center; gap: 8px; box-sizing: border-box; padding-bottom: 4px; pointer-events: none; }
+.rl-jarvis__condwrap { display: inline-flex; flex: none; pointer-events: auto; }
+.rl-jarvis__stripline { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.rl-jarvis__stripline path { fill: none; stroke: var(--jv-hud-line); stroke-width: 1; }
+.rl-jarvis__stripline path.is-end { stroke: var(--jv-hud); stroke-width: 1.5; }
+.rl-jarvis__striplabel { flex: none; margin-right: 4px; font-size: 12px; font-weight: 500; letter-spacing: 0.02em; color: var(--jv-text-3); }
+.rl-jarvis__nocond { font-size: 12px; color: var(--jv-text-3); }
+.rl-jarvis__cond {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--jv-edge);
+  border-radius: 8px;
+  background: var(--jv-cond-bg);
+  color: var(--jv-text);
+  font: inherit;
+  cursor: pointer;
+  /* The chip's meaning colour: its icon, its edge and its glow take it. */
+  --jv-cond: var(--jv-hud);
+  transition: border-color 0.22s ease, background-color 0.22s ease, box-shadow 0.22s ease;
+}
+.rl-jarvis__condin { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.rl-jarvis__condicon { flex: none; color: var(--jv-cond); transition: color 0.22s ease; }
+.rl-jarvis__condlabel { font-size: 12px; color: var(--jv-text-3); }
+.rl-jarvis__condvalue { font-size: 13px; font-weight: 500; color: var(--jv-text); }
+.rl-jarvis__condadd { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; padding: 0 6px; height: 18px; border-radius: 9px; background: var(--jv-warn-soft); font-size: 12px; font-weight: 600; color: var(--jv-warn); }
+/* The scan underline as a chip boots: it runs along the chip's foot (motion scales it, nothing else does). */
+.rl-jarvis__condscan { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--jv-hud); transform-origin: left center; pointer-events: none; }
+.rl-jarvis__cond:hover,
+.rl-jarvis__cond.is-lit { border-color: var(--jv-hud-line); background: var(--jv-hover); }
+.rl-jarvis__cond:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
+.rl-jarvis__cond.is-unset .rl-jarvis__condvalue { font-weight: 600; color: var(--jv-warn); }
+.rl-jarvis__cond.is-unset { --jv-cond: var(--jv-warn-hi); border-color: color-mix(in srgb, var(--jv-warn-hi) 40%, transparent); }
+/* Read now: blue; the mark landed: its meaning, for that step. */
+.rl-jarvis__cond.is-working { --jv-cond: var(--jv-work); border-color: var(--jv-work); background: var(--jv-work-soft); box-shadow: 0 0 0 3px var(--jv-work-soft), 0 0 18px var(--jv-halo); }
+.rl-jarvis__cond.is-working .rl-jarvis__condlabel { color: var(--jv-work-ink); }
+.rl-jarvis__cond.is-flash.is-pass { --jv-cond: var(--jv-ok-hi); border-color: var(--jv-ok-hi); background: var(--jv-ok-soft); box-shadow: 0 0 16px color-mix(in srgb, var(--jv-ok-hi) 40%, transparent); }
+.rl-jarvis__cond.is-flash.is-fail { --jv-cond: var(--jv-bad-hi); border-color: var(--jv-bad-hi); background: var(--jv-bad-soft); box-shadow: 0 0 16px color-mix(in srgb, var(--jv-bad-hi) 40%, transparent); }
+.rl-jarvis__cond.is-flash.is-unknown { --jv-cond: var(--jv-warn-hi); border-color: var(--jv-warn-hi); background: var(--jv-warn-soft); }
+
+/* --- The ring ------------------------------------------------------------------------------ */
+
+.rl-jarvis__ring { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.rl-jarvis__guide { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1; }
+.rl-jarvis__ticks { fill: none; stroke: var(--jv-hud-line); stroke-width: 4; }
+.rl-jarvis__major { stroke: var(--jv-hud); stroke-width: 1.5; stroke-linecap: round; opacity: 0.7; }
+.rl-jarvis__ringa { fill: var(--jv-ring-fill); stroke: var(--jv-hud-line); stroke-width: 1.2; }
+.rl-jarvis__ringb { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1.2; }
+.rl-jarvis__ringc { fill: none; stroke: var(--jv-hud-ghost); stroke-width: 1; }
+.rl-jarvis-root.is-running .rl-jarvis__ringb { stroke: color-mix(in srgb, var(--jv-work) 55%, transparent); }
+/* The core's halo: azure while the engine works, the answer's tone once landed. */
+.rl-jarvis__glowstop.is-in { stop-color: var(--jv-hud); stop-opacity: 0.2; }
+.rl-jarvis__glowstop.is-out { stop-color: var(--jv-hud); stop-opacity: 0; }
+.rl-jarvis-root.is-tone-positive .rl-jarvis__glowstop { stop-color: var(--jv-ok-hi); }
+.rl-jarvis-root.is-tone-negative .rl-jarvis__glowstop { stop-color: var(--jv-bad-hi); }
+.rl-jarvis-root.is-tone-notice .rl-jarvis__glowstop { stop-color: var(--jv-warn-hi); }
+.rl-jarvis__corehalo.is-breathing { animation: rl-jarvis-breathe 4s ease-in-out infinite; }
+@keyframes rl-jarvis-breathe { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+.rl-jarvis__coredisc { fill: var(--jv-bg); stroke: var(--jv-hud); stroke-width: 1.4; filter: drop-shadow(0 0 6px var(--jv-glow-core)); }
+.rl-jarvis__corespin { animation: rl-jarvis-spin 1.6s linear infinite; transform-box: view-box; }
+.rl-jarvis__corearc { fill: none; stroke: var(--jv-work); stroke-width: 2; stroke-linecap: round; }
+.rl-jarvis__corearc.is-b { stroke-opacity: 0.45; }
+.rl-jarvis__coredot { fill: var(--jv-hud); }
+.rl-jarvis-root.is-running .rl-jarvis__coredot { fill: var(--jv-work); filter: drop-shadow(0 0 4px var(--jv-halo)); }
+/* Landed: the core and the reactor ring round it take the answer's tone. */
+.rl-jarvis-root.is-landed .rl-jarvis__ringa { stroke-width: 1.6; }
+.rl-jarvis-root.is-tone-positive .rl-jarvis__ringa,
+.rl-jarvis-root.is-tone-positive .rl-jarvis__coredisc { stroke: var(--jv-ok-hi); }
+.rl-jarvis-root.is-tone-negative .rl-jarvis__ringa,
+.rl-jarvis-root.is-tone-negative .rl-jarvis__coredisc { stroke: var(--jv-bad-hi); }
+.rl-jarvis-root.is-tone-notice .rl-jarvis__ringa,
+.rl-jarvis-root.is-tone-notice .rl-jarvis__coredisc { stroke: var(--jv-warn-hi); }
+.rl-jarvis-root.is-tone-positive .rl-jarvis__coredot { fill: var(--jv-ok-hi); }
+.rl-jarvis-root.is-tone-negative .rl-jarvis__coredot { fill: var(--jv-bad-hi); }
+.rl-jarvis-root.is-tone-notice .rl-jarvis__coredot { fill: var(--jv-warn-hi); }
+.rl-jarvis-root.is-tone-positive .rl-jarvis__ringa { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--jv-ok-hi) 55%, transparent)); }
+.rl-jarvis-root.is-tone-negative .rl-jarvis__ringa { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--jv-bad-hi) 55%, transparent)); }
+
+.rl-jarvis__sweep { fill: var(--jv-work); }
+.rl-jarvis__sweepedge { stroke: var(--jv-work); stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--jv-halo)); }
+.rl-jarvis__sweephead { fill: var(--jv-work); filter: drop-shadow(0 0 5px var(--jv-halo)); }
+.rl-jarvis__ping { fill: none; stroke: var(--jv-hud); stroke-width: 1.5; }
+.rl-jarvis__landping { fill: none; stroke: var(--jv-text-2); stroke-width: 1.8; }
+.rl-jarvis-root.is-tone-positive .rl-jarvis__landping { stroke: var(--jv-ok-hi); }
+.rl-jarvis-root.is-tone-negative .rl-jarvis__landping { stroke: var(--jv-bad-hi); }
+.rl-jarvis-root.is-tone-notice .rl-jarvis__landping { stroke: var(--jv-warn-hi); }
+
+.rl-jarvis__leader { fill: none; stroke: var(--jv-hud-line); stroke-width: 1; }
+
+/* A segment's colour is its group's (`color`): its arc, bracket, pulse and glow take it. */
+.rl-jarvis__seg { color: var(--jv-seg-ghost); transition: color 0.3s ease; }
+.rl-jarvis__segarc { fill: none; stroke: currentColor; stroke-width: 9; stroke-linecap: butt; }
+.rl-jarvis__segpulse { fill: none; stroke: currentColor; stroke-linecap: butt; pointer-events: none; }
+.rl-jarvis__segbracket { fill: none; stroke: currentColor; stroke-width: 1.4; }
+.rl-jarvis__lockstop.is-in { stop-color: currentColor; stop-opacity: 0.32; }
+.rl-jarvis__lockstop.is-out { stop-color: currentColor; stop-opacity: 0; }
+.rl-jarvis__seg .rl-jarvis__leader { stroke: currentColor; opacity: 0.6; }
+.rl-jarvis__seg.is-ghost { color: var(--jv-seg-ghost); }
+.rl-jarvis__seg.is-scan,
+.rl-jarvis__seg.is-found { color: var(--jv-work); }
+.rl-jarvis__seg.is-scan .rl-jarvis__segarc,
+.rl-jarvis__seg.is-found .rl-jarvis__segarc { filter: drop-shadow(0 0 7px var(--jv-halo)); }
+.rl-jarvis__seg.is-locked { color: var(--jv-ok-hi); }
+.rl-jarvis__seg.is-locked .rl-jarvis__segarc { stroke-width: 12; filter: drop-shadow(0 0 7px color-mix(in srgb, currentColor 65%, transparent)); }
+.rl-jarvis__seg.is-locked .rl-jarvis__leader { opacity: 0.95; }
+.rl-jarvis__seg.is-locked.is-negative { color: var(--jv-bad-hi); }
+.rl-jarvis__seg.is-locked.is-notice { color: var(--jv-warn-hi); }
+.rl-jarvis__seg.is-locked.is-neutral { color: var(--jv-off); }
+.rl-jarvis__seg.is-passed { color: var(--jv-seg-passed); }
+.rl-jarvis__seg.is-quiet { color: var(--jv-seg-quiet); }
+.rl-jarvis__seg.is-also { color: var(--jv-warn-hi); }
+.rl-jarvis__seg.is-also .rl-jarvis__segarc { stroke-opacity: 0.8; }
+.rl-jarvis__seg.is-lit .rl-jarvis__segarc { filter: drop-shadow(0 0 7px currentColor); stroke-opacity: 1; }
+.rl-jarvis__seg.is-lit.is-passed,
+.rl-jarvis__seg.is-lit.is-quiet { color: var(--jv-seg-lit); }
+
+.rl-jarvis__ringhit { position: absolute; border-radius: 50%; cursor: grab; touch-action: none; }
+.rl-jarvis__ringhit:active { cursor: grabbing; }
+
+/* The policies' labels. */
+.rl-jarvis__plabel { position: absolute; z-index: 2; color: var(--jv-text-3); transition: color 0.3s ease; }
+.rl-jarvis__pbtn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.rl-jarvis__pbtn:hover,
+.rl-jarvis__plabel.is-lit .rl-jarvis__pbtn { border-color: var(--jv-line); background: var(--jv-hover-soft); }
+.rl-jarvis__pbtn:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 1px; }
+.rl-jarvis__pname { display: flex; align-items: flex-start; gap: 7px; }
+.rl-jarvis__pnum {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  opacity: var(--jv-pnum-op);
+}
+.rl-jarvis__ptext {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--jv-text-2);
+}
+.rl-jarvis__pstate { display: block; min-height: 17px; padding-left: 25px; font-size: 12px; line-height: 17px; overflow: hidden; white-space: nowrap; }
+/* One line, always: the label's height is measured once, so the words never wrap under the eye. */
+.rl-jarvis__pstate .rl-jarvis__decode { display: block; overflow: hidden; }
+.rl-jarvis__pstate .rl-jarvis__decode-ghost { display: block; overflow: hidden; white-space: nowrap; }
+.rl-jarvis__pstate .rl-jarvis__decode-live { white-space: nowrap; text-overflow: ellipsis; }
+.rl-jarvis__plabel.is-ghost .rl-jarvis__ptext { color: var(--jv-text-3); font-weight: 500; }
+.rl-jarvis__plabel.is-quiet .rl-jarvis__ptext,
+.rl-jarvis__plabel.is-passed .rl-jarvis__ptext { color: var(--jv-text-3); font-weight: 500; }
+.rl-jarvis__plabel.is-quiet .rl-jarvis__pstate,
+.rl-jarvis__plabel.is-passed .rl-jarvis__pstate { color: var(--jv-text-3); }
+.rl-jarvis__plabel.is-scan,
+.rl-jarvis__plabel.is-found { color: var(--jv-work-ink); }
+.rl-jarvis__plabel.is-scan .rl-jarvis__ptext,
+.rl-jarvis__plabel.is-found .rl-jarvis__ptext { color: var(--jv-text); }
+.rl-jarvis__plabel.is-locked { color: var(--jv-ok); }
+.rl-jarvis__plabel.is-locked .rl-jarvis__ptext { color: var(--jv-text); }
+.rl-jarvis__plabel.is-locked .rl-jarvis__pbtn { border-color: color-mix(in srgb, currentColor 35%, transparent); background: color-mix(in srgb, currentColor 8%, transparent); }
+.rl-jarvis__plabel.is-locked.is-negative { color: var(--jv-bad); }
+.rl-jarvis__plabel.is-locked.is-notice { color: var(--jv-warn); }
+.rl-jarvis__plabel.is-locked.is-neutral { color: var(--jv-text-2); }
+.rl-jarvis__plabel.is-also { color: var(--jv-warn); }
+.rl-jarvis__plabel.is-also .rl-jarvis__ptext { color: var(--jv-text-2); }
+.rl-jarvis__plabel.is-scan .rl-jarvis__pbtn { border-color: color-mix(in srgb, var(--jv-work) 40%, transparent); background: var(--jv-work-soft); }
+/* Asked: a band of light runs across the label (motion moves the band; its box only clips). */
+.rl-jarvis__pscanbox { position: absolute; inset: 0; overflow: hidden; border-radius: 8px; pointer-events: none; }
+.rl-jarvis__pscan { position: absolute; top: 0; bottom: 0; left: 0; width: 34%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--jv-work) 22%, transparent), transparent); }
+/* Locked: a soft ring out from the label as the reticle snaps in. */
+.rl-jarvis__plock { position: absolute; inset: -2px; border: 2px solid currentColor; border-radius: 10px; pointer-events: none; }
+.rl-jarvis__plabel.is-found .rl-jarvis__plock { color: var(--jv-work); }
+
+/* The reticle: four corners in the colour of what they frame. */
+.rl-jarvis__reticle { position: absolute; inset: 0; pointer-events: none; }
+.rl-jarvis__corner { position: absolute; width: 10px; height: 10px; border: 0 solid currentColor; }
+.rl-jarvis__corner.is-tl { border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 3px; }
+.rl-jarvis__corner.is-tr { border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 3px; }
+.rl-jarvis__corner.is-bl { border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 3px; }
+.rl-jarvis__corner.is-br { border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 3px; }
+
+/* --- The empty slots, the panels' glass ------------------------------------------------------ */
+
+.rl-jarvis__panelslot,
+.rl-jarvis__verdictslot { position: absolute; z-index: 1; }
+.rl-jarvis__frame { position: absolute; inset: 0 0 auto 0; height: 120px; color: var(--jv-hud-line); }
+.rl-jarvis__frame.is-working { color: color-mix(in srgb, var(--jv-work) 70%, transparent); }
+.rl-jarvis__framelabel { position: absolute; left: 14px; top: 12px; font-size: 12px; color: var(--jv-text-3); }
+.rl-jarvis__frame .rl-jarvis__busy { position: absolute; right: 14px; top: 13px; }
+.rl-jarvis__fc { position: absolute; width: 14px; height: 14px; border: 0 solid currentColor; }
+.rl-jarvis__fc.is-tl { left: 0; top: 0; border-top-width: 1px; border-left-width: 1px; }
+.rl-jarvis__fc.is-tr { right: 0; top: 0; border-top-width: 1px; border-right-width: 1px; }
+.rl-jarvis__fc.is-bl { left: 0; bottom: 0; border-bottom-width: 1px; border-left-width: 1px; }
+.rl-jarvis__fc.is-br { right: 0; bottom: 0; border-bottom-width: 1px; border-right-width: 1px; }
+
+.rl-jarvis__panel {
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--jv-edge);
+  border-radius: 10px;
+  background: var(--jv-glass);
+  box-shadow: var(--jv-panel-shadow);
+  backdrop-filter: blur(6px);
+}
+.rl-jarvis__panelhead { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 6px 4px 0; }
+.rl-jarvis__kicker { font-size: 12px; color: var(--jv-text-3); }
+.rl-jarvis__paneltitle { display: block; overflow: hidden; font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.rl-jarvis__rows { display: flex; flex-direction: column; }
+
+/* A rule: a HUD row. Its height is the geometry's (the motion animates it). */
+.rl-jarvis__rule {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--jv-line-soft);
+  border-radius: 8px;
+  background: var(--jv-row);
+  color: var(--jv-text-3);
+}
+.rl-jarvis__rule.is-reticled { overflow: visible; }
+/* The match locks: one ring out from the row (motion scales it; nothing else moves it). */
+.rl-jarvis__rowpulse { position: absolute; inset: -1px; border: 2px solid currentColor; border-radius: 9px; pointer-events: none; }
+.rl-jarvis__rulein { position: relative; }
+.rl-jarvis__rulehead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-jarvis__rulehead:focus-visible { outline: 2px solid var(--jv-work); outline-offset: -2px; }
+.rl-jarvis__num {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+.rl-jarvis__rulename { flex: 1; min-width: 0; overflow: hidden; font-size: 13px; font-weight: 600; color: var(--jv-text-2); white-space: nowrap; text-overflow: ellipsis; }
+.rl-jarvis__rulesub { box-sizing: border-box; margin: -4px 0 0; padding: 0 10px 0 38px; overflow: hidden; font-size: 12px; line-height: 18px; color: var(--jv-text-2); white-space: nowrap; text-overflow: ellipsis; }
+.rl-jarvis__rule.is-waiting,
+.rl-jarvis__rule.is-quiet,
+.rl-jarvis__rule.is-off { background: none; }
+.rl-jarvis__rule.is-waiting .rl-jarvis__rulename,
+.rl-jarvis__rule.is-quiet .rl-jarvis__rulename,
+.rl-jarvis__rule.is-off .rl-jarvis__rulename { color: var(--jv-text-3); font-weight: 500; }
+.rl-jarvis__rule.is-quiet { opacity: var(--jv-quiet-op); }
+.rl-jarvis__rule.is-quiet .rl-jarvis__num { opacity: 1; }
+.rl-jarvis__rule.is-working { border-color: color-mix(in srgb, var(--jv-work) 60%, transparent); background: var(--jv-work-soft); color: var(--jv-work-ink); box-shadow: 0 0 18px color-mix(in srgb, var(--jv-work) 22%, transparent); }
+.rl-jarvis__rule.is-working .rl-jarvis__rulename { color: var(--jv-text); }
+.rl-jarvis__rule.is-missed { border-color: color-mix(in srgb, var(--jv-bad) 32%, transparent); background: var(--jv-bad-faint); color: var(--jv-bad); }
+.rl-jarvis__rule.is-missed .rl-jarvis__rulename { color: var(--jv-text-2); }
+.rl-jarvis__rule.is-unknown,
+.rl-jarvis__rule.is-possible { border-color: color-mix(in srgb, var(--jv-warn) 36%, transparent); background: var(--jv-warn-faint); color: var(--jv-warn); }
+.rl-jarvis__rule.is-unknown .rl-jarvis__rulename,
+.rl-jarvis__rule.is-possible .rl-jarvis__rulename { color: var(--jv-text); }
+.rl-jarvis__rule.is-matched { overflow: visible; border-color: color-mix(in srgb, currentColor 55%, transparent); background: color-mix(in srgb, currentColor 9%, transparent); box-shadow: 0 0 22px color-mix(in srgb, currentColor 18%, transparent); }
+.rl-jarvis__rule.is-matched .rl-jarvis__rulename { color: var(--jv-text); }
+.rl-jarvis__rule.is-matched.is-positive { color: var(--jv-ok); }
+.rl-jarvis__rule.is-matched.is-negative { color: var(--jv-bad); }
+.rl-jarvis__rule.is-matched.is-notice { color: var(--jv-warn); }
+.rl-jarvis__rule.is-matched.is-neutral { color: var(--jv-text-2); }
+.rl-jarvis__rule.is-possible { overflow: visible; }
+.rl-jarvis__rule.is-lit { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 60%, transparent), 0 0 24px color-mix(in srgb, currentColor 30%, transparent); }
+.rl-jarvis__rule.is-lit.is-quiet,
+.rl-jarvis__rule.is-lit.is-waiting { opacity: 1; color: var(--jv-text-2); }
+
+.rl-jarvis__scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--jv-work);
+  box-shadow: 0 0 10px var(--jv-halo);
+  pointer-events: none;
+}
+
+.rl-jarvis__checks { margin: 0; padding: 0 10px 0 38px; list-style: none; }
+.rl-jarvis__check {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 16px;
+  align-items: start;
+  column-gap: 8px;
+  box-sizing: border-box;
+  padding: 4px 0 3px;
+  border-top: 1px solid var(--jv-line-soft);
+}
+.rl-jarvis__cword { padding-top: 1px; font-size: 12px; color: var(--jv-text-3); }
+.rl-jarvis__ctext { display: flex; flex-direction: column; min-width: 0; }
+.rl-jarvis__cfact { overflow: hidden; font-size: 13px; font-weight: 500; line-height: 19px; color: var(--jv-text); white-space: nowrap; text-overflow: ellipsis; }
+.rl-jarvis__cneed { overflow: hidden; font-size: 12px; line-height: 17px; color: var(--jv-text-3); white-space: nowrap; text-overflow: ellipsis; }
+.rl-jarvis__check.is-working .rl-jarvis__cword { color: var(--jv-work-ink); }
+.rl-jarvis__subs { display: flex; flex-direction: column; margin-top: 3px; }
+.rl-jarvis__subline { display: grid; grid-template-columns: minmax(0, 1fr) auto 14px; gap: 6px; height: 22px; align-items: center; font-size: 12px; color: var(--jv-text-3); }
+.rl-jarvis__subval { color: var(--jv-text-2); }
+.rl-jarvis__then { display: flex; align-items: center; gap: 8px; box-sizing: border-box; margin: 0; padding: 0 10px 0 38px; border-top: 1px solid var(--jv-line-soft); margin-left: 0; }
+.rl-jarvis__then .rl-jarvis__cword { width: 62px; padding: 0; }
+.rl-jarvis__thenword { font-size: 13px; font-weight: 600; color: var(--jv-text); }
+.rl-jarvis__then.is-positive .rl-jarvis__thenword { color: var(--jv-ok); }
+.rl-jarvis__then.is-negative .rl-jarvis__thenword { color: var(--jv-bad); }
+.rl-jarvis__then.is-notice .rl-jarvis__thenword { color: var(--jv-warn); }
+
+.rl-jarvis__mark { display: inline-grid; flex: none; place-items: center; }
+.rl-jarvis__mark.is-pass { color: var(--jv-ok); }
+.rl-jarvis__mark.is-fail { color: var(--jv-bad); }
+.rl-jarvis__mark.is-unknown { color: var(--jv-warn); }
+
+/* --- The verdict -------------------------------------------------------------------------- */
+
+.rl-jarvis__verdict {
+  position: relative;
+  box-sizing: border-box;
+  padding: 16px 16px 14px;
+  border-radius: 10px;
+  color: var(--jv-text-2);
+}
+/* The verdict's glass: its own layer, so it can fill in as the frame draws. */
+.rl-jarvis__vglass {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--jv-glass-2);
+  box-shadow: var(--jv-verdict-shadow), 0 0 34px color-mix(in srgb, currentColor 14%, transparent);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.rl-jarvis__verdict.is-positive { color: var(--jv-ok); }
+.rl-jarvis__verdict.is-negative { color: var(--jv-bad); }
+.rl-jarvis__verdict.is-notice { color: var(--jv-warn); }
+.rl-jarvis__verdict.is-lit { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 60%, transparent), 0 0 40px color-mix(in srgb, currentColor 28%, transparent); }
+.rl-jarvis__halo { position: absolute; inset: -1px; border-radius: 10px; box-shadow: 0 0 0 1px currentColor, 0 0 36px 4px color-mix(in srgb, currentColor 45%, transparent); pointer-events: none; }
+/* Depth behind the verdict: a soft radial glow in its tone. */
+.rl-jarvis__vglow { position: absolute; inset: -46px -40px; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, currentColor 16%, transparent), transparent); pointer-events: none; }
+/* Settled: the edge breathes, ≈ 4 s, low (CSS only; never on what motion moves). */
+.rl-jarvis__vbreath { position: absolute; inset: -1px; border-radius: 10px; box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 50%, transparent), 0 0 22px color-mix(in srgb, currentColor 22%, transparent); opacity: 0; pointer-events: none; }
+.rl-jarvis__vbreath.is-breathing { animation: rl-jarvis-breathe-edge 4s ease-in-out infinite; }
+@keyframes rl-jarvis-breathe-edge { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.85; } }
+/* The ripple as the answer lands (motion scales it). */
+.rl-jarvis__ripple { position: absolute; inset: -2px; border: 2px solid currentColor; border-radius: 12px; pointer-events: none; }
+.rl-jarvis__framelines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.rl-jarvis__framelines rect { stroke: currentColor; stroke-width: 1.2; stroke-opacity: 0.7; }
+.rl-jarvis__verdictin { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.rl-jarvis__vkicker { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: currentColor; }
+.rl-jarvis__vword { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0; font-size: 22px; font-weight: 600; line-height: 1.2; color: var(--jv-text); }
+.rl-jarvis__expect { padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--jv-warn) 50%, transparent); border-radius: 5px; font-size: 12px; font-weight: 500; color: var(--jv-warn); }
+.rl-jarvis__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.rl-jarvis__factorwrap { display: inline-flex; align-items: center; gap: 6px; }
+.rl-jarvis__factor { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border: 1px solid color-mix(in srgb, currentColor 34%, transparent); border-radius: 12px; background: color-mix(in srgb, currentColor 9%, transparent); font-size: 13px; font-weight: 500; }
+.rl-jarvis__verdict .rl-jarvis__factor { color: inherit; }
+.rl-jarvis__verdict.is-positive .rl-jarvis__factor { background: var(--jv-ok-soft); color: var(--jv-ok); }
+.rl-jarvis__arrow { color: var(--jv-text-3); }
+.rl-jarvis__deny { margin: 0; font-size: 13px; line-height: 1.4; color: var(--jv-text); }
+.rl-jarvis__ifs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rl-jarvis__ifs li { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--jv-text-2); }
+.rl-jarvis__ifword { font-weight: 600; }
+.rl-jarvis__ifword.is-positive { color: var(--jv-ok); }
+.rl-jarvis__ifword.is-negative { color: var(--jv-bad); }
+.rl-jarvis__by { display: flex; flex-direction: column; gap: 1px; padding-top: 8px; border-top: 1px solid var(--jv-line-soft); }
+.rl-jarvis__bylink {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--jv-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-jarvis__bytext { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rl-jarvis__bypolicy { font-weight: 600; }
+.rl-jarvis__byrule { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 12px; font-weight: 400; line-height: 17px; color: var(--jv-text-2); }
+.rl-jarvis__bylink:hover .rl-jarvis__bypolicy { text-decoration: underline; text-underline-offset: 2px; }
+.rl-jarvis__bylink { width: 100%; justify-content: space-between; }
+.rl-jarvis__bylink svg { flex: none; margin-top: 3px; color: var(--jv-text-3); }
+.rl-jarvis__bylink:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; border-radius: 3px; }
+.rl-jarvis__finding {
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--jv-warn) 40%, transparent);
+  border-radius: 7px;
+  background: var(--jv-warn-soft);
+  color: var(--jv-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.rl-jarvis__finding.is-info { border-color: var(--jv-line); background: var(--jv-hover-soft); color: var(--jv-text-2); }
+.rl-jarvis__finding:hover { border-color: var(--jv-line-strong); }
+.rl-jarvis__finding:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
+.rl-jarvis__vfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rl-jarvis__changed { font-size: 12px; color: var(--jv-text-2); }
+.rl-jarvis__seebtn {
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid var(--jv-line);
+  border-radius: 6px;
+  background: none;
+  color: var(--jv-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rl-jarvis__seebtn:hover,
+.rl-jarvis__seebtn.is-open { border-color: var(--jv-line-strong); background: var(--jv-hover-soft); }
+.rl-jarvis__seebtn:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
+
+.rl-jarvis__see { box-sizing: border-box; padding: 10px; border: 1px solid var(--jv-line); border-radius: 10px; background: var(--jv-glass); box-shadow: var(--jv-see-shadow); }
+.rl-jarvis__seehead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+/* The sign-in page itself stays in the light look, on its own inset: readable. */
+.rl-jarvis__seeinset { padding: 8px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--jv-inset-border); background: var(--surface-raised, #fff); color: var(--text-body, #212529); }
+.rl-jarvis__seeinset .tsee__title:empty { display: none; }
+
+.rl-jarvis__x {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--jv-text-3);
+  cursor: pointer;
+}
+.rl-jarvis__x:hover { background: var(--jv-hover); color: var(--jv-text); }
+.rl-jarvis__x:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 1px; }
+
+/* --- The route ----------------------------------------------------------------------------- */
+
+.rl-jarvis__wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 0; }
+.rl-jarvis__wire { color: var(--jv-hud); transition: color 0.4s ease; }
+.rl-jarvis__wireline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 0 3px color-mix(in srgb, currentColor 45%, transparent)); }
+/* The pulse: a tail in three steps of the wire's colour, brighter toward its head, and the head itself. */
+.rl-jarvis__wiretail { fill: none; stroke: currentColor; stroke-linecap: round; pointer-events: none; }
+.rl-jarvis__wiretail.is-t0 { stroke-width: 3; stroke-opacity: 0.18; }
+.rl-jarvis__wiretail.is-t1 { stroke-width: 3.5; stroke-opacity: 0.35; }
+.rl-jarvis__wiretail.is-t2 { stroke-width: 4; stroke-opacity: 0.7; }
+.rl-jarvis__wiredot { fill: var(--jv-bg); stroke: currentColor; stroke-width: 2; filter: drop-shadow(0 0 6px currentColor); }
+.rl-jarvis__wire.is-working { color: var(--jv-work); }
+.rl-jarvis__wire.is-covers,
+.rl-jarvis__wire.is-positive { color: var(--jv-ok-hi); }
+.rl-jarvis__wire.is-negative { color: var(--jv-bad-hi); }
+.rl-jarvis__wire.is-notice { color: var(--jv-warn-hi); }
+.rl-jarvis__wire.is-neutral { color: var(--jv-off); }
+
+/* --- Ambient life while the engine works, and the lock-on as it lands ------------------------------ */
+
+/* The connectors: soft pulses keep travelling the route while the engine reads (after the line has drawn). */
+.rl-jarvis__wireflow {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0;
+  filter: drop-shadow(0 0 4px currentColor);
+  animation: rl-jarvis-flow 1.25s linear infinite, rl-jarvis-flow-in 0.4s ease-out 0.7s forwards;
+}
+@keyframes rl-jarvis-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -0.4; } }
+@keyframes rl-jarvis-flow-in { to { opacity: 0.55; } }
+
+/* The analysis panel: a slow scan down it while its rules are read (its own clip box; the line alone moves). */
+.rl-jarvis__panel { position: relative; }
+.rl-jarvis__panelscan { position: absolute; inset: 0; overflow: hidden; border-radius: 10px; pointer-events: none; }
+.rl-jarvis__panelscanline { position: absolute; inset: 0; animation: rl-jarvis-panelscan 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; will-change: transform; }
+.rl-jarvis__panelscanline::before { content: ''; position: absolute; left: 0; right: 0; top: -40px; height: 40px; background: var(--jv-work); opacity: 0.045; }
+.rl-jarvis__panelscanline::after { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: var(--jv-work); opacity: 0.55; box-shadow: 0 0 8px var(--jv-halo); }
+@keyframes rl-jarvis-panelscan { from { transform: translateY(0%); } to { transform: translateY(100%); } }
+
+/* The verdict locks on: four brackets close in from outside and let go. */
+.rl-jarvis__lockon { position: absolute; inset: -7px; pointer-events: none; opacity: 0; animation: rl-jarvis-lockon 1.25s cubic-bezier(0.2, 0.8, 0.25, 1) var(--jv-lock-at, 0ms) both; will-change: transform, opacity; }
+.rl-jarvis__lc { position: absolute; width: 16px; height: 16px; border: 0 solid currentColor; filter: drop-shadow(0 0 4px currentColor); }
+.rl-jarvis__lc.is-tl { left: 0; top: 0; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 4px; }
+.rl-jarvis__lc.is-tr { right: 0; top: 0; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 4px; }
+.rl-jarvis__lc.is-bl { left: 0; bottom: 0; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 4px; }
+.rl-jarvis__lc.is-br { right: 0; bottom: 0; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 4px; }
+@keyframes rl-jarvis-lockon {
+  0% { transform: scale(1.16); opacity: 0; }
+  28% { transform: scale(1); opacity: 1; }
+  62% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.015); opacity: 0; }
+}
+/* …and a scan assembles it, top to bottom, once. */
+.rl-jarvis__vscan { position: absolute; inset: 0; overflow: hidden; border-radius: 10px; pointer-events: none; }
+.rl-jarvis__vscanline { position: absolute; inset: 0; opacity: 0; animation: rl-jarvis-vscan 0.8s cubic-bezier(0.4, 0, 0.3, 1) 0.1s both; will-change: transform, opacity; }
+.rl-jarvis__vscanline::before { content: ''; position: absolute; left: 0; right: 0; top: -36px; height: 36px; background: currentColor; opacity: 0.08; }
+.rl-jarvis__vscanline::after { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1.5px; background: currentColor; box-shadow: 0 0 10px currentColor; }
+@keyframes rl-jarvis-vscan {
+  0% { transform: translateY(0%); opacity: 0; }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+/* --- The inspector --------------------------------------------------------------------------- */
+
+.rl-jarvis__peek {
+  position: absolute;
+  z-index: 20;
+  box-sizing: border-box;
+  padding: 10px 30px 10px 12px;
+  border: 1px solid var(--jv-line-strong);
+  border-radius: 9px;
+  background: var(--jv-peek-bg);
+  box-shadow: var(--jv-pop-shadow);
+  color: var(--jv-text);
+}
+.rl-jarvis__peekx { position: absolute; right: 6px; top: 6px; }
+.rl-jarvis__peeklines,
+.rl-jarvis__answerlines { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rl-jarvis__peeklines li,
+.rl-jarvis__answerlines li { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--jv-text); }
+.rl-jarvis__peeklines li.is-lead { font-weight: 600; }
+.rl-jarvis__peeklines li.is-quiet { font-size: 12px; color: var(--jv-text-2); }
+.rl-jarvis__peeklines li.is-positive,
+.rl-jarvis__answerlines li.is-positive { color: var(--jv-ok); }
+.rl-jarvis__peeklines li.is-negative,
+.rl-jarvis__answerlines li.is-negative { color: var(--jv-bad); }
+.rl-jarvis__peeklines li.is-notice,
+.rl-jarvis__answerlines li.is-notice { color: var(--jv-warn); }
+.rl-jarvis__peeklines li.is-neutral,
+.rl-jarvis__answerlines li.is-neutral { color: var(--jv-text-2); }
+.rl-jarvis__peektext { display: flex; flex-direction: column; min-width: 0; }
+.rl-jarvis__peeksub { font-size: 12px; font-weight: 400; color: var(--jv-text-3); }
+.rl-jarvis__peeklines .rl-jarvis__mark { margin-top: 2px; }
+
+/* --- The deck: answer, subtitle, suggestions, command bar ------------------------------------- */
+
+.rl-jarvis__deck {
+  position: absolute;
+  left: 50%;
+  bottom: 66px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  /* Wide enough that a run's suggestions sit on one line, so the deck stays low. */
+  width: min(1060px, calc(100% - 32px));
+  translate: -50% 0;
+  pointer-events: none;
+}
+.rl-jarvis__deck > * { pointer-events: auto; }
+
+.rl-jarvis__answer {
+  box-sizing: border-box;
+  width: min(620px, 100%);
+  max-height: 248px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--jv-line-strong);
+  border-radius: 10px;
+  background: var(--jv-answer-bg);
+  box-shadow: var(--jv-answer-shadow);
+  color: var(--jv-text-2);
+}
+.rl-jarvis__answer.is-positive { border-color: color-mix(in srgb, var(--jv-ok) 45%, transparent); }
+.rl-jarvis__answer.is-negative { border-color: color-mix(in srgb, var(--jv-bad) 45%, transparent); }
+.rl-jarvis__answer.is-notice { border-color: color-mix(in srgb, var(--jv-warn) 45%, transparent); }
+.rl-jarvis__answerhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.rl-jarvis__answertitle { font-size: 14px; font-weight: 600; color: var(--jv-text); }
+
+.rl-jarvis__caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 20px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--jv-text);
+  text-align: center;
+  text-shadow: var(--jv-caption-shadow);
+}
+.rl-jarvis__caption[hidden] { display: none; }
+.rl-jarvis__captionmark { display: inline-grid; flex: none; place-items: center; color: var(--jv-text-3); }
+
+.rl-jarvis__chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.rl-jarvis__chip {
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--jv-line);
+  border-radius: 14px;
+  background: var(--jv-chip-bg);
+  color: var(--jv-text);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rl-jarvis__chip:hover { border-color: var(--jv-line-strong); background: var(--jv-chip-hover); }
+.rl-jarvis__chip.is-on { border-color: var(--jv-text-2); }
+.rl-jarvis__chip:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
+
+.rl-jarvis__ask {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  height: 42px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--jv-line-strong);
+  border-radius: 21px;
+  background: var(--jv-ask-bg);
+  box-shadow: var(--jv-float-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.rl-jarvis__ask:focus-within { border-color: var(--jv-text-2); box-shadow: var(--jv-float-shadow), 0 0 0 3px var(--jv-ask-ring); }
+.rl-jarvis__ask.is-listening { border-color: var(--jv-work); box-shadow: 0 0 0 3px var(--jv-work-soft); }
+.rl-jarvis__askmark { display: inline-grid; flex: none; place-items: center; color: var(--jv-text-3); }
+.rl-jarvis__askmark.is-working { color: var(--jv-work); }
+.rl-jarvis__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--jv-text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.rl-jarvis__input::placeholder { color: var(--jv-text-3); }
+/* The console's own field look (kit.css) stays off the command bar: it is the bar's. */
+.rl-jarvis__ask .rl-jarvis__input,
+.rl-jarvis__ask .rl-jarvis__input:hover,
+.rl-jarvis__ask .rl-jarvis__input:focus,
+.rl-jarvis__ask .rl-jarvis__input:focus-visible {
+  width: auto;
+  height: 100%;
+  padding: 0 4px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--jv-text);
+  outline: none;
+}
+.rl-jarvis__mic,
+.rl-jarvis__send {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 15px;
+  background: none;
+  color: var(--jv-text-2);
+  cursor: pointer;
+}
+.rl-jarvis__mic:hover,
+.rl-jarvis__send:hover:not(:disabled) { background: var(--jv-hover); color: var(--jv-text); }
+.rl-jarvis__mic.is-on { background: var(--jv-work-soft); color: var(--jv-work); }
+.rl-jarvis__send:disabled,
+.rl-jarvis__mic:disabled { opacity: 0.4; cursor: default; }
+.rl-jarvis__mic:focus-visible,
+.rl-jarvis__send:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-jarvis__seg,
+  .rl-jarvis__plabel,
+  .rl-jarvis__rule,
+  .rl-jarvis__face,
+  .rl-jarvis__facearc,
+  .rl-jarvis__cond,
+  .rl-jarvis__condicon,
+  .rl-jarvis__wire,
+  .rl-jarvis__pbtn { transition: none; }
+  .rl-jarvis__busy svg,
+  .rl-jarvis-root.is-booting,
+  .rl-jarvis-root[data-jv-mode='down'],
+  .rl-jarvis__farticks,
+  .rl-jarvis__wireflow,
+  .rl-jarvis__panelscanline,
+  .rl-jarvis__lockon,
+  .rl-jarvis__vscanline,
+  .rl-jarvis__corespin,
+  .rl-jarvis__corehalo.is-breathing,
+  .rl-jarvis__vbreath.is-breathing { animation: none; }
+}
+
+/* The host's fade under the engine pill, in the stage's colour. */
+.sit__stage .tj-canvas.is-jarvis::after,
+.tj-canvas.is-jarvis::after { background: linear-gradient(to bottom, #081424 40%, rgba(8, 20, 36, 0)); }

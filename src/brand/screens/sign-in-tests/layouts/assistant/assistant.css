@@ -1,0 +1,472 @@
+/* -----------------------------------------------------------------------------
+   The assistant dock (AssistantDock.tsx): one floating panel at the bottom
+   centre of the stage — the chips over it, the thread growing up out of it,
+   the ask row with its travelling glow, the controls row.
+
+   Every colour is a variable a layout may set on `.ad` (or an ancestor):
+   light by default, in the console's look; the dark stage under
+   [data-stage='dark']. Colour is meaning: the glow is the assistant's
+   (the console blue into a soft cyan), brighter only while the engine or the
+   assistant works; green / red / amber only on cited answers that mean them.
+   Nothing motion animates carries a CSS transform or transition.
+   -------------------------------------------------------------------------- */
+
+@property --ad-a {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 300deg;
+}
+
+.ad {
+  --ad-surface: var(--surface-raised, #ffffff);
+  --ad-field: var(--surface-raised, #ffffff);
+  --ad-sunken: var(--surface-sunken, #f8f9fa);
+  --ad-line: var(--border-subtle, #e4e8ec);
+  --ad-line-2: var(--border-default, #dee2e6);
+  --ad-text: var(--text-primary, #212529);
+  --ad-text-2: var(--text-secondary, #495057);
+  --ad-text-3: var(--text-muted, #646c75);
+  --ad-hover: var(--surface-sunken, #f1f3f5);
+  --ad-glow-a: var(--accent, #0d6efd);
+  --ad-glow-b: #5ccfe6;
+  --ad-on: var(--accent, #0d6efd);
+  --ad-on-soft: var(--accent-soft, #e7f1ff);
+  --ad-halo: var(--focus-halo, rgba(13, 110, 253, 0.2));
+  --ad-ok: var(--fb-positive-fg, #14663a);
+  --ad-ok-bg: var(--fb-positive-bg, #e8f7ee);
+  --ad-bad: var(--fb-negative-fg, #a5142b);
+  --ad-bad-bg: var(--fb-negative-bg, #fdf0f2);
+  --ad-warn: var(--fb-notice-fg, #7d5800);
+  --ad-warn-bg: var(--fb-notice-bg, #fdf6e0);
+  --ad-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 10px 28px rgba(16, 24, 40, 0.1);
+  --ad-chip: rgba(255, 255, 255, 0.92);
+
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  margin-inline: auto;
+  width: min(640px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  pointer-events: none;
+  font-family: inherit;
+  color: var(--ad-text);
+  cursor: auto;
+}
+.ad[data-stage='dark'] {
+  --ad-surface: rgba(26, 40, 53, 0.96);
+  --ad-field: rgba(16, 27, 37, 0.9);
+  --ad-sunken: rgba(255, 255, 255, 0.05);
+  --ad-line: rgba(255, 255, 255, 0.12);
+  --ad-line-2: rgba(255, 255, 255, 0.2);
+  --ad-text: #eef3f8;
+  --ad-text-2: #c4d0db;
+  --ad-text-3: #93a4b4;
+  --ad-hover: rgba(255, 255, 255, 0.08);
+  --ad-glow-a: #6ea8ff;
+  --ad-glow-b: #7fe3f2;
+  --ad-on: #8fbcff;
+  --ad-on-soft: rgba(110, 168, 255, 0.16);
+  --ad-halo: rgba(110, 168, 255, 0.3);
+  --ad-ok: #8be3b2;
+  --ad-ok-bg: rgba(79, 209, 139, 0.12);
+  --ad-bad: #ffa3ae;
+  --ad-bad-bg: rgba(255, 107, 125, 0.12);
+  --ad-warn: #f6d58a;
+  --ad-warn-bg: rgba(242, 193, 78, 0.12);
+  --ad-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --ad-chip: rgba(26, 40, 53, 0.92);
+}
+.ad > * { pointer-events: auto; }
+
+/* --- The chips ------------------------------------------------------------- */
+
+.ad__chips {
+  align-self: center;
+  width: max-content;
+  max-width: calc(var(--ad-roomw, 1200px) - 32px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+}
+/* Inside the open thread: what to ask next, under the newest answer. */
+.ad__chips.is-next { align-self: stretch; width: auto; max-width: none; justify-content: flex-start; padding-top: 2px; }
+.ad__chips.is-next .ad__chip { height: 26px; font-size: 12px; box-shadow: none; backdrop-filter: none; background: var(--ad-surface); }
+.ad__chip {
+  pointer-events: auto;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--ad-line);
+  border-radius: 999px;
+  background: var(--ad-chip);
+  backdrop-filter: blur(6px);
+  color: var(--ad-text-2);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.ad__chip:hover { border-color: var(--ad-line-2); background: var(--ad-surface); color: var(--ad-text); }
+.ad__chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+
+/* --- The panel ------------------------------------------------------------- */
+
+.ad__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--ad-line);
+  border-radius: 12px;
+  background: var(--ad-surface);
+  box-shadow: var(--ad-shadow);
+}
+
+/* The thread: grows up out of the panel; scrolls inside its 40% of the canvas. */
+.ad__threadwrap { overflow: hidden; }
+.ad__threadhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 6px 6px;
+}
+.ad__threadtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ad-text-3);
+}
+.ad__threadtitle svg { color: var(--ad-glow-a); }
+.ad__thread {
+  max-height: max(160px, calc(var(--ad-room, 800px) * 0.4 - 96px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: thin;
+}
+.ad__item { display: flex; flex-direction: column; gap: 6px; }
+.ad__q {
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: var(--ad-sunken);
+  color: var(--ad-text-2);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.ad__thinking { display: inline-flex; gap: 4px; padding: 8px 2px; }
+.ad__thinking span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ad-glow-a);
+  opacity: 0.35;
+  animation: ad-think 900ms ease-in-out infinite;
+}
+.ad__thinking span:nth-child(2) { animation-delay: 150ms; }
+.ad__thinking span:nth-child(3) { animation-delay: 300ms; }
+@keyframes ad-think { 50% { opacity: 1; } }
+
+.ad__itemfoot { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.ad__spacer { flex: 1; }
+.ad__action {
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--ad-line-2);
+  border-radius: 8px;
+  background: var(--ad-surface);
+  color: var(--ad-on);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.ad__action:hover { background: var(--ad-on-soft); border-color: var(--ad-on); }
+.ad__action:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+.ad__hint { font-size: 12px; color: var(--ad-text-3); }
+.ad__votes { display: inline-flex; align-items: center; gap: 2px; }
+.ad__voteslabel { font-size: 12px; color: var(--ad-text-3); margin-right: 4px; }
+
+/* --- Row 1: ask, with the glow travelling along its border ----------------- */
+
+.ad__ask {
+  position: relative;
+  isolation: isolate;
+  border-radius: 10px;
+}
+/* The glow: a short bright run of the assistant's colours, drifting round the border… */
+.ad__ask::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1.25px;
+  background: conic-gradient(from var(--ad-a), transparent 0deg, transparent 210deg, var(--ad-glow-a) 275deg, var(--ad-glow-b) 325deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.7;
+  pointer-events: none;
+  animation: ad-drift 9s linear infinite;
+}
+/* …and its soft light, behind the field. */
+.ad__ask::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border-radius: 13px;
+  background: conic-gradient(from var(--ad-a), transparent 0deg, transparent 210deg, var(--ad-glow-a) 275deg, var(--ad-glow-b) 325deg, transparent 360deg);
+  filter: blur(9px);
+  opacity: 0.18;
+  pointer-events: none;
+  animation: ad-drift 9s linear infinite;
+}
+@keyframes ad-drift { from { --ad-a: 0deg; } to { --ad-a: 360deg; } }
+.ad.is-busy .ad__ask::before { opacity: 1; animation-duration: 2.6s; }
+.ad.is-busy .ad__ask::after { opacity: 0.4; animation-duration: 2.6s; }
+.ad__ask.is-speaking::before { opacity: 0.95; animation-duration: 4s; }
+.ad__ask.is-focused::before { opacity: 1; }
+/* Still under reduced motion: the glow rests at the top right. */
+.ad.is-reduced .ad__ask::before,
+.ad.is-reduced .ad__ask::after { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ad__ask::before, .ad__ask::after { animation: none; }
+}
+
+.ad__field {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 42px;
+  padding: 0 5px 0 11px;
+  border: 1px solid var(--ad-line);
+  border-radius: 10px;
+  background: var(--ad-field);
+}
+.ad__ask.is-focused .ad__field { border-color: transparent; box-shadow: 0 0 0 3px var(--ad-halo); }
+.ad__lead { flex: none; color: var(--ad-glow-a); }
+.ad__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ad-text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.ad__input::placeholder { color: var(--ad-text-3); }
+.ad__kbd {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--ad-line);
+  border-radius: 5px;
+  color: var(--ad-text-3);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  margin-right: 2px;
+}
+.ad-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: var(--ad-on);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 120ms ease, background-color 120ms ease;
+}
+.ad-send:disabled { background: var(--ad-sunken); color: var(--ad-text-3); cursor: default; }
+.ad-send:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+
+/* The voice line: the waveform, the line said, Stop. */
+.ad__voice { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.ad__wave { flex: none; display: inline-flex; align-items: center; gap: 2.5px; height: 18px; }
+.ad__wave i {
+  display: block;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(var(--ad-glow-b), var(--ad-glow-a));
+  transform-origin: 50% 50%;
+  animation: ad-bar 900ms ease-in-out infinite;
+}
+.ad__wave i:nth-child(1) { animation-delay: -120ms; }
+.ad__wave i:nth-child(2) { animation-delay: -480ms; }
+.ad__wave i:nth-child(3) { animation-delay: -260ms; }
+.ad__wave i:nth-child(4) { animation-delay: -640ms; }
+.ad__wave i:nth-child(5) { animation-delay: -40ms; }
+@keyframes ad-bar { 0%, 100% { transform: scaleY(0.28); } 50% { transform: scaleY(1); } }
+.ad.is-reduced .ad__wave i { animation: none; transform: scaleY(0.6); }
+@media (prefers-reduced-motion: reduce) { .ad__wave i { animation: none; transform: scaleY(0.6); } }
+.ad__subtitle {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  cursor: text;
+  font-size: 13.5px;
+  line-height: 1.3;
+  color: var(--ad-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Row 2: the controls ---------------------------------------------------- */
+
+.ad__controls { display: flex; align-items: center; gap: 2px; padding: 0 2px; min-height: 30px; }
+.ad__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 1px;
+  border: 1px solid var(--ad-line);
+  border-radius: 8px;
+  margin-right: 4px;
+}
+.ad__pct {
+  min-width: 46px;
+  height: 26px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ad-text-2);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.ad__pct:hover { background: var(--ad-hover); color: var(--ad-text); }
+.ad__pct:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+.ad-sep { flex: none; width: 1px; height: 18px; margin: 0 5px; background: var(--ad-line); }
+
+/* One icon button for every control — and the view's own `.bb__act`s, sized alike. */
+.ad-btn,
+.ad .bb__act {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--ad-text-3);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.ad-btn:hover,
+.ad .bb__act:hover { background: var(--ad-hover); color: var(--ad-text); }
+.ad-btn:disabled,
+.ad .bb__act:disabled { opacity: 0.4; cursor: default; background: none; }
+.ad-btn:focus-visible,
+.ad .bb__act:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+.ad-btn.is-on { color: var(--ad-on); }
+.ad-btn.is-on[aria-pressed='true'] { background: var(--ad-on-soft); }
+.ad-btn.is-sm { width: 24px; height: 24px; }
+.ad-btn.is-listening { color: #fff; background: var(--ad-on); animation: ad-listen 1.2s ease-in-out infinite; }
+@keyframes ad-listen { 50% { box-shadow: 0 0 0 5px var(--ad-halo); } }
+.ad.is-reduced .ad-btn.is-listening { animation: none; }
+.ad .bb__float__sep { width: 1px; height: 18px; margin: 0 5px; background: var(--ad-line); }
+
+/* --- An answer, drawn as words (AnswerText.tsx) ----------------------------- */
+
+.ad-ans { display: flex; flex-direction: column; gap: 6px; }
+.ad-ans__sentence { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ad-text); text-wrap: pretty; }
+.ad-ans.is-unknown .ad-ans__sentence { color: var(--ad-text-2); }
+.ad-ans__w { display: inline; }
+.ad-ans__cite {
+  border-radius: 4px;
+  padding: 0 1px;
+  font-weight: 500;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--ad-line-2);
+  cursor: default;
+  outline: none;
+  transition: background-color 120ms ease, text-decoration-color 120ms ease;
+}
+.ad-ans__cite.is-positive { text-decoration-color: color-mix(in srgb, var(--ad-ok) 55%, transparent); }
+.ad-ans__cite.is-negative { text-decoration-color: color-mix(in srgb, var(--ad-bad) 55%, transparent); }
+.ad-ans__cite.is-notice { text-decoration-color: color-mix(in srgb, var(--ad-warn) 60%, transparent); }
+.ad-ans__cite:hover,
+.ad-ans__cite:focus-visible,
+.ad-ans__cite.is-lit { background: var(--ad-sunken); text-decoration-color: currentColor; }
+.ad-ans__cite.is-positive:hover, .ad-ans__cite.is-positive:focus-visible, .ad-ans__cite.is-positive.is-lit { background: var(--ad-ok-bg); }
+.ad-ans__cite.is-negative:hover, .ad-ans__cite.is-negative:focus-visible, .ad-ans__cite.is-negative.is-lit { background: var(--ad-bad-bg); }
+.ad-ans__cite.is-notice:hover, .ad-ans__cite.is-notice:focus-visible, .ad-ans__cite.is-notice.is-lit { background: var(--ad-warn-bg); }
+.ad-ans__cite:focus-visible { box-shadow: 0 0 0 2px var(--ad-halo); }
+.ad-ans__num {
+  display: inline;
+  margin: 0 1px 0 3px;
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: var(--ad-sunken);
+  box-shadow: inset 0 0 0 1px var(--ad-line);
+  color: var(--ad-text-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: 0.55em;
+  text-decoration: none;
+}
+.ad-ans__cite:hover .ad-ans__num,
+.ad-ans__cite:focus-visible .ad-ans__num,
+.ad-ans__cite.is-lit .ad-ans__num { background: var(--ad-text); color: var(--ad-surface); box-shadow: none; }
+.ad-ans__mk { display: inline-block; vertical-align: -1px; margin-right: 3px; }
+.ad-ans__mk.is-pass { color: var(--ad-ok); }
+.ad-ans__mk.is-fail { color: var(--ad-bad); }
+.ad-ans__mk.is-unknown { color: var(--ad-warn); }
+.ad-ans__more {
+  margin: 0;
+  padding: 0 0 0 10px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-left: 2px solid var(--ad-line);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ad-text-2);
+}

@@ -1,0 +1,297 @@
+/* -----------------------------------------------------------------------------
+   The run as a BRIEF (BriefLayout.tsx): the answer first, set large; the
+   evidence cards under it; why not; the follow-ups. Light is the console's
+   own look (white raised cards, sunken fills, hairlines, the dotted ground
+   showing through); dark is the dimmed stage, behind the dock's toggle.
+   Every colour here is a custom property of the stage, set per stage.
+
+   Colour is meaning: the console blue only on what the engine works on now
+   (a blank being written, a row being read, a sweep); green applies /
+   matches / ✓ / an allow; red ✕ / a deny; amber a conflict or can't tell;
+   grey not reached. No transforms or transitions on anything motion moves.
+
+   What the admin picked in the Configure panel has a colour of its own,
+   wherever the sentence and the row on top name it: who (the person, their
+   groups) blue, the application a burnt orange, the conditions (network,
+   device, time, risk, place) violet — a soft tint behind the words, the
+   words in its ink. The engine's things and the answer keep theirs.
+   -------------------------------------------------------------------------- */
+
+.rl-brief[data-stage='light'] {
+  --bf-text: var(--text-primary);
+  --bf-text-2: var(--text-secondary);
+  --bf-text-3: var(--text-tertiary);
+  --bf-card: var(--surface-raised);
+  --bf-sunken: var(--surface-sunken);
+  --bf-inset: var(--surface-inset);
+  --bf-line: var(--border-subtle);
+  --bf-line-2: var(--border-default);
+  --bf-line-3: var(--border-strong);
+  --bf-shadow: var(--el-low);
+  --bf-shadow-up: var(--el-high);
+  --bf-blank: color-mix(in srgb, var(--text-tertiary) 14%, transparent);
+  --bf-work: var(--accent);
+  --bf-work-soft: var(--accent-soft);
+  --bf-work-line: var(--accent-soft-border);
+  --bf-ok: var(--fb-positive-fg);
+  --bf-ok-dot: var(--fb-positive-dot);
+  --bf-ok-bg: var(--fb-positive-bg);
+  --bf-ok-line: var(--fb-positive-border);
+  --bf-bad: var(--fb-negative-fg);
+  --bf-bad-dot: var(--fb-negative-dot);
+  --bf-bad-bg: var(--fb-negative-bg);
+  --bf-bad-line: var(--fb-negative-border);
+  --bf-warn: var(--fb-notice-fg);
+  --bf-warn-dot: var(--fb-notice-dot);
+  --bf-warn-bg: var(--fb-notice-bg);
+  --bf-warn-line: var(--fb-notice-border);
+  --bf-ink: var(--text-primary);
+  --bf-ink-on: var(--surface-raised);
+  --bf-hl: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  --bf-who: #0a58ca;
+  --bf-who-bg: #e7f1ff;
+  --bf-who-line: #b6d4fe;
+  --bf-app: #b4410f;
+  --bf-app-bg: #fff1e8;
+  --bf-app-line: #fdd2bb;
+  --bf-cond: #5b3cc4;
+  --bf-cond-bg: #f1edff;
+  --bf-cond-line: #d9cffc;
+}
+
+.rl-brief[data-stage='dark'] {
+  --bf-text: #eef3f8;
+  --bf-text-2: #b9c6d3;
+  --bf-text-3: #8c9daf;
+  --bf-card: rgba(28, 42, 55, 0.92);
+  --bf-sunken: rgba(255, 255, 255, 0.05);
+  --bf-inset: rgba(255, 255, 255, 0.08);
+  --bf-line: rgba(255, 255, 255, 0.1);
+  --bf-line-2: rgba(255, 255, 255, 0.16);
+  --bf-line-3: rgba(255, 255, 255, 0.32);
+  --bf-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.22);
+  --bf-shadow-up: 0 2px 6px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.4);
+  --bf-blank: rgba(255, 255, 255, 0.08);
+  --bf-work: color-mix(in srgb, var(--accent, #0d6efd) 55%, #ffffff);
+  --bf-work-soft: color-mix(in srgb, var(--accent, #0d6efd) 22%, transparent);
+  --bf-work-line: color-mix(in srgb, var(--accent, #0d6efd) 55%, transparent);
+  --bf-ok: #6fe0ab;
+  --bf-ok-dot: #3fcf8e;
+  --bf-ok-bg: rgba(63, 207, 142, 0.12);
+  --bf-ok-line: rgba(63, 207, 142, 0.45);
+  --bf-bad: #ff9aaa;
+  --bf-bad-dot: #ff6b81;
+  --bf-bad-bg: rgba(255, 107, 129, 0.12);
+  --bf-bad-line: rgba(255, 107, 129, 0.45);
+  --bf-warn: #f7cf73;
+  --bf-warn-dot: #f5c04e;
+  --bf-warn-bg: rgba(245, 192, 78, 0.12);
+  --bf-warn-line: rgba(245, 192, 78, 0.45);
+  --bf-ink: #eef3f8;
+  --bf-ink-on: #142029;
+  --bf-hl: rgba(255, 255, 255, 0.08);
+  --bf-who: #9ec5fe;
+  --bf-who-bg: rgba(77, 148, 255, 0.16);
+  --bf-who-line: rgba(77, 148, 255, 0.36);
+  --bf-app: #ffb38a;
+  --bf-app-bg: rgba(255, 138, 76, 0.14);
+  --bf-app-line: rgba(255, 138, 76, 0.34);
+  --bf-cond: #c4b5fd;
+  --bf-cond-bg: rgba(139, 92, 246, 0.16);
+  --bf-cond-line: rgba(139, 92, 246, 0.4);
+}
+
+/* The dark stage: deep slate and its own fine dots, following the pan and zoom. */
+.rl-brief-stage.is-dark {
+  background-color: #142029;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='1' cy='1' r='0.9' fill='%23ffffff' fill-opacity='0.09'/%3E%3C/svg%3E");
+  background-size: calc(24px * var(--bb-z, 1)) calc(24px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0) var(--bb-y, 0);
+}
+.rl-brief-stage.is-dark .bb__dockbar { border-color: rgba(255, 255, 255, 0.16); background: rgba(26, 40, 53, 0.9); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.rl-brief-stage.is-dark .bb__act { color: #b9c6d3; }
+.rl-brief-stage.is-dark .bb__act:hover { background: rgba(255, 255, 255, 0.08); color: #eef3f8; }
+.rl-brief-stage.is-dark .bb__float__sep { background: rgba(255, 255, 255, 0.16); }
+.tj-canvas.is-brief:has(.rl-brief-stage.is-dark) .tj-engine__pill { border-color: rgba(255, 255, 255, 0.16); background: rgba(26, 40, 53, 0.9); color: #eef3f8; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.tj-canvas.is-brief:has(.rl-brief-stage.is-dark) .tj-engine__text,
+.tj-canvas.is-brief:has(.rl-brief-stage.is-dark) .tj-engine__pill button { color: #dfe7ef; }
+.tj-canvas.is-brief:has(.rl-brief-stage.is-dark)::after { background: linear-gradient(to bottom, #142029 40%, rgba(20, 32, 41, 0)); }
+.tj-canvas.is-brief:has(.rl-brief-stage.is-dark) .tj-engine__done { color: #b9c6d3; }
+.tj-canvas.is-brief:has(.rl-brief-stage.is-dark) .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+/* --- The world ------------------------------------------------------------------------- */
+
+.rl-brief {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  box-sizing: border-box;
+  padding: 4px 0 8px;
+  color: var(--bf-text);
+  font-family: inherit;
+  font-size: var(--fs-md, 13px);
+}
+.rl-brief button { font: inherit; color: inherit; }
+.rl-brief :focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; border-radius: 6px; }
+
+/* The question: who, to what, on what — pressed, the panel opens on it. */
+.rl-brief__ask {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--bf-line);
+  border-radius: 999px;
+  background: var(--bf-card);
+  box-shadow: var(--bf-shadow);
+  font-size: var(--fs-md, 13px);
+  color: var(--bf-text-2);
+  cursor: pointer;
+}
+.rl-brief__ask:hover { border-color: var(--bf-line-2); }
+.rl-brief__ask strong { color: var(--bf-text); font-weight: 600; }
+.rl-brief__ask > svg { color: var(--bf-text-3); }
+.rl-brief__askfact { padding: 1px 8px; border-radius: 999px; background: var(--bf-sunken); color: var(--bf-text-2); font-size: var(--fs-sm, 12px); line-height: 20px; }
+.rl-brief__askfact.is-unset { background: var(--bf-warn-bg); color: var(--bf-warn); }
+.rl-brief__askedit { margin-left: 2px; }
+
+/* --- The answer ------------------------------------------------------------------------ */
+
+.rl-brief__answer { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(100%, 1040px); }
+.rl-brief__sentence {
+  margin: 0;
+  font-size: 26px;
+  line-height: 40px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--bf-text-2);
+  text-align: center;
+  text-wrap: balance;
+}
+.rl-brief__sentence.is-after { font-size: 15px; line-height: 24px; color: var(--bf-text-2); }
+.rl-brief__w { display: inline; }
+
+/* A blank: the words not yet written, at their own width. Blue where the engine works. */
+.rl-brief__blank {
+  color: transparent;
+  border-radius: 8px;
+  background-color: var(--bf-blank);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  user-select: none;
+}
+.rl-brief__blank.is-working {
+  background-color: var(--bf-work-soft);
+  box-shadow: inset 0 0 0 1px var(--bf-work-line);
+  animation: rl-brief-breathe 1.2s ease-in-out infinite;
+}
+@keyframes rl-brief-breathe {
+  50% { background-color: color-mix(in srgb, var(--bf-work) 26%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rl-brief__blank.is-working { animation: none; }
+}
+
+/* A cited phrase: the words, a fine underline, its card's number. */
+.rl-brief__cite {
+  color: var(--bf-text);
+  font-weight: 500;
+  border-radius: 6px;
+  text-decoration: underline;
+  text-decoration-color: var(--bf-line-3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  cursor: pointer;
+  transition: background-color 0.16s ease, text-decoration-color 0.16s ease;
+}
+.rl-brief__cite:hover,
+.rl-brief__cite.is-lit { background-color: var(--bf-hl); text-decoration-color: var(--bf-text); text-decoration-thickness: 2px; }
+.rl-brief__cite.is-notice { color: var(--bf-warn); text-decoration-color: var(--bf-warn-line); }
+.rl-brief__sentence.is-landed.is-positive .rl-brief__cite.is-answer { color: var(--bf-ok); text-decoration-color: var(--bf-ok-line); }
+.rl-brief__sentence.is-landed.is-negative .rl-brief__cite.is-answer { color: var(--bf-bad); text-decoration-color: var(--bf-bad-line); }
+.rl-brief__sentence.is-landed.is-notice .rl-brief__cite.is-answer { color: var(--bf-warn); text-decoration-color: var(--bf-warn-line); }
+.rl-brief__cite.is-answer { font-weight: 600; }
+.rl-brief__glue.is-notice { color: var(--bf-warn); }
+
+.rl-brief__mk {
+  display: inline;
+  margin: 0 1px 0 3px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--bf-sunken);
+  box-shadow: inset 0 0 0 1px var(--bf-line-2);
+  color: var(--bf-text-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  vertical-align: 0.9em;
+  text-decoration: none;
+}
+.rl-brief__sentence .rl-brief__mk { vertical-align: 0.75em; }
+.rl-brief__mk.is-hidden { visibility: hidden; }
+.rl-brief__cite.is-lit .rl-brief__mk,
+.rl-brief__cite:hover .rl-brief__mk { background: var(--bf-ink); color: var(--bf-ink-on); box-shadow: none; }
+
+/* The evidence thread: from a lit citation's numbers to its card's. */
+.rl-brief__thread { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.rl-brief__thread path { fill: none; stroke: var(--bf-ink); stroke-opacity: 0.45; stroke-width: 1.25; }
+.rl-brief > .rl-brief__thread { position: absolute; z-index: 2; }
+.rl-brief > :not(.rl-brief__thread) { position: relative; z-index: 1; }
+
+/* --- What the admin picked ------------------------------------------------------------ */
+
+:is(.rl-brief__ent, .rl-brief__askent).is-person,
+:is(.rl-brief__ent, .rl-brief__askent).is-group { --ent: var(--bf-who); --ent-bg: var(--bf-who-bg); --ent-line: var(--bf-who-line); }
+:is(.rl-brief__ent, .rl-brief__askent).is-app { --ent: var(--bf-app); --ent-bg: var(--bf-app-bg); --ent-line: var(--bf-app-line); }
+:is(.rl-brief__ent, .rl-brief__askfact).is-condition { --ent: var(--bf-cond); --ent-bg: var(--bf-cond-bg); --ent-line: var(--bf-cond-line); }
+
+/* In the sentence: a soft tint behind the words, their ink; the cite's underline and number stay. */
+.rl-brief__ent {
+  padding: 1px 5px;
+  border-radius: 7px;
+  background-color: var(--ent-bg);
+  color: var(--ent);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.rl-brief__sentence.is-after .rl-brief__ent { padding: 1px 3px; border-radius: 5px; }
+
+/* A mark rides with its thing's first word, never alone at a line's end. */
+.rl-brief__lead { white-space: nowrap; }
+.rl-brief__g { display: inline-block; overflow: hidden; margin-right: 0.24em; line-height: 0; vertical-align: -0.16em; }
+.rl-brief__g > svg { display: block; }
+.rl-brief__g > .bx-face { display: grid; }
+.rl-brief__g > .applogo { display: flex; }
+.rl-brief__g.is-face .bx-face { box-shadow: none; background: color-mix(in srgb, var(--ent, var(--bf-who)) 11%, transparent); color: var(--ent, var(--bf-who)); }
+/* The face in the answer: sized to the line, its initials at the 12px floor. */
+.rl-brief__sentence:not(.is-after) .rl-brief__g.is-face { vertical-align: -0.2em; }
+.rl-brief__sentence:not(.is-after) .rl-brief__g.is-face .bx-face { width: 24px; height: 24px; font-size: 12px; }
+.rl-brief__g.is-policy,
+.rl-brief__g.is-rule { color: var(--bf-text-2); }
+.rl-brief__g.is-group { color: var(--ent, var(--bf-who)); }
+.rl-brief__sentence.is-after .rl-brief__g { margin-right: 0.2em; vertical-align: -0.18em; }
+
+/* A blank holds the tints and the marks at their size, unseen. */
+.rl-brief__blank .rl-brief__ent { background-color: transparent; color: transparent; }
+.rl-brief__blank .rl-brief__g { visibility: hidden; }
+
+/* In the row on top: the person, the application and each condition as a tinted chip, its mark kept. */
+.rl-brief__askent { display: inline-flex; align-items: center; gap: 6px; padding: 0 9px 0 0; border-radius: 999px; background: var(--ent-bg); box-shadow: inset 0 0 0 1px var(--ent-line); }
+.rl-brief__askent.is-app { padding-left: 4px; line-height: 22px; }
+.rl-brief__askent.is-group:not(:has(.bx-face)) { padding-left: 7px; line-height: 22px; }
+.rl-brief__ask .rl-brief__askent strong { color: var(--ent); }
+.rl-brief__askent .bx-face { box-shadow: none; background: color-mix(in srgb, var(--ent) 11%, transparent); color: var(--ent); }
+.rl-brief__askent > svg { color: var(--ent); }
+.rl-brief__askfact { display: inline-flex; align-items: center; gap: 5px; }
+.rl-brief__askfact.is-condition:not(.is-unset):not(.is-changed) { background: var(--ent-bg); box-shadow: inset 0 0 0 1px var(--ent-line); color: var(--ent); }
+.rl-brief__askfact > svg { flex: none; }

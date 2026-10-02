@@ -1,0 +1,207 @@
+/* -----------------------------------------------------------------------------
+   The run as PULSE (PulseLayout.tsx): one heartbeat line across the ground,
+   a small card pinned to each beat, the answer at its end, the rail of
+   sections and the playhead under it.
+
+   LIGHT is the console's own look (the default): white raised cards,
+   hairlines, the canvas's dotted ground showing through, soft elevation.
+   DARK (the stage toggle) is the dimmed stage. Every colour below is one of
+   the --pl-* properties set per stage on the root; nothing else is coloured.
+
+   Colour is meaning: blue only where the engine works now (the scan bar, the
+   dot, a card being read); green covers / matches / ✓ / an allow; red ✕ and
+   a deny; amber only a can't-tell or something that also applies; grey what
+   was never read. Never brand orange, never a gradient.
+
+   Nothing motion moves carries a CSS transform or transition: the slots,
+   marks, pins and the answer are moved and faded by motion; the colour and
+   size transitions sit on the button inside a slot.
+   -------------------------------------------------------------------------- */
+
+.rl-pulse-root {
+  --pl-surface: var(--surface-raised);
+  --pl-sunken: var(--surface-sunken);
+  --pl-inset: var(--surface-inset);
+  --pl-line: var(--border-subtle);
+  --pl-line-2: var(--border-default);
+  --pl-line-3: var(--border-strong);
+  --pl-text: var(--text-primary);
+  --pl-body: var(--text-body);
+  --pl-text-2: var(--text-secondary);
+  --pl-text-3: var(--text-tertiary);
+  --pl-muted: var(--text-muted);
+  --pl-link: var(--text-link);
+  --pl-ink: var(--text-secondary);
+  --pl-wait: var(--border-default);
+  --pl-off: var(--border-strong);
+  --pl-work: var(--accent);
+  --pl-work-soft: var(--accent-soft);
+  --pl-work-border: var(--accent-soft-border, var(--accent));
+  --pl-pass: var(--fb-positive-dot);
+  --pl-pass-fg: var(--fb-positive-fg);
+  --pl-pass-bg: var(--fb-positive-bg);
+  --pl-fail: var(--fb-negative-dot);
+  --pl-fail-fg: var(--fb-negative-fg);
+  --pl-fail-bg: var(--fb-negative-bg);
+  --pl-notice: var(--fb-notice-dot);
+  --pl-notice-fg: var(--fb-notice-fg);
+  --pl-notice-bg: var(--fb-notice-bg);
+  --pl-notice-border: var(--fb-notice-border);
+  --pl-el-1: var(--el-low);
+  --pl-el-2: var(--el-mid);
+  --pl-el-3: var(--el-high);
+  --pl-focus: var(--focus-halo);
+  --pl-tip-bg: var(--text-primary);
+  --pl-tip-fg: var(--surface-raised);
+  --pl-ground: transparent;
+  --pl-after: 0.3;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--pl-body);
+}
+.rl-pulse-root[data-stage='dark'] {
+  --pl-surface: rgba(28, 42, 55, 0.92);
+  --pl-sunken: rgba(255, 255, 255, 0.05);
+  --pl-inset: rgba(255, 255, 255, 0.08);
+  --pl-line: rgba(255, 255, 255, 0.12);
+  --pl-line-2: rgba(255, 255, 255, 0.2);
+  --pl-line-3: rgba(255, 255, 255, 0.32);
+  --pl-text: #eef3f8;
+  --pl-body: #dce5ee;
+  --pl-text-2: #b3c1ce;
+  --pl-text-3: #8d9faf;
+  --pl-muted: #6f8294;
+  --pl-link: #8cc2ff;
+  --pl-ink: #b3c1ce;
+  --pl-wait: rgba(255, 255, 255, 0.14);
+  --pl-off: rgba(255, 255, 255, 0.28);
+  --pl-work: #6fb1ff;
+  --pl-work-soft: rgba(111, 177, 255, 0.18);
+  --pl-work-border: rgba(111, 177, 255, 0.5);
+  --pl-pass: #4fd59a;
+  --pl-pass-fg: #8ff0c3;
+  --pl-pass-bg: rgba(79, 213, 154, 0.14);
+  --pl-fail: #ff7a8a;
+  --pl-fail-fg: #ffb3bd;
+  --pl-fail-bg: rgba(255, 122, 138, 0.14);
+  --pl-notice: #f2c14e;
+  --pl-notice-fg: #ffe1a1;
+  --pl-notice-bg: rgba(242, 193, 78, 0.12);
+  --pl-notice-border: rgba(242, 193, 78, 0.42);
+  --pl-el-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --pl-el-2: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --pl-el-3: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --pl-focus: rgba(111, 177, 255, 0.45);
+  --pl-tip-bg: #eef3f8;
+  --pl-tip-fg: #121d26;
+  --pl-ground: #121d26;
+  --pl-after: 0.26;
+}
+
+/* The ground: the canvas's own dots in light; the dimmed stage in dark. */
+.rl-pulse__ground { position: absolute; inset: 0; pointer-events: none; }
+.rl-pulse-root[data-stage='dark'] .rl-pulse__ground {
+  background-color: var(--pl-ground);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='1' cy='1' r='0.9' fill='%23ffffff' fill-opacity='0.08'/%3E%3C/svg%3E");
+  background-size: calc(24px * var(--bb-z, 1)) calc(24px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0) var(--bb-y, 0);
+}
+
+/* The host's engine pill, its fade, and the dock, on the dark stage. */
+.tj-canvas.is-pulse:has(.rl-pulse-root[data-stage='dark']) .tj-engine__pill {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(26, 40, 53, 0.92);
+  color: #eef3f8;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.tj-canvas.is-pulse:has(.rl-pulse-root[data-stage='dark']) :is(.tj-engine__text, .tj-engine__pill button) { color: #dfe7ef; }
+.tj-canvas.is-pulse:has(.rl-pulse-root[data-stage='dark']) .tj-engine__done { color: #b3c1ce; }
+.tj-canvas.is-pulse:has(.rl-pulse-root[data-stage='dark']) .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.sit__stage .tj-canvas.is-pulse:has(.rl-pulse-root[data-stage='dark'])::after,
+.tj-canvas.is-pulse:has(.rl-pulse-root[data-stage='dark'])::after { background: linear-gradient(to bottom, #121d26 40%, rgba(18, 29, 38, 0)); }
+.rl-pulse-root[data-stage='dark'] .bb__dockbar { border-color: var(--pl-line-2); background: rgba(26, 40, 53, 0.92); box-shadow: var(--pl-el-2); }
+.rl-pulse-root[data-stage='dark'] .bb__act { color: var(--pl-text-2); }
+.rl-pulse-root[data-stage='dark'] .bb__act:hover { background: rgba(255, 255, 255, 0.08); color: var(--pl-text); }
+.rl-pulse-root[data-stage='dark'] .bb__float__sep { background: var(--pl-line-2); }
+
+/* --- The world ---------------------------------------------------------------------------- */
+
+.rl-pulse__world { position: relative; font-size: 13px; line-height: 1.3; color: var(--pl-body); }
+.rl-pulse__anchor { position: absolute; pointer-events: none; visibility: hidden; }
+
+/* --- The trace ------------------------------------------------------------------------------ */
+
+.rl-pulse__trace { position: absolute; left: 0; top: 0; z-index: 0; overflow: visible; pointer-events: none; }
+.rl-pulse__ln { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rl-pulse__ln.is-ink { stroke: var(--pl-ink); }
+.rl-pulse__ln.is-wait { stroke: var(--pl-wait); stroke-width: 1.5; stroke-dasharray: 2 5; }
+.rl-pulse__ln.is-off { stroke: var(--pl-off); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.rl-pulse__ln.is-beat { stroke-width: 2.5; }
+.rl-pulse__ln:is(.is-pass, .is-positive) { stroke: var(--pl-pass); }
+.rl-pulse__ln:is(.is-fail, .is-negative) { stroke: var(--pl-fail); }
+.rl-pulse__ln.is-notice { stroke: var(--pl-notice); }
+.rl-pulse__ln.is-neutral { stroke: var(--pl-ink); }
+.rl-pulse__after { opacity: var(--pl-after); }
+
+/* The cursor: blue, only while the engine works. */
+.rl-pulse__bar, .rl-pulse__dot { opacity: 0; }
+.rl-pulse__bar.is-on, .rl-pulse__dot.is-on { opacity: 1; }
+.rl-pulse__barhalo { fill: var(--pl-work-soft); }
+.rl-pulse__barline { stroke: var(--pl-work); stroke-width: 1.5; }
+.rl-pulse__dothalo { fill: var(--pl-work-soft); stroke: var(--pl-work-border); stroke-width: 1; }
+.rl-pulse__dotcore { fill: var(--pl-work); }
+
+/* A beat's mark at its tip. */
+.rl-pulse__beatmark {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  background: var(--pl-surface);
+  color: var(--pl-ink);
+  pointer-events: none;
+}
+.rl-pulse__beatmark:is(.is-pass, .is-positive) { color: var(--pl-pass); }
+.rl-pulse__beatmark:is(.is-fail, .is-negative) { color: var(--pl-fail); }
+.rl-pulse__beatmark.is-notice { color: var(--pl-notice); }
+/* The pin from a beat to its card: a hairline. */
+.rl-pulse__pin { position: absolute; z-index: 0; width: 0; border-left: 1px solid var(--pl-line-3); pointer-events: none; }
+.rl-pulse__pin.is-focus { border-left-color: var(--pl-text-3); }
+/* What was never read: a node each on the dashed run, and its caption. */
+.rl-pulse__node {
+  position: absolute;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  padding: 0;
+  border: 1.5px solid var(--pl-off);
+  border-radius: 50%;
+  background: var(--pl-surface);
+  cursor: pointer;
+}
+.rl-pulse__node:hover, .rl-pulse__node.is-focus { border-color: var(--pl-text-3); }
+.rl-pulse__caption { position: absolute; z-index: 1; font-size: 12px; line-height: 16px; color: var(--pl-text-3); white-space: nowrap; pointer-events: none; }
+.rl-pulse__hit { position: absolute; z-index: 1; padding: 0; border: 0; background: none; cursor: pointer; }
+.rl-pulse__tip {
+  position: absolute;
+  z-index: 12;
+  max-width: 320px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--pl-tip-bg);
+  color: var(--pl-tip-fg);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  translate: -50% -100%;
+  box-shadow: var(--pl-el-2);
+}

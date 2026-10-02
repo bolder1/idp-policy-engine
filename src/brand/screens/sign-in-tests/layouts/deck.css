@@ -1,0 +1,511 @@
+/* -----------------------------------------------------------------------------
+   The run as a deck (DeckLayout.tsx). Cards in the console's language: the
+   raised surface, a hairline, radius 10, DM Sans, 12px the floor. Motion
+   moves the cards (.rl-deck__card: x, y, scale, opacity) and turns them
+   (.rl-deck__flip: rotateY); neither carries a CSS transform or transition.
+   The faces under them do: their edge and shadow ease, and the back is
+   turned by a fixed rotateY of its own that nothing animates.
+   -------------------------------------------------------------------------- */
+
+.rl-deck__world { position: relative; }
+
+/* --- A card, and its two faces ------------------------------------------------------------ */
+
+.rl-deck__card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  perspective: 1200px;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.rl-deck__card.is-rule { position: relative; }
+.rl-deck__card[role='button'] { cursor: pointer; }
+.rl-deck__flip {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+.rl-deck__face {
+  grid-area: 1 / 1;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-body);
+  text-align: left;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: border-color 0.22s ease, box-shadow 0.3s ease, background-color 0.22s ease, opacity 0.22s ease;
+}
+/* The back: turned away by a rotate of its own, a framed card back. */
+.rl-deck__face.is-back {
+  transform: rotateY(180deg);
+  padding: 6px;
+  border-color: var(--border-default);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.rl-deck__backin {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  text-align: center;
+}
+.rl-deck__backin.is-pol > * { opacity: 0.7; }
+.rl-deck__backnum { position: absolute; top: 10px; right: 6px; }
+.rl-deck__backnum .rl-deck__num { background: var(--surface-raised); box-shadow: 0 0 0 1px var(--border-subtle); }
+.rl-deck__backname {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: var(--fw-medium);
+  line-height: 16px;
+  color: var(--text-tertiary);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* In flight: lifted off the table. */
+.rl-deck__card.is-flying .rl-deck__face { box-shadow: var(--el-high); }
+.rl-deck__card.is-forward .rl-deck__face.is-front { box-shadow: var(--el-high); }
+.rl-deck__card:focus-visible .rl-deck__face { box-shadow: 0 0 0 3px var(--focus-halo), var(--el-mid); }
+.rl-deck__card[role='button']:hover .rl-deck__face { border-color: var(--border-default); }
+
+/* Where the engine works now: the one blue thing. */
+.rl-deck__face.is-working { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-mid); }
+.rl-deck__card[role='button']:hover .rl-deck__face.is-working { border-color: var(--accent); }
+/* Found: the light goes once around the card. */
+.rl-deck__face.is-found { animation: rl-deck-found 0.5s ease-out 1; }
+@keyframes rl-deck-found {
+  0% { box-shadow: 0 0 0 0 var(--accent-soft), var(--el-mid); }
+  45% { box-shadow: 0 0 0 7px var(--accent-soft), var(--el-mid); }
+  100% { box-shadow: 0 0 0 3px var(--accent-soft), var(--el-mid); }
+}
+
+.rl-deck__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: 12px;
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.rl-deck__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.rl-deck__mark.is-pass { color: var(--fb-positive-dot); }
+.rl-deck__mark.is-fail { color: var(--fb-negative-dot); }
+.rl-deck__mark.is-unknown { color: var(--fb-notice-dot); }
+.rl-deck__mark.is-none { color: var(--text-muted); }
+
+/* --- Policy cards ------------------------------------------------------------------------- */
+
+.rl-deck__face.is-pol { height: 100%; gap: 4px; }
+.rl-deck__ptop { display: flex; align-items: center; justify-content: space-between; height: 20px; }
+.rl-deck__pname {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  line-height: 18px;
+  color: var(--text-primary);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.rl-deck__psub {
+  display: block;
+  overflow: hidden;
+  margin-top: auto;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rl-deck__psub .tj-skel { display: block; width: 96px; height: 8px; margin: 4px 0; }
+.rl-deck__psub.is-applies { font-weight: var(--fw-medium); color: var(--fb-positive-fg); }
+/* The one that applies: firm, then the answer's tone once it lands. */
+.rl-deck__face.is-chosen { border-color: var(--border-strong); box-shadow: var(--el-mid); }
+.rl-deck__face.is-chosen.is-positive { border-color: var(--fb-positive-dot); box-shadow: 0 0 0 1px var(--fb-positive-dot), var(--el-mid); }
+.rl-deck__face.is-chosen.is-negative { border-color: var(--fb-negative-dot); box-shadow: 0 0 0 1px var(--fb-negative-dot), var(--el-mid); }
+.rl-deck__face.is-chosen.is-notice { border-color: var(--fb-notice-dot); box-shadow: 0 0 0 1px var(--fb-notice-dot), var(--el-mid); }
+.rl-deck__card[role='button']:hover .rl-deck__face.is-chosen.is-positive { border-color: var(--fb-positive-dot); }
+/* Passed over: face up on the pile, grey, its reason. */
+/* A strip on the pile (or fanned out of the deck): number and name on one line, the reason under it. */
+.rl-deck__face.is-strip { gap: 4px; padding: 10px 12px; }
+.rl-deck__face.is-strip .rl-deck__ptop { justify-content: flex-start; gap: 8px; }
+.rl-deck__pname.is-line { display: block; flex: 1 1 auto; min-width: 0; font-size: 13px; white-space: nowrap; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+.rl-deck__face.is-strip .rl-deck__psub { margin-top: 0; padding-left: 28px; }
+.rl-deck__face.is-passed { background: var(--surface-sunken); box-shadow: none; }
+.rl-deck__face.is-passed .rl-deck__pname { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.rl-deck__card.is-discard .rl-deck__face.is-front { box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
+/* Also covers the person: amber when it is a conflict, quiet when only worth knowing. */
+.rl-deck__face.is-also { box-shadow: none; }
+.rl-deck__face.is-also .rl-deck__pname { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.rl-deck__face.is-also .rl-deck__psub { white-space: normal; }
+.rl-deck__face.is-conflict { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.rl-deck__face.is-conflict .rl-deck__pname { color: var(--text-primary); }
+.rl-deck__face.is-conflict .rl-deck__psub { font-weight: var(--fw-medium); color: var(--fb-notice-fg); }
+.rl-deck__alsoicon { color: var(--fb-notice-dot); }
+
+/* The deck's and the pile's names, and the deck's count. */
+.rl-deck__cap {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  height: 18px;
+  font-size: 12px;
+  font-weight: var(--fw-medium);
+  line-height: 18px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.rl-deck__captext { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rl-deck__count { flex: none; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rl-deck__empty { position: absolute; left: 0; box-sizing: border-box; border: 1px dashed var(--border-strong); border-radius: 10px; opacity: 0.6; }
+
+/* --- The sign-in ---------------------------------------------------------------------------- */
+
+.rl-deck__sign {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 216px;
+  padding: 0 12px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.rl-deck__sign:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo), var(--el-mid); }
+.rl-deck__signhead { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 52px; }
+.rl-deck__signwho { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.rl-deck__signwho strong { overflow: hidden; font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-primary); white-space: nowrap; text-overflow: ellipsis; }
+.rl-deck__signwho span { overflow: hidden; font-size: 12px; color: var(--text-tertiary); white-space: nowrap; text-overflow: ellipsis; }
+.rl-deck__signapp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 0 10px;
+  border-top: 1px solid var(--border-subtle);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+.rl-deck__signapp > span:last-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-deck__signto { flex: none; color: var(--text-muted); }
+.rl-deck__facts { display: flex; flex-direction: column; gap: 6px; }
+.rl-deck__fact { display: grid; grid-template-columns: 44px 14px minmax(0, 1fr); align-items: start; gap: 6px; font-size: 12px; line-height: 16px; }
+.rl-deck__fact > * { display: flex; align-items: center; min-height: 16px; }
+.rl-deck__factlabel { color: var(--text-tertiary); }
+.rl-deck__factmark { color: var(--text-secondary); }
+.rl-deck__facttext { display: block !important; min-width: 0; color: var(--text-body); overflow-wrap: anywhere; }
+.rl-deck__fact.is-unset .rl-deck__facttext { color: var(--text-muted); }
+.rl-deck__fact.is-needed .rl-deck__facttext { font-weight: var(--fw-medium); color: var(--fb-notice-fg); }
+
+/* --- Rule cards ---------------------------------------------------------------------------- */
+
+.rl-deck__row { position: absolute; display: flex; align-items: flex-start; gap: 12px; }
+.rl-deck__slot { position: relative; flex: none; }
+.rl-deck__slot.is-folded { align-self: flex-start; }
+.rl-deck__face.is-rule { height: 100%; min-height: 196px; gap: 6px; }
+.rl-deck__card.is-folded .rl-deck__face.is-rule { min-height: 0; }
+/* In the hand, under the card before it: only its edge and number show. */
+.rl-deck__card.is-under .rl-deck__backname,
+.rl-deck__card.is-under .rl-deck__backin > .rl-deck__rtag { visibility: hidden; }
+/* Fanned out of the deck by hand: lifted off the table. */
+.rl-deck__card.is-spread .rl-deck__face.is-front { background: var(--surface-raised); box-shadow: var(--el-mid); }
+.rl-deck__card.is-quiet .rl-deck__face.is-back { border-color: var(--border-default); box-shadow: 0 1px 2px rgb(0 0 0 / 0.05), 6px 0 10px -8px rgb(0 0 0 / 0.2); }
+.rl-deck__rtop { display: flex; align-items: center; justify-content: space-between; height: 20px; }
+.rl-deck__rname {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  line-height: 18px;
+  color: var(--text-primary);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.rl-deck__rnote { font-size: 12px; color: var(--text-tertiary); }
+.rl-deck__checks { display: flex; flex-direction: column; margin: 2px 0 0; padding: 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.rl-deck__check { display: flex; flex-direction: column; gap: 1px; padding: 7px 0; }
+.rl-deck__check + .rl-deck__check { border-top: 1px dashed var(--border-subtle); }
+.rl-deck__check.is-hidden { visibility: hidden; }
+.rl-deck__cword {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 16px;
+  font-size: 12px;
+  font-weight: var(--fw-medium);
+  line-height: 16px;
+  color: var(--text-tertiary);
+}
+.rl-deck__cfact { font-size: 13px; font-weight: var(--fw-medium); line-height: 17px; color: var(--text-primary); overflow-wrap: anywhere; }
+.rl-deck__cvia { font-weight: var(--fw-regular); color: var(--fb-positive-fg); }
+.rl-deck__creq { font-size: 12px; line-height: 16px; color: var(--text-tertiary); overflow-wrap: anywhere; }
+.rl-deck__check.is-fail .rl-deck__cfact { color: var(--fb-negative-fg); }
+.rl-deck__check.is-unknown .rl-deck__cfact { color: var(--fb-notice-fg); }
+.rl-deck__check.is-working .rl-deck__cfact,
+.rl-deck__check.is-working .rl-deck__creq { color: var(--text-tertiary); }
+.rl-deck__check.is-unread .rl-deck__cfact { font-weight: var(--fw-regular); color: var(--text-muted); }
+.rl-deck__then {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+.rl-deck__then .rl-deck__cword { flex: none; }
+.rl-deck__thenword { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.rl-deck__rtag {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: var(--fw-medium);
+  line-height: 16px;
+  text-align: left;
+}
+.rl-deck__rtag.is-notice { color: var(--fb-notice-fg); }
+.rl-deck__rtag svg { flex: none; margin-top: 2px; color: var(--fb-notice-dot); }
+
+/* Matched: lifted, its tone, a soft glow. */
+.rl-deck__face.is-match.is-positive { border-color: var(--fb-positive-dot); box-shadow: 0 0 0 1px var(--fb-positive-dot), 0 14px 30px -12px var(--fb-positive-dot), var(--el-mid); }
+.rl-deck__face.is-match.is-negative { border-color: var(--fb-negative-dot); box-shadow: 0 0 0 1px var(--fb-negative-dot), 0 14px 30px -12px var(--fb-negative-dot), var(--el-mid); }
+.rl-deck__face.is-match.is-notice { border-color: var(--fb-notice-dot); box-shadow: 0 0 0 1px var(--fb-notice-dot), var(--el-mid); }
+.rl-deck__face.is-match.is-neutral { border-color: var(--border-strong); box-shadow: var(--el-mid); }
+.rl-deck__card[role='button']:hover .rl-deck__face.is-match.is-positive { border-color: var(--fb-positive-dot); }
+.rl-deck__card[role='button']:hover .rl-deck__face.is-match.is-negative { border-color: var(--fb-negative-dot); }
+.rl-deck__face.is-glow { animation: rl-deck-glow 0.9s ease-out 1; }
+@keyframes rl-deck-glow {
+  0% { box-shadow: 0 0 0 1px var(--fb-positive-dot), 0 0 0 0 var(--fb-positive-bg), var(--el-mid); }
+  40% { box-shadow: 0 0 0 1px var(--fb-positive-dot), 0 0 0 10px var(--fb-positive-bg), var(--el-mid); }
+}
+.rl-deck__face.is-match.is-negative.is-glow { animation-name: rl-deck-glow-neg; }
+@keyframes rl-deck-glow-neg {
+  0% { box-shadow: 0 0 0 1px var(--fb-negative-dot), 0 0 0 0 var(--fb-negative-bg), var(--el-mid); }
+  40% { box-shadow: 0 0 0 1px var(--fb-negative-dot), 0 0 0 10px var(--fb-negative-bg), var(--el-mid); }
+}
+/* Failed: a red hairline, slid out of the row, its failing check in words. */
+.rl-deck__face.is-miss { border-color: var(--fb-negative-border); box-shadow: none; }
+.rl-deck__face.is-miss .rl-deck__rname { font-weight: var(--fw-medium); color: var(--text-secondary); }
+/* Can't tell: amber. */
+.rl-deck__face.is-unknown { border-color: var(--fb-notice-border); }
+.rl-deck__face.is-off { background: var(--surface-sunken); box-shadow: none; opacity: 0.7; }
+.rl-deck__face.is-peek { border-style: dashed; border-color: var(--border-default); box-shadow: var(--el-mid); }
+.rl-deck__face.is-peek .rl-deck__rname { color: var(--text-secondary); }
+/* Never needed: face down, quiet. */
+.rl-deck__face.is-back.is-conflict { border-color: var(--fb-notice-border); }
+
+/* --- The outcome --------------------------------------------------------------------------- */
+
+.rl-deck__face.is-out { --tone-fg: var(--text-primary); --tone-bg: var(--surface-inset); --tone-dot: var(--text-tertiary); min-height: 168px; padding: 14px 16px 14px; }
+.rl-deck__face.is-out.is-positive { --tone-fg: var(--fb-positive-fg); --tone-bg: var(--fb-positive-bg); --tone-dot: var(--fb-positive-dot); border-color: var(--fb-positive-dot); box-shadow: 0 0 0 1px var(--fb-positive-dot), var(--el-high); }
+.rl-deck__face.is-out.is-negative { --tone-fg: var(--fb-negative-fg); --tone-bg: var(--fb-negative-bg); --tone-dot: var(--fb-negative-dot); border-color: var(--fb-negative-dot); box-shadow: 0 0 0 1px var(--fb-negative-dot), var(--el-high); }
+.rl-deck__face.is-out.is-notice { --tone-fg: var(--fb-notice-fg); --tone-bg: var(--fb-notice-bg); --tone-dot: var(--fb-notice-dot); border-color: var(--fb-notice-dot); box-shadow: 0 0 0 1px var(--fb-notice-dot), var(--el-high); }
+.rl-deck__face.is-out.is-neutral { border-color: var(--border-strong); box-shadow: var(--el-mid); }
+.rl-deck__face.is-back.is-out.is-working { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-high); }
+.rl-deck__backin.is-out { flex-direction: row; }
+.rl-deck__outin { display: flex; flex-direction: column; gap: 10px; }
+.rl-deck__verdict { display: flex; align-items: center; gap: 12px; }
+.rl-deck__tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--tone-bg);
+  color: var(--tone-dot);
+}
+.rl-deck__word { flex: 1 1 auto; min-width: 0; font-size: 22px; font-weight: var(--fw-semibold); line-height: 1.2; color: var(--tone-fg); }
+.rl-deck__expect { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: var(--fw-medium); color: var(--fb-notice-fg); }
+.rl-deck__expect svg { color: var(--fb-notice-dot); }
+.rl-deck__by { display: flex; flex-direction: column; font-size: 13px; line-height: 18px; }
+.rl-deck__bylabel { font-size: 12px; color: var(--text-tertiary); }
+.rl-deck__bylink {
+  display: inline;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  text-align: left;
+  cursor: pointer;
+}
+.rl-deck__bylink:hover span { text-decoration: underline; }
+.rl-deck__bylink:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--focus-halo); }
+.rl-deck__bylink svg { display: inline-block; margin-left: 3px; vertical-align: -1px; }
+.rl-deck__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rl-deck__factors li { display: inline-flex; align-items: center; gap: 4px; }
+.rl-deck__factor {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  font-size: 12px;
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.rl-deck__factarrow { color: var(--text-muted); }
+.rl-deck__deny {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-secondary);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.rl-deck__ifs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.rl-deck__ifs li { display: flex; justify-content: space-between; gap: 8px; }
+.rl-deck__if { color: var(--text-tertiary); }
+.rl-deck__ifword { font-weight: var(--fw-medium); color: var(--text-primary); }
+.rl-deck__needs { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--fb-notice-fg); }
+.rl-deck__needs svg { color: var(--fb-notice-dot); }
+.rl-deck__vs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.rl-deck__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 12px; }
+.rl-deck__finding { display: inline-flex; align-items: center; gap: 4px; color: var(--text-tertiary); }
+.rl-deck__finding.is-conflict { color: var(--fb-notice-fg); }
+.rl-deck__finding.is-conflict svg { color: var(--fb-notice-dot); }
+.rl-deck__changed { color: var(--text-tertiary); }
+.rl-deck__seebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.rl-deck__seebtn:hover,
+.rl-deck__seebtn.is-open { color: var(--text-primary); }
+.rl-deck__seebtn:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--focus-halo); }
+.rl-deck__ghost { position: absolute; box-sizing: border-box; border: 1px dashed var(--border-default); border-radius: 10px; pointer-events: none; }
+.rl-deck__ghost.is-hidden { border-color: transparent; }
+.rl-deck__see {
+  position: absolute;
+  z-index: 96;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+}
+.rl-deck__see .tsee__title { display: none; }
+.rl-deck__see .tsee { margin: 0; }
+
+/* --- A card brought forward: what it says ------------------------------------------------------ */
+
+.rl-deck__sheet {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+  width: max(100%, 240px);
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-high);
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-secondary);
+  cursor: auto;
+}
+.rl-deck__sheet.is-below { top: calc(100% + 8px); left: 0; }
+.rl-deck__sheet.is-right { top: 0; left: calc(100% + 10px); }
+.rl-deck__sheetline { color: var(--text-body); }
+.rl-deck__sheetrow { display: flex; flex-direction: column; gap: 3px; }
+.rl-deck__sheethead { font-weight: var(--fw-medium); color: var(--text-primary); }
+.rl-deck__sheethead.is-fail { color: var(--fb-negative-fg); }
+.rl-deck__sheethead.is-unknown { color: var(--fb-notice-fg); }
+.rl-deck__subs { display: flex; flex-direction: column; gap: 2px; padding-left: 8px; border-left: 2px solid var(--border-subtle); }
+.rl-deck__sub { display: flex; flex-wrap: wrap; gap: 0 6px; }
+.rl-deck__sublabel { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.rl-deck__sub.is-pass .rl-deck__sublabel { color: var(--fb-positive-fg); }
+.rl-deck__sub.is-fail .rl-deck__sublabel { color: var(--fb-negative-fg); }
+.rl-deck__sub.is-unknown .rl-deck__sublabel { color: var(--fb-notice-fg); }
+.rl-deck__subval { color: var(--text-tertiary); }
+.rl-deck__sheetbtn {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  cursor: pointer;
+}
+.rl-deck__sheetbtn:hover { text-decoration: underline; }
+.rl-deck__sheetbtn:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* --- The dock's own: a step at a time, and Deal again ---------------------------------------- */
+
+.rl-deck__dock { display: flex; align-items: center; gap: 2px; }
+.rl-deck__docktext {
+  max-width: 300px;
+  overflow: hidden;
+  padding: 0 8px 0 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rl-deck__deal { display: inline-flex; align-items: center; gap: 6px; width: auto !important; padding: 0 10px !important; font-size: 12px; font-weight: var(--fw-medium); }

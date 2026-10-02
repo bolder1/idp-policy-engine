@@ -209,6 +209,8 @@
 /* The foot: Save sign-in is a plain secondary beside Run, the page's one
    orange — not the Inspector's brand-tinted Save rule, which would make two. */
 .sit-panel__savewrap { display: inline-flex; }
+/* Changes not run yet: quiet words at the foot's start, Run at its end. */
+.sit-panel__unrun { margin-right: auto; font-size: var(--fs-sm); color: var(--text-secondary); }
 .sit-panel .bb__inspfoot .bx-btn--neutral {
   background: var(--int-neutral-bg);
   border-color: var(--int-neutral-border);
@@ -269,6 +271,19 @@
   text-align: center;
 }
 
+/* The picture over the headline (HowItWorks.tsx `CheckArt`): grey for the
+   sign-in screen, the allow ramp for its shield — the one colour. */
+.hiw__ill { display: block; flex: none; width: 220px; height: 136px; margin-bottom: var(--space-8); }
+.hiw__ill-win { fill: var(--surface-raised); stroke: var(--border-strong); stroke-width: 1.25; }
+.hiw__ill-rule { fill: none; stroke: var(--border-default); stroke-width: 1.25; }
+.hiw__ill-addr { fill: var(--surface-inset); stroke: var(--border-default); stroke-width: 1.25; }
+.hiw__ill-field { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1.25; }
+.hiw__ill-bar { fill: var(--border-strong); opacity: 0.45; }
+.hiw__ill-bar.is-soft { opacity: 0.4; }
+.hiw__ill-gap { fill: var(--surface-raised); stroke: var(--surface-raised); stroke-width: 4.5; stroke-linejoin: round; }
+.hiw__ill-shield { fill: var(--fb-positive-bg); stroke: var(--fb-positive-border); stroke-width: 1.5; stroke-linejoin: round; }
+.hiw__ill-tick { fill: none; stroke: var(--fb-positive-dot); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
 /* The words: the headline, ONE line under it, the way in. */
 .hiw .hiw__head {
   margin: 0;
@@ -311,6 +326,7 @@
 /* A short canvas: less air. */
 @container tj (max-height: 520px) {
   .tj-empty { padding-block: var(--space-6); }
+  .hiw__ill { width: 176px; height: 109px; margin-bottom: var(--space-6); }
   .hiw__gets { margin-top: var(--space-6); }
 }
 
@@ -435,3 +451,18 @@
 .sit-att__heldsum:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
 .sit-att__heldn { font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
 .sit-att__held > .sit-att__list { margin-top: var(--space-3); }
+
+/* The Canvas switch on the bar (CanvasSwitch.tsx), while the run's layouts
+   are compared: more segments than the bar is wide, so the row scrolls
+   sideways inside the bar — a wheel or a drag — and never pushes the crumb
+   off the page. */
+.sit .bbtop__crumbs { flex: none; }
+.sit .bbtop__acts { flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
+.sit__canvassw { min-width: 0; max-width: 100%; }
+.sit__canvassw .bseg {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sit__canvassw .bseg::-webkit-scrollbar { display: none; }
+.sit__canvassw .bseg > button { flex: none; }

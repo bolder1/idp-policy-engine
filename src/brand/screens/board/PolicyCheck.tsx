@@ -125,6 +125,8 @@ const SLIDE = { duration: 0.22, ease: [0.2, 0, 0, 1] as const }
 
 /** Two sign-ins are the same run when every fact is. */
 const same = (a: SignInForm, b: SignInForm) => JSON.stringify(a) === JSON.stringify(b)
+/** The panel's Run, which a loaded sign-in hands the focus to. */
+const RUN_BUTTON = '.sit-panel__foot .bx-btn--brand'
 
 /** Each view's mark on its bar button. */
 const VIEW_ICON: Record<CheckView, LucideIcon> = { past: History, people: Users, 'break-in': ShieldAlert }
@@ -330,14 +332,18 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     loadBoard(saved.id, f)
     setRunId((n) => n + 1)
   }
+  /* Run: the panel's sign-in as it stands — after a run, with what the
+     change did said on the answer. A saved sign-in loaded and left as it
+     was runs as it was saved. */
   const runNow = () => {
     if (found.length > 0) {
       setSubmitted(true)
       openForm(() => focusRow(issueToken(found)))
       return
     }
-    const f = forRun(form, rows)
-    toCanvas(() => begin(f, 'full'))
+    const f = loaded && same(form, loaded.form) ? loaded.form : forRun(form, rows)
+    const prev = page.mode === 'journey' && !same(f, ran) ? ran : null
+    toCanvas(() => begin(f, 'full', { prev }))
   }
   /* Ctrl+Enter (⌘ on a Mac) presses Run from anywhere in Check access, before
      the builder reads it as Save: taken on the way down, and stopped. */
@@ -356,31 +362,41 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     return () => document.removeEventListener('keydown', onKey, true)
   }, [])
 
-  /* A field changed: the application brings the facts its rules read; after
-     a run, the change is a run of its own, at the edit pace. */
-  const patch = (p: Partial<SignInForm>, field: FormField) => {
+  /* A field changed: the application brings the facts its rules read. It
+     changes the panel's sign-in and nothing else — Run runs it (owner,
+     2 Oct 2026: "unless I click the run button, don't run"); `now` is a
+     press that says it runs, the canvas's "Run as Engineering only". */
+  const patch = (p: Partial<SignInForm>, field: FormField, now = false) => {
     const touched = page.touched.includes(field) ? page.touched : [...page.touched, field]
     let next = { ...page.draft, ...p }
     const nextRows = field === 'app' ? rowsRead(policies, draft, next.appId, lib) : rows
     if (field === 'app') next = withDefaults(next, nextRows, touched, todayIn(), nowIn())
     setPage((pg) => ({ ...pg, draft: next, touched }))
     setLoaded(null)
-    if (page.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return
+    if (!now || page.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return
     const f = forRun(next, nextRows)
     if (same(f, ran)) return
     begin(f, 'edit', { prev: ran })
   }
-  const pickPerson = (value: string) => {
+  const pickPerson = (value: string, now = false) => {
     const pick = personPick(value, users)
     setAsGroup(pick.asGroup)
-    patch({ personId: pick.personId }, 'person')
+    patch({ personId: pick.personId }, 'person', now)
   }
-  /* A whole sign-in from elsewhere — a saved one, a past one — fills the panel and runs, the panel shut. */
+  /* A whole sign-in from elsewhere — a saved one, a past one — fills the
+     panel, which opens on it, and waits for Run, which takes the focus. */
   const tryWhole = (f: SignInForm, from: Loaded | null) => {
     setAsGroup(null)
     setLoaded(from)
-    toCanvas(() => begin(f, 'full', { draft: f, touched: [] }))
+    setPage((pg) => ({ ...pg, draft: f, touched: [] }))
+    setSubmitted(false)
+    setSavedOpen(false)
+    openForm(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))
   }
+  /* The panel's sign-in has changes the run on the canvas has not checked, in the facts its rules read. */
+  const unrun = page.mode === 'journey' && !same(forRun(form, rows), forRun(ran, rows))
+  /* Edit sign-in, on the run's line: the panel, on its Person row; pressed again, shut. */
+  const editSignIn = () => (panel === 'form' ? closePanel(true) : openForm(() => focusRow('person')))
   const trySaved = (sv: SavedSignIn) => {
     const f = formOf(sv.facts, zones)
     tryWhole(f, { name: sv.name, form: f, expected: sv.expected })
@@ -432,12 +448,15 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
           focusRun={focusRun}
           panel={panel === 'form' || panel === 'saved' ? panel : null}
           why={why}
-          onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`)}
+          onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}
           loaded={loaded}
           policy={pair}
           run={run}
           onOpenPolicy={openPolicy}
           onOpenRule={openRule}
+          onEdit={editSignIn}
+          editing={panel === 'form'}
+          unrun={unrun}
         />
       </div>
       <AnimatePresence initial={false}>
@@ -455,6 +474,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
             onPerson={pickPerson}
             onPatch={patch}
             onRun={runNow}
+            unrun={unrun}
             saved={mySaved}
             onUseSaved={trySaved}
             savedOpen={savedOpen}

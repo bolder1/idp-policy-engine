@@ -1,0 +1,343 @@
+/* -----------------------------------------------------------------------------
+   The run as a tree (TreeLayout.tsx): four columns on the builder's ground,
+   the wires in one SVG under them, each branch's words on its own run.
+
+   Colour is meaning, one each: --accent while the engine works; the route a
+   strong neutral while it plays, then its tone (--rt-*) once the answer
+   lands; red a check that failed; amber a policy that also covers the person
+   or a rule that can't be told; grey the rest. Motion owns opacity and the
+   wires' pathLength and the answer's rise — nothing here transitions or
+   transforms those elements (.rl-tree__slot, .rl-tree__wire's dash,
+   .rl-tree__mark); the cards' borders and the wires' colour ease in CSS.
+   -------------------------------------------------------------------------- */
+
+.rl-tree {
+  --rt-col-root: 192px;
+  --rt-col-pol: 210px;
+  --rt-col-rule: 236px;
+  --rt-col-out: 248px;
+  --rt-gap-pol: 186px;
+  --rt-gap-rule: 132px;
+  --rt-gap-out: 52px;
+  --rt-dot: var(--text-secondary);
+  --rt-fg: var(--text-primary);
+  --rt-bg: var(--surface-inset);
+  --rt-border: var(--border-default);
+  --rt-route: var(--text-secondary);
+}
+.rl-tree.is-tight {
+  /* A 1280 window: 1148 wide, so fit keeps zoom 1 and the 12px floor. */
+  --rt-col-root: 192px;
+  --rt-col-pol: 196px;
+  --rt-col-rule: 232px;
+  --rt-col-out: 220px;
+  --rt-gap-pol: 150px;
+  --rt-gap-rule: 124px;
+  --rt-gap-out: 34px;
+}
+.rl-tree.is-landed.is-positive { --rt-dot: var(--fb-positive-dot); --rt-fg: var(--fb-positive-fg); --rt-bg: var(--fb-positive-bg); --rt-border: var(--fb-positive-border); --rt-route: var(--fb-positive-dot); }
+.rl-tree.is-landed.is-negative { --rt-dot: var(--fb-negative-dot); --rt-fg: var(--fb-negative-fg); --rt-bg: var(--fb-negative-bg); --rt-border: var(--fb-negative-border); --rt-route: var(--fb-negative-dot); }
+.rl-tree.is-landed.is-notice { --rt-dot: var(--fb-notice-dot); --rt-fg: var(--fb-notice-fg); --rt-bg: var(--fb-notice-bg); --rt-border: var(--fb-notice-border); --rt-route: var(--fb-notice-dot); }
+
+.rl-tree__map { position: relative; padding: 8px 0 12px; font-family: inherit; }
+.rl-tree__cols { position: relative; z-index: 1; display: flex; align-items: flex-start; }
+.rl-tree__col { position: relative; display: flex; flex-direction: column; flex: none; }
+.rl-tree__col.is-root { width: var(--rt-col-root); }
+.rl-tree__col.is-pol { width: var(--rt-col-pol); margin-left: var(--rt-gap-pol); gap: 12px; }
+.rl-tree__col.is-rules { width: var(--rt-col-rule); margin-left: var(--rt-gap-rule); gap: 12px; }
+.rl-tree__col.is-out { width: var(--rt-col-out); margin-left: var(--rt-gap-out); }
+.rl-tree__slot { position: relative; }
+.rl-tree__slot[aria-hidden='true'] { pointer-events: none; }
+.rl-tree__slot[aria-hidden='true'] > * { visibility: hidden; }
+
+/* --- Wires --- */
+.rl-tree__wires { position: absolute; left: 0; top: 0; z-index: 0; overflow: visible; pointer-events: none; }
+.rl-tree__wire {
+  stroke: var(--border-default);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.14s ease, stroke-width 0.14s ease;
+}
+.rl-tree__wire.is-quiet, .rl-tree__wire.is-off { stroke: var(--border-default); }
+.rl-tree__wire.is-passed { stroke: color-mix(in srgb, var(--text-tertiary) 45%, transparent); }
+.rl-tree__wire.is-ask { stroke: var(--accent); stroke-width: 2; }
+.rl-tree__wire.is-route { stroke: var(--rt-route); stroke-width: 3; }
+.rl-tree__wire.is-fail { stroke: var(--fb-negative-dot); stroke-width: 1.5; opacity: 0.75; }
+.rl-tree__wire.is-unknown { stroke: var(--fb-notice-dot); stroke-width: 1.5; }
+.rl-tree__wire.is-also { stroke: var(--fb-notice-dot); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.rl-tree__wire.is-also-info { stroke: color-mix(in srgb, var(--text-tertiary) 55%, transparent); stroke-width: 1.25; stroke-dasharray: 5 4; }
+
+/* A branch's words, on its run into the node it reaches: sat on the wire, a
+   second line upward when the reason is long (the box is the room for two). */
+.rl-tree__lblbox {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.rl-tree__lbl {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--fs-sm);
+  line-height: 15px;
+  text-align: right;
+  overflow-wrap: anywhere;
+  color: var(--text-tertiary);
+  pointer-events: auto;
+}
+.rl-tree__lbl.is-route { color: var(--text-primary); font-weight: var(--fw-medium); }
+.rl-tree__lbl.is-fail { color: var(--fb-negative-fg); }
+.rl-tree__lbl.is-notice { color: var(--fb-notice-fg); }
+
+/* --- Cards: the builder's --- */
+.rl-tree__card {
+  position: relative;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  color: var(--text-primary);
+  /* Short: a scan beat is ~420 ms, and the one asked before must be grey before the next is blue. */
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, opacity 0.2s ease, background-color 0.12s ease;
+}
+.rl-tree__card.is-working { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-low); }
+.rl-tree__card.is-route { border-color: var(--rt-dot); box-shadow: 0 0 0 1px var(--rt-dot), var(--el-low); }
+/* The engine still on a node between its own beats (a rule's match said, a miss kept, the decider opening). */
+.rl-tree__card.is-live { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-low); }
+.rl-tree__card.is-quiet, .rl-tree__card.is-off { opacity: 0.5; box-shadow: none; }
+.rl-tree__card.is-skel { box-shadow: none; }
+.rl-tree__card.is-also { border-color: var(--fb-notice-border); }
+
+.rl-tree__num {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.rl-tree__card.is-route .rl-tree__num { background: var(--rt-bg); color: var(--rt-fg); }
+.rl-tree__card.is-fail .rl-tree__num { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.rl-tree__card.is-unknown .rl-tree__num, .rl-tree__card.is-also .rl-tree__num { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.rl-tree__card.is-working .rl-tree__num { background: var(--accent-soft); color: var(--accent); }
+
+.rl-tree__namewrap { position: relative; display: flex; flex: 1 1 auto; align-items: center; min-width: 0; }
+.rl-tree__name.is-hidden, .rl-tree__then.is-hidden { visibility: hidden; }
+.rl-tree__skel.is-over { position: absolute; left: 0; top: 50%; width: 70%; margin-top: -4px; }
+.rl-tree__side { display: grid; flex: none; place-items: center; width: 18px; height: 18px; margin-right: -4px; }
+.rl-tree__card.is-route .rl-tree__name, .rl-tree__card.is-working .rl-tree__name { -webkit-line-clamp: 3; }
+.rl-tree__card.is-skel.is-last .rl-tree__name { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+.rl-tree__name {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--fs-md);
+  line-height: 17px;
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.rl-tree__card.is-passed .rl-tree__name, .rl-tree__card.is-fail .rl-tree__name, .rl-tree__card.is-also-info .rl-tree__name { color: var(--text-secondary); font-weight: var(--fw-regular); }
+.rl-tree__card.is-route .rl-tree__name { font-weight: var(--fw-semibold); }
+.rl-tree__skel { display: block; flex: 1 1 auto; height: 8px; max-width: 70%; border-radius: 4px; background: var(--surface-inset); }
+.rl-tree__skel.is-row { max-width: 82%; height: 6px; }
+
+/* Open in the builder: a quiet mark, there once the run has landed. */
+.rl-tree__go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.rl-tree__card:hover .rl-tree__go, .rl-tree__go:focus-visible { opacity: 1; }
+.rl-tree__go:hover { background: var(--surface-inset); color: var(--text-primary); }
+
+/* --- The root: the sign-in --- */
+.rl-tree__root { padding: 0; }
+.rl-tree__rootbtn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.rl-tree__rootbtn:hover { background: var(--surface-sunken); }
+.rl-tree__rootbtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.rl-tree__who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rl-tree__whotext { display: flex; flex-direction: column; min-width: 0; }
+.rl-tree__whotext strong { font-size: var(--fs-base); line-height: 18px; font-weight: var(--fw-semibold); }
+.rl-tree__whotext span { font-size: var(--fs-sm); line-height: 16px; color: var(--text-tertiary); }
+.rl-tree__app { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); }
+.rl-tree__app > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-tree__to { flex: none; color: var(--text-tertiary); }
+/* The facts the rules read: one line each, under a hairline, in the rule rows' own shape. */
+.rl-tree__facts { display: flex; flex-direction: column; gap: 3px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.rl-tree__fact { display: flex; align-items: flex-start; gap: 7px; min-width: 0; color: var(--text-secondary); font-size: var(--fs-sm); line-height: 17px; }
+.rl-tree__fmark { display: grid; flex: none; place-items: center; width: 16px; height: 17px; color: var(--text-tertiary); }
+.rl-tree__fact.is-unset { color: var(--fb-notice-fg); }
+.rl-tree__fact.is-unset .rl-tree__fmark { color: var(--fb-notice-fg); }
+
+/* --- Policies --- */
+.rl-tree__pol { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 10px; }
+
+/* --- Rules --- */
+.rl-tree__rule { padding: 8px 10px; }
+.rl-tree__rhead { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.rl-tree__then { flex: none; color: var(--text-tertiary); font-size: var(--fs-sm); }
+.rl-tree__rows { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.rl-tree__rows.is-one { display: grid; }
+.rl-tree__rows.is-one > .rl-tree__tick { grid-area: 1 / 1; }
+.rl-tree__tick.is-off { pointer-events: none; }
+.rl-tree__tick { margin: 0; padding: 0; list-style: none; }
+.rl-tree__row { position: relative; display: flex; align-items: flex-start; gap: 6px; min-height: 20px; font-size: var(--fs-sm); line-height: 16px; list-style: none; }
+.rl-tree__row.is-skel > :not(.rl-tree__skel) { visibility: hidden; }
+.rl-tree__row.is-skel > .rl-tree__skel { position: absolute; left: 0; top: 5px; width: 82%; }
+.rl-tree__rtext > span { grid-area: 1 / 1; }
+.rl-tree__rtext > .is-sizer { visibility: hidden; }
+.rl-tree__ricon { flex: none; margin-top: 1.5px; color: var(--text-tertiary); }
+.rl-tree__rword { flex: none; width: 52px; color: var(--text-tertiary); }
+.rl-tree__rtext { display: grid; flex: 1 1 auto; min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
+.rl-tree__row.is-fail .rl-tree__rword { display: none; }
+.rl-tree__row.is-fail .rl-tree__rtext { color: var(--text-primary); }
+.rl-tree__rmark { display: grid; flex: none; place-items: center; width: 16px; height: 16px; }
+.rl-tree__mark { display: grid; place-items: center; }
+.rl-tree__mark.is-pass { color: var(--fb-positive-fg); }
+.rl-tree__mark.is-fail { color: var(--fb-negative-fg); }
+.rl-tree__mark.is-unknown { color: var(--fb-notice-fg); }
+.rl-tree__add {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 16px;
+}
+.rl-tree__add:hover { background: var(--surface-inset); }
+
+/* The person's way in, under a who that passed: the fact, set apart from what the rule asks. */
+.rl-tree__row:has(> .rl-tree__rfact) { flex-wrap: wrap; row-gap: 0; }
+.rl-tree__row:has(> .rl-tree__rfact) > .rl-tree__rtext { flex-basis: 0; }
+.rl-tree__rfact { flex: 1 0 100%; box-sizing: border-box; padding-left: 19px; color: var(--text-tertiary); overflow-wrap: anywhere; }
+.rl-tree__rfact.is-hidden { visibility: hidden; }
+
+/* --- Pressing a node: why --- */
+.rl-tree__hit { display: flex; flex: 1 1 auto; align-items: center; gap: 8px; min-width: 0; }
+.rl-tree__whybtn {
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.rl-tree__whybtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
+.rl-tree__ghit { display: flex; flex-direction: column; min-width: 0; }
+.rl-tree__ghit.rl-tree__whybtn { width: calc(100% + 12px); }
+/* Peeked at: a neutral halo over its state's border — never the engine's blue. */
+.rl-tree__card.is-peek { box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-tertiary) 22%, transparent), var(--el-low); }
+.rl-tree__card.is-peek.is-quiet, .rl-tree__card.is-peek.is-off { opacity: 0.85; }
+.rl-tree__why {
+  pointer-events: none;
+  position: absolute;
+  z-index: 3;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--el-high, 0 8px 24px rgb(0 0 0 / 0.12));
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+.rl-tree__wtitle { margin: 0; font-size: var(--fs-md); line-height: 18px; font-weight: var(--fw-semibold); }
+.rl-tree__why.is-positive .rl-tree__wtitle { color: var(--fb-positive-fg); }
+.rl-tree__why.is-negative .rl-tree__wtitle { color: var(--fb-negative-fg); }
+.rl-tree__why.is-notice .rl-tree__wtitle { color: var(--fb-notice-fg); }
+.rl-tree__wpairs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.rl-tree__wpair { display: flex; align-items: flex-start; gap: 8px; }
+.rl-tree__wword { flex: none; width: 48px; color: var(--text-tertiary); }
+.rl-tree__wvals { display: grid; flex: 1 1 0; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; min-width: 0; overflow-wrap: anywhere; }
+.rl-tree__wlab { color: var(--text-tertiary); }
+.rl-tree__wneed { color: var(--text-secondary); }
+.rl-tree__whas { color: var(--text-primary); }
+.rl-tree__wpair.is-fail .rl-tree__whas { color: var(--fb-negative-fg); }
+.rl-tree__wpair.is-unknown .rl-tree__whas { color: var(--fb-notice-fg); }
+.rl-tree__wline { margin: 8px 0 0; color: var(--text-secondary); }
+.rl-tree__wline + .rl-tree__wline { margin-top: 2px; }
+
+/* --- What another policy would have given --- */
+.rl-tree__ghosts { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.rl-tree__ghost { padding: 8px 10px; border-style: dashed; border-color: var(--border-default); background: var(--surface-sunken); box-shadow: none; }
+.rl-tree__ghost.is-conflict { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.rl-tree__gwould { display: block; margin: 0; font-size: var(--fs-md); line-height: 18px; color: var(--text-secondary); }
+.rl-tree__gwould s { color: var(--text-primary); text-decoration-thickness: 1.5px; }
+.rl-tree__ghost.is-conflict .rl-tree__gwould, .rl-tree__ghost.is-conflict .rl-tree__gwould s { color: var(--fb-notice-fg); }
+.rl-tree__gby { display: block; margin: 2px 0 0; overflow: hidden; font-size: var(--fs-sm); line-height: 16px; color: var(--text-tertiary); white-space: nowrap; text-overflow: ellipsis; }
+
+/* --- The answer --- */
+.rl-tree__out { padding: 12px 14px; }
+.rl-tree__out.is-positive { --o-fg: var(--fb-positive-fg); --o-bg: var(--fb-positive-bg); --o-dot: var(--fb-positive-dot); }
+.rl-tree__out.is-negative { --o-fg: var(--fb-negative-fg); --o-bg: var(--fb-negative-bg); --o-dot: var(--fb-negative-dot); }
+.rl-tree__out.is-notice { --o-fg: var(--fb-notice-fg); --o-bg: var(--fb-notice-bg); --o-dot: var(--fb-notice-dot); }
+.rl-tree__out.is-neutral { --o-fg: var(--text-primary); --o-bg: var(--surface-inset); --o-dot: var(--text-tertiary); }
+.rl-tree__out { border-color: var(--o-dot); box-shadow: 0 0 0 1px var(--o-dot), var(--el-low); }
+.rl-tree__verdict { display: flex; align-items: center; gap: 10px; }
+.rl-tree__vicon { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--o-bg); color: var(--o-fg); }
+.rl-tree__vword { font-size: var(--fs-xl); line-height: 22px; font-weight: var(--fw-semibold); color: var(--o-fg); }
+.rl-tree__by { display: flex; flex-direction: column; margin: 10px 0 0; font-size: var(--fs-md); line-height: 17px; }
+.rl-tree__bylabel { color: var(--text-tertiary); font-size: var(--fs-sm); line-height: 16px; }
+.rl-tree__byrule { white-space: nowrap; }
+.rl-tree__bylink { padding: 0; border: 0; background: none; color: var(--text-primary); font: inherit; font-weight: var(--fw-medium); text-align: left; }
+.rl-tree__bylink:hover { text-decoration: underline; text-underline-offset: 2px; }
+.rl-tree__chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 10px 0 0; font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); }
+.rl-tree__step { display: inline-flex; align-items: center; }
+.rl-tree__step .is-end { color: var(--text-primary); font-weight: var(--fw-medium); }
+.rl-tree__arrow { margin: 0 5px; color: var(--text-tertiary); }
+.rl-tree__deny { margin: 8px 0 0; font-size: var(--fs-sm); line-height: 16px; color: var(--text-secondary); }
+.rl-tree__ifs { display: flex; flex-direction: column; gap: 3px; margin: 10px 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); line-height: 16px; }
+.rl-tree__ifs li { display: flex; justify-content: space-between; gap: 8px; }
+.rl-tree__ifs span { color: var(--text-tertiary); }
+.rl-tree__ifs strong { font-weight: var(--fw-medium); color: var(--text-primary); text-align: right; }
+.rl-tree__needs { margin: 8px 0 0; font-size: var(--fs-sm); line-height: 16px; color: var(--fb-notice-fg); }
+.rl-tree__expect { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+.rl-tree__changed { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.rl-tree__see { margin-top: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-tree__wire, .rl-tree__card, .rl-tree__go { transition: none; }
+}

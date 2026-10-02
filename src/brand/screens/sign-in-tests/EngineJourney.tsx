@@ -1,12 +1,12 @@
 import { AnimatePresence, animate as tween, motion, useMotionValue } from 'motion/react'
 import { createContext, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal, flushSync } from 'react-dom'
-import { ArrowRight, ArrowUpRight, Ban, Check, ChevronRight, CircleHelp, Info, KeyRound, RotateCcw, ShieldCheck, Split, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Ban, Check, ChevronRight, CircleHelp, Info, KeyRound, Pencil, RotateCcw, ShieldCheck, Split, TriangleAlert, type LucideIcon } from 'lucide-react'
 
 import { memberGroupIds, type AccessDecision, type Policy } from '../../data'
 import { DecisionBadge } from '../../decision-badge'
 import { DECISION_TONE, DECISION_WORDS } from '../../decision-words'
-import { Button, TipDot } from '../../kit'
+import { Button, Tip, TipDot } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
 import { ATTEMPTS_LINK, REVIEW_ATTEMPTS, attemptsGetThroughSaid, attemptsOnSaid, type AppBreakInSummary } from '../break-in-app'
 import { GROUP_WORDS } from '../break-in-model'
@@ -596,6 +596,7 @@ export function EngineLine({
   skipRef,
   replayRef,
   notice = false,
+  edit,
 }: {
   text: string
   running: boolean
@@ -613,6 +614,8 @@ export function EngineLine({
   replayRef: RefObject<HTMLSpanElement | null>
   /** The step names a conflict: said in the notice tone, its mark in place of the spinner. */
   notice?: boolean
+  /** Edit sign-in: the form's panel, open or not, and whether the form has changes not run yet. No `onPress`: the layout has a pencil of its own, so only "Not run" is said here. Absent, neither. */
+  edit?: { onPress?: () => void; open: boolean; unrun: boolean }
 }) {
   /* The words box's width: the first sentence's at once, each after it
      eased to — measured by the ruler before the frame is painted. `said` is
@@ -720,6 +723,19 @@ export function EngineLine({
             </span>
           )}
         </span>
+        {/* The pencil alone (owner, 2 Oct 2026: "pencil icon is enough here"), named by its tip. */}
+        {edit && (edit.onPress || edit.unrun) && (
+          <span className="tj-engine__edit">
+            {edit.onPress && (
+              <Tip text="Edit sign-in" placement="bottom">
+                <button type="button" className="bx-btn bx-btn--ghost bx-btn--sm tj-engine__pencil" aria-label="Edit sign-in" aria-pressed={edit.open} onClick={edit.onPress}>
+                  <Pencil size={14} strokeWidth={2} aria-hidden />
+                </button>
+              </Tip>
+            )}
+            {edit.unrun && <span className="tj-engine__unrun">Not run</span>}
+          </span>
+        )}
         {/* How far through its plan the run is: time, so it fills at an
             even rate — the one thing here that is linear — and fades as
             the run lands. */}

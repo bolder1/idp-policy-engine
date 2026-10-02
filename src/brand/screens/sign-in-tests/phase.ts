@@ -22,6 +22,15 @@
    one of them off the page.
    -------------------------------------------------------------------------- */
 
+/* The run's canvas in more than one layout, side by side for the owner to
+   choose from (owner, 1 Oct 2026: "give me a fresh approach … not the same
+   orientation … spread out the cards … so I want some more options"). On,
+   the page's bar carries a Canvas switch (run-layout.ts); off, the run is
+   drawn as it was, one column. A review switch, not a product control: it
+   reads its own flag, not SHOWCASE, so the comparison can be seen in the
+   showcase build until a layout is chosen. */
+export const CANVAS_OPTIONS: boolean = true
+
 /** Saved sign-ins: the panel, the form's row, Save sign-in. Off for this phase. */
 export const SAVED_SIGN_INS: boolean = false
 

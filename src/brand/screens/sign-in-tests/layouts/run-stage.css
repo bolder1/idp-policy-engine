@@ -1,0 +1,27 @@
+/* -----------------------------------------------------------------------------
+   The ground every layout of the run stands on (RunStage.tsx). The canvas
+   around it is the column's (.tj-canvas, journey.css; on the page it stands
+   on the region's dotted ground, sign-in-tests.css). Here: the scroller with
+   no bars, its room as padding, the world in its middle, the hand while a
+   drag pans, and the dock where the column's sits.
+   -------------------------------------------------------------------------- */
+
+.rstage { position: absolute; inset: 0; }
+.rstage__scroll {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: var(--rs-pt, 64px) var(--rs-pr, 48px) var(--rs-pb, 76px) var(--rs-pl, 48px);
+  scrollbar-width: none;
+  cursor: grab;
+}
+.rstage__scroll::-webkit-scrollbar { display: none; }
+.rstage__scroll:focus-visible { outline: none; }
+.rstage.is-panning .rstage__scroll { cursor: grabbing; }
+/* In the middle when smaller than the view; from its start when larger (auto margins, not centring, so nothing is cut off on the left). */
+.rstage__world { flex: none; margin: auto; }
+.rstage__world :is([data-card], .bb__card, button, a) { cursor: auto; }
+.rstage__world button, .rstage__world a, .rstage__world [role='button'] { cursor: pointer; }
+.rstage__dock { z-index: 4; }

@@ -184,7 +184,11 @@ describe('the panel is the page’s form, scoped to the policy', () => {
     expect(checkSrc).toContain('scope={scope}')
     expect(checkSrc).toContain('const scope = useMemo(() => boardScope(draft), [draft])')
     /* Run shuts it, then the run begins on the whole canvas. */
-    expect(checkSrc).toMatch(/const runNow = \(\) => \{[\s\S]*?toCanvas\(\(\) => begin\(f, 'full'\)\)/)
+    expect(checkSrc).toMatch(/const runNow = \(\) => \{[\s\S]*?toCanvas\(\(\) => begin\(f, 'full', \{ prev \}\)\)/)
+    /* Only Run runs (2 Oct): a change waits; "Run as" runs at once. */
+    expect(checkSrc).toContain("if (!now || page.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return")
+    expect(checkSrc).toContain('onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}')
+    expect(checkSrc).toContain('onEdit={editSignIn}')
     expect(checkSrc).toContain('title={loaded?.name ?? ACCESS_CHECK}')
   })
 
@@ -277,12 +281,15 @@ describe('Past sign-ins, a button of its own on the bar', () => {
     expect(text(on)).not.toContain('Try a sign-in')
   })
 
-  it('opens its view in the right-hand panel, pressed while it is open; a row fills the sign-in and runs it, the panel shut', () => {
+  it('opens its view in the right-hand panel, pressed while it is open; a row fills the sign-in and opens it, for Run', () => {
     const open = draw(<CheckBarViews views={['past']} panel="past" onToggle={noop} />)
     expect(open).toContain('class="bx-btn bx-btn--neutral bx-btn--sm sit__savedbtn is-on" aria-expanded="true" aria-controls="bbchk-past"')
     expect(checkSrc).toMatch(/\{panel === 'past' && \(\s+<ViewPanel key="past" view="past"/)
     expect(checkSrc).toContain('<DockPast draft={draft} apps={mine} version={version} onLoad={(f) => tryWhole(f, null)} />')
-    expect(checkSrc).toMatch(/const tryWhole = [\s\S]*?toCanvas\(\(\) => begin\(f, 'full', \{ draft: f, touched: \[\] \}\)\)/)
+    const whole = checkSrc.slice(checkSrc.indexOf('const tryWhole = '), checkSrc.indexOf('const trySaved = '))
+    expect(whole).toContain('setPage((pg) => ({ ...pg, draft: f, touched: [] }))')
+    expect(whole).toContain('openForm(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))')
+    expect(whole).not.toContain('begin(')
   })
 
   it('leaves Run the one orange while the sign-in’s panel is open: the policy’s save steps down', () => {

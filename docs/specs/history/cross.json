@@ -1,0 +1,306 @@
+{
+ "conflicts": [
+  {
+   "specs": "A vs B vs C vs D",
+   "problem": "Four different homes and names for the decision vocabulary: A adds DECISION_SAID to data.ts; B puts DECISION_WORDS in screens/testing/selectors.ts; C creates screens/decision-words.ts (DECISION_WORD, DECISION_PHRASE, WOULD_WORD); D creates src/brand/decision-words.ts (DECISION_WORDS, FACTOR_WORDS, FACT_WORDS). None of these files exist today.",
+   "resolution": "Create one module, src/brand/decision-words.ts, in the foundations step. It exports DECISION_WORDS, DECISION_PHRASE (lower case), WOULD_WORDS, FACTOR_WORDS and FACT_WORDS, and every spec imports from it. Drop DECISION_SAID and the selectors.ts copy. DECISION_LABEL and DecisionChip stay as they are until the copy pass (see owner questions)."
+  },
+  {
+   "specs": "A vs B vs D",
+   "problem": "There are three 'Needs:' / fact-label maps and they disagree. A: address 'Address', risk 'Device risk score'. B: FIELD_LABEL 'IP address', 'Device risk score', 'When'. D: FACT_WORDS 'Address', 'Risk score', 'Device platform', and so on. The same field is also labelled 'Address' in A and 'IP address' in B.",
+   "resolution": "Use one FACT_WORDS map in decision-words.ts. The field label and the Needs word are the same string. Use 'IP address' for the field and 'Device risk score' for risk. Device facts collapse to 'Device' in Needs lines; the detailed words stay only in D's Break-in facts line."
+  },
+  {
+   "specs": "A vs B",
+   "problem": "There are two sign-in form models and two factsOf functions. A has SignInInput (origin preset, place modes including distance, when object, device preset+facts, risk number) and factsOf(input, rows, zones) in board/try-sign-in.ts, stored per policy on BrandStore as signInTests. B has SignInForm (address string, place from-address|stated, date/time/tz strings, device none|preset|custom, risk string, assumeOn) and factsOf(form) in screens/testing/sign-in-form.ts, held in a React context. B points out that keystroke-rate state on BrandStore re-renders every useBrand() consumer (store.tsx:444-455).",
+   "resolution": "Keep B's session context (TestingSessionProvider) and a single sign-in-form.ts. Extend SignInForm with A's extras: origin preset id, the distance place mode and 'not stated' semantics. Rename A's per-policy memory to a map inside the session, not the store. A's rowsRead becomes a view filter over the shared form: board shows only read rows, while V1/V2 show all fields. Build SignInFields once, with a `rows` prop."
+  },
+  {
+   "specs": "A vs B",
+   "problem": "Device presets are defined twice, with different ids, labels and facts. A: win11-registered (agent 4.3), win11-unregistered, win10, iphone, android14, android12; labels 'Windows 11 laptop · registered'. B: android-12, android-14, iphone, win11-registered (= CHIP_DEVICES 'Managed (MDM)'), win11-unregistered, win11-no-agent, win10; labels 'Windows 11 laptop, registered'. The default device also differs: A uses win11-registered with risk 12, B uses Not stated.",
+   "resolution": "Keep one DEVICE_PRESETS in screens/testing/device-presets.ts, taking B's id spelling (kebab 'android-12') plus win11-no-agent. Take the label punctuation from A ('·' separator, matching the console). Every preset spreads CHIP_DEVICES with source overridden to 'stated', because CHIP_DEVICES carries source 'assumed'. Board test mode defaults to win11-registered, risk 12. V1/V2 default to Not stated. Record this per surface."
+  },
+  {
+   "specs": "A vs B vs C vs D",
+   "problem": "Default and sample addresses disagree. Office is 203.0.113.24 in A and C and 203.0.113.25 in B and D. Four sample concepts overlap: A's ORIGIN_PRESETS chips, B's SAMPLE_SIGN_INS (9 named scenarios, view titled 'Sample sign-ins'), C's generated rows (also headed 'Sample sign-ins', with a colliding type name SampleSignIn), and D's S1–S4 fixture.",
+   "resolution": "Office is 203.0.113.24 everywhere. Rename C's type to MonitorSample and its section heading to 'Modelled sign-ins', so 'Sample sign-ins' means only B's view. D's acceptance fixture uses B's seeded saved sign-ins by id; add Vikram (u-exec-2, Protected) to showcaseSavedSignIns so D's A4 still has a Protected blocker."
+  },
+  {
+   "specs": "B vs D",
+   "problem": "The SavedSignIn contract differs. B has `expected`, savedBy and savedAt in src/brand/saved-sign-ins.ts. D has `expect` and no savedBy/savedAt, declared beside decision-words. The names in the seed also differ: B's 'Kavya Menon in the office', D's 'Kavya in the Pune office'.",
+   "resolution": "B owns the type in src/brand/saved-sign-ins.ts, with field `expected`. D's guard reads `expected`, and D's acceptance strings use B's seed names."
+  },
+  {
+   "specs": "B vs D",
+   "problem": "The Break-in test is specified twice. B makes it an inline section toggled by a secondary 'Break-in test' button (ShieldAlert) inside Saved sign-ins, with 4 × 208 tiles, a rows table (Attempt/Person/Asked/Got/Result), 'Show held attempts', and a default policy of assumed, else Try decider, else first. D makes it a pushed page (neutral button, Shield icon) with a Back crumb, or a 560 Drawer in the rail-page variant. D has count cells that act as filter toggles, grouped h3 lists, fixes with preview, and Accept with a reason; its default policy is the first Active. B's Break-in is also not gated by D's features.breakInTest.",
+   "resolution": "Use D's BreakInView everywhere (the richer model: fixes, accept, groups) and delete B's BreakInSection. Host it as a page pushed inside the Saved sign-ins view in all three versions: V1 page, V2 slider, V3 board panel. That is one pattern, with no extra 560 Drawer on top of a page. Use a secondary button, ShieldAlert icon, label 'Break-in test'. Default policy is B's rule. Gate it by features.breakInTest."
+  },
+  {
+   "specs": "A vs D",
+   "problem": "They conflict over the bar's Check pip. A removes both pips (Check and What changes) and the separator, and puts 'Try a sign-in' in their place. D keeps the Check pip, minus the grade, and shows '{n} through' in Full. D also puts the Break-in board host under a 'Saved sign-ins header' inside the sign-in panel, but A's panel has no Saved sign-ins view. It exists only in B's V3.",
+   "resolution": "Follow A: no pips. D's Full-only '{n} through' is dropped and Break-in is reached from Saved sign-ins. In V1/V2 the board panel links 'Saved sign-ins' to the page or slider view. The in-panel Saved view exists only in V3."
+  },
+  {
+   "specs": "A vs B vs D",
+   "problem": "Three specs claim the board inspector slot's contents. A: the sign-in panel, h2 plus Replay/Back/Next/Close, swapping to the Inspector when a card is clicked. B V3: a views Tabs strip (Try/Check a person/Saved sign-ins) inside that panel. D: a 'page stack with a Back crumb' in the same panel for Break-in.",
+   "resolution": "Define one panel shell in A's SignInPanel with, top to bottom: header, optional views Tabs (V3 only), and a page stack (Try, then pushed Break-in). The Inspector swap replaces the whole shell, and 'Back to Try a sign-in' restores the last page."
+  },
+  {
+   "specs": "A vs B",
+   "problem": "The row-menu item and its destination disagree. A always routes 'Try a sign-in' to the board (open: 'try'), placed after Edit policy. B routes by testing version (page/slider/board) with the FlaskConical icon and RowAction 'test'.",
+   "resolution": "Keep one item with B's routing. In V3 it uses A's route. Icon is LogIn (the same as A's bar button), so the concept has one glyph."
+  },
+  {
+   "specs": "A vs B vs D",
+   "problem": "The route union is extended three times. A adds open: 'try'. B adds rule?: string plus the 'policy-testing' screen and policies.testing. D adds open: 'break-in' and rule?: string.",
+   "resolution": "Merge into one edit to store.tsx in the foundations step: board { policyId; open?: 'gauntlet'|'impact'|'try'|'break-in'; rule?: string }; policies { testing?: TestingView }; policy-testing { view? }."
+  },
+  {
+   "specs": "B vs D (and A, C)",
+   "problem": "The showcase feature pins collide. B adds withShowcasePins in edition.ts, which imports SHOWCASE there. D pins breakInTest inline at store.tsx:722. Both touch the same line, and showcase.ts says pins go at the call site. The flags are A trySignIn (both editions), B policyTesting (Lite false), C monitorMode (both), D beforeTurningOn (both) and breakInTest (Lite false). The showcase runs Lite (store.tsx:632).",
+   "resolution": "Add one call-site pin at store.tsx:722: `features: SHOWCASE ? { ...featuresOf(edition), policyTesting: true, breakInTest: true } : featuresOf(edition)`. Put all five new flags in edition.ts together, and update edition.test.ts once. Skip B's GAPS entry: GAPS is not rendered anywhere."
+  },
+  {
+   "specs": "A vs B vs C",
+   "problem": "Monitor clashes with the version table and the Which policy list. A's columnsFor has no 'monitor' branch and says watching is ignored, yet owner decision 1 puts Monitor IN. A strikes through every losing policy, but C says a monitoring row is never struck through and the marker never enters it. B renders watching as a separate block with a neutral Badge 'Monitor' plus a DecisionPill; C renders it in list order with the Monitoring StatusPill plus an info Badge 'Would …'. C labels the right column 'If turned on', while p1 and A say 'Stored version'.",
+   "resolution": "A's columnsFor gains monitor rows: Today | Stored version, and Today | Your edits. Use 'Stored version' in Try columns to match p1, and keep 'If turned on' only as the Monitoring page's column header. The monitoring standing is one row in list order, not struck through, with the Monitoring pill and a 'Would …' badge (C's anatomy), shared as C's WatchingBadge in A's gate and B's WhichPolicy. B's Assume on also lists Monitoring policies."
+  },
+  {
+   "specs": "C vs D",
+   "problem": "Before turning on differs in content and in the footer secondary. C wants a 'While monitoring' section (plan line and View monitoring) when coming from Monitoring, and a footer 'Monitor instead' from Inactive. D's GuardDrawer has six fixed rows and a footer 'Report only' (neutral). C also keeps an interim centred-modal M3 for Monitoring → Active until the guard exists.",
+   "resolution": "Add a seventh, conditional ChangeSection 'While monitoring' to GuardDrawer. Use one secondary label (see owner question 1). Sequence the build so D's Before turning on lands before C's Monitoring → Active transition; M3 is then never built."
+  },
+  {
+   "specs": "C vs D",
+   "problem": "StatusControl props collide at BoardBar.tsx:207. C adds `unsaved` for M2 and renders useMonitoringPage().page. D adds `edits?: RuleSet` (needs a new `live` prop from BoardBuilder) for the turn-on version choice. use-status-change.tsx is rewritten by both: C adds monitor paths and copy, D replaces the turn-on Modal at :129-165 with GuardDrawer.",
+   "resolution": "Make one StatusControl API: { policyId, edits?: RuleSet } and derive `unsaved = !!edits`. Land D's use-status-change turn-on branch first, then C's monitor branches in the same file."
+  },
+  {
+   "specs": "C vs A/B",
+   "problem": "C's acceptance check 3 gives the Active row menu as 'Edit policy, Monitor, Turn off, Save as template, Duplicate, Delete policy', with Eye as the icon for both Monitor and View monitoring. A and B insert 'Try a sign-in' after Edit policy.",
+   "resolution": "Merged order: Edit policy · Try a sign-in · [status options by strength] · View monitoring (when monitoring) · Save as template · Duplicate · Delete policy. Keep Eye for 'View monitoring' only; give 'Monitor' a distinct glyph (for example EyeOff or Radar)."
+  },
+  {
+   "specs": "A vs B vs D",
+   "problem": "Board geometry is wrong or inconsistent. A budgets a 200 px rail and 920 px content, with a 428 px chain and '[ ] rail is 200 px' in its acceptance. But Shell.tsx:323 auto-collapses the rail to 64 px on BUILDER_SCREENS (board), so the board is 1056 px. B says 64 px and a 552 px canvas (actually 1056 − 492 = 564). D assumes the 46 % cap, giving a 423 px panel (A19), while A fixes the track at 492/480.",
+   "resolution": "Default board: 64 rail, 1056 content, 564 chain, 480 panel. The worst case, where the admin reopens the rail (200 + 920), must still hold with A's fixed 492 track and a 428 chain. Acceptance checks measure both, and D's A19 uses 480, not 423."
+  },
+  {
+   "specs": "A vs B",
+   "problem": "There are two route-marker designs. A uses a 12 px dot (motion.span layoutId, hop at most 180 ms, total at most 1.1 s, ring when unknown). B uses a 3 px bar keyframed on y/height (at most 160 ms per step, total at most 1.2 s). B's 'Changed by' label only shows under reduced motion; A always shows it.",
+   "resolution": "Build one RouteMarker component (A's dot on the board, B's bar in list layouts, same timing function hopMs) and one changed-by rule: always print 'Changed by {field}' on the decision, not only under reduced motion."
+  },
+  {
+   "specs": "A vs B vs C",
+   "problem": "Decision rendering and the grey token disagree. A uses kit Badge positive/notice/negative. B invents a new DecisionPill styled like .bx-decision, which is a second pill family. C's Today cells are plain text and its would-be decisions are info Badges. For 'Can't tell', A uses --text-muted, B --text-secondary and D --text-tertiary. --text-muted is #93a2b0 (about 2.6:1) outside the rebrand.",
+   "resolution": "Use one DecisionBadge wrapping kit Badge (positive, notice, negative), used by every surface, including Monitoring Today cells. 'Would …' stays info. 'Can't tell' uses --text-tertiary everywhere, which passes AA in both looks."
+  },
+  {
+   "specs": "A vs B vs D",
+   "problem": "There are three banned-word tests in three places: A's inside try-sign-in.test.ts, B's src/brand/ui-copy.test.ts (case-insensitive, comments included), and D's src/brand/screens/ui-copy.test.ts. D also bans 'Blocked', while its own copy says 'Saving is blocked' and 'blocks saving'. There are also two env hooks: B's screens/testing/use-tenant-env.ts useTenantEnv, and D's screens/sim-env.ts useSimEnv plus envWith. A adds appName inline in BoardBuilder, and C builds its own.",
+   "resolution": "Keep one src/brand/ui-copy.test.ts covering every new file. Ban the whole words gauntlet, blast radius, rehearse, 'try a login', and the title-case chip labels 'Verified', 'Straight in' and 'Blocked', matched as labels, not substrings. Keep one screens/sim-env.ts (useSimEnv + envWith, including appName and userName) used by A, B, C, D and BoardBuilder."
+  },
+  {
+   "specs": "D vs owner decision 4",
+   "problem": "D widens the Save interrupt. It adds regressions to can't-tell on Must pass/Protected (Q1), optionally a Got-through rise (Q3a), and it always runs for the always-on Global Default. Owner decision 4 says open only when a check blocks or someone is newly allowed.",
+   "resolution": "Keep the owner's two triggers exactly. A Got-through rise counts as 'newly allowed', because a hostile sign-in is newly let in. Can't-tell items appear when the page opens for another reason, but never open it. See owner question 3."
+  },
+  {
+   "specs": "C Q5 vs D Q8",
+   "problem": "Turn off and Active → Monitoring both newly allow people (72 modelled sign-ins for HRMS). C keeps a plain confirm modal; D proposes the guard page under the Save rule.",
+   "resolution": "Ask once (owner question 2) and apply the same answer to both transitions."
+  }
+ ],
+ "rule_violations": [
+  {
+   "spec": "B",
+   "problem": "It adds PageHead.action, a 'Policy testing' button in the page head beside Documentation. The page-head rule (Shell.tsx:681, 'at most Documentation, or the page's preview switches') puts actions on the bar row below, not in the head.",
+   "fix": "Put the V2 entry as a secondary Button in the PageBar right group, before 'New policy' (view + primary on the right). Do not add an action prop to PageHead."
+  },
+  {
+   "spec": "B",
+   "problem": "Its EmptyState blurbs and captions are explanatory sentences ('Every policy on the application is checked.', 'Samples use the showcase people and apps.', \"Each application's decision for one person.\", \"Sign-ins no policy decides can't be tested.\").",
+   "fix": "Keep the titles and drop the blurbs, or use a single label-length blurb only where an action follows (for example 'No saved sign-ins' plus the 'Try a sign-in' button)."
+  },
+  {
+   "spec": "D",
+   "problem": "It uses --blue and --blue-soft for pressed count cells, change outlines and the rule flash. These tokens exist only under :root[data-brand='rebrand'] (rebrand.css:64-67), so outside the rebrand the outlines vanish.",
+   "fix": "Use --accent and --accent-soft. The rebrand maps them to #0d6efd, and elsewhere they fall back to the slate state colour, which is the console's convention."
+  },
+  {
+   "spec": "D",
+   "problem": "The motion is decorative. Break-in rows 'settle' with framer y 4→0 staggered to 760 ms, and guard drawer rows fade in 30 ms apart on open. Neither explains anything, and the stagger works against the one-read drawer.",
+   "fix": "Opacity only, no stagger, on the guard drawer. Keep B's in-order fade on the first Break-in run (it explains attempt order), opacity only, with no y."
+  },
+  {
+   "spec": "D",
+   "problem": "The ban list includes 'Blocked', but the spec's own strings say 'Saving is blocked', 'Turning on is blocked' and '· blocks saving'. A case-insensitive ui-copy test fails on D itself.",
+   "fix": "Rename the banners to \"Can't save\" and \"Can't turn on\", matching the existing \"Can't turn on {name}\" dialog. The summary suffix becomes '· stops saving', or is dropped because the banner already says it."
+  },
+  {
+   "spec": "C",
+   "problem": "M3 (Monitoring → Active before the guard exists) is a centred Modal carrying content: the Sample badge and plan line. M1 and M2 are fine as existing confirm patterns, but content belongs in a slider.",
+   "fix": "Do not build M3. Order the work so D's Before turning on drawer exists before the Monitoring → Active transition ships."
+  },
+  {
+   "spec": "A, D",
+   "problem": "'Login' and 'sign-in' are mixed. A's start stage keeps 'A login arrives at {app}' (Board.tsx:609), and D's 'What you changed' rows use ruleIfLine, which prints 'For Human Resources, any login' (predicate-prose.ts:275). C already fixes 'logins' → 'sign-ins' in use-status-change.",
+   "fix": "In the foundations copy pass, change 'login' to 'sign-in' in Board.tsx:609 and predicate-prose.ts:165/275, and add 'login' (as a word) to the ui-copy test's watch list for new files."
+  },
+  {
+   "spec": "A",
+   "problem": "'Can't tell' is set in --text-muted and claimed as 4.5:1. That holds only under the rebrand (#646c75). The base token is #93a2b0 (about 2.6:1), so the claim fails whenever SHOWCASE is off.",
+   "fix": "Use --text-tertiary (#5A6775 base, #5c636a rebrand) for all 'Can't tell' text."
+  },
+  {
+   "spec": "B",
+   "problem": "The Testing version switch renders in the showcase while TESTING_VERSION_CHOSEN is null. That breaks the SHOWCASE rule that every A/B switch is hidden.",
+   "fix": "This is an allowed exception, because owner decision 2 asks to compare the versions in the showcase. State it in a showcase.ts comment next to the pin, and remove the exception the day a version is chosen."
+  },
+  {
+   "spec": "C",
+   "problem": "Tooltips run to two sentences (pill title 'Checks sign-ins. Enforces nothing.'; TipDot 'Modelled on the sample directory. Real sign-ins need the backend.').",
+   "fix": "Cut each to one line: 'Checks sign-ins; enforces nothing' and 'Modelled on the sample directory, not real traffic'."
+  }
+ ],
+ "wrong_paths_or_names": [
+  "A: the §3.1 pixel budget and the acceptance check 'rail is 200 px' are wrong for the board. Shell.tsx:221/323 (BUILDER_SCREENS) auto-collapses the rail to 64 px, so the board content is 1056 px, not 920.",
+  "A: board-tour.test.ts lives at src/brand/tour/board-tour.test.ts, not under screens/board. It does not reference 'board-tools'; the only reference is BoardBar.tsx:287.",
+  "B: `<Face kind=\"person\" …>` is wrong. FaceKind is 'group' | 'user' (faces.tsx:19), so use kind=\"user\", as A does.",
+  "B: PageHead has no `action` prop (Shell.tsx:659-691). Only title, caption and preview exist.",
+  "B: device-profile-version.ts is at src/brand/screens/device-profile-version.ts, and page-width.ts is at src/brand/page-width.ts (no screens/). The spec cites both without directories.",
+  "B: CHIP_DEVICES entries carry source 'assumed' (sign-in-facts.ts:213 and following). Presets 'iphone = CHIP_DEVICES[...]' must spread with source overridden to 'stated'.",
+  "B/C: WatchedResult (tenant-resolver.ts:52) today has only policyId, policyName, decision and possible. status, trace, wouldDecide and yieldsTo come from C's extension, so B's watching rows depend on C M2.",
+  "B/D: 'withShowcasePins' and 'useTenantEnv' / 'useSimEnv' / 'envWith' do not exist. They are proposed twice under different names.",
+  "C: screens/decision-words.ts and D's src/brand/decision-words.ts do not exist; A's DECISION_SAID is not in data.ts. Three proposed homes for one map.",
+  "C: src/brand/monitor.test.ts does not exist (deleted in cb89c91). It is a new file, not an edit.",
+  "D: `decide` is exported from screens/simulate.ts:898, not impact-arena.ts. impact-arena's contextOf (:128) and decideSituation (:159) are private, so sweepTenant has to live in impact-arena.ts.",
+  "D: `proposeFix` (gauntlet.ts:575) takes the legacy `Round` from DECK, not `AttemptRound`, and `namesMissing` is private (:557). D's proposeFrom refactor is required, not optional.",
+  "D: ChangeTone (change-list.tsx:35) is 'added' | 'changed' | 'removed' | 'effect' only. The 'Fails' (negative) and 'Passes' (positive) blocks need new tones, and D adds only 'neutral'.",
+  "D: '--blue' and '--blue-soft' are defined only in rebrand.css:64-67. Use --accent and --accent-soft.",
+  "D: its 'Saved sign-ins header' inside the board sign-in panel (E12, the Break-in board host) does not exist in Spec A's panel. It exists only in Spec B V3.",
+  "D: its A19 '423 px panel' assumes the board.css:104 46% cap. Spec A fixes the test-mode track at 492/480.",
+  "D: `src/brand/screens/ui-copy.test.ts` versus B's `src/brand/ui-copy.test.ts`. Neither exists; pick the latter.",
+  "D: variant letters A/B/C for rail page, slider and board collide with the spec letters and with B's V1/V2/V3 and ids 'page' | 'slider' | 'board'. Use B's ids.",
+  "C: its Active-row acceptance menu omits the 'Try a sign-in' item that A and B add after Edit policy.",
+  "B: its GAPS entry for 'Policy testing' is dead weight. GAPS is not rendered by any .tsx (only edition.ts and edition.test.ts read it)."
+ ],
+ "owner_questions": [
+  {
+   "question": "What is the Monitor vocabulary: the pill word, the menu verb, and the secondary button in Before turning on?",
+   "options": "Pill: Monitoring / Monitor / Report-only. Guard secondary: 'Monitor instead' (C) / 'Report only' (D). Standing badge: the Monitoring pill (C) / a neutral 'Monitor' badge (B).",
+   "recommendation": "Pill 'Monitoring', menu 'Monitor', guard secondary 'Monitor instead', and the standing row uses the same Monitoring pill. That is one word family and drops 'Report only'."
+  },
+  {
+   "question": "Should Turn off and Active → Monitoring, which both newly allow people (72 modelled sign-ins for HRMS), go through the guard page?",
+   "options": "A: plain one-line confirm, as today. B: the same rule as Save, where the page opens only when someone is newly allowed. C: always the page.",
+   "recommendation": "B, applied to both transitions at once, so the rule stays that one path never loosens silently. If that is too much for this round, A for both now."
+  },
+  {
+   "question": "What exactly opens 'Before saving' on an Active policy?",
+   "options": "A: only your two triggers, a blocking check or someone newly allowed. B: also a rise in Break-in 'Got through'. C: also a Must pass or Protected sign-in regressing to Can't tell.",
+   "recommendation": "A, reading a Got-through rise as 'newly allowed' because a hostile sign-in is newly let in. Can't-tell items are listed when the page opens anyway, but never open it."
+  },
+  {
+   "question": "Should What changes gain a 'Now on 1 factor' category (2FA loosened to 1 factor)?",
+   "options": "A: add it after Now allowed, not a trigger. B: fold it into Now allowed. C: leave it out.",
+   "recommendation": "A."
+  },
+  {
+   "question": "Where do Break-in rounds outside your four counts go ('Less than asked', 'Can't tell')?",
+   "options": "A: listed rows under their own heading, with no count cell. B: a fifth count. C: folded into Got through.",
+   "recommendation": "A. It keeps the four counts you approved."
+  },
+  {
+   "question": "How do Must pass and Protected differ in practice?",
+   "options": "Must pass: overridable from the block with 'Expect {decision} instead' plus a reason, or not. Protected: editable or deletable in Saved sign-ins (with DELETE confirmation), or locked.",
+   "recommendation": "Must pass is overridable in the guard with a reason; Protected never is. Both can be edited or deleted in Saved sign-ins, with Protected needing the typed DELETE confirmation."
+  },
+  {
+   "question": "What happens to the Full edition's Check and What changes pips on the board bar?",
+   "options": "A: remove both (Spec A). B: keep Check without the grade, showing '{n} through' (Spec D). C: keep both.",
+   "recommendation": "A. Keep both reachable in Full from ⌘K until Break-in and What changes live in the panel; the showcase is unaffected."
+  },
+  {
+   "question": "What state should HRMS access from corporate offices be seeded in for the demo?",
+   "options": "A: Active, as today; show Inactive and Monitor live through the pill. B: Inactive (p1 journey: Today | Stored version from the first click). C: Monitoring.",
+   "recommendation": "B at Phase 4, so the pitch journey opens on Today | Stored version and Monitor is shown as a live switch from Inactive (no modal). Keep Active until then, so the showcase tests stay stable."
+  },
+  {
+   "question": "Should one decision vocabulary apply everywhere, including 'would' forms and existing screens?",
+   "options": "A: the testing surfaces only, and leave DecisionChip ('Allow / MFA / Deny') and DECISION_LABEL ('1 factor / 2 factors') alone. B: one copy pass after the testing version is chosen. The 'would' form is either 'Would allow with 2FA' or 'Would ask for 2FA'.",
+   "recommendation": "B, using 'Would allow on 1 factor / Would allow with 2FA / Would deny'."
+  },
+  {
+   "question": "Testing page version switch: where does it sit, and which version shows by default?",
+   "options": "Placement: the Policies page head preview slot (and the testing page) or the top bar. Default: V1 rail page, V2 slider, or V3 board.",
+   "recommendation": "The Policies head preview slot, defaulting to V1, the only version fully demonstrable before Spec A lands."
+  },
+  {
+   "question": "Should the V2 slider be modal or docked?",
+   "options": "A: a modal Drawer at 780 px with a scrim. B: a docked DockPanel beside a narrowed list, which leaves about 480 px and forces one column.",
+   "recommendation": "A."
+  },
+  {
+   "question": "What colour are the testing views tabs?",
+   "options": "A: grey pill Tabs, greyscale selection. B: underline line tabs, orange per the 15 Sep ruling.",
+   "recommendation": "A. It keeps orange to the primary, the rail edge and 'New'."
+  },
+  {
+   "question": "Should the Device risk score be in the demo while the laptop risk question (p6 #7) is open?",
+   "options": "A: show the row only when a device-risk condition is read, with the TipDot 'Risk signals are collected on Android and iOS only' on Windows and macOS. B: hide it until ruled.",
+   "recommendation": "A, because the corporate-devices scenario is one of the four showcase policies and cannot be shown without it."
+  },
+  {
+   "question": "What date does Try a sign-in default to?",
+   "options": "A: today in Asia/Kolkata (Spec A). B: a fixed stated date, 28 Sep 2026 09:30 (Spec B samples and saved sign-ins).",
+   "recommendation": "Try defaults to today. Samples and saved sign-ins keep their stated fixed date, and the film rig sets its own."
+  },
+  {
+   "question": "Should the distance ruler name a point as a stated place ('30 km from Pune')?",
+   "options": "A: a stated label, so beyond the range it answers Deny. B: city null, so beyond the range it answers Can't tell.",
+   "recommendation": "A, with the source word 'stated'."
+  },
+  {
+   "question": "Should 'Would change if' ever suggest loosening?",
+   "options": "A: never. Sign-in chips only move toward a rule's requirement; policy chips only tighten. B: also offer loosening edits.",
+   "recommendation": "A."
+  },
+  {
+   "question": "Do sign-in facts and thresholds count under 'each number once per view'?",
+   "options": "A: allow a fact or threshold (48, 25 km, 40/71) in its control and again in the 'actual · required' line. B: strict, so one of the two is dropped.",
+   "recommendation": "A, keeping the rule strict for counts."
+  },
+  {
+   "question": "Should rule editing in test mode stay at 480 px instead of 560 px?",
+   "options": "A: keep 480, so there is no width jump mid-test. B: widen to 560 while editing.",
+   "recommendation": "A."
+  },
+  {
+   "question": "Which version does Before turning on default to when both exist?",
+   "options": "A: With your edits. B: Stored version.",
+   "recommendation": "A. The Seg makes the choice visible."
+  },
+  {
+   "question": "Should the weaker-factor fix narrow a rule to phishing-resistant methods only (FIDO2 / Passkey), which some people may not have enrolled?",
+   "options": "A: offer it. B: offer it only once factor readiness is shown. C: do not offer it.",
+   "recommendation": "A now, adding readiness to the preview when What changes ships it."
+  },
+  {
+   "question": "How does a draft get to Monitoring?",
+   "options": "A: save first, then the toast action 'Monitor'. B: directly from the draft pill.",
+   "recommendation": "A."
+  },
+  {
+   "question": "Should Inactive ↔ Monitoring confirm, given no user impact?",
+   "options": "A: an Undo toast. B: a confirm modal like Turn on and Turn off.",
+   "recommendation": "A."
+  },
+  {
+   "question": "Should 'Use' on a risk profile, which changes every device-risk condition at once, get Also changes rows?",
+   "options": "A: route it through Review changes with the same Also changes rows. B: leave it as a direct switch.",
+   "recommendation": "A."
+  }
+ ],
+ "build_order": "Phase 0 is done (uncommitted). After it:\n\n**F. Foundations, about 1.5 days, blocks everything.**\n- One `src/brand/decision-words.ts`: DECISION_WORDS, DECISION_PHRASE, WOULD_WORDS, FACTOR_WORDS, FACT_WORDS.\n- One `screens/sim-env.ts` (useSimEnv plus envWith, with appName and userName). BoardBuilder and gauntlet-dialog switch to it.\n- The merged BrandScreen union: board open try|break-in|gauntlet|impact plus rule, policies.testing, policy-testing.\n- The five feature flags, with one SHOWCASE pin at store.tsx:722 and edition.test.ts updated once.\n- kit Button pressed/keys; ChangeTone pass/fail/neutral.\n- `src/brand/ui-copy.test.ts`.\n- The login → sign-in copy pass (Board.tsx:609, predicate-prose.ts).\n- `saved-sign-ins.ts` type plus the store slice and seed (B §5.4, plus Vikram).\n- The shared form: `screens/testing/sign-in-form.ts` (B's SignInForm extended with A's origin preset and distance mode), device-presets.ts, and the session context TestingSessionProvider.\n\n**M1–M2. Monitor status and resolver `watching` (Spec C), 2 days.** Depends only on Phase 0 and F. It lands early so every later surface renders Monitoring standings from day one.\n\n**A. Try a sign-in, board test mode, about 8 days.** Needs F and M2 (for the monitoring row in Which policy and the monitor branch in columnsFor).\n- Build the panel shell with a page stack and an optional views Tabs slot.\n- Build SignInFields once, with a `rows` prop.\n- Build the RouteMarker and DecisionBadge components shared with B.\n- Retire the pips and CheckTab's 'Try a login'.\n\n**B core, V1 and V2, about 7 days.** Can run in parallel with A after F, because it reuses SignInFields, WhichPolicy (with WatchingBadge) and DecisionBadge. It adds:\n- the testing-version switch (V3 option disabled);\n- Try, Check a person and Samples;\n- the Saved sign-ins view, without its own Break-in.\n\n**D1. Break-in view, about 3 days.** Needs B's Saved sign-ins view as its host.\n- gauntlet.ts proposeFrom, proposeAttemptFix and proposeFactorFix.\n- break-in-model, and BreakInView as a pushed page.\n- breakInAccepted in the store.\n- It replaces B's BreakInSection.\n\n**D2. Guard, about 5 days.** Needs saved sign-ins, sweepTenant and D1 counts.\n- runGuard and GuardDrawer. Before saving (with the owner's two triggers) wired into saveNow, the palette, the Inspector Save rule, ReviewDialog onCommit and AppsPane.\n- Before turning on replaces the modal at use-status-change.tsx:129-165.\n- The seventh row, 'While monitoring', and the 'Monitor instead' secondary are added here, so C's M3 modal is never built.\n\n**M3. Monitoring page slider (Spec C), 1.5 days.** Any time after M2. The 'View monitoring' link from D2 comes after both.\n\n**B V3, about 2 days.** Needs A. It mounts the views Tabs (Try, Check a person, Saved) into A's panel shell, and the Which policy stage renders WhichPolicy compact.\n\n**D3. Library guard, about 2 days.** Also changes rows in Review changes for zones, device profiles and the risk profile in use. Needs D2's guard.ts.\n\n**M4 and cleanup.**\n- C's hooks in Try, the testing page and the guard (mostly absorbed above).\n- Delete BoardSheet, CheckTab and ImpactTab once Break-in and What changes live in the panel.\n- Set FULL.exposure to false.\n- Phase 4 reseeds HRMS as Inactive (pending the owner's answer).\n\n**Verification gate after each step:** `npx vitest run`, `npx tsc -b`, `npx oxlint` at or below the branch baseline, `npm run build`, and a browser pass at 1,120 px. Measure the board at both 64 px and 200 px rail. Confirm which worktree owns localhost:5173 first.\n\n**Critical path:** F, then A, then B V3; D2 needs B's saved sign-ins plus D1."
+}

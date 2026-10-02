@@ -49,7 +49,19 @@
    because the field, unlike the heading, cannot ellipsise: below the width of
    its count and ✕ ✓ the pills go under it rather than out of the page. */
 .bfp2__pagehead:has(> .bx-namefield) { flex: 1 1 auto; flex-wrap: wrap; align-items: flex-start; }
-.bfp2__pagehead:has(> .bx-namefield) > :not(.bx-namefield) { margin-top: 20px; translate: 0 -50%; }
+.bfp2__pagehead:has(> .bx-namefield) > :not(.bx-namefield, .bfp2__nameerr) { margin-top: 20px; translate: 0 -50%; }
+/* Why the typed name can't be used — one another profile has. A rename saves
+   itself now (1 Oct 2026, rename-now.ts), so the field refuses a taken name
+   rather than the save footer. Last in the row and the row's full width, so it
+   wraps under the field and the pills beside it; pulled up to sit with the
+   field rather than a row gap away. Red, the kit NameField's own refused edge,
+   on every page that renames this way — zones, device profiles, risk profiles
+   (owner, 1 Oct 2026: "use red only"). Risk profiles share it. */
+.bfp2__pagehead > .bfp2__nameerr {
+  order: 1; flex: 0 0 100%;
+  margin: calc(-1 * var(--space-3)) 0 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fb-negative-fg);
+}
 
 /* The page's way back: a link the size of its words. As a grid child it
    stretched across the whole page, so the empty right of the row was a click

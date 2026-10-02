@@ -458,7 +458,10 @@ export type RiskReviewLine = ReviewLine
 /** Every change between the saved profile and the draft, in the order the page reads.
 
     How each row is filed in the review, in the page's own words:
-      Name          no section (it leads under General), changed
+      Name          no section (it leads under GENERAL_GROUP, "Basic
+                    details"), changed. Kept for the diff's sake: the page
+                    never leaves a name in the draft any more, since a rename
+                    saves itself (1 Oct 2026, rename-now.ts)
       Risk scores   the three bands, named as the page names them (Low, Medium,
                     High). A consequence of the signal and weight edits, never
                     an edit of its own — nobody types a score — so `effect`.

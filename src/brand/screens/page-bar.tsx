@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 import { usePageWidth, type PageWidth } from '../page-width'
 import { SHOWCASE } from '../showcase'
+import { TOGGLE_STYLES, useToggleStyle } from '../toggle-style'
 
 /* -----------------------------------------------------------------------------
    The row under a page's head. ONE shape, on every list page (owner, 16 Sep
@@ -95,6 +96,22 @@ export function WidthSwitch() {
         Width
       </span>
       <FilterTabs label="Page width" value={width} options={WIDTHS} onChange={setWidth} />
+    </div>
+  )
+}
+
+/* Which of six styles every switch in the console is drawn in: a pending
+   decision (owner, 1 Oct 2026), so unlike the width switch it shows in the
+   showcase build. Same word-then-segments shape as Width. Goes once the owner
+   picks; see toggle-style.ts. */
+export function ToggleStyleSwitch() {
+  const [style, setStyle] = useToggleStyle()
+  return (
+    <div className="bwidth">
+      <span className="bwidth__label" aria-hidden>
+        Toggle style
+      </span>
+      <FilterTabs label="Toggle style" value={style} options={TOGGLE_STYLES} onChange={setStyle} />
     </div>
   )
 }

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>keyboard — test page</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=block"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../keyboard.css" />
+    <style>
+      /* The ground and the product window, as literals copied from
+         compose.css (light :root, dark :root[data-theme='dark']) rather
+         than linked from it: compose.css is edited by other modules, and a
+         determinism check on the board's pixels must not move when a
+         sibling's stylesheet does. If the ground is retokenised these
+         values go stale, which costs nothing but a slightly wrong backdrop. */
+      html,
+      body {
+        margin: 0;
+        background: #f2f4f7;
+      }
+      #film {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #bg {
+        position: absolute;
+        inset: 0;
+        background-color: #f2f4f7;
+        background-image: radial-gradient(circle at 1px 1px, rgba(33, 37, 41, 0.085) 1.2px, transparent 1.6px),
+          radial-gradient(1200px 800px at 12% 8%, rgba(74, 85, 96, 0.1), transparent 60%),
+          radial-gradient(900px 700px at 92% 96%, rgba(235, 84, 36, 0.06), transparent 62%);
+        background-size: 26px 26px, 100% 100%, 100% 100%;
+      }
+      html[data-theme='dark'] body {
+        background: #131922;
+      }
+      html[data-theme='dark'] #bg {
+        background-color: #131922;
+        background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.075) 1.2px, transparent 1.6px),
+          radial-gradient(1200px 800px at 12% 8%, rgba(147, 160, 174, 0.08), transparent 60%),
+          radial-gradient(900px 700px at 92% 96%, rgba(239, 118, 80, 0.09), transparent 62%);
+      }
+      /* A stand-in for the product window: the app's 1440×900 at 1:1 in
+         the frame, which is where the plate overlaps its bottom-right
+         corner. Only its surface colour matters here (--win-bg). */
+      #win {
+        position: absolute;
+        left: 240px;
+        top: 90px;
+        width: 1440px;
+        height: 900px;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 30px 80px rgba(22, 32, 44, 0.2);
+      }
+      html[data-theme='dark'] #win {
+        background: #1a212a;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px #262e38;
+      }
+      #kbd {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="film">
+      <div id="bg"></div>
+      <div id="win" hidden></div>
+      <div id="kbd"></div>
+    </div>
+    <script src="../keyboard.js"></script>
+    <script>
+      window.KEYBOARD.init(document.getElementById('kbd'))
+      /* render-keyboard.mjs drives this: one call per still. */
+      window.TEST = {
+        render({ t, events, corner = 'br', theme = 'light', window: win = false }) {
+          document.documentElement.dataset.theme = theme
+          document.getElementById('win').hidden = !win
+          const k = window.KEYBOARD.update(t, events, { corner })
+          return { k, rect: window.KEYBOARD.rect(corner), down: window.KEYBOARD.presses(t, events) }
+        },
+      }
+    </script>
+  </body>
+</html>

@@ -5,7 +5,6 @@ import { PLACES } from '../places'
 import {
   canSaveZone,
   classifyIp,
-  describeZone,
   explainBadEntry,
   ipInEntry,
   ipv4Number,
@@ -35,7 +34,6 @@ function zone(over: Partial<Zone> = {}): Zone {
 }
 const loc = (over: Partial<ZoneLocation> = {}): ZoneLocation => ({ ...emptyLocation(), ...over })
 const pune: ZoneRange = { km: 25, lat: 18.5204, lon: 73.8567, label: 'Pune' }
-const mumbai: ZoneRange = { km: 10, lat: 19.1, lon: 72.9, label: 'Mumbai' }
 const idsOf = (z: Zone) => validateZone(z).map((i) => i.id)
 
 describe('address classification', () => {
@@ -214,27 +212,6 @@ describe('every seeded zone is valid', () => {
     expect(hq.location.ranges[0]).toMatchObject({ km: 25, label: 'Pune' })
     const place = PLACES.find((p) => p.id === hq.location.ranges[0].placeId)
     expect(place).toMatchObject({ kind: 'city', name: 'Pune' })
-  })
-})
-
-describe('describeZone', () => {
-  it('lists both facets, with "any" on the empty side', () => {
-    expect(describeZone(zone({ ip: ['203.0.113.0/24'] }))).toBe('1 network · Any location')
-    expect(describeZone(zone({ location: loc({ countries: ['India'] }) }))).toBe(
-      'Any network · India',
-    )
-  })
-
-  it('words each range as a distance from its city, one part each', () => {
-    expect(describeZone(zone({ location: loc({ ranges: [pune] }) }))).toBe('Any network · Within 25 km of Pune')
-    expect(describeZone(zone({ location: loc({ countries: ['Japan'], ranges: [pune, mumbai] }) }))).toBe(
-      'Any network · Japan · Within 25 km of Pune · Within 10 km of Mumbai',
-    )
-  })
-
-  it('counts addresses and ASNs separately', () => {
-    const z = zone({ ip: ['10.0.0.0/8', '10.1.0.0/16'], asn: ['AS64512'] })
-    expect(describeZone(z)).toContain('2 networks + 1 ASN')
   })
 })
 

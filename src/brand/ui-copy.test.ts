@@ -23,7 +23,6 @@ import whenEditorSrc from './screens/board/WhenEditor.tsx?raw'
 import overviewSrc from './screens/overview.tsx?raw'
 import proseSrc from './screens/predicate-prose.ts?raw'
 import trySignInSrc from './screens/board/try-sign-in.ts?raw'
-import useTrySignInSrc from './screens/board/use-try-sign-in.ts?raw'
 import trySignInRunSrc from './screens/board/try-sign-in-run.ts?raw'
 import testModeSrc from './screens/board/test-mode.ts?raw'
 import signInTestsSrc from './screens/SignInTests.tsx?raw'
@@ -113,10 +112,9 @@ const NAMED: Record<string, string> = {
   './screens/watching-words.ts': watchingWordsSrc,
   /* Try a sign-in on the board: its model, its run, the words and choices of
      test mode (the why-line, the tab a route opens), and the gate it still
-     draws on the chain. The test panel, the sentence and the trace live in
+     draws on the chain. The sentence, the trace and the dock's views live in
      screens/testing/, and the glob picks them up. */
   './screens/board/try-sign-in.ts': trySignInSrc,
-  './screens/board/use-try-sign-in.ts': useTrySignInSrc,
   './screens/board/try-sign-in-run.ts': trySignInRunSrc,
   './screens/board/test-mode.ts': testModeSrc,
   './screens/board/RouteGate.tsx': routeGateSrc,

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vo — envelope and word timing</title>
+    <!-- A standalone check for audio/vo.py: for every line, its waveform, the
+         30 Hz envelope the mouth will follow, and the word boundaries the cloud
+         will reveal, on one time axis. lib/vo-selftest.mjs injects the data with
+         VO_TEST.draw(report) and screenshots the page. Nothing here animates. -->
+    <style>
+      :root {
+        --ink: #212529;
+        --ink-3: #646e79;
+        --line: #e4e8ec;
+        --brand: #eb5424;
+        --info-bg: #e9f2fd;
+        --info-bd: #b9d6f5;
+        --info-dot: #1189d4;
+        --pos-dot: #128f43;
+        --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 28px 32px 24px;
+        width: 1920px;
+        background: #f3f5f8;
+        color: var(--ink);
+        font-family: var(--font);
+        -webkit-font-smoothing: antialiased;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--ink-3);
+        font-size: 13px;
+        margin: 0 0 18px;
+        font-family: var(--mono);
+      }
+      .line {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px 10px;
+        margin-bottom: 14px;
+      }
+      .line h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 2px;
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+      }
+      .line h2 .id {
+        font-family: var(--mono);
+        font-weight: 500;
+        color: var(--brand);
+      }
+      .line h2 .n {
+        color: var(--ink-3);
+        font-weight: 400;
+        font-size: 12px;
+        font-family: var(--mono);
+      }
+      .line p {
+        margin: 0 0 8px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+      canvas {
+        display: block;
+        width: 1820px;
+        height: 220px;
+      }
+      .key {
+        display: flex;
+        gap: 22px;
+        font-size: 12px;
+        color: var(--ink-3);
+        margin: -6px 0 16px;
+      }
+      .key span::before {
+        content: '';
+        display: inline-block;
+        width: 14px;
+        height: 3px;
+        margin-right: 6px;
+        vertical-align: middle;
+        background: var(--c);
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="title">Voice-over</h1>
+    <p class="sub" id="sub"></p>
+    <div class="key">
+      <span style="--c: #b9d6f5">waveform (peak per column)</span>
+      <span style="--c: #eb5424">RMS envelope, 30 Hz, p95 = 1</span>
+      <span style="--c: #1189d4">word onset · word box = [t, t+dur]</span>
+    </div>
+    <div id="lines"></div>
+    <script>
+      window.VO_TEST = {
+        draw(report) {
+          document.getElementById('title').textContent = `Voice-over — ${report.voice.name}`
+          document.getElementById('sub').textContent = `rate ${report.voice.rate}  pitch ${report.voice.pitch}  ·  ${report.dir}`
+          const root = document.getElementById('lines')
+          root.innerHTML = ''
+          for (const line of report.lines) root.appendChild(card(line))
+          return report.lines.length
+
+          function card(line) {
+            const el = document.createElement('div')
+            el.className = 'line'
+            el.innerHTML = `<h2><span class="id"></span><span class="n"></span></h2><p></p><canvas width="1820" height="220"></canvas>`
+            el.querySelector('.id').textContent = line.id
+            el.querySelector('.n').textContent = `${line.duration.toFixed(3)} s · ${line.words.length} words · env ${line.env.length} frames`
+            el.querySelector('p').textContent = line.text
+            paint(el.querySelector('canvas'), line)
+            return el
+          }
+
+          function paint(cv, line) {
+            const ctx = cv.getContext('2d')
+            const W = cv.width
+            const H = cv.height
+            const padL = 36
+            const padR = 16
+            const top = 10
+            const waveH = 130
+            const wordsY = top + waveH + 14
+            const wordsH = 36
+            const pxs = (W - padL - padR) / line.duration
+            const x = (t) => padL + t * pxs
+            ctx.clearRect(0, 0, W, H)
+
+            // axis: a tick every 0.5 s, labelled every second
+            ctx.font = '11px ' + getComputedStyle(document.body).getPropertyValue('--mono')
+            ctx.fillStyle = '#646e79'
+            ctx.strokeStyle = '#e4e8ec'
+            ctx.lineWidth = 1
+            ctx.textAlign = 'center'
+            for (let t = 0; t <= line.duration + 1e-9; t += 0.5) {
+              ctx.beginPath()
+              ctx.moveTo(x(t) + 0.5, top)
+              ctx.lineTo(x(t) + 0.5, wordsY + wordsH + 6)
+              ctx.stroke()
+              if (Math.abs(t - Math.round(t)) < 1e-9) ctx.fillText(`${t.toFixed(0)}s`, x(t), H - 4)
+            }
+            ctx.textAlign = 'left'
+            ctx.fillText('1.0', 4, top + 10)
+            ctx.fillText('0', 4, top + waveH)
+
+            // waveform: one |peak| per column, mirrored about the middle
+            const mid = top + waveH / 2
+            ctx.strokeStyle = '#b9d6f5'
+            ctx.lineWidth = 1
+            const cols = line.peaks.length
+            for (let c = 0; c < cols; c++) {
+              const px = padL + ((c + 0.5) / cols) * (W - padL - padR)
+              const a = line.peaks[c] * (waveH / 2 - 2)
+              ctx.beginPath()
+              ctx.moveTo(px, mid - a)
+              ctx.lineTo(px, mid + a + 0.5)
+              ctx.stroke()
+            }
+
+            // word onsets, drawn through the waveform so their alignment to the envelope is visible
+            ctx.strokeStyle = '#1189d4'
+            ctx.lineWidth = 1
+            for (const w of line.words) {
+              ctx.beginPath()
+              ctx.moveTo(Math.round(x(w.t)) + 0.5, top)
+              ctx.lineTo(Math.round(x(w.t)) + 0.5, wordsY)
+              ctx.stroke()
+            }
+
+            // envelope: one value per output frame, plotted at the frame's centre
+            ctx.strokeStyle = '#eb5424'
+            ctx.lineWidth = 2
+            ctx.lineJoin = 'round'
+            ctx.beginPath()
+            line.env.forEach((v, i) => {
+              const px = x((i + 0.5) / 30)
+              const py = top + waveH - v * (waveH - 2)
+              if (i === 0) ctx.moveTo(px, py)
+              else ctx.lineTo(px, py)
+            })
+            ctx.stroke()
+            ctx.fillStyle = '#eb5424'
+            line.env.forEach((v, i) => {
+              ctx.beginPath()
+              ctx.arc(x((i + 0.5) / 30), top + waveH - v * (waveH - 2), 1.6, 0, Math.PI * 2)
+              ctx.fill()
+            })
+
+            // words: a box from t to t+dur, label inside, two rows so short words never collide
+            ctx.font = '12px ' + getComputedStyle(document.body).getPropertyValue('--font')
+            line.words.forEach((w, i) => {
+              const bx = x(w.t)
+              const bw = Math.max(2, w.dur * pxs)
+              const row = i % 2
+              const by = wordsY + row * (wordsH / 2 + 2)
+              const bh = wordsH / 2 - 2
+              ctx.fillStyle = '#e9f2fd'
+              ctx.strokeStyle = '#b9d6f5'
+              ctx.beginPath()
+              ctx.roundRect(bx, by, bw, bh, 3)
+              ctx.fill()
+              ctx.stroke()
+              ctx.fillStyle = '#212529'
+              ctx.textAlign = 'left'
+              ctx.textBaseline = 'middle'
+              const label = w.text
+              const tw = ctx.measureText(label).width
+              // a label wider than its box hangs to the right of the onset instead
+              ctx.fillText(label, tw + 6 <= bw ? bx + 4 : bx + bw + 3, by + bh / 2 + 0.5)
+              ctx.textBaseline = 'alphabetic'
+            })
+          }
+        },
+      }
+    </script>
+  </body>
+</html>

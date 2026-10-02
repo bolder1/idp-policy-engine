@@ -1273,7 +1273,11 @@ export function rosterFromCsv(fileName: string, text: string, now: Date): Roster
    files and what kind of change it is, because Review changes groups by the
    page's own sections (17 Sep 2026):
 
-     Name                  no section, so it leads under "General"
+     Name                  no section, so it leads under GENERAL_GROUP, which is
+                           "Basic details" (1 Oct 2026) — the setup rows'
+                           section, so it joins them in one. Only on a new
+                           profile now: a stored one's rename saves itself
+                           (rename-now.ts) and the draft's name follows
      the setup rows        "Basic details", always changed — '' to '3' devices
                            per person is a setting moving, not something added
      a check or signal     "Checks" / "Signals", the noun the label already

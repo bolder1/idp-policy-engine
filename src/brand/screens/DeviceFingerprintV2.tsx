@@ -40,6 +40,7 @@ import {
   countLabel,
   ITEM_NOUN,
   modeLabel,
+  nameIssue,
   offeredAttributes,
   profileChangeParts,
   profileIssue,
@@ -55,6 +56,7 @@ import {
   type ProfileReach,
 } from '../fingerprint'
 import { useBrand } from '../store'
+import { keepName, nameRefusal } from '../rename-now'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
 import { DEVICES_NOTE, itemsNote } from './profile-notes'
@@ -995,6 +997,32 @@ function ProfilePage({
     return true
   }
 
+  /* The name saves itself (owner, 1 Oct 2026: "we already have a save button
+     for the basic details so no need to have it in the review, or save it" —
+     see rename-now.ts). On a stored profile a kept name goes to the store at
+     once, through the same `onChange` the footer's Save uses and so with the
+     same "<name> saved" toast, as the stored profile with only its name
+     replaced: the draft's other edits stay unsaved. The draft's name follows,
+     so the rename never opens the footer or shows in Review changes, and a
+     name another profile has is refused by the field itself.
+
+     A new profile is not stored, so its name goes in the draft, as it always
+     did, and waits for Create profile. A taken one is still the footer's to
+     refuse there, as it was, and a blank one keeps the name it had. */
+  const renameIssue = (name: string) => nameIssue(name, otherNames)
+  const nameProblem = (typed: string) => (isNew ? null : nameRefusal(profile, typed, renameIssue))
+  const keepTypedName = (typed: string) => {
+    if (isNew) {
+      const name = typed.trim()
+      if (name) setDraft((d) => (d.name === name ? d : { ...d, name }))
+      return
+    }
+    const kept = keepName(profile, typed, renameIssue)
+    if (kept.kind !== 'saved') return
+    onChange(kept.stored)
+    setDraft((d) => ({ ...d, name: kept.name }))
+  }
+
   /* What saving it would do to the policies that name it and the saved
      sign-ins they decide (spec D.6), read in Review changes. The one fix is
      the profile as saved. A new profile is named by no rule yet. */
@@ -1039,8 +1067,9 @@ function ProfilePage({
       </button>
 
       <header className="bfp2__head" ref={head}>
-        {/* `draft.name`, not `profile.name`: the heading is the name field, so
-            it shows what was typed. The save bar says the two differ. */}
+        {/* `draft.name`, not `profile.name`: on a new profile the heading shows
+            the name it will be created with. On a stored one the two are the
+            same name, since a kept rename saves itself. */}
         {/* Name, pencil, then the pills — the zone and risk profile pages'
             order. The pencil is always shown, not revealed on hover, and it is
             the page's only Rename: the header's action trail is gone, and Used
@@ -1050,7 +1079,8 @@ function ProfilePage({
         <div className="bfp2__pagehead">
           <EditableName
             value={draft.name}
-            onChange={(name) => setDraft((d) => ({ ...d, name }))}
+            problem={nameProblem}
+            onKeep={keepTypedName}
             editing={renaming}
             setEditing={setRenaming}
             onDone={() => pencil.current?.querySelector<HTMLButtonElement>('button')?.focus()}
@@ -1195,42 +1225,72 @@ function ProfilePage({
    One rendering, and it is the heading. The pencil beside it turns it into the
    kit's name field: the input, its count, and a ✕ and ✓ under its right edge.
 
-   Enter, ✓ or leaving the field keeps the trimmed name; a blank one puts back
-   the name the edit started from. Escape or ✕ reverts just the name — leaving
-   the page can already discard everything, but backing out of a rename should
-   not cost the check retuned two minutes ago. The keys and the buttons hand
-   focus back to the pencil; leaving the field leaves it where it went. */
+   Enter, ✓ or leaving the field keeps the trimmed name — on a stored profile
+   that is saving it (1 Oct 2026, see the page's `keepTypedName`); a blank one
+   puts back the name it had. Escape or ✕ throws the typing away and nothing
+   else — leaving the page can already discard everything, but backing out of a
+   rename should not cost the check retuned two minutes ago. The keys and the
+   buttons hand focus back to the pencil; leaving the field leaves it where it
+   went.
+
+   What is typed stays in the field until it is kept. It used to go into the
+   draft a keystroke at a time, which made the page unsaved while somebody was
+   still typing a name that was about to save itself. A name the page refuses
+   — one another profile has — is said under the field, and the field stays
+   open to fix it: on ✓ or Enter at once, on a leave once the field would
+   close, as on the zone page (the line in the flow, shown on the mousedown
+   that left, would push the page under the pointer before the click). */
 function EditableName({
   value,
-  onChange,
+  problem,
+  onKeep,
   editing,
   setEditing,
   onDone,
 }: {
+  /** The name as it stands, which the heading shows. */
   value: string
-  onChange: (v: string) => void
+  /** Why a typed name can't be kept, or null. Blank is not refused: it puts the name back. */
+  problem: (typed: string) => string | null
+  /** Keep a typed name the page did not refuse. */
+  onKeep: (typed: string) => void
   editing: boolean
   setEditing: (on: boolean) => void
   /** Called after Enter, Escape, ✓ or ✕ has ended the edit, to put focus somewhere real. */
   onDone?: () => void
 }) {
   const input = useRef<HTMLInputElement>(null)
-  /* What the name was when this edit began. Captured on entry rather than read
-     from the saved profile: the pre-edit value may itself be unsaved. */
-  const before = useRef(value)
+  const errorId = useId()
+  const [typed, setTyped] = useState(value)
+  const [error, setError] = useState<string | null>(null)
+  /* Each edit starts from the name as it stands, with nothing to say yet.
+     Latched during render, so the field never opens on the last edit's words
+     for a frame. */
+  const [open, setOpen] = useState(editing)
+  if (open !== editing) {
+    setOpen(editing)
+    if (editing) {
+      setTyped(value)
+      setError(null)
+    }
+  }
+  const refused = problem(typed)
   /* Set once a key or a button has ended the edit, which is what sends focus
      back to the pencil. A leave has already put focus where it was going. */
   const ended = useRef(false)
 
   /* Enter and ✓ are one act, Escape and ✕ the other. */
   const apply = () => {
+    if (refused) {
+      setError(refused)
+      return
+    }
     ended.current = true
-    onChange(value.trim() || before.current)
+    onKeep(typed)
     setEditing(false)
   }
   const cancel = () => {
     ended.current = true
-    onChange(before.current)
     setEditing(false)
   }
 
@@ -1242,7 +1302,6 @@ function EditableName({
       if (ended.current) onDone?.()
       return
     }
-    before.current = value
     ended.current = false
     input.current?.focus()
     input.current?.select()
@@ -1262,30 +1321,49 @@ function EditableName({
     )
   }
 
+  /* The error line is the header row's last child, so it wraps onto a line of
+     its own under the field and the pills (device-fingerprint-v2.css). */
   return (
-    <NameField
-      inputRef={input}
-      value={value}
-      max={PROFILE_NAME_MAX}
-      label="Profile name"
-      placeholder="Corporate laptops"
-      onChange={onChange}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          apply()
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          cancel()
-        }
-      }}
-      /* Focus out of the field keeps the name as ✓ would, without the trip back
-         to the pencil; the kit holds the close until a press has had its click. */
-      onLeave={() => onChange(value.trim() || before.current)}
-      onClose={() => setEditing(false)}
-      onApply={apply}
-      onCancel={cancel}
-    />
+    <>
+      <NameField
+        inputRef={input}
+        value={typed}
+        max={PROFILE_NAME_MAX}
+        label="Profile name"
+        placeholder="Corporate laptops"
+        errorId={error ? errorId : undefined}
+        invalid={!!error}
+        onChange={(v) => {
+          setTyped(v)
+          setError(null)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            apply()
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            cancel()
+          }
+        }}
+        /* Focus out of the field keeps the name as ✓ would, without the trip back
+           to the pencil; the kit holds the close until a press has had its click. */
+        onLeave={() => {
+          if (!refused) onKeep(typed)
+        }}
+        onClose={() => {
+          if (refused) setError(refused)
+          else setEditing(false)
+        }}
+        onApply={apply}
+        onCancel={cancel}
+      />
+      {error && (
+        <p id={errorId} className="bfp2__nameerr" role="alert">
+          {error}
+        </p>
+      )}
+    </>
   )
 }
 

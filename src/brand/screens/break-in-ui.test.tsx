@@ -10,14 +10,12 @@ import { BreakInView } from './break-in-view'
 import breakInCss from './break-in.css?raw'
 import breakInViewSrc from './break-in-view.tsx?raw'
 import { envOf } from './tenant-resolver'
-import { BreakInPage } from './testing/BreakInPage'
-import { SavedView } from './testing/SavedView'
 import { TestingSessionProvider } from './testing/session'
 
 /* The Break-in test drawn once without a browser, on the showcase tenant: the
-   counts and rows it prints, that nothing in it is a grade or a second orange
-   button, and that Saved sign-ins offers it. The browser pass checks the
-   motion and the layout at 1,120 px. */
+   counts and rows it prints, and that nothing in it is a grade or a second
+   orange button. The browser pass checks the motion and the layout at
+   1,120 px. */
 
 const t = showcaseTenant()
 const env = envOf(t)
@@ -68,23 +66,6 @@ describe('the Break-in test', () => {
      policy's list when the Picker changed it (D.4: a first run only fades). */
   it('pairs a row for its motion within one policy only', () => {
     expect(breakInViewSrc).toContain('layoutId={rowLayoutId(baseId, policy.id, row.id)}')
-  })
-})
-
-describe('where it lives', () => {
-  it('Saved sign-ins offers it as a secondary button at the end of the bar', () => {
-    const out = html(<SavedView onTry={noop} onEmpty={noop} />)
-    expect(out).toMatch(/tst__barend[\s\S]*?bx-btn--neutral[^>]*>(?:<svg[\s\S]*?<\/svg>)?Break-in test/)
-  })
-
-  it('opens on a pushed page with Back to Saved sign-ins and the policy to test', () => {
-    const out = html(<BreakInPage onBack={noop} />)
-    const said = text(out)
-    expect(said.startsWith('Saved sign-ins')).toBe(true)
-    expect(out).toContain('Policy to test')
-    /* Kavya in the office is decided by HRMS, so the page opens on it. */
-    expect(said).toContain('HRMS access from corporate offices')
-    expect(said).toContain('Locked out Finance working from home')
   })
 })
 

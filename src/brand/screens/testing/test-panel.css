@@ -1,7 +1,9 @@
 /* -----------------------------------------------------------------------------
-   Try a sign-in's test panel (TestPanel.tsx) and its tabs (DockSaved,
-   DockPeople, DockPast): the board's right-hand column while a sign-in is
-   tried (Policy testing V4, §2.4-bis).
+   The dock's views — Saved sign-ins (DockSaved), People (DockPeople) and
+   Past sign-ins (DockPast) — at a right-hand panel's width. They were the
+   tabs of the board's test panel (Policy testing V4, §2.4-bis); Check access
+   opens People and Past sign-ins as panels of its own (board/PolicyCheck.tsx),
+   and the panel's own chrome — its header, sentence and tabs — is gone.
 
    The chrome is the inspector's — `.bb__insp` in board.css, the floating card
    with its margins, radius and `--el-mid` — so this sheet only lays out what
@@ -13,22 +15,13 @@
    Tokens only: every colour is a console-theme variable, decisions in the
    `--fb-*` tones and nothing else, selection in `--accent*`. The rows, the
    tab body and the distribution's segments are motion's (layout, opacity,
-   width), so nothing here gives them a transform or a transition. The three
-   animations this sheet owns — the panel's fade back from the rule editor,
-   the flash on a row Run all moved — are on plain elements, and every one
-   stops under reduced motion.
+   width), so nothing here gives them a transform or a transition. The two
+   animations this sheet owns — the inspector's fade back from the rule
+   editor, the flash on a row Run all moved — are on plain elements, and both
+   stop under reduced motion.
    -------------------------------------------------------------------------- */
 
 /* --- The column --------------------------------------------------------------- */
-
-/* A flex column that never scrolls as a whole: the header, the sign-in and
-   the tabs stay put, and only the tab's body scrolls under them. */
-.tpanel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  color: var(--text-primary);
-}
 
 /* Back from the rule editor: the same column, a fade rather than the slide
    the inspector enters with. The rule editor coming in wears it too. */
@@ -36,113 +29,6 @@
 @keyframes tpanel-swap {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-/* --- The header -------------------------------------------------------------- */
-
-.bb__inspbar.is-test {
-  flex: none;
-  gap: var(--space-2);
-  min-height: 48px;
-  padding: 0 var(--space-4) 0 var(--space-6);
-}
-.tpanel__title {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  color: var(--text-primary);
-}
-.tpanel__title:focus { outline: none; }
-.tpanel__title:focus-visible {
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 3px var(--focus-halo);
-}
-.tpanel__acts {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-.tpanel__anchor { display: inline-flex; }
-/* The hairline between the run's buttons and Close. */
-.tpanel__rule {
-  width: var(--bw-thin);
-  height: 18px;
-  margin: 0 var(--space-3);
-  background: var(--border-subtle);
-}
-
-/* --- The sign-in ------------------------------------------------------------- */
-
-.tpanel__signin {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  padding: var(--space-6);
-}
-/* The hairline between the sign-in and the tabs: under the sign-in, so it
-   runs the panel's width whether or not the edition has the tabs. */
-.tpanel__signin:not(:last-child) { border-bottom: var(--bw-thin) solid var(--border-subtle); }
-.tpanel__verdict {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-}
-/* One line, always: the rule that decided, or what is needed. */
-.tpanel__why {
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: var(--fs-sm);
-  line-height: 18px;
-  color: var(--text-secondary);
-}
-/* What else applies to this person (the Sign-in tests canvas's line, carried
-   here by Open rule): quiet words, its mark in the notice tone for a
-   conflict and for what can't be told, grey for what is only worth knowing. */
-.tpanel__also {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: calc(var(--space-2) * -1) 0 0;
-  min-width: 0;
-  font-size: var(--fs-xs);
-  line-height: 17px;
-  color: var(--text-secondary);
-}
-.tpanel__also > svg { flex: none; margin-top: 2px; color: var(--text-tertiary); }
-.tpanel__also.is-conflict > svg,
-.tpanel__also.is-depends > svg { color: var(--fb-notice-dot); }
-
-/* --- The tabs ------------------------------------------------------------------- */
-
-/* The kit's line tabs, the product's orange underline, on their own hairline.
-   A tab's label sits 6 px inside it, so the first label starts on the 16 px
-   gutter. */
-.tpanel__tabs.bx-tabs--line {
-  flex: none;
-  gap: var(--space-2);
-  padding: 0 calc(var(--space-6) - var(--space-3));
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.tpanel__tabs.bx-tabs--line .bx-tabs__tab {
-  height: 40px;
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
-.tpanel__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 /* --- A tab --------------------------------------------------------------------- */
@@ -616,8 +502,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bb__insp.is-swap,
-  .bb__insp.tpanel { animation: none; }
+  .bb__insp.is-swap { animation: none; }
   .tpanel-row__flash {
     animation: none;
     opacity: 0;

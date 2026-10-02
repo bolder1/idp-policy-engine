@@ -1,0 +1,196 @@
+/* The explainer inset (DESIGN-v6 §5.1): one 420×220 card, the console's own
+   surface tokens, and the classes the five SVG compositions in explain.js
+   draw with. The engine places the card and runs its enter/exit; every colour
+   lives here so the JS only moves things. */
+.ov-explain {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 19;
+  width: 420px;
+  height: 220px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e4e8ec;
+  box-shadow: 0 12px 32px rgba(10, 14, 20, 0.1), 0 1px 2px rgba(10, 14, 20, 0.06);
+  overflow: hidden;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+/* the drawing sits on the card's outer box, so viewBox px are card px */
+.ov-explain svg {
+  display: block;
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  width: 420px;
+  height: 220px;
+  overflow: visible;
+}
+.ov-explain text {
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- type ------------------------------------------------------------------- */
+.xp-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  fill: #212529;
+}
+.xp-label {
+  font-size: 17px;
+  font-weight: 500;
+  fill: #495057;
+}
+.xp-small {
+  font-size: 13px;
+  font-weight: 500;
+  fill: #646e79;
+}
+.xp-ink2 {
+  fill: #495057;
+}
+.xp-mono {
+  font-size: 22px;
+  font-weight: 700;
+  fill: #212529;
+}
+.xp-tag-t {
+  font-size: 13px;
+  font-weight: 600;
+  fill: #eb5424;
+}
+.xp-avatar-t {
+  font-size: 13px;
+  font-weight: 600;
+  fill: #212529;
+}
+
+/* --- glyphs (Lucide, 24 grid, stroke 1.75 in grid units) ------------------- */
+.xp-glyph {
+  fill: none;
+  stroke: #4a5560;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.xp-glyph.xp-hi {
+  stroke: #eb5424;
+}
+.xp-glyph.xp-ok {
+  stroke: #128f43;
+}
+.xp-glyph.xp-no {
+  stroke: #d01243;
+}
+.xp-glyph.xp-tick-w {
+  stroke: #ffffff;
+}
+
+/* --- surfaces ---------------------------------------------------------------- */
+.xp-chip {
+  fill: #ffffff;
+  stroke: #e4e8ec;
+  stroke-width: 1;
+}
+.xp-chip-hi {
+  fill: none;
+  stroke: #eb5424;
+  stroke-width: 1;
+}
+.xp-tile {
+  fill: #ffffff;
+  stroke: #d3dae1;
+  stroke-width: 1;
+}
+.xp-disc {
+  stroke-width: 1;
+}
+.xp-hi-fill {
+  fill: #fdeee9;
+  stroke: #f9cabb;
+}
+.xp-ok-fill {
+  fill: #e8f7ee;
+  stroke: #b6e3c6;
+}
+.xp-no-fill {
+  fill: #fdf0f2;
+  stroke: #f5c6ce;
+}
+.xp-tag {
+  fill: #fdeee9;
+  stroke: #f9cabb;
+  stroke-width: 1;
+}
+.xp-avatar {
+  fill: #eef1f4;
+}
+.xp-badge {
+  fill: #ffffff;
+  stroke: #eb5424;
+  stroke-width: 1.25;
+}
+
+/* --- connectors, rails, bars --------------------------------------------------- */
+.xp-line {
+  fill: none;
+  stroke: #d3dae1;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.xp-rail {
+  fill: none;
+  stroke: #d3dae1;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 4 6;
+}
+.xp-arrow {
+  fill: #646e79;
+}
+.xp-bar {
+  fill: none;
+  stroke: #646e79;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.xp-bar-soft {
+  fill: none;
+  stroke: #d3dae1;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.xp-bar-hi {
+  fill: none;
+  stroke: #eb5424;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.xp-dash {
+  fill: none;
+  stroke: #646e79;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.xp-ind {
+  fill: #ffffff;
+  stroke: #d3dae1;
+  stroke-width: 1.5;
+}
+.xp-ind-hit {
+  fill: #eb5424;
+  stroke: none;
+}
+
+/* --- the sign-in token: the only thing that travels ----------------------- */
+.xp-token-ring {
+  fill: #ffffff;
+}
+.xp-token {
+  fill: #eb5424;
+}

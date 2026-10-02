@@ -7,7 +7,6 @@ import {
   Copy,
   CopyPlus,
   Globe,
-  Info,
   Layers,
   Link2,
   MapPin,
@@ -43,19 +42,29 @@ import { PLACES, coveredBy, placeContext, searchPlaces, type Place } from '../pl
 import { useBrand } from '../store'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
-import { describeZone, explainBadEntry, validateZone } from './zone-validation'
+import { explainBadEntry, validateZone } from './zone-validation'
 import {
-  centredOn,
+  CURRENT_IP,
+  LIST_OF,
+  entryKind,
   hasEntry,
   locationEntries,
   normaliseEntry,
   parseEntries,
+  placeAtAddress,
+  placeRefusal,
   rangeAt,
   takenZoneIds,
+  withCurrentPlace,
   withRange,
+  withStoredName,
   zoneChanges,
   zoneReviewRows,
+  type PlaceList,
+  type Refusal,
 } from './zone-entries'
+import { NoteStyleSwitch, ZoneNote } from './zone-notes'
+import { useNoteStyle, type ZoneHalf } from './zone-notes-model'
 import { deleteImpact, policiesUsing } from './usage'
 import { libraryChecked, zoneGuard, zoneRestored } from './library-guard'
 import { useLibraryReview } from './library-review'
@@ -298,6 +307,22 @@ export function ZonesFinal() {
               store.showToast(`${z.name} saved`)
             }
           }}
+          /* A stored zone's rename is saved at once, and only the name: read
+             from the store here, so the page's unsaved draft never rides along
+             (see `withStoredName`). A new zone has nothing stored to rename. */
+          onRename={
+            creating
+              ? undefined
+              : (name) => {
+                  const next = withStoredName(
+                    store.zones.find((z) => z.id === detail.id),
+                    name,
+                  )
+                  if (!next) return
+                  store.updateZone(next)
+                  store.showToast(`${name} saved`)
+                }
+          }
         />
       ) : (
         <>
@@ -528,12 +553,13 @@ const ROWS_NOT_ADDED = 'Fix or remove the entries that were not added.'
 /** Rows still in the IP networks list that are not part of the draft yet. */
 type Pending = { typed: number; unread: number }
 
-function ZoneDetail({
+export function ZoneDetail({
   zone,
   isNew,
   otherNames,
   onBack,
   onSave,
+  onRename,
 }: {
   zone: Zone
   /** Not stored yet: the first save creates it. */
@@ -542,6 +568,8 @@ function ZoneDetail({
   otherNames: string[]
   onBack: () => void
   onSave: (z: Zone) => void
+  /** A stored zone only: saves a usable new name straight to the store. */
+  onRename?: (name: string) => void
 }) {
   /* The edit buffer. A zone is what live rules match against, so nothing here
      writes to the store until the save bar commits. */
@@ -563,8 +591,20 @@ function ZoneDetail({
   const dirty = changes.length > 0 || pending.typed > 0
 
   /* Renaming in place. The input holds a half-typed name that Escape can throw
-     away; a committed rename lands in the draft like every other edit. */
+     away.
+
+     A committed rename on a STORED zone is saved there and then (owner, 1 Oct
+     2026: "we already have a save button for the basic details, so no need to
+     have it in the review, or save it"): the ✓, Enter or leaving the field
+     writes the name to the store through `onRename` — the name alone, never the
+     rest of the draft — and the draft's name follows, so the page stays as
+     clean or as dirty as it was and Review changes never lists the name. A NEW
+     zone is not stored yet, so its name lands in the draft with everything
+     else and is reviewed under Basic details. */
   const [renaming, setRenaming] = useState(false)
+  /* The name last sent to the store, so a rename that commits twice — Enter,
+     then the field's own leave — saves and says so once. */
+  const savedName = useRef(zone.name)
   const [draftName, setDraftName] = useState(zone.name)
   const [nameErr, setNameErr] = useState<string | null>(null)
   /* The pencil's wrapper, there so focus can return to it: IconButton takes no ref. */
@@ -593,6 +633,10 @@ function ZoneDetail({
     setNameErr(null)
     setDraftName(name)
     if (name !== draft.name) setDraft((d) => ({ ...d, name }))
+    if (onRename && name !== savedName.current) {
+      savedName.current = name
+      onRename(name)
+    }
     return true
   }
 
@@ -655,7 +699,18 @@ function ZoneDetail({
   const placeCount = locationEntries(draft.location).length
 
   /* Opens on the half that has something in it; an empty zone opens on IP networks. */
-  const [tab, setTab] = useState<'net' | 'place'>(netCount === 0 && placeCount > 0 ? 'place' : 'net')
+  const [tab, setTab] = useState<ZoneHalf>(netCount === 0 && placeCount > 0 ? 'place' : 'net')
+
+  /* The side note's version, from the preview switch in the head. */
+  const [noteStyle] = useNoteStyle()
+  /* A paper note arrives — unrolls, clips on, points — once
+     per visit to this page, tab and version, not on every tab switch back to
+     it. Per version, while the switch is up: a version flipped to for the
+     first time arrives as itself, or the owner would only ever see the first
+     one he tried move. The inline tip's first-visit flag stood here too; the
+     tip went on 1 Oct 2026. */
+  const rolled = useRef(new Set<string>())
+  const noteKey = `${tab}-${noteStyle}`
 
   return (
     <>
@@ -736,11 +791,21 @@ function ZoneDetail({
               {nameErr}
             </p>
           )}
-          <p>{describeZone(draft)}</p>
+          {/* The summary line stood here — "2 networks · Bengaluru, Mumbai ·
+              Within 25 km of Pune" (owner, 1 Oct 2026: "hide this, not needed,
+              only heading is enough"). The tabs under it hold the same things,
+              one per row, and the list row still sums them up. */}
         </div>
         {/* No action trail on the right. Rename is the pencil above; Duplicate,
             Used by and Delete are questions about a zone on the list, and live
-            in its row menu there. */}
+            in its row menu there. What sits here is PREVIEW furniture, in the
+            slot `PageHead` gives it: the side note's four versions (1 and 2
+            Oct 2026).
+            Shown in the showcase build too, because it is a decision still
+            open; it goes once the owner picks — see zone-notes.tsx. */}
+        <div className="bpage__preview">
+          <NoteStyleSwitch />
+        </div>
       </header>
 
       <section className="bz7__build">
@@ -798,6 +863,8 @@ function ZoneDetail({
             {/* Both panels stay mounted, so a half-typed row survives a tab switch. */}
             <div role="tabpanel" id="bz7-panel-net" aria-labelledby="bz7-tab-net" hidden={tab !== 'net'}>
               <AddressSection key={`net-${resetKey}`} draft={draft} onChange={setDraft} onPending={setPending} />
+              {/* The Inline tip's fold stood under each section (1 Oct 2026);
+                  every note is in the aside again. */}
             </div>
             <div role="tabpanel" id="bz7-panel-place" aria-labelledby="bz7-tab-place" hidden={tab !== 'place'}>
               <PlaceSection key={`place-${resetKey}`} draft={draft} onChange={setDraft} />
@@ -805,7 +872,16 @@ function ZoneDetail({
           </div>
 
           <aside className="bz7__aside">
-            {tab === 'net' ? <AcceptsNote /> : <PlacesNote />}
+            {/* Keyed by tab and version, so a newly shown note arrives as itself
+                — the sticky note unrolls, the clipboard drops — rather than
+                morphing out of the last. */}
+            <ZoneNote
+              key={noteKey}
+              half={tab}
+              style={noteStyle}
+              rollOut={!rolled.current.has(noteKey)}
+              onRolled={() => rolled.current.add(noteKey)}
+            />
 
             {issues.length > 0 && (
               <div className="bz7__issues">
@@ -1018,81 +1094,18 @@ function NameOnlyModal({
 /* --- IP networks ---------------------------------------------------------------------
    One field for addresses, blocks, ranges and ASNs. */
 
-/* THIS IP IS MOCKED. A browser cannot see its own public address without a
-   server, so this is a documentation-range placeholder for what the real console
-   would fill from the request. */
-const CURRENT_IP = '203.0.113.42'
+/* `CURRENT_IP` stood here; it is in zone-entries.ts now, where the Locations
+   tab's Quick add reads the same address to find where this session is. */
 
 const QUICK: { label: string; value: string; hint: string }[] = [
   { label: 'My current IP', value: CURRENT_IP, hint: 'The address this session comes from' },
 ]
 
-export function AcceptsNote() {
-  return (
-    <div className="bz7__side">
-      <h3 className="bz7__sidehead">
-        <Info size={14} strokeWidth={2} aria-hidden />
-        What you can add
-      </h3>
-      <ul className="bz7__sidelist">
-        <li>
-          <code>10.0.0.1</code>
-          <em>An IPv4 or IPv6 address</em>
-        </li>
-        <li>
-          <code>192.168.0.0/24</code>
-          <em>A CIDR block</em>
-        </li>
-        <li>
-          <code>192.168.0.1-192.168.0.254</code>
-          <em>An IPv4 range</em>
-        </li>
-        <li>
-          <code>AS15169</code>
-          <em>An ASN</em>
-        </li>
-      </ul>
-      {/* The paste line stood here — "Paste a list to add several at once…"
-          (owner, 23 Sep 2026: "remove"). The examples are what the note is
-          for; pasting is something the field does whether or not it is
-          announced. */}
-    </div>
-  )
-}
-
-export function PlacesNote() {
-  return (
-    <div className="bz7__side">
-      <h3 className="bz7__sidehead">
-        <Info size={14} strokeWidth={2} aria-hidden />
-        What you can add
-      </h3>
-      <ul className="bz7__sidelist">
-        <li>
-          <code>India</code>
-          <em>A country</em>
-        </li>
-        <li>
-          <code>Maharashtra</code>
-          <em>A state or region</em>
-        </li>
-        <li>
-          <code>Pune</code>
-          <em>A city</em>
-        </li>
-        <li>
-          <code>Within 25 km of Pune</code>
-          <em>A city with a range</em>
-        </li>
-      </ul>
-      <p className="bz7__sidep">
-        A country covers its states and cities, and a state covers its cities. The narrower ones stay
-        in the list, marked as covered.
-      </p>
-      <p className="bz7__sidep">Matched on the sign-in's IP address. A VPN shows where it exits.</p>
-    </div>
-  )
-}
+/* `AcceptsNote` and `PlacesNote` stood here: "What you can add", one example
+   per line in monospace — India, Maharashtra, Pune, Within 25 km of Pune. They
+   are in zone-notes.tsx now, unchanged, as the Classic version of `ZoneNote`
+   (owner, 1 Oct 2026: "have the old one as a classic as we used to have"),
+   beside the paper versions behind the head's Note style switch. */
 
 /* Focus the item now at `index` in a section's list, or the one before it, or
    the section's add control. Used after a remove takes the focused row away.
@@ -1407,70 +1420,83 @@ export function AddressSection({
         <ul className={`bz7__fields ${filterOn ? 'is-scroll' : ''}`}>
           {shown.map((r) => {
             const errId = `bz7-net-err-${r.key}`
+            /* What the row holds, said inside it at the right as a Locations
+               row says "City" — and read off the text, so it follows typing.
+               Nothing while the row reads as no single entry. */
+            const kind = entryKind(r.text)
+            const kindId = `bz7-net-kind-${r.key}`
+            const describedBy = [r.err ? errId : null, kind ? kindId : null].filter(Boolean).join(' ')
             return (
               <li key={r.key}>
                 <div className="bz7__fieldline">
-                  <input
-                    type="text"
-                    className="bz7__rowin"
-                    data-row={r.key}
-                    value={r.text}
-                    placeholder={r.value === null ? '10.0.0.1, 192.168.0.0/24, AS15169' : undefined}
-                    aria-label="IP address, network or ASN"
-                    aria-invalid={r.err ? true : undefined}
-                    aria-describedby={r.err ? errId : undefined}
-                    autoComplete="off"
-                    spellCheck={false}
-                    onChange={(e) => patchRow(r.key, { text: e.target.value, err: null })}
-                    /* A one-line field drops the line breaks out of a pasted list,
-                       which glues "10.0.0.1" and "10.0.0.2" into one unreadable
-                       entry. Each line becomes a comma instead. */
-                    onPaste={(e) => {
-                      const pasted = e.clipboardData.getData('text')
-                      if (!/[\r\n]/.test(pasted)) return
-                      e.preventDefault()
-                      const el = e.currentTarget
-                      const from = el.selectionStart ?? el.value.length
-                      const to = el.selectionEnd ?? from
-                      const flat = pasted.trim().replace(/\s*[\r\n]+\s*/g, ', ')
-                      patchRow(r.key, { text: el.value.slice(0, from) + flat + el.value.slice(to), err: null })
-                    }}
-                    /* Committed on the way out: a filled row left behind is an
-                       entry somebody believes they added.
-                       Tab out of an empty row lands on that row's own trash
-                       button, and the commit then drops the row and the button
-                       with it, which leaves focus on the page body. So when the
-                       row goes and focus was headed into it, focus carries on
-                       forward: the row that took its place, else Add IP. */
-                    onBlur={(e) => {
-                      const to = e.relatedTarget
-                      const within = to instanceof Node && !!e.currentTarget.closest('li')?.contains(to)
-                      const at = shown.findIndex((x) => x.key === r.key)
-                      if (commitRow(r.key) === 'dropped' && within) focusForward(at)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                  <span className="bz7__inwrap">
+                    <input
+                      type="text"
+                      className="bz7__rowin"
+                      data-row={r.key}
+                      value={r.text}
+                      placeholder={r.value === null ? '10.0.0.1, 192.168.0.0/24, AS15169' : undefined}
+                      aria-label="IP address, network or ASN"
+                      aria-invalid={r.err ? true : undefined}
+                      aria-describedby={describedBy || undefined}
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(e) => patchRow(r.key, { text: e.target.value, err: null })}
+                      /* A one-line field drops the line breaks out of a pasted list,
+                         which glues "10.0.0.1" and "10.0.0.2" into one unreadable
+                         entry. Each line becomes a comma instead. */
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData.getData('text')
+                        if (!/[\r\n]/.test(pasted)) return
                         e.preventDefault()
-                        /* An empty new row is already the next row. */
-                        if (r.value === null && !r.text.trim()) return
+                        const el = e.currentTarget
+                        const from = el.selectionStart ?? el.value.length
+                        const to = el.selectionEnd ?? from
+                        const flat = pasted.trim().replace(/\s*[\r\n]+\s*/g, ', ')
+                        patchRow(r.key, { text: el.value.slice(0, from) + flat + el.value.slice(to), err: null })
+                      }}
+                      /* Committed on the way out: a filled row left behind is an
+                         entry somebody believes they added.
+                         Tab out of an empty row lands on that row's own trash
+                         button, and the commit then drops the row and the button
+                         with it, which leaves focus on the page body. So when the
+                         row goes and focus was headed into it, focus carries on
+                         forward: the row that took its place, else Add IP. */
+                      onBlur={(e) => {
+                        const to = e.relatedTarget
+                        const within = to instanceof Node && !!e.currentTarget.closest('li')?.contains(to)
                         const at = shown.findIndex((x) => x.key === r.key)
-                        const last = at === shown.length - 1
-                        const done = commitRow(r.key)
-                        if (done === 'clean' && last) addRow()
-                        else if (done === 'dropped') focusInSection(sectionRef, '.bz7__rowin', at)
-                      }
-                      if (e.key === 'Escape') {
-                        if (r.value === null && !r.text.trim()) {
+                        if (commitRow(r.key) === 'dropped' && within) focusForward(at)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
                           e.preventDefault()
-                          removeRow(r.key)
-                        } else if (r.value !== null && r.text !== r.value) {
-                          /* Back to the entry as stored. */
-                          e.preventDefault()
-                          patchRow(r.key, { text: r.value, err: null })
+                          /* An empty new row is already the next row. */
+                          if (r.value === null && !r.text.trim()) return
+                          const at = shown.findIndex((x) => x.key === r.key)
+                          const last = at === shown.length - 1
+                          const done = commitRow(r.key)
+                          if (done === 'clean' && last) addRow()
+                          else if (done === 'dropped') focusInSection(sectionRef, '.bz7__rowin', at)
                         }
-                      }
-                    }}
-                  />
+                        if (e.key === 'Escape') {
+                          if (r.value === null && !r.text.trim()) {
+                            e.preventDefault()
+                            removeRow(r.key)
+                          } else if (r.value !== null && r.text !== r.value) {
+                            /* Back to the entry as stored. */
+                            e.preventDefault()
+                            patchRow(r.key, { text: r.value, err: null })
+                          }
+                        }
+                      }}
+                    />
+                    {kind && (
+                      <span className="bz7__placekind bz7__netkind" id={kindId}>
+                        {kind}
+                      </span>
+                    )}
+                  </span>
                   {/* The mousedown would blur the field first, and a blur commits:
                       an empty row would unmount this button before the click. */}
                   <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
@@ -1530,8 +1556,6 @@ export function AddressSection({
    makes it the city once more. Countries and states have no range: a circle
    is drawn around a point, and a country is not one. */
 
-type PlaceList = 'countries' | 'states' | 'cities'
-
 /** One row of the list. A place's id is its kind and name: a state and a city
     can share a name (Berlin). A range's is its centre and not its distance, so
     a new distance keeps the row, and the focus in its distance field. */
@@ -1539,7 +1563,8 @@ type PlaceRow = { id: string; kind: PlaceList; v: string; label: string }
 type RangeRow = { id: string; kind: 'range'; v: string; range: ZoneRange }
 type Chosen = PlaceRow | RangeRow
 
-const LIST_OF: Record<Place['kind'], PlaceList> = { country: 'countries', state: 'states', city: 'cities' }
+/* `LIST_OF`, `Refusal` and `placeRefusal` are in zone-entries.ts now (1 Oct
+   2026), beside the current-location Quick add that asks the same question. */
 
 /** What a search adds. One kind now: a range is a city's distance field, not a search. */
 type SearchMode = 'place'
@@ -1554,9 +1579,6 @@ interface PlaceSearch {
 }
 
 let placeSearchSeq = 0
-
-/** Why a place cannot go in, or null when it can. */
-type Refusal = { kind: 'added' } | { kind: 'covered'; by: string } | null
 
 const rangeId = (r: ZoneRange) => `range:${r.placeId ?? `${r.lat},${r.lon}`}`
 
@@ -1589,15 +1611,6 @@ const cityNamed = (name: string) => PLACES.find((p) => p.kind === 'city' && p.na
 function withoutPlace(l: ZoneLocation, c: Chosen): ZoneLocation {
   if (c.kind === 'range') return { ...l, ranges: l.ranges.filter((r) => r !== c.range) }
   return { ...l, [c.kind]: l[c.kind].filter((x) => x !== c.v) }
-}
-
-/* A place already in the zone, or inside one that is, would change nothing. */
-function placeRefusal(p: Place, l: ZoneLocation): Refusal {
-  if (l[LIST_OF[p.kind]].includes(p.name)) return { kind: 'added' }
-  /* A city with a distance is still that city. */
-  if (p.kind === 'city' && l.ranges.some((r) => centredOn(r, p))) return { kind: 'added' }
-  const by = coveredBy(p, l)
-  return by ? { kind: 'covered', by } : null
 }
 
 const REFUSAL: Record<SearchMode, (p: Place, l: ZoneLocation) => Refusal> = {
@@ -1634,6 +1647,13 @@ const firstOpenHit = (hits: Place[], l: ZoneLocation, mode: SearchMode) =>
 /* What brings a search of this mode back: its add control under the list, or
    its button in the empty state. */
 const addSel = (mode: SearchMode) => `button[data-add="${mode}"], [data-add="${mode}"] button`
+
+/* The place this session's address is in, for Locations' Quick add (owner,
+   1 Oct 2026: "add an option for add my current location"). The SAME address
+   the IP networks tab offers, put through the same lookup zone matching uses
+   for a sign-in's place — so the place offered here is the place a sign-in
+   from this session would be matched at. Constant, as the address is. */
+const HERE: Place | null = placeAtAddress(CURRENT_IP)
 
 export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
   const sectionRef = useRef<HTMLElement | null>(null)
@@ -1761,6 +1781,43 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     put({ ...l, cities: l.cities.filter((x) => x !== c.v), ranges: [...l.ranges, { ...rangeAt(p, km), unit }] })
   }
 
+  /* Quick add, as on IP networks: one chip, "My current location Pune". It
+     adds the place as Add location would — a city at range 0 — and focus goes
+     to its new row. Already in the zone (Pune with a distance is still Pune),
+     or inside a wider place that is, it says so and adds nothing, as the IP
+     chip does for an address already listed. No chip when the lookup names no
+     place for the address. */
+  const hereNo = HERE ? placeRefusal(HERE, l) : null
+  const quickHere = HERE && (
+    <div className="bz7__quick">
+      <span>Quick add</span>
+      <button
+        type="button"
+        className={`bz7__quickbtn ${hereNo ? 'is-in' : ''}`}
+        disabled={!!hereNo}
+        title={
+          hereNo?.kind === 'added'
+            ? 'Already in this zone'
+            : hereNo?.kind === 'covered'
+              ? `Covered by ${hereNo.by}`
+              : "Where this session's IP address is"
+        }
+        /* Keeps an open search from closing, and moving this, before the click lands. */
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          const next = withCurrentPlace(l, HERE)
+          if (!next) return
+          put(next)
+          focusLater(`[data-place="${CSS.escape(`${LIST_OF[HERE.kind]}:${HERE.name}`)}"]`)
+        }}
+      >
+        {hereNo ? <Check size={12} strokeWidth={2.6} aria-hidden /> : <Plus size={12} strokeWidth={2.4} aria-hidden />}
+        My current location
+        <span className="bz7__quickval">{hereNo?.kind === 'covered' ? `${HERE.name}, in ${hereNo.by}` : HERE.name}</span>
+      </button>
+    </div>
+  )
+
   if (chosen.length === 0 && !open) {
     return (
       <section className="bz7__sec bz7__sec--empty" ref={sectionRef}>
@@ -1772,13 +1829,16 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
           action={
             /* A span, because the kit's Button takes no data attributes and Escape
                from a search comes back to the button that opened it. */
-            <span className="bz7__emptyadds">
-              <span data-add="place">
-                <Button variant="brand" icon={Plus} onClick={() => openNew('place')}>
-                  Add location
-                </Button>
+            <>
+              <span className="bz7__emptyadds">
+                <span data-add="place">
+                  <Button variant="brand" icon={Plus} onClick={() => openNew('place')}>
+                    Add location
+                  </Button>
+                </span>
               </span>
-            </span>
+              {quickHere}
+            </>
           }
         />
       </section>
@@ -1912,8 +1972,7 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
             </ul>
           )}
         </div>
-        {/* The Range column's room, so a row being searched keeps its neighbours' edges. */}
-        <span className="bz7__rangecol is-empty" aria-hidden />
+        <SearchRange {...searchRangeOf(c)} />
         {/* The mousedown would blur the field first, and a blur closes the search. */}
         <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
           <IconButton
@@ -2043,7 +2102,49 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
           Add location
         </button>
       </div>
+
+      {quickHere}
     </section>
+  )
+}
+
+/* The Range column on the row being searched, before there is a place to draw
+   a range round (owner, 1 Oct 2026: "don't make the range empty, add a disabled
+   state anyway"). It was an empty gap the control's width, there only so the
+   row kept its neighbours' edges, and the row read as unfinished. Now it is the
+   place rows' own control — the number, the unit — at 0 km and disabled, the
+   way a country's is, so every row in the list has the same three parts.
+
+   Disabled for real: a fieldset, so neither half takes focus or a click, and
+   nothing in it can change the draft; Tab from the search goes on to the
+   row's remove, as before. Its mousedown is held, as the remove's is, so a
+   click on it does not blur the search — the blur that closes it — and pull
+   the row out from under the pointer. That needs the stylesheet's help: a
+   disabled control gets no mousedown at all, so its halves let the pointer
+   through to the fieldset (`.bz7__rangecol:disabled > *`). When a place is
+   picked, the row becomes that place's row, with its live Range.
+
+   What it shows is what the pick will keep (browser pass, 2 Oct 2026). A new
+   row, or a country or a state being changed, is at 0 km. A city with a range
+   being changed shows that range: a city picked in its place keeps it (`pick`,
+   `withRange`), and the row read "0 km" while Pune's 25 km was carried over
+   to Chennai. */
+const noRange = () => {}
+
+const searchRangeOf = (c: Chosen | null): { km: number; unit: DistanceUnit } =>
+  c?.kind === 'range' ? { km: c.range.km, unit: unitOf(c.range) } : { km: 0, unit: 'km' }
+
+export function SearchRange({ km = 0, unit = 'km' }: { km?: number; unit?: DistanceUnit }) {
+  return (
+    <fieldset
+      className="bz7__rangecol"
+      disabled
+      title="Choose a place first"
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      <input className="bz7__rangenum" inputMode="numeric" aria-label="Range" value={String(km)} readOnly />
+      <Picker size="md" label="Range unit" value={unit} options={DISTANCE_UNITS} onChange={noRange} />
+    </fieldset>
   )
 }
 

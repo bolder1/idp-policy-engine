@@ -42,6 +42,7 @@ import {
   type ProfileMode,
 } from './fingerprint'
 import { CHECK_BRAND } from './logos/check-brands'
+import { GENERAL_GROUP, groupSections } from './review-rows'
 
 /* The attribute master is a transcription of somebody else's spreadsheet, and a
    transcription drifts silently: a weight typo or a lost category reads as a
@@ -625,11 +626,29 @@ describe('what changed, for the save bar and Review changes', () => {
   it('files each row under its section and says what kind of change it is', () => {
     const next: FingerprintProfile = { ...corp, name: 'Corporate laptops', enabled: ['device-type', 'browser-chrome'] }
     const [name, added] = profileReview(corp, next)
-    /* The name files nowhere, so it leads under General; it is not an effect. */
+    /* The name files nowhere, so it leads under Basic details (GENERAL_GROUP);
+       it is not an effect. */
     expect(name.group).toBeUndefined()
     expect(name.effect).toBeUndefined()
     expect(added).toMatchObject({ group: 'Checks', kind: 'added', item: 'Chrome version' })
     expect(added.effect).toBeUndefined()
+  })
+
+  /* A new trusted device lists its name as added beside its setup, as the page
+     does (`shownReview`, against a copy with no name). The general heading is
+     "Basic details" (1 Oct 2026) and so is the setup's section, so the two are
+     one section in Review changes, never two of the same name. */
+  it("files a new profile's name with its setup, under one Basic details", () => {
+    const fresh: FingerprintProfile = { ...blankProfile('Kiosks', 'device'), id: 'fp-new' }
+    const draft: FingerprintProfile = { ...fresh, restrictionSet: true, autoRegister: true }
+    const rows = profileReview({ ...fresh, name: '' }, draft)
+    const sections = groupSections(rows)
+    expect(GENERAL_GROUP).toBe('Basic details')
+    expect(sections.map((x) => x.title)).toEqual([GENERAL_GROUP])
+    expect(sections[0].blocks.map((b) => [b.kind, b.rows.map((r) => r.label)])).toEqual([
+      ['added', ['Name']],
+      ['changed', ['Basic details', 'Device auto-registration']],
+    ])
   })
 
   /* The profile page counts a draft as unsaved only when this has a row, so a

@@ -43,7 +43,9 @@ const TODAY = '2026-10-01'
 const policy = (id: string) => t.policies.find((p) => p.id === id)!
 const hrms = policy('sc-hrms-office')
 const text = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()
-const rules = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
+/* LF line ends first: a Windows checkout (core.autocrlf) hands the sheet over
+   with CRLF, and the selector lists below are matched across a line break. */
+const rules = (css: string) => css.replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '')
 
 const noop = () => {}
 const sessionWith = (over: Partial<TestingSession>): TestingSession => ({

@@ -8,9 +8,10 @@ import { decisionSig, runSentence, updateSentence, type DecisionView, type Route
    the stops its marker travels, where the marker stands, what last moved the
    answer, and what the status region says.
 
-   use-try-sign-in.ts holds these in React state and feeds them the clock.
-   Every decision it makes with them is here, pure, so the rules of the run
-   can be pinned without a browser:
+   The board's Try a sign-in hook held these in React state and fed them the
+   clock, until Check access (PolicyCheck.tsx) took test mode's place on
+   1 Oct 2026. Every decision it made with them is here, pure, so the rules
+   of the run can be pinned without a browser:
 
      a run      opening test mode, an origin chip, Replay — the three
                 triggers, and the only ones. It travels from the start, and

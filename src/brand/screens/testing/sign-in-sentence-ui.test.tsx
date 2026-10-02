@@ -41,7 +41,7 @@ const policy = (id: string): Policy => t.policies.find((p) => p.id === id)!
    Place, exists only against this one. */
 const BARE = t.policies.map((p) => (p.isSystem ? { ...p, rules: [] } : p))
 
-/* The board's first sign-in for a policy, as use-try-sign-in makes it. */
+/* The board's first sign-in for a policy (`defaultBoardForm`). */
 function board(id: string, patch: Partial<SignInForm> = {}, policies: readonly Policy[] = t.policies) {
   const p = policies.find((x) => x.id === id)!
   const form = { ...defaultBoardForm(p, t.directory.people, t.apps, TODAY), ...patch }

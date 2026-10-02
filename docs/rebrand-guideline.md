@@ -5,6 +5,12 @@ product at `login.xecurify.com/moas/admin/customer/home` and applied while the
 **Rebrand** switch in the top bar is on. It changes how the console looks, never
 what it does. The current look stays exactly as it is when the switch is off.
 
+> **Status, 1 Oct 2026:** the showcase build always runs the rebrand. `SHOWCASE` (`src/brand/showcase.ts`) sets
+> `data-brand="rebrand"` before first paint in `src/main.tsx` and hides `BrandSwitch`, so the switch in §1 shows only
+> with `SHOWCASE` off. Two later owner rulings refine this file: blue is for selection, while icons and pills keep their
+> base colours (16 Sep), and every primary fill is `#eb5424` (22 Sep). They are in `docs/memory/icon-audit-and-basic-details.md` and
+> `docs/memory/rebrand-live-console-blue.md`.
+
 This file is the reference for every rebrand change. When a screen and this file
 disagree, fix the screen.
 

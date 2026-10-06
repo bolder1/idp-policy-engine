@@ -1,13 +1,13 @@
 # Troubleshooting: what admins need next
 
-Status: **built overnight, 5 to 6 Oct 2026**, in the 5181 worktree (`okta-device-policy-walkthrough-cea5b7`), uncommitted, behind flags. Follows `DENIAL-REASONS.md` (its steps 1 to 5 are built too). Proven by tests and a type check; **not yet looked at in a browser** (the Browser pane was hidden, which freezes the run).
+Status: **built overnight, 5 to 6 Oct 2026**, in the 5181 worktree (`okta-device-policy-walkthrough-cea5b7`) and **committed on 6 Oct in 5575ce7** (on `main` at 306f64e), behind flags. Follows `DENIAL-REASONS.md` (its steps 1 to 5 are built too). Proven by tests and a type check. The overnight build was not looked at in a browser; the browser checks since (6 Oct) covered the Why panel in Focus and the details panel, not every screen below.
 
 ## Who and what they need to get done
 
 | Who | The job | Built |
 |---|---|---|
-| **Help desk** | "I can't get into Box": find the person's refusal, say why, say what to do, hand it on | Find a blocked sign-in; Sign-in activity (filters, detail, Open in Access checks); Copy summary in Why and in the activity detail |
-| **IdP admin** | Fix a policy that blocks the wrong people without opening a hole | Fix in policy (already there); What changed in Why |
+| **Help desk** | "I can't get into Box": find the person's refusal, say why, say what to do, hand it on | Find a blocked sign-in (the Blocked sign-ins panel); Sign-in activity (filters, detail, Open in Access checks); Copy summary in Why and in the activity detail |
+| **IdP admin** | Fix a policy that blocks the wrong people without opening a hole | Fix in policy (already there); What changed in Why; the details panel to read the policy and rule first |
 | **IdP admin** | Let one person in for a while | Let in for a while, from a refusal's Why |
 | **IdP admin** | Know that a refusal is intended | Accept this result and Restore expectation on each break-in attempt |
 | **Security lead** | See patterns and whether a change caused them | Reasons report on Sign-in activity; Changes view; What changed |
@@ -15,12 +15,12 @@ Status: **built overnight, 5 to 6 Oct 2026**, in the 5181 worktree (`okta-device
 
 ## What was built
 
-Flags are in `screens/sign-in-tests/phase.ts`: `DENIAL_REASONS`, `TEMP_ACCESS`, `ACCEPT_ATTEMPTS`, all on.
+Flags are in `screens/sign-in-tests/phase.ts`: `DENIAL_REASONS`, `TEMP_ACCESS`, `ACCEPT_ATTEMPTS`, all on. Since 6 Oct the Why is also reachable from Focus (`WHY_IN_FOCUS`, on): the outcome card ends in a Why link, so Let in for a while, How to get in, What changed and Copy summary are all reachable in the one view the owner presents. A grant now ends on its date even with the time cleared.
 
 1. **Accept as expected on the Access checks page.** On a break-in attempt row: Accept this result (a reason, who and when are recorded), and Restore expectation. Uses the existing acceptance model and store.
 2. **Copy summary in Why.** Plain text for a ticket: who, where to, the answer, what decided it, the reason on a refusal, what else applies, how to get in. `why-summary.ts`.
 3. **Let in for a while.** In a refusal's Why: an end date (up to 30 days) and a reason. The policy that refused gets a first rule for that person on 2 factors that **switches itself off after the date** (`Rule.tempAccess`, `ruleExpired`, evaluated on the sign-in's date). A toast with Undo. Not offered when the Global Default decided. `temp-access.ts`, `GrantForm.tsx`.
-4. **Sign-in activity** (`screens/SignInActivity.tsx`, route `sign-in-activity`, opened from a row at the top of the Access checks form). The week's sign-ins across every application: result, reason (admin only), deciding policy and rule. Filters: search, result, reason, application. A row opens in place with Open in Access checks (loads the sign-in into the form, never runs it) and Copy summary. A **Changes** view lists who changed which policy. **Export** saves the current view as CSV.
+4. **Sign-in activity** (`screens/SignInActivity.tsx`, route `sign-in-activity`). Opened from a **Sign-in activity** button beside Check access on the All Policies page (owner, 5 Oct: "move the sign-in activities in the main policy screen"). The week's sign-ins across every application: result, reason (admin only), deciding policy and rule. Filters: search, result, reason, application. A row opens in place with Open in Access checks (loads the sign-in into the form, never runs it) and Copy summary. A **Policy changes** tab lists who changed which policy. **Export** saves the current view as CSV.
 5. **Reasons report.** On Sign-in activity: each reason with a count; pressing one filters to it.
 6. **What changed.** On a refusal, Why lists edits to the policy that refused in the last 14 days (who, when, what). Needs the **change log**: the store now records every save and status change (`change-log.ts`, `store.changeLog`). The showcase tenant starts with four seeded entries (dummy data).
 7. **Suggested next step per reason** in the Deny rule editor: one press fills the rule's Next step. Never added by itself.
@@ -43,11 +43,11 @@ Flags are in `screens/sign-in-tests/phase.ts`: `DENIAL_REASONS`, `TEMP_ACCESS`, 
 ## Rulings kept
 
 - The reason and the `Ref:` code are **admin only**; the end user's deny page shows the message, next step and contact. (5 Oct)
-- Nothing is committed. New controls sit behind flags. Tokens only, one orange button, no counts on tabs.
+- New controls sit behind flags. The work is committed (5575ce7). Tokens only, one orange button, no counts on tabs.
 
 ## Open decisions for the owner
 
 1. Should a grant be capped at 30 days, and always ask for a reason? Built that way.
 2. Does a grant on a policy with other temporary rules need a list of "what will expire"? `tempGrantsOf(policy)` exists; nothing shows it yet.
 3. Is the change log's seeded history acceptable as showcase dummy data?
-4. Should Sign-in activity live in the rail under Policies, or stay a link from Access checks? Built as a link.
+4. Decided 5 Oct: Sign-in activity is a button on the All Policies page, beside Check access. It is not in the rail.

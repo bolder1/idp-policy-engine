@@ -40,6 +40,7 @@ These hide finished work for the current phase. Don't delete what they gate, and
 
 - `SHOWCASE` (`src/brand/showcase.ts`)
 - `SAVED_SIGN_INS` / `BREAK_IN_ATTEMPTS` (`screens/sign-in-tests/phase.ts`)
+- The rest of the Access checks flags in `screens/sign-in-tests/phase.ts`: `CANVAS_OPTIONS`, `DENIAL_REASONS`, `ACCEPT_ATTEMPTS`, `TEMP_ACCESS`, `MULTI_IDENTITY`, `INSPECTOR`, `READ_AS_TEXT_TAB`, `DETAILS_IN_BAR`, `WHY_IN_FOCUS`; and `CANVAS_PICKER`, `ARUNA_ENTRY` in `run-layout.ts`
 - `PEOPLE_AND_BREAK_IN` (`screens/board/test-mode.ts`)
 - `BAR_DEMO` / `BAR_TOUR` / `BAR_READ` (`screens/board/bar-tools.ts`)
 - `features` in `src/brand/store.tsx`

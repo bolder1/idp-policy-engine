@@ -1,6 +1,6 @@
 # Denial reasons: one reason, three readers (v2)
 
-Status: steps 1 to 5 and the step-3 extras are built in the 5181 worktree (5 Oct 2026), uncommitted, behind `DENIAL_REASONS` (on). Proven by tests; browser-checked on the older build only.
+Status: steps 1 to 5 and the step-3 extras are built (5 Oct 2026) and committed (5575ce7, 6 Oct), behind `DENIAL_REASONS` (on). Proven by tests; browser-checked on the older build only. See `DENIAL-NEXT.md` for what came after.
 
 **Owner ruling, 5 Oct 2026: the reason is admin only.** The outcome card, Why and the blocked list say it. The end user's deny page shows the rule's message, next step and a contact, and never the reason or a reference code. This follows the IDP miniOrange design repo (the end user stays opaque about policy, factor, IP and device).
 
@@ -69,7 +69,7 @@ After the owner's review, in this order: Accept as expected for break-in attempt
 
 ## Flag and rules
 
-New controls sit behind `DENIAL_REASONS`, off in the showcase until the owner flips it. Tokens only, one orange button per view, no counts on tabs, sentence case, never "log in" in new text.
+New controls sit behind `DENIAL_REASONS`, now on (`phase.ts`). Tokens only, one orange button per view, no counts on tabs, sentence case, never "log in" in new text.
 
 ## Must-have versus later
 
@@ -79,5 +79,5 @@ Must-have now: steps 1 to 3. Then step 4. Step 5 follows. Everything under "Afte
 
 1. Decided: contact is per tenant (`TENANT_DENY_CONTACT`) with a per-rule override.
 2. Decided 5 Oct: no reference for the end user; the reason is admin only.
-3. Help-desk lookup inside Access checks (recommended) or on its own page?
-4. Should "How to get in" show to the end user as well, or only to the admin and help desk? Recommended: admin and help desk first, because the end user cannot act on a what-if.
+3. Decided: inside Access checks (the Blocked sign-ins panel), and the week's refusals on Sign-in activity.
+4. Decided: "How to get in" is inside Why, so admin and help desk only; the end user never sees it.

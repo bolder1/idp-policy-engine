@@ -1,6 +1,6 @@
 # Check access: see everything here, leave only to change something
 
-Status: proposal, 6 Oct 2026. Nothing here is built. Owner ask: after a check, the admin should be able to look
+Status: **built on 6 Oct 2026**, committed in 5575ce7 (what was decided and built is the last section; the rest is the proposal as it stood before the build, kept for the reasons and the "Later" list). The 6 Oct fixes to the Depends views and the default in the person list are in the worktree, uncommitted. Owner ask: after a check, the admin should be able to look
 into anything the check touched, in a right-hand panel, and leave Check access only to edit.
 
 ## The principle
@@ -12,9 +12,9 @@ way out is **Edit in builder ↗**, which lands on the exact policy or rule.
 
 ## What the check touches, what the admin wants next, and what exists
 
-Status is from the code at 6 Oct 2026. "Exists" means the data or a surface is there today.
+The "Before the build" column is the code as it stood on the morning of 6 Oct 2026, before the inspector existed. "Exists" meant the data or a surface was there then.
 
-| Object | What the admin wants to know | Today |
+| Object | What the admin wants to know | Before the build |
 |---|---|---|
 | **Person** | Every group they are in; role and type; which policies reach them and why; their methods; recent sign-ins | Name and groups on the sign-in card only. Data exists (`User`, groups). No panel |
 | **Application** | Every policy on it in the order the engine reads; who it covers; break-in result | Policy list on the Policies card (names only). Break-in panel exists |

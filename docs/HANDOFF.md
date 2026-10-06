@@ -98,7 +98,7 @@ Hidden means kept, not deleted. Flip the flag and the door comes back with every
 
 Two switches stay on screen even in the showcase build until he chooses; then pin the choice and delete the switch and the losing styles.
 
-- **Toggle style** — on Authentication methods, page head: Blue (today's), Green, Grayscale, Navy, Outlined, Icons. App-wide via `html[data-toggle-style]`, remembered per viewer (`src/brand/toggle-style.ts`, the blocks in `kit.css`).
+- **Toggle style — DECIDED 5 Oct 2026: Blue.** The switch and the five other styles are deleted; Blue is the plain `.bx-toggle` rules in `kit.css` (off = white with a dark edge and knob, disabled off = the grey pill), pinned by `src/brand/toggle.test.tsx`.
 - **Note style** — on a zone's page head: Classic (the original card, as at d03d761), Sticky note, Clipboard, Pointer (`screens/zone-notes.tsx`, `zone-notes-model.ts`, `zones-final.css`). He cut Colours, Example rows, Inline tip, Note pile and Index card.
 - Small open calls from the last review: Classic's example descriptions measure 3.93:1 (the original styling; `opacity: 0.78` on `.bz7__sidelist em` would pass); the Clipboard's top padding and the Pointer's notch were sized up from the research spec in the browser.
 

@@ -89,7 +89,10 @@ export interface SignInFacts {
   /* undefined: not stated, and looked up from `network` when that is set.
      null: looked up, and the lookup names no place (an anonymiser). */
   location?: SignInPlace | null
-  when?: { date?: string /* YYYY-MM-DD */; time: string /* HH:MM */; timeZone: string /* IANA */; source: FactSource }
+  /* The date and the time are each stated or not. A date with no time is still a date (6 Oct 2026): a temporary access
+     grant ends on a day, not at an hour (data.ts `ruleExpired`), so a sign-in whose time was cleared is still judged by
+     its date — and a time window or a weekday that needs the hour stays Can't tell, asking for the time. */
+  when?: { date?: string /* YYYY-MM-DD */; time?: string /* HH:MM */; timeZone: string /* IANA */; source: FactSource }
   device?: SignInDevice
   /** 0–100, compared strictly, as the showcase bands need. */
   risk?: { score: number; source: FactSource }

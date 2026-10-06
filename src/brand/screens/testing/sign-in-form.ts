@@ -124,8 +124,13 @@ export function factsOf(form: SignInForm, zones: readonly Zone[]): { facts: Sign
   const location = placeFacts(form.place, zones)
   if (location) facts.location = location
 
-  if (form.time) {
-    facts.when = { ...(form.date ? { date: form.date } : null), time: form.time, timeZone: form.timeZone || TENANT_TZ, source: 'stated' }
+  /* The date and the time, each as stated. A date with no time used to state
+     nothing at all, and the one thing a date alone decides went with it: a
+     temporary access grant that had ended still let the person in once the
+     time was cleared (6 Oct 2026). No time is made up for it — a time window
+     on a date-only sign-in is still Can't tell. */
+  if (form.time || form.date) {
+    facts.when = { ...(form.date ? { date: form.date } : null), ...(form.time ? { time: form.time } : null), timeZone: form.timeZone || TENANT_TZ, source: 'stated' }
   }
 
   const device = deviceFacts(form.device)
@@ -277,7 +282,7 @@ function placeSaid(facts: SignInFacts): string {
 }
 
 /** "2026-09-28" as "28 Sep 2026". By table, not Intl: en-GB now says "Sept". */
-function dateSaid(iso: string): string {
+export function dateSaid(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
   const month = m ? MONTHS[Number(m[2]) - 1] : undefined
   return m && month ? `${Number(m[3])} ${month} ${m[1]}` : iso

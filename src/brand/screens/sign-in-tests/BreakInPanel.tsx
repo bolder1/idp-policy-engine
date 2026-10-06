@@ -201,9 +201,10 @@ export function BreakInPanel({ result, appName, reduced, back, slide = true, wid
         ))}
 
         {/* What held, last and folded: not the question. Its count is said
-            here and nowhere else in the panel. A native disclosure, so the
-            page's Escape — which waits for anything expanded in the panel —
-            still shuts the panel with it open. */}
+            here and nowhere else in the panel. A native disclosure; the
+            page's Escape waits only for a popup open in the panel, never for
+            a row — this fold or an attempt opened above (page-keys.ts) — so
+            it shuts the panel with either open. */}
         {held.length > 0 && (
           <details className="sit-att__held" open={heldOpen} onToggle={(e) => setHeldOpen(e.currentTarget.open)}>
             <summary className="sit-att__heldsum">

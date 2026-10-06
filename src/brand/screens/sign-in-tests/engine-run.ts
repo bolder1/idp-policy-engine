@@ -1133,6 +1133,8 @@ export function readersOf(policies: readonly Policy[], appId: string | null, lib
   for (const p of policiesOn(policies, appId, extra)) {
     p.rules.forEach((r, i) => {
       if (!r.enabled) return
+      /* A temporary access grant reads the date it ends on (rows-read.ts). */
+      if (r.tempAccess) note('when', p.name, i + 1)
       for (const c of leaves(r.when)) {
         switch (c.typeId) {
           case 'zone':

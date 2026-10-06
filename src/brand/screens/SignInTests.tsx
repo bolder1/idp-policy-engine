@@ -46,6 +46,7 @@ import {
 import { TryJourney } from './sign-in-tests/TryJourney'
 import { InspectPanel } from './sign-in-tests/InspectPanel'
 import { isPeek, sameTarget, type InspectTarget } from './sign-in-tests/inspect-model'
+import { openerOf, popupOpen, refocus } from './sign-in-tests/page-keys'
 import { SavedPanel, TryPanel, WhyPanel } from './sign-in-tests/TryPanel'
 import { useSimEnv } from './sim-env'
 import { resolveSignIn } from './tenant-resolver'
@@ -166,10 +167,11 @@ import './sign-in-tests/panel-stage.css'
    - Fix in policy opens the deciding policy in the builder, the fix in its
      draft (the route's `fix`, break-in-app.ts `fixOnArrival`).
    Any new run shuts the panel — Replay and an "As each group" re-run too,
-   the why with it (`shutBeside`); shut, the focus goes back to the strip or
-   the link that opened it, else Replay. A played attempt is held to what
-   its row says (`attemptPlay`): a held one never shows a failure, a Weaker
-   factor one says so.
+   the why with it (`shutBeside`); shut, the focus goes back to what opened
+   it — the strip, the quiet link, Focus's Break-in attempts — else Replay
+   (page-keys.ts). A played attempt is held to what its row says
+   (`attemptPlay`): a held one never shows a failure, a Weaker factor one
+   says so.
    -------------------------------------------------------------------------- */
 
 export type SignInTestsTab = 'try' | 'saved' | 'people' | 'runs'
@@ -246,6 +248,15 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   const [attemptsFrom, setAttemptsFrom] = useState<AttemptsFrom>('outcome')
   /* The why and the attempts are one panel: the one swapped in for the other is there at once, not slid in. */
   const [swapped, setSwapped] = useState(false)
+  /* What opened the panel — a name on a card, Break-in attempts on Focus's bar, the answer's strip, Edit sign-in —
+     for the focus to go back to as it shuts (review, 6 Oct 2026: on Focus it went nowhere, the doors `closePanel`
+     knew being the older layouts'). Taken as each panel opens; one opened from inside another keeps the first's
+     (page-keys.ts `openerOf`). */
+  const opener = useRef<HTMLElement | null>(null)
+  const noteOpener = () => {
+    const a = document.activeElement
+    opener.current = openerOf(a instanceof HTMLElement ? a : null, panel !== null ? opener.current : null, document.body)
+  }
   const panelOpen = panel === 'form'
   useEffect(() => {
     if (SAVED_SIGN_INS && !TABLES && routeTab === 'saved') setPanel('saved')
@@ -377,6 +388,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     /* A run waiting for the panel to slide out still begins — but the panel
        is back, so the canvas must not take the focus from it. */
     if (leaving.current) leaving.current.keepFocus = true
+    noteOpener()
     setPanel('form')
     if (!then) return
     if (already || reduced) then()
@@ -389,6 +401,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
       slot: whySlot,
       onOpen: (o: boolean) => {
         if (o) {
+          noteOpener()
           setSaveOpen(false)
           setSavedAt(null)
           setSwapped(panel === 'break-in')
@@ -396,7 +409,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
         } else if (panel === 'why') closePanel(true)
       },
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `closePanel` reads only `panel`
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `closePanel` and `noteOpener` read only `panel` (and a ref)
     [panel, whySlot],
   )
   /* Review attempts — the answer's strip or quiet link, or the why's
@@ -408,6 +421,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
       return
     }
     if (leaving.current) leaving.current.keepFocus = true
+    noteOpener()
     setSaveOpen(false)
     setSavedAt(null)
     setAttemptsFrom(from)
@@ -420,29 +434,47 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     setPanel('why')
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>('.sit-whypanel .tj-why__title')?.focus({ preventScroll: true })))
   }
+  /* The week's refused sign-ins, from the empty canvas's Blocked sign-ins (DENIAL_REASONS). */
+  const openBlocked = () => {
+    noteOpener()
+    setPanel('blocked')
+  }
   /* Open the panel on the saved sign-ins: their search takes the focus as it arrives (SavedPanel). */
   const openSaved = () => {
     if (leaving.current) leaving.current.keepFocus = true
+    noteOpener()
     setSaveOpen(false)
     setSavedAt(null)
     setPanel('saved')
   }
   /* Shut it, and — when the focus was in it, or asked to — hand the focus
-     back to the canvas: the empty canvas's button for what was open, or
-     the run's Replay, else the sentence at its top. The attempts give it to
-     what opened them — the strip or the quiet link, else the strip that
-     opened the why they came from — else Replay. */
+     back: to what opened it, while that is still on the page and takes it
+     (`noteOpener`, page-keys.ts `refocus`) — a name on a card, Break-in
+     attempts on Focus's bar, the strip. Else to the canvas: the empty
+     canvas's button for what was open, or the run's Replay, else the
+     sentence at its top. The attempts give it to the strip or the quiet
+     link, else the strip that opened the why they came from — else Replay.
+     Last, Focus's own (review, 6 Oct 2026: the doors above are the older
+     layouts', and a panel shut on Focus left the focus on nothing): its
+     Break-in attempts for the attempts, its Why link for the why (the door
+     focus2-why.tsx takes when the focus is left on nothing — the canvas
+     taken first would beat it), the Replay on its sign-in card, the canvas
+     itself. */
   const closePanel = (focusBack = false) => {
     const from = panel
     const inPanel = !!(document.activeElement instanceof HTMLElement && document.activeElement.closest('.sit-panel'))
+    const opened = opener.current
+    opener.current = null
     setPanel(null)
     setSaveOpen(false)
     setSavedAt(null)
     if (!focusBack && !inPanel) return
     window.requestAnimationFrame(() => {
+      if (refocus(opened)) return
       const at = (sel: string) => document.querySelector<HTMLElement>(`.sit__stage ${sel}`)
+      const onFocus = () => (from === 'break-in' ? at('.f2cb__break') : from === 'why' ? at('.rl-c2__why') : null) ?? at('.rl-c2__replay') ?? at('.tj-canvas')
       if (from === 'break-in') {
-        const back = at('.tj-hero__attempts') ?? at('button.tj-hero__strip') ?? at('.tj-engine__replay button')
+        const back = at('.tj-hero__attempts') ?? at('button.tj-hero__strip') ?? at('.tj-engine__replay button') ?? onFocus()
         back?.focus()
         return
       }
@@ -450,12 +482,12 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
          Why? — as the why under the answer does, else Replay (review, 1 Oct
          2026: its X left the focus on nothing). */
       if (from === 'why') {
-        const back = document.querySelector<HTMLElement>(WHY_DOOR) ?? at('.tj-engine__replay button')
+        const back = document.querySelector<HTMLElement>(WHY_DOOR) ?? at('.tj-engine__replay button') ?? onFocus()
         back?.focus()
         return
       }
       const ways = Array.from(document.querySelectorAll<HTMLElement>('.sit__stage .hiw__act button'))
-      const door = (from === 'saved' ? ways[1] : ways[0]) ?? document.querySelector<HTMLElement>('.sit__stage .tj-engine__replay button, .sit__stage .tj-sin2__edit')
+      const door = (from === 'saved' ? ways[1] : ways[0]) ?? document.querySelector<HTMLElement>('.sit__stage .tj-engine__replay button, .sit__stage .tj-sin2__edit') ?? onFocus()
       door?.focus()
     })
   }
@@ -491,16 +523,22 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
       leaving.current = wait
     } else go(false)
   }
-  /* Escape shuts the panel — unless something is open over it (a picker's
-     list, a fact's panel, Save sign-in, a Saved sign-ins picker), which takes
-     that Escape itself. Taken on the way down: a closed Picker still stops
-     the Escape that reaches it. */
+  /* Escape shuts the panel — unless a popup is open over it (a picker's
+     list, a fact's panel, Save sign-in, a Saved sign-ins picker, the Choose
+     a user dialog), which takes that Escape itself. A row opened in the
+     panel is no popup: an attempt opened in Break-in attempts held the panel
+     up for good while Escape waited for anything expanded (review, 6 Oct
+     2026; page-keys.ts `popupOpen`). Taken on the way down: a closed Picker
+     still stops the Escape that reaches it. And taken: what listens after
+     the page — the Brief's own panel Escape — stands back, so one Escape
+     shuts one thing, as in the builder's Check access. */
   const anyPanel = panel !== null
   useEffect(() => {
     if (!anyPanel) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
-      if (document.querySelector('.sit-panel [aria-expanded="true"]')) return
+      if (popupOpen()) return
+      e.preventDefault()
       closeLatest.current()
     }
     document.addEventListener('keydown', onKey, true)
@@ -657,6 +695,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   const [pins, setPins] = useState<InspectTarget[]>([])
   const togglePin = (t: InspectTarget) => setPins((cur) => (cur.some((p) => sameTarget(p, t)) ? cur.filter((p) => !sameTarget(p, t)) : [...cur, t]))
   const onInspect = (t: InspectTarget, plan: EngineRun, fresh = false) => {
+    noteOpener()
     setInspect((cur) => ({ stack: cur && panel === 'inspect' && !fresh ? [...cur.stack.filter((x) => !sameTarget(x, t)), t] : [t], plan }))
     setPanel('inspect')
   }
@@ -783,7 +822,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
             why={why}
             onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}
             onTryForm={playForm}
-            onBlocked={DENIAL_REASONS ? () => setPanel('blocked') : undefined}
+            onBlocked={DENIAL_REASONS ? openBlocked : undefined}
             onPickBlocked={DENIAL_REASONS ? fillBlocked : undefined}
             onGrant={grantAccess}
             onPickIdentity={showPick}
@@ -869,7 +908,9 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
               onEdit={editInBuilder}
               pins={pins}
               onPin={togglePin}
-              signIn={{ personId: session.form.personId, appId: session.form.appId }}
+              /* A group's check runs as one member who stands for it (sign-in-card.ts `memberOf`): that member is not
+                 the person signing in, so Related names no person then — the application alone (review, 6 Oct 2026). */
+              signIn={{ personId: asGroup ? null : session.form.personId, appId: session.form.appId }}
             />
           )}
           {panel === 'saved' && (

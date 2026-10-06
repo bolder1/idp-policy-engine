@@ -6,7 +6,7 @@ import { TENANT_TZ, type DevicePlatform } from '../sign-in-facts'
 import { DEVICE_PRESETS, devicePreset, type DevicePresetId } from './device-presets'
 import type { RowsRead } from './rows-read'
 import { CUSTOM_DEVICE, deviceFactsOf, fieldRowId, type FieldOption } from './sign-in-fields'
-import { ORIGIN_PRESETS, distancePlace, type FormField, type FormIssue, type OriginPresetId, type SignInForm } from './sign-in-form'
+import { ORIGIN_PRESETS, dateSaid, distancePlace, type FormField, type FormIssue, type OriginPresetId, type SignInForm } from './sign-in-form'
 
 /* -----------------------------------------------------------------------------
    The sign-in, as one sentence of pills (Policy testing V4, §2.2).
@@ -224,9 +224,14 @@ export function tokenValue(token: TokenId, form: SignInForm, ctx: SentenceContex
       return said(d.kind === 'preset' ? devicePreset(d.id).label : CUSTOM_DEVICE, mark)
     }
     case 'when': {
-      if (!form.time) return unset({ kind: 'icon', icon: 'clock' })
-      const day = form.date ? weekdayOf(form.date) : null
       const tz = form.timeZone && form.timeZone !== TENANT_TZ ? zoneCity(form.timeZone) : null
+      /* A date with the time cleared is still stated (sign-in-form.ts
+         `factsOf`, 6 Oct 2026): a temporary access grant ends on it, and the
+         pill read "Any time" in grey while that date refused the person. Said
+         as the date alone, with no weekday: without the hour the weekday is
+         not read (simulate.ts, the day check). */
+      if (!form.time) return form.date ? said([dateSaid(form.date), tz].filter(Boolean).join(' · '), { kind: 'icon', icon: 'clock' }) : unset({ kind: 'icon', icon: 'clock' })
+      const day = form.date ? weekdayOf(form.date) : null
       return said([[form.time, day].filter(Boolean).join(' '), tz].filter(Boolean).join(' · '), { kind: 'icon', icon: 'clock' })
     }
     case 'risk': {

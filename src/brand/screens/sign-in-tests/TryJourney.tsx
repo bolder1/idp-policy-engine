@@ -871,6 +871,9 @@ export function TryJourney({
               onInspect={onInspect ? (t, fresh) => onInspect(t, shown, fresh) : undefined}
               onAsGroup={onAsGroup}
               why={why}
+              onTryForm={onTryForm}
+              onGrant={onGrant}
+              grantFor={grantFor}
               breakIn={breakIn}
               onReviewBreakIn={onReviewBreakIn}
               onReplay={replay}

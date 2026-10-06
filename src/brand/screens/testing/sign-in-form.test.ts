@@ -163,9 +163,13 @@ describe('factsOf', () => {
     expect(['12', '48', '86'].map((risk) => run({ ...f, risk }).decision)).toEqual(['1fa', '2fa', 'deny'])
   })
 
-  it('states the hour without a day, and nothing at all without an hour', () => {
+  /* A day without an hour is stated too (6 Oct 2026): a temporary access
+     grant ends on a date, and clearing the time must not hide it. No time is
+     made up for it. */
+  it('states the hour without a day, the day without an hour, and nothing at all without either', () => {
     expect(factsOf({ ...hrms, date: '' }, t.zones).facts.when).toEqual({ time: '09:30', timeZone: 'Asia/Kolkata', source: 'stated' })
-    expect(factsOf({ ...hrms, time: '' }, t.zones).facts.when).toBeUndefined()
+    expect(factsOf({ ...hrms, time: '' }, t.zones).facts.when).toEqual({ date: TODAY, timeZone: 'Asia/Kolkata', source: 'stated' })
+    expect(factsOf({ ...hrms, date: '', time: '' }, t.zones).facts.when).toBeUndefined()
   })
 
   it('states no device and no person it was not given', () => {
@@ -252,9 +256,10 @@ describe('formSummary', () => {
     expect(formSummary({ ...hrms, ...typedAddressPatch('') }, t.zones)).toMatch(/^IP address not stated · Place not stated · /)
   })
 
-  it('states the hour without a day, and says when nothing is', () => {
+  it('states the hour without a day, the day without an hour, and says when nothing is', () => {
     expect(formSummary({ ...hrms, date: '' }, t.zones).split(' · ')[2]).toBe('09:30 Asia/Kolkata')
-    expect(formSummary({ ...hrms, time: '' }, t.zones).split(' · ')[2]).toBe('When not stated')
+    expect(formSummary({ ...hrms, time: '' }, t.zones).split(' · ')[2]).toBe('28 Sep 2026 Asia/Kolkata')
+    expect(formSummary({ ...hrms, date: '', time: '' }, t.zones).split(' · ')[2]).toBe('When not stated')
   })
 })
 

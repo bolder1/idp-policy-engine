@@ -273,8 +273,9 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
    calendar fact, whatever zone it is read in. */
 function whenSaid(w: NonNullable<SignInFacts['when']>): string {
   const m = w.date ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(w.date) : null
-  const day = m ? `${WEEKDAYS[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()]} ${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]} ` : ''
-  return `${day}${w.time} ${w.timeZone}`
+  const day = m ? `${WEEKDAYS[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()]} ${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : ''
+  /* A date may now be stated with no time (sign-in-facts.ts). */
+  return [day, w.time, w.timeZone].filter(Boolean).join(' ')
 }
 
 /* The sign-in a card scripts, each fact with where it came from: "Arun Patel ·

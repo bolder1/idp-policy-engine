@@ -13,6 +13,7 @@ import {
   CircleHelp,
   Columns2,
   Copy,
+  CornerDownRight,
   FilePen,
   History,
   Info,
@@ -44,7 +45,7 @@ import { useDraftDiff, useLines } from '../board/use-lines'
 import { policySentences } from '../predicate-prose'
 import { readFoot, storedVersions } from '../board/read-as-text'
 import type { EngineRun } from './engine-run'
-import { FATE_WORDS, evidenceOf, fateOf, PEEK_FALLBACK, isPeek, ruleList, sameTarget, ruleOf, targetLabel, type Evidence, type InspectTarget, type RuleFate } from './inspect-model'
+import { FATE_WORDS, evidenceOf, fateOf, PEEK_FALLBACK, isPeek, ruleList, sameTarget, ruleOf, targetLabel, type Evidence, type InspectTarget, type RuleFate, type RuleListRow } from './inspect-model'
 import { objectsOfRule, peekNames, PEEK_LIBRARY } from './peek-model'
 import { KindMark, PeekView, Section, Row } from './PeekViews'
 import { compareFacts, factsOf } from './inspect-facts'
@@ -319,7 +320,50 @@ function Verdict({ tone, icon: Icon, title, line }: { tone: Tone; icon: LucideIc
   )
 }
 
-const FATE_MARK: Record<RuleFate, LucideIcon> = { decided: Check, 'not-matched': X, 'cant-tell': CircleHelp, off: Minus, 'not-reached': Minus }
+/* A run that Depends (6 Oct 2026). The policy the engine opened is the one
+   that decides, but a rule in it could not be told, so no rule of it decided —
+   and the panel said "Did not decide this sign-in" over "<this policy> did",
+   contradicting itself; where a later rule matched on the definite reading it
+   said "Decided this sign-in" under an outcome that says Depends. Now it says
+   the outcome's own word, "Depends", in the outcome's notice tone, and names
+   the rules it is waiting on and what would settle them, as the folded policy
+   on the canvas does ("Can’t tell: Device", journey.ts `policyWhy`).
+
+   The rule the definite reading walks on to — a later rule that matched, or
+   the last row — is "If not", as the canvas draws it (PolicyStack.tsx
+   `WORD.possible`): what happens only if the rules above do not match, never a
+   match. Keyed on the run's own rules, so a policy with no matching rule in a
+   run it decides reads Depends whatever the outcome's status says. */
+type Shown = RuleFate | 'if-not'
+
+const FATE_MARK: Record<Shown, LucideIcon> = { decided: Check, 'not-matched': X, 'cant-tell': CircleHelp, off: Minus, 'not-reached': Minus, 'if-not': CornerDownRight }
+const FATE_SAID: Record<Shown, string> = { ...FATE_WORDS, 'if-not': 'If not' }
+
+/** This policy decides the run, but the answer Depends: a rule in it could not be told. */
+const dependsIn = (plan: EngineRun, policyId: string): boolean => plan.decider?.id === policyId && (plan.outcome.status === 'depends' || !plan.rules.some((r) => r.state === 'match'))
+
+/** How a row of the list fared, as the panel says it: on a run that Depends, the rule it walks on to is "If not". */
+function shownFate(row: Pick<RuleListRow, 'id' | 'fate'>, depends: boolean): Shown | null {
+  if (depends && (row.fate === 'decided' || (row.id === null && row.fate === 'cant-tell'))) return 'if-not'
+  return row.fate
+}
+
+/** The rules of a policy it could not tell, in order: the ones a run that Depends is waiting on. */
+const waitingOn = (list: readonly RuleListRow[]) => list.filter((r) => r.fate === 'cant-tell' && r.n !== null)
+
+/** "Rule 1", "Rules 1 and 3", "Rules 1, 2 and 3"; '' for none. */
+function rulesSaid(ns: readonly number[]): string {
+  if (ns.length === 0) return ''
+  if (ns.length === 1) return `Rule ${ns[0]}`
+  return `Rules ${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
+}
+
+/** "Rule 1 · Compliant device · Can’t tell: Device": the rule it waits on (or "Rules 1 and 2"), and what would settle it. */
+function dependsLine(waiting: readonly RuleListRow[], needs: readonly string[]): string {
+  const rules = waiting.length === 1 ? `Rule ${waiting[0].n} · ${waiting[0].name}` : rulesSaid(waiting.map((r) => r.n ?? 0))
+  const tell = needs.length > 0 ? `${FATE_WORDS['cant-tell']}: ${needs.join(', ')}` : FATE_WORDS['cant-tell']
+  return [rules, tell].filter(Boolean).join(' · ')
+}
 
 /* --- Two of a kind, side by side ----------------------------------------------------------------------------------- */
 
@@ -373,12 +417,15 @@ function PolicyView({ target, plan, onPush }: { target: Extract<InspectTarget, {
   const list = ruleList(policy, plan)
   const audience = policy.isSystem ? 'Everyone' : audienceSummary(policy.audience, groups, users).label || 'Nobody'
   const decided = plan.decider?.id === policy.id
-  const by = decided ? list.find((r) => r.fate === 'decided') : undefined
+  const depends = dependsIn(plan, policy.id)
+  const by = decided && !depends ? list.find((r) => r.fate === 'decided') : undefined
   const changed = readFoot(policy).split(' · ').slice(1).join(' · ')
   return (
     <>
       <div className="insp__lead">
-        {decided && by ? (
+        {depends ? (
+          <Verdict tone="notice" icon={CircleHelp} title="Depends" line={dependsLine(waitingOn(list), plan.outcome.view.needs)} />
+        ) : decided && by ? (
           <Verdict tone={DECISION_TONE[by.decision]} icon={DECISION_MARK[by.decision]} title="Decided this sign-in" line={`${by.n === null ? by.name : `Rule ${by.n} · ${by.name}`} · ${DECISION_WORDS[by.decision]}`} />
         ) : (
           <Verdict tone="neutral" icon={CircleDashed} title="Did not decide this sign-in" line={plan.decider ? `${plan.decider.name} did` : undefined} />
@@ -455,19 +502,20 @@ function PolicyView({ target, plan, onPush }: { target: Extract<InspectTarget, {
           <Section id="rules" title="Rules" icon={ListOrdered} aside={<span className="insp__secmeta">In order</span>}>
             <ul className="insp__rows">
               {list.map((r) => {
-                const FateIcon = r.fate ? FATE_MARK[r.fate] : null
+                const fate = shownFate(r, depends)
+                const FateIcon = fate ? FATE_MARK[fate] : null
                 return (
                   <li key={r.id ?? 'last'}>
-                    <button type="button" className={`insp__rule${r.fate ? ` is-${r.fate}` : ''}`} onClick={() => onPush({ kind: 'rule', policyId: policy.id, ruleId: r.id })}>
+                    <button type="button" className={`insp__rule${fate ? ` is-${fate}` : ''}`} onClick={() => onPush({ kind: 'rule', policyId: policy.id, ruleId: r.id })}>
                       <span className="insp__n" aria-hidden>
                         {r.n ?? <Asterisk size={12} strokeWidth={2.2} />}
                       </span>
                       <span className="insp__rmain">
                         <span className="insp__rname">{r.name}</span>
-                        {r.fate && FateIcon && (
-                          <span className={`insp__fate is-${r.fate}`}>
+                        {fate && FateIcon && (
+                          <span className={`insp__fate is-${fate}`}>
                             <FateIcon size={12} strokeWidth={2.4} aria-hidden />
-                            {FATE_WORDS[r.fate]}
+                            {FATE_SAID[fate]}
                           </span>
                         )}
                       </span>
@@ -517,6 +565,9 @@ function RuleView({ target, plan, onPush }: { target: Extract<InspectTarget, { k
   if (!policy || !found) return <p className="insp__gone">This rule is no longer there.</p>
   const { rule, terminal } = found
   const fate = fateOf(plan, policy.id, target.ruleId)
+  /* On a run that Depends, the rule the walk goes on to is "If not", and says which rules it waits on. */
+  const shown = fate ? shownFate({ id: target.ruleId, fate }, dependsIn(plan, policy.id)) : null
+  const waiting = shown === 'if-not' ? waitingOn(ruleList(policy, plan)).map((r) => r.n ?? 0) : []
   const evidence: Evidence[] = evidenceOf(plan, policy.id, target.ruleId)
   const refuses = rule.decision === 'deny'
   const uses = objectsOfRule(rule, activeRiskProfileId)
@@ -525,15 +576,23 @@ function RuleView({ target, plan, onPush }: { target: Extract<InspectTarget, { k
   return (
     <>
       <div className="insp__lead">
-        {fate === 'decided' ? (
+        {shown === 'if-not' ? (
+          <Verdict
+            tone="notice"
+            icon={CornerDownRight}
+            title={waiting.length > 0 ? `If ${rulesSaid(waiting).toLowerCase()} ${waiting.length === 1 ? 'does' : 'do'} not match` : FATE_SAID['if-not']}
+            line={`${DECISION_WORDS[rule.decision]} · ${policy.name}`}
+          />
+        ) : shown === 'decided' ? (
           <Verdict tone={DECISION_TONE[rule.decision]} icon={DECISION_MARK[rule.decision]} title="Decided this sign-in" line={`${DECISION_WORDS[rule.decision]} · ${policy.name}`} />
-        ) : fate === 'not-matched' ? (
+        ) : shown === 'not-matched' ? (
           <Verdict tone="neutral" icon={X} title="Not matched" line={failed ? `${failed.word} did not match` : undefined} />
-        ) : fate === 'not-reached' ? (
+        ) : shown === 'not-reached' ? (
           <Verdict tone="neutral" icon={Minus} title="Not reached" line="An earlier rule decided, so this one was not checked." />
-        ) : fate === 'cant-tell' ? (
-          <Verdict tone="notice" icon={CircleHelp} title="Can’t tell" line="The sign-in does not say enough to decide this rule." />
-        ) : fate === 'off' ? (
+        ) : shown === 'cant-tell' ? (
+          /* What is at stake, in the outcome card's words ("If rule 1 matches · Deny"); what it could not read is listed under This sign-in. */
+          <Verdict tone="notice" icon={CircleHelp} title={FATE_WORDS['cant-tell']} line={`If it matches: ${DECISION_WORDS[rule.decision]}`} />
+        ) : shown === 'off' ? (
           <Verdict tone="neutral" icon={Minus} title="Switched off" />
         ) : (
           <Verdict tone="neutral" icon={CircleDashed} title="Not checked for this sign-in" line={`${policy.name} did not decide it`} />

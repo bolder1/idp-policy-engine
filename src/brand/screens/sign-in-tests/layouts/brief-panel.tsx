@@ -190,8 +190,10 @@ export function HowPanel(p: HowPanelProps) {
     return () => window.cancelAnimationFrame(id)
   }, [goto, reduced])
 
-  /* Escape shuts the panel. The page's own Escape stands back while anything in a panel is expanded — here, an
-     open rule's checks — so when only ours are, the panel shuts on the way back up (never twice: theirs did nothing). */
+  /* Escape shuts the panel. Until 6 Oct 2026 the page's own Escape stood back while anything in a panel was expanded —
+     here, an open rule's checks — and this shut the panel in its place, on the way back up. The page now waits only
+     for a popup (page-keys.ts) and takes the key as it shuts the panel, so `defaultPrevented` stops this one: never
+     twice. (The builder's Check access draws the column, never this panel.) */
   const onClose = p.onClose
   useEffect(() => {
     if (p.inline) return

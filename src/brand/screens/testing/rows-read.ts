@@ -15,8 +15,15 @@ import { leaves } from '../../predicate'
      country/state/city  Place
      time                When, and the time ruler
      day                 When
+     temporary access    When: the date a grant ends on
      device profile      Device, and the detail rows the profile checks
      device risk score   Device risk score
+
+   A temporary access grant (temp-access.ts) has no condition, but it reads
+   the sign-in's date: past its end date the rule is off (data.ts
+   `ruleExpired`). Without the When row the admin had no way to move the date
+   and watch a grant end (6 Oct 2026), so a grant asks for it as a day check
+   does — and the time ruler stays away, since a grant draws no window.
 
    The rules asked are every enabled rule of every app access policy that
    covers the application — the Global Default covers them all — plus the
@@ -116,6 +123,7 @@ export function rowsRead(policies: readonly Policy[], draft: Policy | null, appI
   const rows = new Set<RowId>()
   const device = new Set<DeviceRowId>()
   for (const r of rulesOn(policiesOn(policies, appId, draft))) {
+    if (r.tempAccess) rows.add('when')
     for (const c of leaves(r.when)) {
       switch (c.typeId) {
         case 'zone':

@@ -266,6 +266,24 @@
 .rl-c2__reason { color: var(--text-secondary); }
 .rl-c2__reason span { color: var(--text-tertiary); margin-left: var(--space-1); }
 .rl-c2__arrow { flex: none; color: var(--text-tertiary); }
+/* The way to the why in the page's right-hand panel (Focus hands it; classic2-chain.tsx `ChainWhy`): the body's last
+   line, a quiet link in the link's own colour with its chevron — the policy names' look, never a button, never orange. */
+.rl-c2__whyrow { margin-top: var(--space-2); }
+.rl-c2__why {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  cursor: pointer;
+}
+.rl-c2__why > svg { flex: none; }
+.rl-c2__why:hover { text-decoration: underline; }
+.rl-c2__why:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); border-radius: var(--radius-sm); }
 
 /* --- The sign-in node (classic2-pill.tsx) ----------------------------------- */
 

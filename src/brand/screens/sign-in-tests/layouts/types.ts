@@ -78,6 +78,14 @@ export interface RunLayoutProps {
   onAsGroup?: (groupId: string) => void
   /** The why in the page's right-hand panel: open, its body, the way to open it. */
   why?: { open: boolean; slot: HTMLElement | null; onOpen: (open: boolean) => void }
+  /* What the why does under a refusal, as the column's why is handed them (EngineJourney.tsx; Focus draws the same why,
+     layouts/focus2-why.tsx). Absent, the why has none of them. */
+  /** How to get in: a what-if pressed in the why runs that sign-in (get-in.ts) — a press that says it runs. */
+  onTryForm?: (form: SignInForm) => void
+  /** Let in for a while: the policy that refused, the person, an end date and a reason (temp-access.ts). */
+  onGrant?: (policyId: string, person: { id: string; name: string }, until: string, reason: string) => void
+  /** The only policy a grant may go to (the builder's own, whose Check access edits its draft). Absent, whichever refused. */
+  grantFor?: string
   /** Break-in attempts on the application, once the run is done (the page's). */
   breakIn?: { summary: AppBreakInSummary; open: boolean } | null
   onReviewBreakIn?: (from: AttemptsFrom) => void

@@ -159,7 +159,14 @@ describe('what a token says', () => {
     expect(tokenValue('when', form(), ctx)).toMatchObject({ text: '09:30 Mon', mark: { kind: 'icon', icon: 'clock' } })
     expect(tokenValue('when', form({ date: '' }), ctx).text).toBe('09:30')
     expect(tokenValue('when', form({ timeZone: 'Europe/London' }), ctx).text).toBe('09:30 Mon · London')
-    expect(tokenValue('when', form({ time: '' }), ctx)).toMatchObject({ text: 'Any time', unset: true })
+    expect(tokenValue('when', form({ date: '', time: '' }), ctx)).toMatchObject({ text: 'Any time', unset: true })
+  })
+
+  /* 6 Oct 2026: a date with the time cleared is stated (factsOf), and a temporary access grant ends on it — the pill
+     said "Any time" in grey while that date refused the person. The date alone, no weekday: without the hour it is not read. */
+  it('says a date with no time as the date, stated', () => {
+    expect(tokenValue('when', form({ time: '' }), ctx)).toMatchObject({ text: '28 Sep 2026', unset: false })
+    expect(tokenValue('when', form({ time: '', timeZone: 'Europe/London' }), ctx).text).toBe('28 Sep 2026 · London')
   })
 
   it('says the risk as the number alone — "with risk" before it says the rest', () => {

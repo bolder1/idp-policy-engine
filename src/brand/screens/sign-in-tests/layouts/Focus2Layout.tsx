@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { AnimatePresence, PresenceContext, motion, type Transition } from 'motion/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 
 import { useBrand } from '../../../store'
 import { sentenceTokens, tokenValue } from '../../testing/sign-in-sentence'
@@ -38,6 +39,7 @@ import { beatOfCard, cardName, cardsOf, pickLabel } from './focus2-story'
 import { DIM_MS, playsLanding } from './focus2-draw-model'
 import { Focus2Bar } from './focus2-trail'
 import { trailOf } from './focus2-trail-model'
+import { useFocusWhy } from './focus2-why'
 import { heroFinding } from '../journey'
 import type { RunLayoutProps } from './types'
 import './focus.css'
@@ -221,6 +223,18 @@ import './focus2.css'
    node first (classic2-glide.ts); once they have landed the connectors are drawn
    again, the new way. A card open stays open through it. The route, its carousel
    and the bar's Back are behind ROUTE_MAP.
+
+   THE WHY (6 Oct 2026; phase.ts `WHY_IN_FOCUS`). How to get in, Let in for a while,
+   What changed, Copy summary, the conflicts and As each group — the troubleshooting
+   built on 5 Oct — are the why's (WhyCard.tsx), and only the column's answer opened
+   it: this view never read the page's `why`, so none of it could be reached from the
+   view the owner presents. Now the outcome card's body ends in one quiet link
+   (classic2-chain.tsx `ChainWhy`: "Why", "Review conflict", "Why, and how to get in"),
+   offered by the column's own rule once the presented run has landed, and the why is
+   drawn into the page's right-hand panel (`why.slot`) while it is open on it — out of
+   the stage, so nothing pressed in the panel reaches the stage's own presses. One
+   panel: the inspector taking it shuts the why, and the why taking it shuts the
+   inspector. focus2-why.tsx reads it all as EngineJourney.tsx does.
    -------------------------------------------------------------------------- */
 
 /* THE ROUTE MAP (owner, 5 Oct 2026: "just 4 simple cards will be enough"): Horizontal is the chain laid across the
@@ -711,6 +725,12 @@ export default function Focus2Layout(
   /* The presented step, and `running` widened by the presentation: everything downstream reads the picture's step and
      not the engine's — the sign-in node, the panel, and Classic v2's cards in both views. */
   const presented = useMemo<RunLayoutProps>(() => ({ ...props, s: p, running: running || presenting, onReplay: replay }), [props, p, running, presenting, replay])
+
+  // --- The why, in the page's right-hand panel (THE WHY) ---
+  /* Offered, and drawn, only once the presented run has landed and nothing plays: never before the picture has reached
+     the answer it is about. The page's panel says whether it is open; the outcome card's link opens and shuts it. */
+  const whyDone = landed && !running && !presenting
+  const focusWhy = useFocusWhy(props, whyDone, rootRef)
 
   // --- Classic v2's cards: the Vertical view's chain, and the Horizontal view's stations ---
   const chain = useChainRun(presented)
@@ -1607,6 +1627,7 @@ export default function Focus2Layout(
                         glide={glide}
                         links={linksOn}
                         lit={litCard}
+                        why={focusWhy.link}
                       />
                     </div>
                   </PresenceContext.Provider>
@@ -1843,6 +1864,9 @@ export default function Focus2Layout(
           </div>
         </LitCtx.Provider>
       </RunStage>
+      {/* The why, in the page's right-hand panel while it is open on it (THE WHY): portalled from here, beside the stage
+          and not inside it, so a press or a wheel in the panel never reaches the stage's pan and zoom. */}
+      {focusWhy.card && props.why?.slot && createPortal(focusWhy.card, props.why.slot)}
     </div>
   )
 }

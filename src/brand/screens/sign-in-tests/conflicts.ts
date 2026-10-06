@@ -1,4 +1,4 @@
-import { FALLBACK_NAME, enforces, memberGroupIds, type AccessDecision, type Policy, type Rule, type RuleWho, type User } from '../../data'
+import { FALLBACK_NAME, enforces, memberGroupIds, ruleExpired, type AccessDecision, type Policy, type Rule, type RuleWho, type User } from '../../data'
 import { CANT_TELL, DECISION_PHRASE, DECISION_WORDS, factWords } from '../../decision-words'
 import { listNames, normaliseWho, whoPasses, whoSummary } from '../../rule-who'
 import { journeyOf, type JourneyStep } from '../board/model'
@@ -552,7 +552,8 @@ export function conflictsOf(input: ConflictsInput): SignInConflicts {
   if (landing && hitRule) {
     const landedFlow = flowKey(landing.ask)
     decider.rules.forEach((r, i) => {
-      if (i <= landing.index || !r.enabled) return
+      /* A grant past its end date is off for this sign-in, as the trace has it (simulate.ts `tracePolicy`). */
+      if (i <= landing.index || !r.enabled || ruleExpired(r, facts.when?.date)) return
       const step = trace.steps.find((s) => s.ruleId === r.id)
       if (!step || step.match === 'no') return
       const via = viaOf(r, person, env)

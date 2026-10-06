@@ -533,7 +533,7 @@ function partsOf(f: SignInFacts, t: DescribeTenant, reads: { risk: boolean; time
   const preset: DevicePresetId | null = f.device ? presetOf(f.device) : null
   const device = !f.device ? 'Device not stated' : preset ? (DEVICE_PRESETS.find((d) => d.id === preset)?.label ?? 'Custom device') : 'Custom device'
   const risk = reads.risk && f.risk ? `Risk ${f.risk.score}` : null
-  const when = reads.time && f.when ? `${f.when.date ? weekdayOf(f.when.date) : ''} ${f.when.time}`.trim() : null
+  const when = reads.time && f.when?.time ? `${f.when.date ? weekdayOf(f.when.date) : ''} ${f.when.time}`.trim() : null
   const all: [PartKey, string | null][] = [
     ['person', person],
     ['app', app],

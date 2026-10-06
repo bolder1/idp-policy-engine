@@ -1431,7 +1431,8 @@ export function evalCondition(c: Condition, facts: SignInFacts, env: SimEnv, car
       const to = toMinutes(vals[1] ?? '23:59')
       const asked = `${c.operator} ${vals[0] ?? '—'} and ${vals[1] ?? '—'}${c.tz ? ` in ${c.tz}` : ''}`
       const when = facts.when
-      if (!when) return unknown('no time was given', ['time'], { required: asked })
+      /* A date alone (sign-in-facts.ts) is no time of day. */
+      if (!when?.time) return unknown('no time was given', ['time'], { required: asked })
       let local: number
       let caveat: string | undefined
       if (when.date) {
@@ -1462,7 +1463,11 @@ export function evalCondition(c: Condition, facts: SignInFacts, env: SimEnv, car
     case 'day': {
       const target = c.tz ?? card?.conditions.find((x) => x.typeId === 'time' && x.tz)?.tz ?? TENANT_TZ
       const when = facts.when
-      if (!when?.date) return unknown('no date was given, so the weekday is not known', when ? ['date'] : ['date', 'time'])
+      if (!when?.date) return unknown('no date was given, so the weekday is not known', when?.time ? ['date'] : ['date', 'time'])
+      /* A date with no time stays undecided, as it was before a date could be
+         stated alone: the weekday is read on the condition's clock, and near
+         midnight the hour moves it. */
+      if (!when.time) return unknown('no time was given, so the weekday is not known', ['time'])
       const at = instantOf(when.date, when.time, when.timeZone)
       const wall = at === null ? null : wallClock(at, target)
       if (!wall) return unknown(`${when.date} ${when.time} in ${when.timeZone} is not a time this model can read`)

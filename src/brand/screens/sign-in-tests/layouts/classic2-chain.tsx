@@ -8,6 +8,7 @@ import {
   Ban,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -105,6 +106,10 @@ import './classic2.css'
                   the identity chips, so the sign-in card does not repeat them
      lit          the card an answer points at, ringed where it stands
      onPress      (one card) a press on it does something other than open it
+     why          the outcome's way to the why in the page's right-hand panel:
+                  one quiet link at the foot of its body (`ChainWhy`). Only a
+                  page that draws the why there hands it — Focus, on the page;
+                  never ClassicV2Layout, and never the builder's Check access
    -------------------------------------------------------------------------- */
 
 /** Decelerating: what arrives. */
@@ -129,6 +134,18 @@ const META_ICON: Record<Exclude<MetaMark, 'spin' | null>, LucideIcon> = { check:
 
 /** The chain's two shapes: the builder's column down the canvas, or the same nodes across it. */
 export type ChainOrientation = 'vertical' | 'horizontal'
+
+/* THE WAY TO THE WHY (owner's ruling, 6 Oct 2026: what opens the page's right-hand panel is a name or a link INSIDE a
+   card — never a button on the canvas's bar, never an icon on a card's head). The outcome card's body ends in one quiet
+   link: what it says, whether the panel is open on the why, the why's id once it is (the link's aria-controls), and the
+   press, which opens the panel or shuts it. The page decides all four; the card only draws them. */
+export interface ChainWhy {
+  /** "Why", "Review conflict", or "Why, and how to get in" — the page's words for what the why holds. */
+  label: string
+  open: boolean
+  id: string
+  onPress: () => void
+}
 
 export interface Classic2ChainProps {
   /** The run as the page draws it: Classic v2 the host's, Focus its presented one. */
@@ -156,6 +173,8 @@ export interface Classic2ChainProps {
   chainRef?: Ref<HTMLDivElement>
   /** The landed chain's zoom (ClassicV2Layout's fit): `--rl-c2-z`. */
   zoom?: number
+  /** The outcome's link to the why in the page's right-hand panel (`ChainWhy`). Absent, no link. */
+  why?: ChainWhy | null
 }
 
 /** A connector fading out as the chain starts to change shape, and back in once its nodes have landed. */
@@ -165,7 +184,7 @@ const LINK_IN = { duration: 0.2, ease: EASE_OUT }
 /* The chain: the first node, then each card on screen after its connector — top to bottom, or left to right — arriving
    as the run reaches it. Across, the row keeps a place for every card the run will draw from the start, so the nodes
    already there never move as the next arrives; the places are its grid's tracks (`--rl-c2-tracks`). */
-export function Classic2Chain({ run, data, fold, animate, snap, orientation = 'vertical', start, signInCard = true, glide = null, links = true, topRow = false, lit = null, chainRef, zoom }: Classic2ChainProps) {
+export function Classic2Chain({ run, data, fold, animate, snap, orientation = 'vertical', start, signInCard = true, glide = null, links = true, topRow = false, lit = null, chainRef, zoom, why = null }: Classic2ChainProps) {
   const { at, shown } = data
   /* Two cards that arrive at the same step (a Replay finds the policy at once) come in a beat apart, top to bottom. */
   const delayOf = (k: CardKey) => (animate ? shown.filter((j) => j !== k && at[j] === at[k] && shown.indexOf(j) < shown.indexOf(k)).length * STAGGER_S : 0)
@@ -184,7 +203,7 @@ export function Classic2Chain({ run, data, fold, animate, snap, orientation = 'v
       {(k !== 'sign-in' || signInCard) && (
         <>
           <Link order={orderOf(k)} shown={links} />
-          <Classic2Card card={k} run={run} data={data} open={fold.open[k]} onFold={() => fold.fold(k)} snap={snap} animate={animate} topRow={topRow} lit={lit === k} order={orderOf(k)} />
+          <Classic2Card card={k} run={run} data={data} open={fold.open[k]} onFold={() => fold.fold(k)} snap={snap} animate={animate} topRow={topRow} lit={lit === k} order={orderOf(k)} why={k === 'outcome' ? why : null} />
         </>
       )}
     </motion.div>
@@ -262,13 +281,15 @@ export interface Classic2CardProps {
   opens?: boolean
   /** Its place in the chain's glide (classic2-glide.ts): the stagger of its move. */
   order?: number
+  /** (The outcome) its link to the why in the page's right-hand panel; never while it is still deciding. */
+  why?: ChainWhy | null
 }
 
 /** The outcome before it is told: no decision, no tone, nothing to open. */
 const DECIDING: OutcomeView = { tone: 'none', decision: null, title: 'Deciding', by: '', link: '', open: null, factors: [], message: null, outcomes: [], needs: [] }
 
 /** One of the four cards, on its own: the chain's, or a station of Focus's route. */
-export function Classic2Card({ card, run, data, open, onFold, snap, animate, topRow = false, lit = false, onPress, ruleAt, passed, deciding = false, opens: canOpen = true, order = 0 }: Classic2CardProps) {
+export function Classic2Card({ card, run, data, open, onFold, snap, animate, topRow = false, lit = false, onPress, ruleAt, passed, deciding = false, opens: canOpen = true, order = 0, why = null }: Classic2CardProps) {
   const { plan, running, onOpenRule, onOpenPolicy } = run
   const { decider, done, outcome } = data
   const pressed = { lit, onPress, order }
@@ -322,6 +343,7 @@ export function Classic2Card({ card, run, data, open, onFold, snap, animate, top
       follow={running}
       onOpen={done && opens ? () => (opens.ruleId ? onOpenRule(opens.policyId, opens.ruleId) : onOpenPolicy(opens.policyId)) : undefined}
       inspects={!!run.onInspect}
+      why={deciding ? null : why}
       {...pressed}
     />
   )
@@ -1051,7 +1073,10 @@ function RuleUses({ rule }: { rule: Rule }) {
    Rule 2". The body: `then` — the decision's chip and what the person is
    asked for, the builder's then-row (or the Deny's message; when it depends,
    each answer it could be); `decided by` — the policy and the rule, which
-   opens it. */
+   opens it. Where the page hands it (`why`, Focus on the page), the body's
+   last line is the way to the why in the page's right-hand panel — at the
+   keywords' edge, after everything the card itself says, so it reads as the
+   card's next step rather than as part of who decided. */
 function OutcomeCard({
   plan,
   view,
@@ -1061,6 +1086,7 @@ function OutcomeCard({
   follow,
   onOpen,
   inspects = false,
+  why = null,
   lit,
   onPress,
   order,
@@ -1074,6 +1100,8 @@ function OutcomeCard({
   onOpen?: () => void
   /** Decided by opens in the page's panel: its mark says Details. */
   inspects?: boolean
+  /** The way to the why in the page's right-hand panel (`ChainWhy`); absent, the body ends at who decided. */
+  why?: ChainWhy | null
 } & Pressed) {
   const Icon = OUT_ICON[view.tone]
   const head = outcomeHead(plan, view)
@@ -1166,6 +1194,14 @@ function OutcomeCard({
           {!view.decision && view.tone !== 'depends' && !view.link && (
             <div className="bb__ifrow">
               <span className="bb__ifkw is-blank">{metaWords(head.meta) || view.title}</span>
+            </div>
+          )}
+          {why && (
+            <div className="bb__ifrow rl-c2__whyrow">
+              <button type="button" className="rl-c2__why" aria-expanded={why.open} aria-controls={why.open ? why.id : undefined} onClick={why.onPress}>
+                {why.label}
+                <ChevronRight size={12} strokeWidth={2.2} aria-hidden />
+              </button>
             </div>
           )}
         </div>

@@ -29,8 +29,8 @@ describe('tempAccessIssue', () => {
 describe('temporary access, end to end on the showcase tenant', () => {
   const t = showcaseTenant()
   const env = envOf(t)
-  const sign = (policies: typeof t.policies, date: string) => {
-    const f = { ...emptyDraft(date, '09:30'), personId: 'u-leo', appId: 'aws', ...originPatch('home') }
+  const sign = (policies: typeof t.policies, date: string, time = '09:30') => {
+    const f = { ...emptyDraft(date, time), personId: 'u-leo', appId: 'aws', ...originPatch('home') }
     return resolveSignIn(policies, factsOf(f, t.zones).facts, env)
   }
 
@@ -48,6 +48,16 @@ describe('temporary access, end to end on the showcase tenant', () => {
     expect(first.name).toBe('Temporary access: Leo Fernandes, until 5 Oct 2026')
     expect(first.who).toEqual({ groupIds: [], userIds: ['u-leo'] })
     expect([ruleExpired(first, '2026-10-05'), ruleExpired(first, '2026-10-06'), ruleExpired(first, undefined)]).toEqual([false, true, false])
+  })
+
+  /* 6 Oct 2026: the date reached the engine only beside a time, so with the
+     time cleared an ended grant still let Leo in. The date is the grant's. */
+  it('ends on the date with the time cleared too', () => {
+    const policyId = sign(t.policies, TODAY).decidedBy!.policyId
+    const granted = t.policies.map((p) => (p.id === policyId ? grantTempAccess(p, { id: 'u-leo', name: 'Leo Fernandes' }, { until: '2026-10-05', reason: 'On call this week', by: 'Jaspreet Toor' }) : p))
+    expect(sign(granted, '2026-10-05', '').decision).toBe('2fa')
+    expect(sign(granted, '2026-10-06', '').decision).toBe('deny')
+    expect(sign(granted, '2026-10-06', '').trace?.steps[0].kind).toBe('off')
   })
 
   it('is for that one person: somebody else is still refused', () => {

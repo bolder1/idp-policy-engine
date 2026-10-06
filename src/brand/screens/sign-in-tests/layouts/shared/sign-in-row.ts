@@ -5,7 +5,7 @@ import { TENANT_TZ } from '../../../sign-in-facts'
 import { devicePreset } from '../../../testing/device-presets'
 import type { RowsRead } from '../../../testing/rows-read'
 import { CUSTOM_DEVICE, deviceFactsOf } from '../../../testing/sign-in-fields'
-import { distancePlace, ORIGIN_PRESETS, type FormField, type SignInForm } from '../../../testing/sign-in-form'
+import { dateSaid, distancePlace, ORIGIN_PRESETS, type FormField, type SignInForm } from '../../../testing/sign-in-form'
 import { weekdayOf } from '../../../testing/sign-in-sentence'
 import type { EngineRun } from '../../engine-run'
 import { wordsOfPlan } from '../assistant/what-if'
@@ -79,7 +79,11 @@ export function rowFacts(form: SignInForm, rows: RowsRead, ctx: RowFactsContext)
   if (rows.rows.has('when')) {
     const day = form.date ? weekdayOf(form.date) : null
     const tz = form.timeZone && form.timeZone !== TENANT_TZ ? zoneCity(form.timeZone) : null
-    say('when', 'Time', form.time ? [[day, form.time].filter(Boolean).join(' '), tz].filter(Boolean).join(' · ') : '', 'time')
+    /* With the time cleared the date is still stated, and a temporary
+       access grant ends on it (6 Oct 2026): the date alone, as the panel's
+       pill says it (sign-in-sentence.ts), not "+ Time". */
+    const when = form.time ? [day, form.time].filter(Boolean).join(' ') : form.date ? dateSaid(form.date) : ''
+    say('when', 'Time', when ? [when, tz].filter(Boolean).join(' · ') : '', 'time')
   }
 
   if (rows.rows.has('device')) {

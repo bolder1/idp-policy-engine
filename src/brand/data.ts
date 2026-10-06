@@ -584,7 +584,7 @@ export interface TempAccess {
   by: string
 }
 
-/** A rule whose temporary access has run out as of the sign-in's date. A sign-in with no date stated is never past it. */
+/** A rule whose temporary access has run out as of the sign-in's date — read with or without a time (sign-in-facts.ts), since a grant ends on a day. A sign-in with no date stated is never past it. */
 export const ruleExpired = (rule: Pick<Rule, 'tempAccess'>, date: string | undefined): boolean => !!rule.tempAccess && !!date && date > rule.tempAccess.until
 
 export interface Rule {

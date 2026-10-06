@@ -23,6 +23,10 @@ describe('the peeks’ model', () => {
     const o = rules.flatMap((r) => objectsOfRule(r, RISK))[0]
     expect(usedByPolicies(t.policies, o, RISK).length).toBeGreaterThan(0)
     expect(usedByPolicies(t.policies, { kind: 'zone', id: 'nope' }, RISK)).toEqual([])
+    /* A zone the default policy's own rules name lists the default — last, as the library's Used by counts it. */
+    const sys = t.policies.find((p) => p.isSystem)!
+    const z = sys.rules.flatMap((r) => objectsOfRule(r, RISK)).find((x) => x.kind === 'zone')
+    if (z) expect(usedByPolicies(t.policies, z, RISK).at(-1)?.id).toBe(sys.id)
   })
 
   it('labels and compares peeks beside policies and rules', () => {

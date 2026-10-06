@@ -1192,6 +1192,9 @@ button.tj-why__grow:focus-visible { outline: var(--bw-thick) solid var(--accent)
 .tj-why__grow.is-current { background: var(--surface-sunken); }
 .tj-why__face { display: inline-grid; place-items: center; }
 .tj-why__glabel { min-width: 0; overflow: hidden; font-size: var(--fs-sm); font-weight: var(--fw-medium); text-overflow: ellipsis; white-space: nowrap; }
+/* A row with no face — How to get in's "From Office network" — takes the face's track too: its words were squeezed into
+   the 24 px a face stands in, "Fr…" (6 Oct 2026, seen once Focus opened the why). */
+.tj-why__glabel:first-child { grid-column: 1 / span 2; }
 .tj-why__grow.is-current .tj-why__glabel { font-weight: var(--fw-semibold); }
 .tj-why__gresult { display: inline-flex; min-width: 0; }
 .tj-why__gsource { min-width: 0; overflow: hidden; font-size: var(--fs-xs); color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }

@@ -48,17 +48,27 @@ describe('the inspector’s facts', () => {
 })
 
 describe('what a peek is in', () => {
-  it('a person: the policies written for them', () => {
+  it('a person: the policies written for them, then the default, once and last', () => {
     const leo = t.directory.people.find((u) => u.id === 'u-leo')!
     const mine = policiesForPerson(t.policies, leo)
-    expect(mine.length).toBeGreaterThan(0)
-    expect(mine.every((p) => !p.isSystem)).toBe(true)
+    expect(mine.length).toBeGreaterThan(1)
+    expect(mine.filter((p) => p.isSystem)).toHaveLength(1)
+    expect(mine.at(-1)?.isSystem).toBe(true)
     expect(usedByPolicies(t.policies, { kind: 'person', id: leo.id }, t.activeRiskProfileId, t.directory.people)).toEqual(mine)
   })
 
-  it('an application: the policies on it and the default', () => {
+  it('a person no policy is written for is still covered by the default (6 Oct 2026: it said "No policy yet")', () => {
+    /* Someone in a group no policy names, on a tenant whose only policy for everyone is the default. */
+    const nobody = { id: 'u-nobody', groupId: 'no-such-group', alsoGroupIds: [] }
+    const theDefault = t.policies.find((p) => p.isSystem)!
+    const policies = t.policies.filter((p) => p.isSystem || !p.audience.everyone)
+    expect(policiesForPerson(policies, nobody)).toEqual([theDefault])
+  })
+
+  it('an application: the policies on it, then the default, last', () => {
     const on = usedByPolicies(t.policies, { kind: 'app', id: 'aws' }, t.activeRiskProfileId)
-    expect(on.some((p) => p.isSystem)).toBe(true)
+    expect(on.filter((p) => p.isSystem)).toHaveLength(1)
+    expect(on.at(-1)?.isSystem).toBe(true)
     expect(on.some((p) => p.id === aws.id)).toBe(true)
   })
 

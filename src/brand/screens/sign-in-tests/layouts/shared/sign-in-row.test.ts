@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../../../fixtures'
-import { rowsRead } from '../../../testing/rows-read'
+import { rowsRead, type RowId, type RowsRead } from '../../../testing/rows-read'
 import { originPatch, type SignInForm } from '../../../testing/sign-in-form'
 import type { EngineRun } from '../../engine-run'
 import { emptyDraft, forRun, withDefaults } from '../../sign-in-card'
@@ -43,6 +43,17 @@ describe('rowFacts', () => {
     const f = rowFacts(form, rows, { zones: t.zones, policyName: (id) => t.policies.find((p) => p.id === id)?.name })
     expect(f[0]).toMatchObject({ field: 'address', stated: false, label: 'Network' })
     expect(f[f.length - 1]).toMatchObject({ field: 'assume-on', value: 'Assumed on: HRMS access from corporate offices', icon: 'assume' })
+  })
+
+  /* 6 Oct 2026: with the time cleared the date is still stated — a temporary access grant ends on it — so the row
+     says the date and counts it, where it said "+ Time" while that date refused the person. */
+  it('a date with no time is said as the date, not an Add', () => {
+    const rows: RowsRead = { rows: new Set<RowId>(['when']), device: new Set() }
+    const { form } = formOf('Maya Iyer', 'AWS Console')
+    const time = (patch: Partial<SignInForm>) => rowFacts({ ...form, ...patch }, rows, { zones: t.zones }).find((f) => f.field === 'when')
+    expect(time({ date: '2026-10-14', time: '09:30' })).toMatchObject({ stated: true, value: 'Wed 09:30' })
+    expect(time({ date: '2026-10-14', time: '' })).toMatchObject({ stated: true, value: '14 Oct 2026' })
+    expect(time({ date: '', time: '' })).toMatchObject({ stated: false, label: 'Time' })
   })
 })
 

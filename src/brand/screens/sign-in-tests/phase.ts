@@ -17,18 +17,20 @@
    the outcome strip when attempts get through and nothing louder is said, and
    the attempts panel behind Review attempts. Shown only with the edition's
    Break-in test on as well (`features.breakInTest`); the builder's own stays
-   hidden (board/test-mode.ts). No Accept here yet — that is a later phase —
-   but a result accepted in the builder is honoured. Flip this to take every
-   one of them off the page.
+   hidden (board/test-mode.ts). Accept as expected is built here since 5 Oct
+   (ACCEPT_ATTEMPTS, below), and a result accepted in the builder is honoured
+   too. Flip this to take every one of them off the page.
    -------------------------------------------------------------------------- */
 
 /* The run's canvas in more than one layout, side by side for the owner to
    choose from (owner, 1 Oct 2026: "give me a fresh approach … not the same
-   orientation … spread out the cards … so I want some more options"). On,
-   the page's bar carries a Canvas switch (run-layout.ts); off, the run is
-   drawn as it was, one column. A review switch, not a product control: it
-   reads its own flag, not SHOWCASE, so the comparison can be seen in the
-   showcase build until a layout is chosen. */
+   orientation … spread out the cards … so I want some more options"). It
+   began as a temporary review switch; since 5 Oct 2026 it is the one that
+   selects Focus. On, the page draws `shownLayout()` (run-layout.ts): Focus
+   (`MAIN_VIEW`, with Classic v2's cards), and the Canvas picker only if
+   CANVAS_PICKER is on (it is off). Off, the run is drawn as it was, one
+   column. It reads its own flag, not SHOWCASE, so it is not hidden by the
+   showcase pin. */
 export const CANVAS_OPTIONS: boolean = true
 
 /** Saved sign-ins: the panel, the form's row, Save sign-in. Off for this phase. */
@@ -57,3 +59,11 @@ export const READ_AS_TEXT_TAB: boolean = false
 
 /** Details in the canvas bar (the policy that decided, in the inspector). Off (owner, 6 Oct 2026: "remove this button, no need"): the names inside the cards are the way in. */
 export const DETAILS_IN_BAR: boolean = false
+
+/* The why in Focus (6 Oct 2026). How to get in, Let in for a while, What changed, Copy summary, the conflicts and As each
+   group were built on 5 Oct into the why (WhyCard.tsx) — which only the column's answer opened, so Focus, the one view
+   the owner presents, could not reach any of it. On: the outcome card's body ends in one quiet link ("Why", "Review
+   conflict", "Why, and how to get in"), and the why opens in the page's right-hand panel, as the column's does
+   (layouts/focus2-why.tsx). Inside a card, by his ruling — never on the canvas's bar, never an icon on a card's head.
+   Off: Focus draws neither, as before. */
+export const WHY_IN_FOCUS: boolean = true

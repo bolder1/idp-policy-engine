@@ -221,7 +221,8 @@ describe('Sign-in tests — the help desk’s blocked sign-ins (DENIAL-REASONS s
         </BrandProvider>,
       ),
     ).not.toContain('Recently blocked')
-    expect(pageSrc).toContain("onBlocked={DENIAL_REASONS ? () => setPanel('blocked') : undefined}")
+    expect(pageSrc).toContain('onBlocked={DENIAL_REASONS ? openBlocked : undefined}')
+    expect(pageSrc).toMatch(/const openBlocked = \(\) => \{\s+noteOpener\(\)\s+setPanel\('blocked'\)/)
     /* A panel in the form's slot, like Saved sign-ins — not a slider over the page. */
     expect(pageSrc).toContain('<BlockedPanel key="blocked"')
     expect(pageSrc).not.toContain('<BlockedDrawer')
@@ -561,8 +562,8 @@ describe('Sign-in tests — the panel (§14.2)', () => {
     /* The canvas takes the focus two frames on: Skip, Replay, else the canvas itself. */
     expect(tryPageSrc).toContain("const to = skipRef.current ?? replayRef.current?.querySelector<HTMLElement>('button') ?? canvasRef.current")
     expect(pageSrc).toContain('onClose={() => closePanel(true)}')
-    /* Escape, on the way down, unless something open over the panel takes it. */
-    expect(pageSrc).toContain(`if (document.querySelector('.sit-panel [aria-expanded="true"]')) return`)
+    /* Escape, on the way down, unless a popup open over the panel takes it (page-keys.test.tsx holds which). */
+    expect(pageSrc).toMatch(/if \(popupOpen\(\)\) return\s+e\.preventDefault\(\)\s+closeLatest\.current\(\)/)
     expect(pageSrc).toMatch(/document\.addEventListener\('keydown', onKey, true\)\s+return \(\) => document\.removeEventListener\('keydown', onKey, true\)\s+\}, \[anyPanel\]\)/)
     /* Shut, the focus goes back to the canvas: its Check access, else Replay or the sentence. */
     expect(pageSrc).toContain("const ways = Array.from(document.querySelectorAll<HTMLElement>('.sit__stage .hiw__act button'))")
@@ -984,7 +985,7 @@ describe('Sign-in tests — the canvas before the first run (§12.3, §14.3)', (
     expect(tryPageSrc).toContain('const onPressNode = useCallback(() => latest.current.onNode(), [])')
     /* The panel opens first, and the row takes the focus once it has slid in. */
     expect(pageSrc).toContain('onAdd={(f) => openPanel(() => focusRow(tokenOfField(f), true))}')
-    expect(pageSrc).toMatch(/const openPanel = \(then\?: \(\) => void\) => \{\s+const already = panelOpen\s+(?:\/\*[\s\S]*?\*\/\s+)?if \(leaving\.current\) leaving\.current\.keepFocus = true\s+setPanel\('form'\)\s+if \(!then\) return\s+if \(already \|\| reduced\) then\(\)\s+else window\.setTimeout\(then, ARRIVE_MS\)/)
+    expect(pageSrc).toMatch(/const openPanel = \(then\?: \(\) => void\) => \{\s+const already = panelOpen\s+(?:\/\*[\s\S]*?\*\/\s+)?if \(leaving\.current\) leaving\.current\.keepFocus = true\s+noteOpener\(\)\s+setPanel\('form'\)\s+if \(!then\) return\s+if \(already \|\| reduced\) then\(\)\s+else window\.setTimeout\(then, ARRIVE_MS\)/)
     expect(pageSrc).toMatch(/const row = document\.getElementById\(tokenDomId\(PANEL_ID, token\)\)\s+const el = row\?\.matches\('button'\) \? row : row\?\.querySelector<HTMLElement>\('button'\)\s+el\?\.focus\(\)\s+if \(open && el\?\.getAttribute\('aria-expanded'\) !== 'true'\) el\?\.click\(\)/)
   })
 

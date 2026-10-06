@@ -386,7 +386,7 @@ export function WhenRow({
   onPatch: (p: Partial<SignInForm>, field: FormField) => void
 }) {
   return (
-    <Row id={id} label="When" tip={read.rows.has('time-track') ? 'Buffer time not modelled' : undefined} source={form.time ? 'stated' : null}>
+    <Row id={id} label="When" tip={read.rows.has('time-track') ? 'Buffer time not modelled' : undefined} source={form.time || form.date ? 'stated' : null}>
       <WhenControls form={form} size={size} onPatch={onPatch} />
       {read.rows.has('time-track') && boundaries?.time && (
         <BandStrip bands={boundaries.time.bands} max={1439} ticks={boundaries.time.edges.map((m) => ({ at: m, label: clock(m) }))} />

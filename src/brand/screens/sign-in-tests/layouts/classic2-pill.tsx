@@ -56,7 +56,7 @@ export interface SignInNodeProps {
 }
 
 export function SignInNode({ run, lit = false, across = false }: SignInNodeProps) {
-  const { form, rows, asGroup, plan, running, unrun, changed, expected, editing, onPressPerson, onReplay, onPickIdentity } = run
+  const { form, rows, asGroup, plan, running, unrun, changed, expected, editing, onPressPerson, onReplay, onPickIdentity, onInspect } = run
   const { users, groups, apps, zones } = useBrand()
   const person = users.find((u) => u.id === form.personId) ?? null
   const group = asGroup ? (groups.find((g) => g.id === asGroup || g.name === asGroup)?.name ?? asGroup) : null
@@ -72,15 +72,33 @@ export function SignInNode({ run, lit = false, across = false }: SignInNodeProps
 
   /* What the press says it edits, and what the sign-in is: the count and the run's state are words of the same press. */
   const label = [whoLabel(chips ? chips.map((c) => c.name).join(', ') : who, appName), count, state?.words].filter(Boolean).join(', ')
+  /* Where the page has the details panel (owner, 6 Oct 2026: "move it to the top — on a click on the name you can open
+     the name in the right panel, and for the app the same"), the person and the application are their own presses on
+     the pill, each opening its page in the panel; the rest of the pill still opens the sign-in, as the pencil does. A
+     group's check names no person (its stand-in member is not who signs in), so its name stays words. */
+  const opens = !!onInspect
+  const openPerson = onInspect && person && !group ? () => onInspect({ kind: 'person', id: person.id }, true) : null
+  const openApp = onInspect && app ? () => onInspect({ kind: 'app', id: app.id }, true) : null
+  const stop = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation()
+    fn()
+  }
   const what = (
     <>
       {app ? (
         <>
           <span className="rl-c2__nverb">signs in to</span>
-          <span className="rl-c2__napp">
-            <AppLogo appId={app.id} name={app.name} size={16} />
-            <b className="bb__start__at">{app.name}</b>
-          </span>
+          {openApp ? (
+            <button type="button" className="rl-c2__napp rl-c2__nlink" title={`Details of ${app.name}`} onClick={stop(openApp)}>
+              <AppLogo appId={app.id} name={app.name} size={16} />
+              <b className="bb__start__at">{app.name}</b>
+            </button>
+          ) : (
+            <span className="rl-c2__napp">
+              <AppLogo appId={app.id} name={app.name} size={16} />
+              <b className="bb__start__at">{app.name}</b>
+            </span>
+          )}
         </>
       ) : (
         <span className="rl-c2__nnone">Choose an application</span>
@@ -118,15 +136,35 @@ export function SignInNode({ run, lit = false, across = false }: SignInNodeProps
           </span>
         )}
         {/* Who signs in to what, and how many conditions it states: one press, its words wrapping as one line of prose. */}
-        <button type="button" className="rl-c2__nmain" aria-label={label} title="Edit the sign-in">
-          {!chips && (group || person) && (
-            <span className="rl-c2__nface" aria-hidden>
-              {group ? <Face kind="group" name={group} size="sm" decorative /> : person && <Face kind="user" name={person.name} size="sm" decorative />}
-            </span>
-          )}
-          {!chips && <span className={person || group ? 'rl-c2__nname' : 'rl-c2__nnone'}>{who}</span>}
-          {what}
-        </button>
+        {opens ? (
+          /* Not one button here: the name and the application are presses of their own inside it. */
+          <span className="rl-c2__nmain is-split">
+            {!chips && (group || person) && (
+              <span className="rl-c2__nface" aria-hidden>
+                {group ? <Face kind="group" name={group} size="sm" decorative /> : person && <Face kind="user" name={person.name} size="sm" decorative />}
+              </span>
+            )}
+            {!chips &&
+              (openPerson ? (
+                <button type="button" className="rl-c2__nname rl-c2__nlink" title={`Details of ${who}`} onClick={stop(openPerson)}>
+                  {who}
+                </button>
+              ) : (
+                <span className={person || group ? 'rl-c2__nname' : 'rl-c2__nnone'}>{who}</span>
+              ))}
+            {what}
+          </span>
+        ) : (
+          <button type="button" className="rl-c2__nmain" aria-label={label} title="Edit the sign-in">
+            {!chips && (group || person) && (
+              <span className="rl-c2__nface" aria-hidden>
+                {group ? <Face kind="group" name={group} size="sm" decorative /> : person && <Face kind="user" name={person.name} size="sm" decorative />}
+              </span>
+            )}
+            {!chips && <span className={person || group ? 'rl-c2__nname' : 'rl-c2__nnone'}>{who}</span>}
+            {what}
+          </button>
+        )}
         {/* The pencil and Replay: their own presses, never the pill's. */}
         <span className="rl-c2__nacts" onClick={(e) => e.stopPropagation()}>
           <button type="button" className="bb__act rl-c2__edit" aria-label="Edit sign-in" aria-pressed={editing === true} title="Edit sign-in" onClick={onPressPerson}>

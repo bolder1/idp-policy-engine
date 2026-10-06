@@ -45,7 +45,7 @@ import {
 } from './sign-in-tests/sign-in-card'
 import { TryJourney } from './sign-in-tests/TryJourney'
 import { InspectPanel } from './sign-in-tests/InspectPanel'
-import { isPeek, sameTarget, type InspectTarget } from './sign-in-tests/inspect-model'
+import { isPeek, type InspectTarget } from './sign-in-tests/inspect-model'
 import { openerOf, popupOpen, refocus } from './sign-in-tests/page-keys'
 import { SavedPanel, TryPanel, WhyPanel } from './sign-in-tests/TryPanel'
 import { useSimEnv } from './sim-env'
@@ -689,14 +689,12 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   const toBoardFor = (row: AppBreakInRow, policyId: string) => {
     if (attempts) session.loadBoard(policyId, formOf(attemptFacts(row.round.challenge, attempts.result.appId), zones))
   }
-  /* The inspector: a policy or rule pressed on the run opens in the right-hand panel; Edit in builder is the way out. */
-  const [inspect, setInspect] = useState<{ stack: InspectTarget[]; plan: EngineRun } | null>(null)
-  /* Pinned this visit: ways back to a thing, and the other side of Compare. */
-  const [pins, setPins] = useState<InspectTarget[]>([])
-  const togglePin = (t: InspectTarget) => setPins((cur) => (cur.some((p) => sameTarget(p, t)) ? cur.filter((p) => !sameTarget(p, t)) : [...cur, t]))
-  const onInspect = (t: InspectTarget, plan: EngineRun, fresh = false) => {
+  /* The details panel: a name pressed on the run puts that one thing in the right-hand panel, fresh — one page, no way
+     back (owner, 6 Oct 2026: "I don't want this multi-page thing"). Edit in builder is the way out. */
+  const [inspect, setInspect] = useState<{ target: InspectTarget; plan: EngineRun } | null>(null)
+  const onInspect = (t: InspectTarget, plan: EngineRun) => {
     noteOpener()
-    setInspect((cur) => ({ stack: cur && panel === 'inspect' && !fresh ? [...cur.stack.filter((x) => !sameTarget(x, t)), t] : [t], plan }))
+    setInspect({ target: t, plan })
     setPanel('inspect')
   }
   const PEEK_SCREEN = { zone: { name: 'zones' }, device: { name: 'fingerprint' }, risk: { name: 'risk-signals' }, hook: { name: 'hooks' }, app: { name: 'applications' } } as const
@@ -897,20 +895,13 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
           {INSPECTOR && panel === 'inspect' && inspect && (
             <InspectPanel
               key="side"
-              stack={inspect.stack}
+              target={inspect.target}
               plan={inspect.plan}
               reduced={reduced}
               wide={wide}
               onToggleWidth={() => setWide((w) => !w)}
               onClose={() => closePanel(true)}
-              onPush={(t) => setInspect((cur) => (cur ? { ...cur, stack: [...cur.stack, t] } : cur))}
-              onGoTo={(i) => setInspect((cur) => (cur ? { ...cur, stack: cur.stack.slice(0, i + 1) } : cur))}
               onEdit={editInBuilder}
-              pins={pins}
-              onPin={togglePin}
-              /* A group's check runs as one member who stands for it (sign-in-card.ts `memberOf`): that member is not
-                 the person signing in, so Related names no person then — the application alone (review, 6 Oct 2026). */
-              signIn={{ personId: asGroup ? null : session.form.personId, appId: session.form.appId }}
             />
           )}
           {panel === 'saved' && (

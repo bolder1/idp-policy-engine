@@ -34,7 +34,7 @@ import journeySrc from './TryJourney.tsx?raw'
    (d) A panel shut gives the focus back to what opened it, else the page's
        doors and, last, Focus's own: on Focus it went nowhere.
    (f) A group's check runs as one member who stands for the group; the
-       inspector's Related never names that member as the person.
+       sign-in line never offers that member as the person to open.
 
    Nothing here clicks: the rules are page-keys.ts's, held on the panels as
    they are drawn and on stand-ins for the page's elements; how the page
@@ -48,7 +48,6 @@ const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const TODAY = '2026-10-06'
 const noop = () => {}
 const html = (node: React.ReactNode) => renderToStaticMarkup(<BrandProvider>{node}</BrandProvider>)
-const text = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()
 
 /* Every start tag that says whether it is expanded, as its attributes — and as
    they would read once it is open (the panels are drawn shut). */
@@ -71,8 +70,7 @@ function runOf(form: SignInForm): EngineRun {
   return engineRun({ res, policies: t.policies, form, facts, env, ctx: { people, apps: t.apps, zones: t.zones, rows }, intro: 'none' })
 }
 
-const inspector = (plan: EngineRun, stack: InspectTarget[], signIn: { personId: string | null; appId: string | null }) =>
-  html(<InspectPanel stack={stack} plan={plan} reduced wide onToggleWidth={noop} onClose={noop} onPush={noop} onGoTo={noop} onEdit={noop} pins={[]} onPin={noop} signIn={signIn} />)
+const inspector = (plan: EngineRun, target: InspectTarget) => html(<InspectPanel target={target} plan={plan} reduced wide onToggleWidth={noop} onClose={noop} onEdit={noop} />)
 
 describe('(c) Escape waits for a popup over the panel, never for a row opened in it', () => {
   it('an attempt opened in Break-in attempts is a row: open, it never holds the page’s Escape', () => {
@@ -173,14 +171,14 @@ describe('(c) Escape waits for a popup over the panel, never for a row opened in
     expect(keysSrc).toContain('dialogOpen: () => boolean = hasOpenDialog')
   })
 
-  it('the inspector holds nothing: its names are presses, and no row in it waits on the Escape', () => {
+  it('the details panel holds nothing: its rules open in place, and no row in it waits on the Escape', () => {
     const plan = runOf({ ...emptyDraft(TODAY, '09:30'), personId: 'u-leo', appId: 'aws' })
     const decider = plan.decider
     expect(decider).not.toBeNull()
     if (!decider) return
     const policy = t.policies.find((p) => p.id === decider.id)!
-    for (const stack of [[{ kind: 'policy', policyId: policy.id }], [{ kind: 'policy', policyId: policy.id }, { kind: 'rule', policyId: policy.id, ruleId: policy.rules[0].id }]] as InspectTarget[][]) {
-      const out = inspector(plan, stack, { personId: 'u-leo', appId: 'aws' })
+    for (const target of [{ kind: 'policy', policyId: policy.id }, { kind: 'rule', policyId: policy.id, ruleId: policy.rules[1].id }] as InspectTarget[]) {
+      const out = inspector(plan, target)
       expect(out).toContain('class="bb__insp sit-panel insp"')
       expect(expandables(out).filter((e) => holdsEscape(e.opened))).toEqual([])
     }
@@ -261,7 +259,7 @@ describe('(d) a panel shut gives the focus back to what opened it — then the d
 
   it('the page notes the opener as each panel opens — a name, the attempts, the why, the form, the saved, the blocked', () => {
     expect(pageSrc).toContain('opener.current = openerOf(a instanceof HTMLElement ? a : null, panel !== null ? opener.current : null, document.body)')
-    expect(pageSrc).toMatch(/const onInspect = \(t: InspectTarget, plan: EngineRun, fresh = false\) => \{\s+noteOpener\(\)/)
+    expect(pageSrc).toMatch(/const onInspect = \(t: InspectTarget, plan: EngineRun\) => \{\s+noteOpener\(\)/)
     expect(pageSrc).toMatch(/if \(from === 'outcome' && panel === 'break-in'\) \{\s+closePanel\(\)\s+return\s+\}\s+if \(leaving\.current\) leaving\.current\.keepFocus = true\s+noteOpener\(\)/)
     expect(pageSrc).toMatch(/onOpen: \(o: boolean\) => \{\s+if \(o\) \{\s+noteOpener\(\)/)
     expect(pageSrc).toMatch(/const openPanel = \(then\?: \(\) => void\) => \{[\s\S]*?noteOpener\(\)\s+setPanel\('form'\)/)
@@ -304,24 +302,14 @@ describe('(f) a group’s check never names the member who stands for it as the 
     expect(asGroupOf(settled({ ran: own.ran }), own.form, people)).toBeNull()
   })
 
-  it('the page hands the inspector no person while the run stands for a group', () => {
+  it('the sign-in line never offers the stand-in as the person: no press on the name while the run stands for a group', () => {
     expect(pageSrc).toContain('const ranForm = session.form')
     expect(pageSrc).toContain('const asGroup = asGroupOf(tryPage, ranForm, users)')
-    expect(pageSrc).toContain('signIn={{ personId: asGroup ? null : session.form.personId, appId: session.form.appId }}')
-  })
-
-  it('so Related names the application alone — never the stand-in as the person', () => {
+    /* The person is a press of its own only for a person's check (classic2-pill.tsx); a group's name stays words. */
+    expect(pillSrc).toContain('const openPerson = onInspect && person && !group ?')
+    /* The panel itself names no person any more: there is no Related (owner, 6 Oct 2026). */
     const plan = runOf({ ...base, personId: standIn.id })
     const top: InspectTarget = plan.decider ? { kind: 'policy', policyId: plan.decider.id } : { kind: 'app', id: 'aws' }
-    const related = (out: string) => {
-      const at = out.indexOf('aria-label="Sign-in"')
-      return at < 0 ? '' : text(out.slice(at, out.indexOf('</ul>', at)))
-    }
-    const asGroup = related(inspector(plan, [top], { personId: null, appId: 'aws' }))
-    expect(asGroup).toContain('AWS Console')
-    expect(asGroup).not.toContain(standIn.name)
-    expect(asGroup).not.toContain('Person')
-    /* Given a person, the same panel names them: the null is what keeps the stand-in out. */
-    expect(related(inspector(plan, [top], { personId: standIn.id, appId: 'aws' }))).toContain(standIn.name)
+    expect(inspector(plan, top)).not.toContain('Related')
   })
 })

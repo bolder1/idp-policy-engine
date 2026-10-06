@@ -139,7 +139,9 @@ describe('an ended grant says so (6 Oct 2026)', () => {
     expect(grant.rules[0].tempAccess?.until).toBe(END)
     expect(classic2Src).toContain("const ended = r.state === 'off' && !!rule?.tempAccess && rule.enabled !== false")
     expect(classic2Src).toContain("possible: 'If not'")
-    expect(inspectSrc).toContain('title={GRANT_ENDED} line={`Ran until ${dateSaid(rule.tempAccess!.until)}`}')
+    /* The details page: the rule's line in the accordion, and the note when it is open. */
+    expect(inspectSrc).toContain("fate === 'off' && endedGrant(stored) ? GRANT_ENDED : FATE_SAID[fate]")
+    expect(inspectSrc).toContain('`Ran until ${dateSaid(rule.tempAccess!.until)}.`')
     expect(GRANT_ENDED).toBe('Temporary access ended')
   })
 })

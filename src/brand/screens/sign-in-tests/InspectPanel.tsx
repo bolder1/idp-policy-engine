@@ -1,35 +1,20 @@
 import { motion, useIsPresent } from 'motion/react'
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
-  AppWindow,
-  ArrowLeft,
   ArrowUpRight,
-  Asterisk,
   Check,
-  ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ChevronsLeftRight,
   ChevronsRightLeft,
   CircleDashed,
   CircleHelp,
-  Columns2,
   Copy,
   CornerDownRight,
-  FilePen,
-  History,
-  Info,
-  Link2,
-  ListOrdered,
-  ListTree,
-  MessageSquareText,
   Minus,
-  Pin,
-  PinOff,
-  Puzzle,
-  ScanSearch,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
-  Users,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -38,126 +23,105 @@ import { DEFAULT_DENY_MESSAGE, TENANT_DENY_CONTACT, audienceSummary, blankPolicy
 import { GRANT_ENDED, dateSaid } from './temp-access'
 import { DecisionBadge } from '../../decision-badge'
 import { DECISION_WORDS } from '../../decision-words'
-import { Button, StatusPill, Tabs } from '../../kit'
+import { Button, StatusPill } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
 import { IfBlock } from '../board/IfBlock'
-import { ReadAsTextBody } from '../board/ReadAsTextPanel'
-import { useDraftDiff, useLines } from '../board/use-lines'
-import { policySentences } from '../predicate-prose'
+import { useDraftDiff } from '../board/use-lines'
 import { readFoot, storedVersions } from '../board/read-as-text'
 import type { EngineRun } from './engine-run'
-import { FATE_WORDS, evidenceOf, fateOf, PEEK_FALLBACK, isPeek, ruleList, sameTarget, ruleOf, targetLabel, type Evidence, type InspectTarget, type RuleFate, type RuleListRow } from './inspect-model'
+import { FATE_WORDS, PEEK_FALLBACK, evidenceOf, isPeek, ruleList, ruleOf, targetLabel, type Evidence, type InspectTarget, type PeekTarget, type RuleFate, type RuleListRow } from './inspect-model'
+import { factsOf } from './inspect-facts'
 import { objectsOfRule, peekNames, PEEK_LIBRARY } from './peek-model'
-import { KindMark, PeekView, Section, Row } from './PeekViews'
-import { compareFacts, factsOf } from './inspect-facts'
-import { READ_AS_TEXT_TAB } from './phase'
+import { Block, Facts, Hero, KindMark, PeekPage } from './PeekViews'
 import { PANEL_SLIDE as SLIDE } from './sign-in-card'
 import './inspect.css'
 
 /* -----------------------------------------------------------------------------
-   The inspector (docs/specs/CHECK-ACCESS-INSPECTOR.md): a name on the run — a
-   policy, a rule, a zone, a person — opens here, in the page's right-hand
-   panel, read-only, and says what the thing is AND what it did to this sign-in.
-   One shell, a view per kind (owner, 6 Oct 2026: "a panel per kind").
+   The details panel (docs/specs/CHECK-ACCESS-INSPECTOR.md), as the owner asked
+   for it the second time (6 Oct 2026): "I don't want this multi-page thing. I
+   want a single page where at the top we have a card bearing the overview of
+   the policy, then the rules — rules can be opened in the same page. Remove the
+   related part, and move it to the top: on a click on the name you can open the
+   name in the right panel, and for the app the same."
 
-     ┌ ← [▤] Policy                      ⧉ ⌖ | >< × ┐   the kind's mark, its kind, its name
-     │      AWS for engineering teams                 │
-     ├────────────────────────────────────────────────┤
-     │ AWS for engineering teams › Rule 1             │   the way back (a long one folds to …)
-     │ ┌ ✓ Decided this sign-in ───────────────────┐  │   what it did to THIS sign-in, in its tone
-     │ └   Rule 2 · Allow on 1 factor              ┘  │
-     │ [Details] [Read as text]                       │   (the text tab: READ_AS_TEXT_TAB)
-     │ ⓘ About        Status, applications, audience  │   sections in the builder inspector's
-     │ ≡ Rules        1 · 2 · 3 · Nothing else …      │   grammar: a brand-coloured mark, a
-     │ 🔗 Related     the sign-in, what is pinned     │   semibold heading, a guide rule
-     ├────────────────────────────────────────────────┤
-     │                              [Edit in builder ↗]│   the one way out, at the foot
-     └────────────────────────────────────────────────┘
+     ┌ Policy                                       ⧉ | >< × ┐
+     │ ┌──────────────────────────────────────────────────┐ │
+     │ │ [▤] AWS for engineering teams          [Active]   │ │  the overview card
+     │ │ Applications  AWS Console   Audience  3 groups    │ │
+     │ │ Last change   Changed 3 days ago by …             │ │
+     │ │ ✓ Decided this sign-in · Rule 2 · Allow on 1 …   │ │  what it did to THIS sign-in
+     │ └──────────────────────────────────────────────────┘ │
+     │ Rules                                       In order │
+     │ ▸ 1 Contractors away from the office  ✕ Not matched  │
+     │ ▾ 2 Engineers on a compliant device   ✓ Decided      │  open in place: this sign-in,
+     │     This sign-in · Checks · Uses · What they're told  │  the rule, what it uses
+     │ ▸ * Nothing else matched              — Not reached  │
+     ├──────────────────────────────────────────────────────┤
+     │                                  [Edit in builder ↗] │
+     └──────────────────────────────────────────────────────┘
 
-   Pin keeps a thing a press away for this visit, and a pinned thing of the same
-   kind offers Compare (inspect-facts.ts). Copy puts the view on the clipboard.
+   One thing at a time and no way back: a press on a name on the canvas puts it
+   here, fresh. A rule pressed on the canvas opens its policy's page with that
+   rule open and brought into view. What a rule uses (a zone, a device profile)
+   opens in place under it, never as a page over this one. The person and the
+   application are pressed on the sign-in line at the top of the canvas
+   (classic2-pill.tsx), not listed here.
+
    Tokens only (inspect.css); nothing moves but the panel.
    -------------------------------------------------------------------------- */
 
 export interface InspectPanelProps {
-  /** The way in, oldest first: the last is on screen; earlier ones are the way back. */
-  stack: readonly InspectTarget[]
+  /** The one thing on the page. A rule is its policy's page, that rule open. */
+  target: InspectTarget
   /** The run on screen, for how each rule fared. */
   plan: EngineRun
   reduced: boolean
   wide: boolean
   onToggleWidth: () => void
   onClose: () => void
-  /** A name pressed inside the panel: the next step in the stack. */
-  onPush: (t: InspectTarget) => void
-  /** A step of the way back pressed: the stack is cut to it (index into `stack`). */
-  onGoTo: (index: number) => void
   /** Edit in builder ↗ for a policy or a rule; the library page for anything else. The only ways out. */
   onEdit: (t: InspectTarget) => void
-  /** Pinned this visit, oldest first; a pin is a way back to a thing and the other side of Compare. */
-  pins: readonly InspectTarget[]
-  onPin: (t: InspectTarget) => void
-  /** Who is signing in to what, so both are a press away (a person, an application). */
-  signIn: { personId: string | null; appId: string | null }
 }
 
-/** What a target is, said over its name in the panel's head. */
-function kickerOf(t: InspectTarget, policies: readonly Policy[]): string {
+/** What the panel's bar says it is showing. */
+function kindOf(t: InspectTarget): string {
   if (isPeek(t)) return PEEK_FALLBACK[t.kind]
-  if (t.kind === 'policy') return policies.find((p) => p.id === t.policyId)?.isSystem ? 'Default policy' : 'Policy'
-  const p = policies.find((x) => x.id === t.policyId)
-  if (!p || t.ruleId === null) return 'Last row'
-  const i = p.rules.findIndex((r) => r.id === t.ruleId)
-  return i < 0 ? 'Rule' : `Rule ${i + 1} of ${p.rules.length}`
+  return 'Policy'
 }
 
-/** The name in the head: a rule's own name, without the "Rule 2 ·" the kicker already says. */
-function nameOf(t: InspectTarget, label: string, policies: readonly Policy[]): string {
-  if (t.kind !== 'rule') return label
-  if (t.ruleId === null) return label
-  return policies.find((p) => p.id === t.policyId)?.rules.find((r) => r.id === t.ruleId)?.name ?? label
-}
-
-export function InspectPanel({ stack, plan, reduced, wide, onToggleWidth, onClose, onPush, onGoTo, onEdit, pins, onPin, signIn }: InspectPanelProps) {
+export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClose, onEdit }: InspectPanelProps) {
   const present = useIsPresent()
   const lib = useBrand()
   const { policies, zones, fingerprints, hooks, riskProfiles, users, apps, showToast } = lib
   const names = useMemo(() => peekNames({ zones, fingerprints, hooks, riskProfiles, users, apps }), [zones, fingerprints, hooks, riskProfiles, users, apps])
-  const label = (t: InspectTarget) => targetLabel(t, policies, names)
   const heading = useId()
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLHeadingElement | null>(null)
-  const top = stack[stack.length - 1]
-  const topKey = top ? `${stack.length}:${label(top)}` : ''
-  /* Compare belongs to the step it was opened on: a new step of the stack ends it, with no effect to do so. */
-  const [cmp, setCmp] = useState<{ at: string; with: InspectTarget } | null>(null)
-  const other = cmp && cmp.at === topKey ? cmp.with : null
-  /* Its title takes the focus once it has arrived, and again when the stack moves. */
+  /* A rule is shown as its policy's page; the key is the page, so a new thing starts it afresh (its open rules too). */
+  const page: InspectTarget = target.kind === 'rule' ? { kind: 'policy', policyId: target.policyId } : target
+  const pageKey = `${page.kind}:${isPeek(page) ? page.id : page.policyId}:${target.kind === 'rule' ? String(target.ruleId) : ''}`
+  const name = targetLabel(page, policies, names)
+  /* The rule the policy's footer opens the builder on: the one open, where exactly one is. */
+  const [openOne, setOpenOne] = useState<string | null | undefined>(undefined)
   useEffect(() => {
     const t = window.setTimeout(() => titleRef.current?.focus({ preventScroll: true }), reduced ? 0 : SLIDE.duration * 1000)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as it opens
   }, [])
   useEffect(() => {
-    titleRef.current?.focus({ preventScroll: true })
     bodyRef.current?.scrollTo({ top: 0 })
-  }, [topKey])
-  if (!top) return null
-  const title = label(top)
-  const pinned = pins.some((p) => sameTarget(p, top))
-  const comparable = (p: InspectTarget) => !sameTarget(p, top) && p.kind === top.kind && factsOf(p, lib) !== null && factsOf(top, lib) !== null
+  }, [pageKey])
   const copy = () => {
     const text = bodyRef.current?.innerText ?? ''
     if (!navigator.clipboard) return showToast('Could not copy the text')
-    navigator.clipboard.writeText(`${kickerOf(top, policies)}: ${title}\n\n${text}`).then(() => showToast('Copied'), () => showToast('Could not copy the text'))
+    navigator.clipboard.writeText(`${kindOf(page)}: ${name}\n\n${text}`).then(() => showToast('Copied'), () => showToast('Could not copy the text'))
   }
-  const related: InspectTarget[] = [
-    ...(signIn.personId ? [{ kind: 'person', id: signIn.personId } as const] : []),
-    ...(signIn.appId ? [{ kind: 'app', id: signIn.appId } as const] : []),
-  ].filter((t) => !sameTarget(t, top))
-  const pinnedOthers = pins.filter((p) => !sameTarget(p, top))
-  /* The foot's way out: the builder for a policy or a rule, a library page for the rest; a person has none here. */
-  const out = top.kind === 'person' ? null : isPeek(top) ? `Open in ${PEEK_LIBRARY[top.kind]}` : 'Edit in builder'
+  /* The foot's way out: the builder for a policy (on its open rule, where one is), a library page for the rest; a person has none. */
+  const out = page.kind === 'person' ? null : isPeek(page) ? `Open in ${PEEK_LIBRARY[page.kind]}` : 'Edit in builder'
+  const edit = () => {
+    if (page.kind === 'policy' && openOne !== undefined) onEdit({ kind: 'rule', policyId: page.policyId, ruleId: openOne })
+    else onEdit(page)
+  }
 
   return (
     <motion.aside
@@ -170,23 +134,11 @@ export function InspectPanel({ stack, plan, reduced, wide, onToggleWidth, onClos
       transition={SLIDE}
     >
       <div className="bb__inspbar is-rule insp__bar">
-        {stack.length > 1 && (
-          <button type="button" className="bb__act" aria-label="Back" title="Back" onClick={() => onGoTo(stack.length - 2)}>
-            <ArrowLeft size={15} strokeWidth={2} />
-          </button>
-        )}
-        <KindMark target={top} />
-        <div className="insp__titles">
-          <span className="insp__kicker">{kickerOf(top, policies)}</span>
-          <h2 ref={titleRef} id={heading} className="insp__title" title={title} tabIndex={-1}>
-            {nameOf(top, title, policies)}
-          </h2>
-        </div>
+        <h2 ref={titleRef} id={heading} className="insp__bartitle" tabIndex={-1}>
+          {kindOf(page)} details<span className="u-sr-only">: {name}</span>
+        </h2>
         <button type="button" className="bb__act" aria-label="Copy this view" title="Copy" onClick={copy}>
           <Copy size={14} strokeWidth={2} />
-        </button>
-        <button type="button" className={`bb__act${pinned ? ' is-on' : ''}`} aria-label={pinned ? 'Unpin' : 'Pin to compare'} title={pinned ? 'Unpin' : 'Pin'} aria-pressed={pinned} onClick={() => onPin(top)}>
-          {pinned ? <PinOff size={14} strokeWidth={2} /> : <Pin size={14} strokeWidth={2} />}
         </button>
         <span className="bb__inspbar__sep" aria-hidden />
         <button type="button" className="bb__act" aria-label={wide ? 'Narrow the panel' : 'Widen the panel'} title={wide ? 'Narrow' : 'Widen'} onClick={onToggleWidth}>
@@ -197,106 +149,18 @@ export function InspectPanel({ stack, plan, reduced, wide, onToggleWidth, onClos
         </button>
       </div>
 
-      <div className="bb__inspbody insp__body" ref={bodyRef}>
-        {stack.length > 1 && <Crumbs stack={stack} label={label} onGoTo={onGoTo} />}
-        {other ? (
-          <CompareView a={top} b={other} label={label} />
-        ) : isPeek(top) ? (
-          <PeekView target={top} onPush={onPush} />
-        ) : top.kind === 'policy' ? (
-          <PolicyView target={top} plan={plan} onPush={onPush} />
-        ) : (
-          <RuleView target={top} plan={plan} onPush={onPush} />
-        )}
-        {!other && (related.length > 0 || pinnedOthers.length > 0) && (
-          <Section id="related" title="Related" icon={Link2}>
-            {related.length > 0 && (
-              <div className="insp__group" aria-label="Sign-in" role="group">
-                <span className="insp__grouplabel">This sign-in</span>
-                <ul className="insp__rows">
-                  {related.map((t) => (
-                    <li key={`${t.kind}-${label(t)}`}>
-                      <Row mark={<KindMark target={t} small />} name={label(t)} meta={PEEK_FALLBACK[t.kind as 'person' | 'app']} onPress={() => onPush(t)} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {pinnedOthers.length > 0 && (
-              <div className="insp__group" aria-label="Pinned" role="group">
-                <span className="insp__grouplabel">Pinned</span>
-                <ul className="insp__rows">
-                  {pinnedOthers.map((t) => (
-                    <li key={`${t.kind}-${label(t)}`} className="insp__pinrow">
-                      <Row mark={<KindMark target={t} small />} name={label(t)} meta={kickerOf(t, policies)} onPress={() => onPush(t)} />
-                      {comparable(t) && (
-                        <button type="button" className="insp__cmpbtn" aria-label={`Compare with ${label(t)}`} title="Compare side by side" onClick={() => setCmp({ at: topKey, with: t })}>
-                          <Columns2 size={13} strokeWidth={2} aria-hidden />
-                          Compare
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </Section>
-        )}
+      <div className="bb__inspbody insp__body" ref={bodyRef} key={pageKey}>
+        {isPeek(page) ? <PeekPage target={page} plan={plan} /> : <PolicyPage policyId={page.policyId} focus={target.kind === 'rule' ? target.ruleId : undefined} plan={plan} onEdit={onEdit} onOpenOne={setOpenOne} />}
       </div>
 
-      {(out || other) && (
+      {out && (
         <div className="bb__inspfoot insp__foot">
-          {other && (
-            <Button variant="ghost" size="sm" onClick={() => setCmp(null)}>
-              Back to details
-            </Button>
-          )}
-          {out && (
-            <Button variant="secondary" size="sm" iconRight={ArrowUpRight} onClick={() => onEdit(top)}>
-              {out}
-            </Button>
-          )}
+          <Button variant="secondary" size="sm" iconRight={ArrowUpRight} onClick={edit}>
+            {out}
+          </Button>
         </div>
       )}
     </motion.aside>
-  )
-}
-
-/* --- The way back ------------------------------------------------------------------------------------------------ */
-
-function Crumbs({ stack, label, onGoTo }: { stack: readonly InspectTarget[]; label: (t: InspectTarget) => string; onGoTo: (i: number) => void }) {
-  /* A long way in folds its middle into one step back: the first, …, the last two. */
-  const folded = stack.length > 4
-  return (
-    <nav className="insp__crumbs" aria-label="Where you are">
-      {stack.map((t, i) => {
-        if (folded && i > 0 && i < stack.length - 2) {
-          if (i !== 1) return null
-          return (
-            <span key="gap" className="insp__crumbstep">
-              <ChevronRight size={12} strokeWidth={2} aria-hidden />
-              <button type="button" className="insp__crumb" title={stack.slice(1, -2).map(label).join(' › ')} aria-label={`Back to ${label(stack[stack.length - 3])}`} onClick={() => onGoTo(stack.length - 3)}>
-                …
-              </button>
-            </span>
-          )
-        }
-        return (
-          <span key={`${i}-${label(t)}`} className="insp__crumbstep">
-            {i > 0 && <ChevronRight size={12} strokeWidth={2} aria-hidden />}
-            {i < stack.length - 1 ? (
-              <button type="button" className="insp__crumb" onClick={() => onGoTo(i)}>
-                {label(t)}
-              </button>
-            ) : (
-              <span className="insp__crumb is-here" aria-current="page">
-                {label(t)}
-              </span>
-            )}
-          </span>
-        )
-      })}
-    </nav>
   )
 }
 
@@ -306,12 +170,12 @@ type Tone = 'positive' | 'notice' | 'negative' | 'neutral'
 const DECISION_TONE: Record<AccessDecision, Tone> = { '1fa': 'positive', '2fa': 'notice', deny: 'negative' }
 const DECISION_MARK: Record<AccessDecision, LucideIcon> = { '1fa': ShieldCheck, '2fa': ShieldAlert, deny: ShieldX }
 
-/** The band under the head: how this thing met the sign-in on the canvas, in the outcome's own tone. */
+/** The strip at the overview card's foot: how this thing met the sign-in on the canvas, in the outcome's own tone. */
 function Verdict({ tone, icon: Icon, title, line }: { tone: Tone; icon: LucideIcon; title: string; line?: string }) {
   return (
     <div className={`insp__verdict is-${tone}`} role="status">
       <span className="insp__verdictmark" aria-hidden>
-        <Icon size={16} strokeWidth={2.2} />
+        <Icon size={15} strokeWidth={2.2} />
       </span>
       <span className="insp__verdicttext">
         <b>{title}</b>
@@ -322,19 +186,14 @@ function Verdict({ tone, icon: Icon, title, line }: { tone: Tone; icon: LucideIc
 }
 
 /* A run that Depends (6 Oct 2026). The policy the engine opened is the one
-   that decides, but a rule in it could not be told, so no rule of it decided —
-   and the panel said "Did not decide this sign-in" over "<this policy> did",
-   contradicting itself; where a later rule matched on the definite reading it
-   said "Decided this sign-in" under an outcome that says Depends. Now it says
-   the outcome's own word, "Depends", in the outcome's notice tone, and names
-   the rules it is waiting on and what would settle them, as the folded policy
-   on the canvas does ("Can’t tell: Device", journey.ts `policyWhy`).
+   that decides, but a rule in it could not be told, so no rule of it decided.
+   It says the outcome's own word, "Depends", in the outcome's notice tone, and
+   names the rules it is waiting on and what would settle them, as the folded
+   policy on the canvas does ("Can’t tell: Device", journey.ts `policyWhy`).
 
-   The rule the definite reading walks on to — a later rule that matched, or
-   the last row — is "If not", as the canvas draws it (PolicyStack.tsx
-   `WORD.possible`): what happens only if the rules above do not match, never a
-   match. Keyed on the run's own rules, so a policy with no matching rule in a
-   run it decides reads Depends whatever the outcome's status says. */
+   The rule the definite reading walks on to — a later rule that matched, or the
+   last row — is "If not", as the canvas draws it (PolicyStack.tsx
+   `WORD.possible`): what happens only if the rules above do not match. */
 type Shown = RuleFate | 'if-not'
 
 const FATE_MARK: Record<Shown, LucideIcon> = { decided: Check, 'not-matched': X, 'cant-tell': CircleHelp, off: Minus, 'not-reached': Minus, 'if-not': CornerDownRight }
@@ -368,246 +227,180 @@ function dependsLine(waiting: readonly RuleListRow[], needs: readonly string[]):
   return [rules, tell].filter(Boolean).join(' · ')
 }
 
-/* --- Two of a kind, side by side ----------------------------------------------------------------------------------- */
+/* --- A policy, on one page --------------------------------------------------------------------------------------- */
 
-function CompareView({ a, b, label }: { a: InspectTarget; b: InspectTarget; label: (t: InspectTarget) => string }) {
-  const lib = useBrand()
-  const resolve = useNameLookup()
-  const say = (p: Policy, ruleId: string | null) => {
-    const lines = policySentences(p, resolve, (id) => lib.apps.find((x) => x.id === id)?.name ?? 'a deleted application')
-    return lines.find((l) => (ruleId === null ? l.ruleId === 'fallback' : l.ruleId === ruleId))?.text ?? ''
-  }
-  const fa = factsOf(a, lib, say)
-  const fb = factsOf(b, lib, say)
-  if (!fa || !fb) return <p className="insp__gone">One of these is no longer there.</p>
-  const rows = compareFacts(fa, fb)
-  const differ = rows.filter((r) => !r.same).length
-  return (
-    <Section id="compare" title="Compare" icon={Columns2} aside={<span className="insp__secmeta">{differ === 0 ? 'No differences' : differ === 1 ? '1 difference' : `${differ} differences`}</span>}>
-      <table className="insp__compare">
-        <thead>
-          <tr>
-            <th scope="col">
-              <span className="u-sr-only">Field</span>
-            </th>
-            <th scope="col">{label(a)}</th>
-            <th scope="col">{label(b)}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.label} className={r.same ? '' : 'is-differs'}>
-              <th scope="row">{r.label}</th>
-              <td>{r.a || '—'}</td>
-              <td>{r.b || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Section>
-  )
-}
+const rowKey = (id: string | null) => id ?? 'last'
 
-/* --- A policy ---------------------------------------------------------------------------------------------------- */
-
-function PolicyView({ target, plan, onPush }: { target: Extract<InspectTarget, { kind: 'policy' }>; plan: EngineRun; onPush: (t: InspectTarget) => void }) {
+function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: string; focus: string | null | undefined; plan: EngineRun; onEdit: (t: InspectTarget) => void; onOpenOne: (id: string | null | undefined) => void }) {
   const { policies, apps, groups, users } = useBrand()
-  const policy = policies.find((p) => p.id === target.policyId)
-  const [tab, setTab] = useState<'details' | 'text'>('details')
+  const policy = policies.find((p) => p.id === policyId)
   const versions = useMemo(() => (policy ? storedVersions(policy) : { draft: blankPolicy(''), live: null }), [policy])
   const diff = useDraftDiff(versions)
+  const list = policy ? ruleList(policy, plan) : []
+  const depends = policy ? dependsIn(plan, policy.id) : false
+  /* Open on arrival: the rule pressed on the canvas; else the one that decided; on a run that Depends, the ones it waits on. */
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => {
+    if (focus !== undefined) return new Set([rowKey(focus)])
+    if (depends) return new Set(waitingOn(list).map((r) => rowKey(r.id)))
+    const by = list.find((r) => r.fate === 'decided')
+    return new Set(by ? [rowKey(by.id)] : [])
+  })
+  const focusRef = useRef<HTMLLIElement | null>(null)
+  useEffect(() => {
+    if (focus !== undefined) focusRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [focus])
+  useEffect(() => {
+    const ids = [...open]
+    onOpenOne(ids.length === 1 ? (ids[0] === 'last' ? null : ids[0]) : undefined)
+  }, [open, onOpenOne])
   if (!policy) return <p className="insp__gone">This policy is no longer there.</p>
-  const list = ruleList(policy, plan)
   const audience = policy.isSystem ? 'Everyone' : audienceSummary(policy.audience, groups, users).label || 'Nobody'
   const decided = plan.decider?.id === policy.id
-  const depends = dependsIn(plan, policy.id)
   const by = decided && !depends ? list.find((r) => r.fate === 'decided') : undefined
   const changed = readFoot(policy).split(' · ').slice(1).join(' · ')
+  const appsSaid = policy.isSystem ? (
+    'Every application'
+  ) : policy.appIds.length === 0 ? (
+    'None'
+  ) : (
+    <span className="insp__apps">
+      {policy.appIds.map((id) => {
+        const app = apps.find((a) => a.id === id)
+        return (
+          <span key={id} className="insp__app">
+            {app && <KindMark target={{ kind: 'app', id }} small />}
+            {app?.name ?? 'A deleted application'}
+          </span>
+        )
+      })}
+    </span>
+  )
+  const toggle = (k: string) =>
+    setOpen((cur) => {
+      const next = new Set(cur)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      return next
+    })
   return (
     <>
-      <div className="insp__lead">
-        {depends ? (
-          <Verdict tone="notice" icon={CircleHelp} title="Depends" line={dependsLine(waitingOn(list), plan.outcome.view.needs)} />
-        ) : decided && by ? (
-          <Verdict tone={DECISION_TONE[by.decision]} icon={DECISION_MARK[by.decision]} title="Decided this sign-in" line={`${by.n === null ? by.name : `Rule ${by.n} · ${by.name}`} · ${DECISION_WORDS[by.decision]}`} />
-        ) : (
-          <Verdict tone="neutral" icon={CircleDashed} title="Did not decide this sign-in" line={plan.decider ? `${plan.decider.name} did` : undefined} />
-        )}
-        {READ_AS_TEXT_TAB && (
-          <Tabs<'details' | 'text'>
-            className="bx-tabs--line insp__tabs"
-            name="Policy view"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'details', label: 'Details' },
-              { value: 'text', label: 'Read as text' },
-            ]}
-          />
-        )}
-      </div>
-      {tab === 'text' && READ_AS_TEXT_TAB ? (
-        <div className="insp__text">
-          <ReadTab policy={policy} />
-        </div>
-      ) : (
-        <>
-          <Section id="about" title="About" icon={Info}>
-            <dl className="insp__facts">
-              <Fact icon={ShieldCheck} label="Status">
-                <StatusPill status={policy.status} />
-              </Fact>
-              <Fact icon={AppWindow} label="Applications">
-                {policy.isSystem
-                  ? 'Every application'
-                  : policy.appIds.length === 0
-                    ? 'None'
-                    : policy.appIds.map((id) => {
-                        const app = apps.find((a) => a.id === id)
-                        return app ? (
-                          <button key={id} type="button" className="insp__applink" onClick={() => onPush({ kind: 'app', id })}>
-                            <KindMark target={{ kind: 'app', id }} small />
-                            {app.name}
-                          </button>
-                        ) : (
-                          <span key={id}>A deleted application</span>
-                        )
-                      })}
-              </Fact>
-              <Fact icon={Users} label="Audience">
-                {audience}
-              </Fact>
-              {changed && (
-                <Fact icon={History} label="Last change">
-                  {changed}
-                </Fact>
-              )}
-            </dl>
-          </Section>
-          {diff && (diff.added.length > 0 || diff.removed.length > 0) && (
-            <Section id="draft" title="Draft changes" icon={FilePen} aside={<span className="insp__secmeta">Not live yet</span>}>
-              <ul className="insp__diff">
-                {diff.removed.map((t) => (
-                  <li key={`-${t}`} className="is-removed">
-                    <span className="insp__diffword">Removed</span>
-                    <span className="insp__difftext">{t}</span>
-                  </li>
-                ))}
-                {diff.added.map((t) => (
-                  <li key={`+${t}`} className="is-added">
-                    <span className="insp__diffword">Added</span>
-                    <span className="insp__difftext">{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-          <Section id="rules" title="Rules" icon={ListOrdered} aside={<span className="insp__secmeta">In order</span>}>
-            <ul className="insp__rows">
-              {list.map((r) => {
-                const fate = shownFate(r, depends)
-                const FateIcon = fate ? FATE_MARK[fate] : null
-                return (
-                  <li key={r.id ?? 'last'}>
-                    <button type="button" className={`insp__rule${fate ? ` is-${fate}` : ''}`} onClick={() => onPush({ kind: 'rule', policyId: policy.id, ruleId: r.id })}>
-                      <span className="insp__n" aria-hidden>
-                        {r.n ?? <Asterisk size={12} strokeWidth={2.2} />}
-                      </span>
-                      <span className="insp__rmain">
-                        <span className="insp__rname">{r.name}</span>
-                        {fate && FateIcon && (
-                          <span className={`insp__fate is-${fate}`}>
-                            <FateIcon size={12} strokeWidth={2.4} aria-hidden />
-                            {fate === 'off' && endedGrant(policy.rules.find((x) => x.id === r.id)) ? GRANT_ENDED : FATE_SAID[fate]}
-                          </span>
-                        )}
-                      </span>
-                      <DecisionBadge decision={r.decision} />
-                      <ChevronRight size={14} strokeWidth={2} aria-hidden className="insp__chev" />
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </Section>
-        </>
+      <Hero
+        target={{ kind: 'policy', policyId: policy.id }}
+        kicker={policy.isSystem ? 'Default policy' : 'Policy'}
+        name={policy.name}
+        badge={<StatusPill status={policy.status} />}
+        facts={[
+          { label: 'Applications', value: appsSaid, wide: !policy.isSystem && policy.appIds.length > 1 },
+          { label: 'Audience', value: audience },
+          ...(changed ? [{ label: 'Last change', value: changed, wide: true }] : []),
+        ]}
+        strip={
+          depends ? (
+            <Verdict tone="notice" icon={CircleHelp} title="Depends" line={dependsLine(waitingOn(list), plan.outcome.view.needs)} />
+          ) : decided && by ? (
+            <Verdict tone={DECISION_TONE[by.decision]} icon={DECISION_MARK[by.decision]} title="Decided this sign-in" line={`${by.n === null ? by.name : `Rule ${by.n} · ${by.name}`} · ${DECISION_WORDS[by.decision]}`} />
+          ) : (
+            <Verdict tone="neutral" icon={CircleDashed} title="Did not decide this sign-in" line={plan.decider ? `${plan.decider.name} did` : undefined} />
+          )
+        }
+      />
+      {diff && (diff.added.length > 0 || diff.removed.length > 0) && (
+        <Block title="Draft changes" aside="Not live yet">
+          <ul className="insp__diff">
+            {diff.removed.map((t) => (
+              <li key={`-${t}`} className="is-removed">
+                <span className="insp__diffword">Removed</span>
+                <span className="insp__difftext">{t}</span>
+              </li>
+            ))}
+            {diff.added.map((t) => (
+              <li key={`+${t}`} className="is-added">
+                <span className="insp__diffword">Added</span>
+                <span className="insp__difftext">{t}</span>
+              </li>
+            ))}
+          </ul>
+        </Block>
       )}
+      <Block title="Rules" aside="In order">
+        <ul className="insp__accs">
+          {list.map((r) => {
+            const k = rowKey(r.id)
+            const fate = shownFate(r, depends)
+            const FateIcon = fate ? FATE_MARK[fate] : null
+            const stored = r.id === null ? undefined : policy.rules.find((x) => x.id === r.id)
+            const isOpen = open.has(k)
+            const bodyId = `insp-rule-${policy.id}-${k}`
+            return (
+              <li key={k} ref={focus !== undefined && rowKey(focus) === k ? focusRef : undefined} className={`insp__acc${isOpen ? ' is-open' : ''}${fate ? ` is-${fate}` : ''}`}>
+                <button type="button" className="insp__acchead" aria-expanded={isOpen} aria-controls={bodyId} onClick={() => toggle(k)}>
+                  <span className="insp__n" aria-hidden>
+                    {r.n ?? '*'}
+                  </span>
+                  <span className="insp__rmain">
+                    <span className="insp__rname">{r.name}</span>
+                    {fate && FateIcon && (
+                      <span className={`insp__fate is-${fate}`}>
+                        <FateIcon size={12} strokeWidth={2.4} aria-hidden />
+                        {fate === 'off' && endedGrant(stored) ? GRANT_ENDED : FATE_SAID[fate]}
+                      </span>
+                    )}
+                  </span>
+                  <DecisionBadge decision={r.decision} />
+                  {isOpen ? <ChevronUp size={14} strokeWidth={2} aria-hidden className="insp__chev" /> : <ChevronDown size={14} strokeWidth={2} aria-hidden className="insp__chev" />}
+                </button>
+                {isOpen && (
+                  <div id={bodyId} className="insp__accbody">
+                    <RuleBody policy={policy} ruleId={r.id} plan={plan} shown={fate} list={list} onEdit={onEdit} />
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </Block>
     </>
   )
 }
 
-function Fact({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
-  return (
-    <div className="insp__fact">
-      <dt>
-        <Icon size={13} strokeWidth={2} aria-hidden />
-        {label}
-      </dt>
-      <dd>{children}</dd>
-    </div>
-  )
-}
-
-/* Read as text, a tab beside the details (owner, 6 Oct 2026: it may not stay in the main product, so it is one tab,
-   behind READ_AS_TEXT_TAB, and the details never depend on it). */
-function ReadTab({ policy }: { policy: Policy }) {
-  const versions = useMemo(() => storedVersions(policy), [policy])
-  const { version, setVersion, lines } = useLines(versions)
-  return <ReadAsTextBody lines={lines} version={versions.live ? version : null} onVersion={setVersion} foot={readFoot(policy)} />
-}
-
-/* --- A rule ------------------------------------------------------------------------------------------------------ */
+/* --- A rule, open in place --------------------------------------------------------------------------------------- */
 
 const MARK = { pass: Check, fail: X, unknown: CircleHelp } as const
 
-function RuleView({ target, plan, onPush }: { target: Extract<InspectTarget, { kind: 'rule' }>; plan: EngineRun; onPush: (t: InspectTarget) => void }) {
-  const { policies, zones, fingerprints, hooks, riskProfiles, activeRiskProfileId, users, apps } = useBrand()
+function RuleBody({ policy, ruleId, plan, shown, list, onEdit }: { policy: Policy; ruleId: string | null; plan: EngineRun; shown: Shown | null; list: readonly RuleListRow[]; onEdit: (t: InspectTarget) => void }) {
+  const lib = useBrand()
+  const { zones, fingerprints, hooks, riskProfiles, activeRiskProfileId, users, apps } = lib
   const resolve = useNameLookup()
-  const policy = policies.find((p) => p.id === target.policyId)
-  const found = policy ? ruleOf(policy, target.ruleId) : null
-  if (!policy || !found) return <p className="insp__gone">This rule is no longer there.</p>
+  const [use, setUse] = useState<string | null>(null)
+  const found = ruleOf(policy, ruleId)
+  if (!found) return <p className="insp__gone">This rule is no longer there.</p>
   const { rule, terminal } = found
-  const fate = fateOf(plan, policy.id, target.ruleId)
-  /* On a run that Depends, the rule the walk goes on to is "If not", and says which rules it waits on. */
-  const shown = fate ? shownFate({ id: target.ruleId, fate }, dependsIn(plan, policy.id)) : null
-  const waiting = shown === 'if-not' ? waitingOn(ruleList(policy, plan)).map((r) => r.n ?? 0) : []
-  const evidence: Evidence[] = evidenceOf(plan, policy.id, target.ruleId)
+  const evidence: Evidence[] = evidenceOf(plan, policy.id, ruleId)
   const refuses = rule.decision === 'deny'
-  const uses = objectsOfRule(rule, activeRiskProfileId)
+  const uses = terminal ? [] : objectsOfRule(rule, activeRiskProfileId)
   const names = peekNames({ zones, fingerprints, hooks, riskProfiles, users, apps })
-  const failed = evidence.find((e) => e.status === 'fail')
+  const waiting = shown === 'if-not' ? waitingOn(list).map((r) => r.n ?? 0) : []
+  const note =
+    shown === 'if-not'
+      ? waiting.length > 0
+        ? `Applies only if ${rulesSaid(waiting).toLowerCase()} ${waiting.length === 1 ? 'does' : 'do'} not match.`
+        : 'Applies only if the rules above do not match.'
+      : shown === 'not-reached'
+        ? 'An earlier rule decided, so this one was not checked.'
+        : shown === 'cant-tell'
+          ? `If it matches: ${DECISION_WORDS[rule.decision]}.`
+          : shown === 'off' && endedGrant(rule)
+            ? `Ran until ${dateSaid(rule.tempAccess!.until)}.`
+            : shown === null
+              ? `Not checked: ${policy.name} did not decide this sign-in.`
+              : ''
+  const picked = uses.find((o) => `${o.kind}:${o.id}` === use) ?? null
   return (
     <>
-      <div className="insp__lead">
-        {shown === 'if-not' ? (
-          <Verdict
-            tone="notice"
-            icon={CornerDownRight}
-            title={waiting.length > 0 ? `If ${rulesSaid(waiting).toLowerCase()} ${waiting.length === 1 ? 'does' : 'do'} not match` : FATE_SAID['if-not']}
-            line={`${DECISION_WORDS[rule.decision]} · ${policy.name}`}
-          />
-        ) : shown === 'decided' ? (
-          <Verdict tone={DECISION_TONE[rule.decision]} icon={DECISION_MARK[rule.decision]} title="Decided this sign-in" line={`${DECISION_WORDS[rule.decision]} · ${policy.name}`} />
-        ) : shown === 'not-matched' ? (
-          <Verdict tone="neutral" icon={X} title="Not matched" line={failed ? `${failed.word} did not match` : undefined} />
-        ) : shown === 'not-reached' ? (
-          <Verdict tone="neutral" icon={Minus} title="Not reached" line="An earlier rule decided, so this one was not checked." />
-        ) : shown === 'cant-tell' ? (
-          /* What is at stake, in the outcome card's words ("If rule 1 matches · Deny"); what it could not read is listed under This sign-in. */
-          <Verdict tone="notice" icon={CircleHelp} title={FATE_WORDS['cant-tell']} line={`If it matches: ${DECISION_WORDS[rule.decision]}`} />
-        ) : shown === 'off' ? (
-          endedGrant(rule) ? (
-            <Verdict tone="neutral" icon={Minus} title={GRANT_ENDED} line={`Ran until ${dateSaid(rule.tempAccess!.until)}`} />
-          ) : (
-            <Verdict tone="neutral" icon={Minus} title="Switched off" />
-          )
-        ) : (
-          <Verdict tone="neutral" icon={CircleDashed} title="Not checked for this sign-in" line={`${policy.name} did not decide it`} />
-        )}
-      </div>
-
+      {note && <p className="insp__accnote">{note}</p>}
       {evidence.length > 0 && (
-        <Section id="signin" title="This sign-in" icon={ScanSearch}>
+        <div className="insp__part">
+          <h4>This sign-in</h4>
           <ul className="insp__evidence">
             {evidence.map((e, i) => {
               const Mark = MARK[e.status]
@@ -624,41 +417,57 @@ function RuleView({ target, plan, onPush }: { target: Extract<InspectTarget, { k
               )
             })}
           </ul>
-        </Section>
+        </div>
       )}
-
-      <Section id="rule" title="The rule" icon={ListTree} aside={<span className="insp__secmeta">{policy.name}</span>}>
-        <IfBlock rule={rule} resolve={resolve} terminal={terminal} />
-      </Section>
-
+      <div className="insp__part">
+        <h4>{terminal ? 'What it does' : 'What it checks'}</h4>
+        <div className="insp__rulebody">
+          <IfBlock rule={rule} resolve={resolve} terminal={terminal} />
+        </div>
+      </div>
       {uses.length > 0 && (
-        <Section id="uses" title="Uses" icon={Puzzle}>
-          <ul className="insp__rows">
-            {uses.map((o) => (
-              <li key={`${o.kind}-${o.id}`}>
-                <Row mark={<KindMark target={o} small />} name={names[o.kind](o.id) ?? PEEK_FALLBACK[o.kind]} meta={PEEK_FALLBACK[o.kind]} onPress={() => onPush(o)} />
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <div className="insp__part">
+          <h4>Uses</h4>
+          <div className="insp__uses">
+            {uses.map((o) => {
+              const k = `${o.kind}:${o.id}`
+              return (
+                <button key={k} type="button" className={`insp__use${use === k ? ' is-on' : ''}`} aria-expanded={use === k} onClick={() => setUse(use === k ? null : k)}>
+                  <KindMark target={o} small />
+                  {names[o.kind](o.id) ?? PEEK_FALLBACK[o.kind]}
+                  <em>{PEEK_FALLBACK[o.kind]}</em>
+                </button>
+              )
+            })}
+          </div>
+          {picked && <UseFacts target={picked} onEdit={onEdit} />}
+        </div>
       )}
-
       {refuses && (
-        <Section id="told" title="What the person is told" icon={MessageSquareText}>
+        <div className="insp__part">
+          <h4>What the person is told</h4>
           <blockquote className="insp__quote">{rule.denyMessage ?? DEFAULT_DENY_MESSAGE}</blockquote>
-          <dl className="insp__facts">
-            {rule.denyAction && (
-              <Fact icon={ChevronRight} label="Next step">
-                {rule.denyAction}
-              </Fact>
-            )}
-            <Fact icon={Users} label="Contact">
-              {rule.denyContact ?? TENANT_DENY_CONTACT}
-            </Fact>
-          </dl>
-        </Section>
+          <Facts rows={[...(rule.denyAction ? [['Next step', rule.denyAction] as [string, string]] : []), ['Contact', rule.denyContact ?? TENANT_DENY_CONTACT]]} />
+        </div>
       )}
     </>
   )
 }
 
+/** A zone or a device profile a rule uses, opened in place under it: its facts, and the way to its own page. */
+function UseFacts({ target, onEdit }: { target: PeekTarget; onEdit: (t: InspectTarget) => void }) {
+  const lib = useBrand()
+  const rows = factsOf(target, lib)
+  if (!rows) return <p className="insp__gone">This is no longer there.</p>
+  return (
+    <div className="insp__usefacts">
+      <Facts rows={rows} />
+      {target.kind !== 'person' && (
+        <button type="button" className="insp__link" onClick={() => onEdit(target)}>
+          Open in {PEEK_LIBRARY[target.kind]}
+          <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden />
+        </button>
+      )}
+    </div>
+  )
+}

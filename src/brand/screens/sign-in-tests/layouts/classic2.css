@@ -217,13 +217,8 @@
 
 /* The engine on it: its edge in the accent's soft border, as the trace card's. */
 .rl-c2 .bb__card.rl-c2__card.is-reading { border-color: var(--accent-soft-border); }
-/* Matched: the ring in its decision's colour (owner, 1 Oct 2026) — the answer's, never the selection's — and the ✓ of
-   the rows that held in it too. The last row keeps its decision down the edge. */
-.rl-c2 .bb__card.rl-c2__card.is-matched,
-.rl-c2 .bb__card.rl-c2__card.is-matched:hover {
-  border-color: var(--tone-dot, var(--fb-positive-dot));
-  box-shadow: 0 0 0 var(--bw-thin) var(--tone-dot, var(--fb-positive-dot)), var(--el-low);
-}
+/* Matched: no ring. It had one in its decision's colour (1 Oct 2026); the owner took it off (6 Oct 2026: "remove the
+   colour outline, not needed") — the head's "Matches · Then …" and the ✓ of the rows that held already say it. */
 .rl-c2__card.is-matched .bb__tmark.is-pass { background: var(--tone-bg, var(--fb-positive-bg)); color: var(--tone-fg, var(--fb-positive-fg)); }
 /* Each row's mark at the row's right end, one column of them, as the trace card lines them up. */
 .rl-c2 .bb__ifwho > .bb__tmark,
@@ -332,6 +327,14 @@
 /* The application's mark and name as one, so a wrapping line keeps them together. */
 .rl-c2__napp { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
 .rl-c2__napp > .applogo { flex: none; }
+/* The person and the application as presses of their own (classic2-pill.tsx, where the page has the details panel):
+   the words as they were, the link's colour and underline under the pointer, the focus ring on the word itself. */
+.rl-c2__nlink { padding: 0; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; color: inherit; cursor: pointer; }
+.rl-c2__nlink:hover,
+.rl-c2__nlink:hover .bb__start__at { color: var(--text-link); text-decoration: underline; }
+.rl-c2__nlink:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+/* `font: inherit` would take the name's weight with it: the person stays semibold, as the words were. */
+.rl-c2__nlink.rl-c2__nname { font-weight: var(--fw-semibold); white-space: nowrap; }
 .rl-c2__nnone { color: var(--text-tertiary); white-space: nowrap; }
 .rl-c2__nids { display: flex; min-width: 0; }
 /* The count, quiet, after a dot; its tip says the conditions. Then the run's state, as the row said it. */

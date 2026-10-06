@@ -123,3 +123,8 @@ export function draftDiff(live: readonly PolicyLine[], draft: readonly PolicyLin
   const is = new Set(draft.map(said))
   return { added: draft.filter((l) => !was.has(said(l))).map(said), removed: live.filter((l) => !is.has(said(l))).map(said) }
 }
+
+/** The rows the facts give, as the overview card's grid (PeekViews.tsx `Hero`): a value longer than half a card takes its whole width. */
+export function heroFacts(rows: readonly Fact[]): { label: string; value: string; wide: boolean }[] {
+  return rows.filter(([, v]) => v).map(([label, value]) => ({ label, value, wide: value.length > 26 }))
+}

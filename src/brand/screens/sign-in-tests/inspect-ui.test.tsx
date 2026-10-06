@@ -12,16 +12,18 @@ import { engineRun, type EngineRun } from './engine-run'
 import { InspectPanel } from './InspectPanel'
 import type { InspectTarget } from './inspect-model'
 import { objectsOfRule } from './peek-model'
-import { PeekView } from './PeekViews'
+import { PeekPage } from './PeekViews'
 import { emptyDraft } from './sign-in-card'
 import panelSrc from './InspectPanel.tsx?raw'
 import pageSrc from '../SignInTests.tsx?raw'
 import barSrc from './layouts/focus2-canvasbar.tsx?raw'
 import focusSrc from './layouts/Focus2Layout.tsx?raw'
+import pillSrc from './layouts/classic2-pill.tsx?raw'
 import { DETAILS_IN_BAR } from './phase'
 import css from './inspect.css?raw'
 
-/* The inspector, drawn (CHECK-ACCESS-INSPECTOR.md): one panel, a view per kind, the way in from every name on the run. */
+/* The details panel, drawn (CHECK-ACCESS-INSPECTOR.md): one page per thing (owner, 6 Oct 2026) — an overview card, then
+   the rules opening in place; the way in from the names on the run, the person and the application on the sign-in line. */
 const t = showcaseTenant()
 const env = envOf(t)
 const html = (node: React.ReactNode) => renderToStaticMarkup(<BrandProvider>{node}</BrandProvider>)
@@ -42,60 +44,48 @@ function runOf(patch: Partial<SignInForm>): EngineRun {
 const plan = runOf({ personId: 'u-leo', appId: 'aws', ...originPatch('home') })
 const policy = t.policies.find((p) => p.id === plan.decider!.id)!
 
-const panelOf = (run: EngineRun, signIn: { personId: string; appId: string }, stack: InspectTarget[], pins: InspectTarget[] = []) =>
-  html(<InspectPanel stack={stack} plan={run} reduced wide onToggleWidth={noop} onClose={noop} onPush={noop} onGoTo={noop} onEdit={noop} pins={pins} onPin={noop} signIn={signIn} />)
-const panel = (stack: InspectTarget[], pins: InspectTarget[] = []) => panelOf(plan, { personId: 'u-leo', appId: 'aws' }, stack, pins)
+const panelOf = (run: EngineRun, target: InspectTarget) => html(<InspectPanel target={target} plan={run} reduced wide onToggleWidth={noop} onClose={noop} onEdit={noop} />)
+const panel = (target: InspectTarget) => panelOf(plan, target)
+/** The open rules' names, in order: what the accordion shows open. */
+const openRules = (out: string) => [...out.matchAll(/<li class="insp__acc is-open[^"]*"><button type="button" class="insp__acchead" aria-expanded="true"[\s\S]*?class="insp__rname">([^<]+)</g)].map((m) => m[1])
 
-describe('the inspector panel', () => {
-  it('a policy: its kind and name, what it did to this sign-in, how each rule fared, the sign-in a press away, Edit in builder', () => {
-    const out = panel([{ kind: 'policy', policyId: policy.id }])
+describe('the details panel: one page', () => {
+  it('a policy: the overview card at the top — name, status, facts, what it did to this sign-in — then its rules, the one that decided open', () => {
+    const out = panel({ kind: 'policy', policyId: policy.id })
     const said = text(out)
-    expect(said).toContain(policy.name)
-    expect(out).toContain('class="insp__kicker">Policy<')
+    expect(out).toContain('class="insp__hero"')
+    expect(said).toMatch(new RegExp(`Policy ${esc(policy.name)} Active`))
+    expect(said).toMatch(/Applications .*Audience/)
     expect(out).toContain('insp__verdict is-negative')
     expect(said).toContain('Decided this sign-in')
-    expect(said).toMatch(/About .*Status .*Applications .*Audience/)
-    expect(said).toContain('Rules')
-    expect(out).toContain('aria-label="Sign-in"')
-    expect(said).toMatch(/This sign-in (LF )?Leo Fernandes Person AWS Console Application/)
-    /* Read as text is off (owner, 6 Oct 2026): no tab row at all. */
-    expect(out).not.toContain('role="tablist"')
-    expect(said).not.toContain('Read as text')
+    expect(said).toContain('Rules In order')
+    expect(openRules(out)).toEqual([policy.rules[0].name])
+    expect(said).toContain('This sign-in')
+    expect(said).toContain('What it checks')
+    expect(said).toContain('What the person is told')
     expect(out).toMatch(/class="bb__inspfoot insp__foot"[\s\S]*Edit in builder/)
-    expect(out).toContain('aria-label="Pin to compare"')
     expect(out).toContain('aria-label="Copy this view"')
   })
 
-  it('a rule: what this sign-in showed, the rule, what it uses, what the person is told', () => {
-    const out = text(panel([{ kind: 'policy', policyId: policy.id }, { kind: 'rule', policyId: policy.id, ruleId: policy.rules[0].id }]))
-    expect(out).toContain('This sign-in')
-    expect(out).toContain('The rule')
-    if (objectsOfRule(policy.rules[0], t.activeRiskProfileId).length) expect(out).toContain('Uses')
-    expect(out).toContain('What the person is told')
-    expect(out).toContain('Contact')
+  it('no pages over pages: no back, no breadcrumb, no Related, no pins, no tabs', () => {
+    const out = panel({ kind: 'policy', policyId: policy.id })
+    for (const gone of ['aria-label="Back"', 'aria-label="Where you are"', 'Related', 'Pin to compare', 'Compare with', 'role="tablist"', 'Read as text']) expect(out).not.toContain(gone)
   })
 
-  it('a long way in folds its middle into one step back', () => {
-    const z = t.zones[0]
-    const stack: InspectTarget[] = [
-      { kind: 'policy', policyId: policy.id },
-      { kind: 'rule', policyId: policy.id, ruleId: policy.rules[0].id },
-      { kind: 'zone', id: z.id },
-      { kind: 'person', id: 'u-leo' },
-      { kind: 'app', id: 'aws' },
-    ]
-    const out = panel(stack)
-    expect(out).toContain('aria-label="Where you are"')
-    expect(out).toContain('…')
-    expect((out.match(/class="insp__crumbstep"/g) ?? []).length).toBe(4)
+  it('a rule pressed on the canvas is its policy’s page with that rule open', () => {
+    const r2 = policy.rules[1]
+    const out = panel({ kind: 'rule', policyId: policy.id, ruleId: r2.id })
+    expect(text(out)).toContain(policy.name)
+    expect(openRules(out)).toEqual([r2.name])
+    /* Not reached: it says so in place, and checks nothing against this sign-in. */
+    expect(text(out)).toContain('An earlier rule decided, so this one was not checked.')
   })
 
-  it('a pin of the same kind offers Compare; a pin of another kind does not', () => {
-    const other = t.policies.find((p) => p.id !== policy.id && !p.isSystem)!
-    const top: InspectTarget = { kind: 'policy', policyId: policy.id }
-    expect(panel([top], [{ kind: 'policy', policyId: other.id }])).toContain(`aria-label="Compare with ${other.name}"`)
-    expect(panel([top], [{ kind: 'zone', id: t.zones[0].id }])).not.toContain('aria-label="Compare with')
-    expect(panel([top], [{ kind: 'zone', id: t.zones[0].id }])).toContain('aria-label="Pinned"')
+  it('what a rule uses opens in place under it — never a page over this one', () => {
+    const out = panel({ kind: 'policy', policyId: policy.id })
+    if (objectsOfRule(policy.rules[0], t.activeRiskProfileId).length === 0) return
+    expect(out).toContain('class="insp__uses"')
+    expect(out).toMatch(/<button type="button" class="insp__use" aria-expanded="false">/)
   })
 })
 
@@ -108,7 +98,6 @@ describe('a run that Depends: the policy that decides, and its rules (6 Oct 2026
      told, and rule 2 — which matches — decides only if rule 1 does not. */
   const hrms = runOf({ personId: 'priya', appId: 'hrms', device: { kind: 'none' } })
   const gd = t.policies.find((p) => p.id === hrms.decider?.id)!
-  const view = (run: EngineRun, appId: string, stack: InspectTarget[]) => panelOf(run, { personId: 'priya', appId }, stack)
 
   it('the runs are the cases they stand for', () => {
     expect(outlook.outcome.status).toBe('depends')
@@ -118,96 +107,100 @@ describe('a run that Depends: the policy that decides, and its rules (6 Oct 2026
     expect(hrms.rules.map((r) => r.state)).toEqual(['unknown', 'match', 'not-reached'])
   })
 
-  it('the policy says Depends in the notice tone and names the rule it waits on — never "did not decide" over its own name', () => {
-    const out = view(outlook, 'outlook', [{ kind: 'policy', policyId: dc.id }])
+  it('the policy says Depends in the notice tone and names the rule it waits on — that rule open; never "did not decide" over its own name', () => {
+    const out = panelOf(outlook, { kind: 'policy', policyId: dc.id })
     const said = text(out)
     expect(out).toContain('insp__verdict is-notice')
     expect(said).toContain(`Depends Rule 1 · ${dc.rules[0].name} · Can’t tell: Device`)
     expect(said).not.toContain('Did not decide')
-    expect(said).not.toContain(`${dc.name} did`)
     expect(said).not.toContain('Decided this sign-in')
-    /* The list: the rule it could not tell, then the last row as the canvas draws it. */
+    expect(openRules(out)).toEqual([dc.rules[0].name])
     expect(said).toMatch(new RegExp(`${esc(dc.rules[0].name)} Can’t tell`))
     expect(said).toMatch(new RegExp(`${esc(FALLBACK_NAME)} If not`))
     expect(out).toContain('insp__fate is-if-not')
   })
 
   it('a rule it could not tell says what is at stake; the last row says which rule it waits on', () => {
-    const r1 = text(view(outlook, 'outlook', [{ kind: 'rule', policyId: dc.id, ruleId: dc.rules[0].id }]))
-    expect(r1).toContain(`Can’t tell If it matches: ${DECISION_WORDS[dc.rules[0].decision]}`)
-    expect(r1).not.toContain('does not say enough')
-    const last = view(outlook, 'outlook', [{ kind: 'rule', policyId: dc.id, ruleId: null }])
-    expect(last).toContain('insp__verdict is-notice')
-    expect(text(last)).toContain(`If rule 1 does not match ${DECISION_WORDS[outlook.rules[1].decision]} · ${dc.name}`)
-    expect(text(last)).not.toContain('Can’t tell If it matches')
+    const r1 = text(panelOf(outlook, { kind: 'rule', policyId: dc.id, ruleId: dc.rules[0].id }))
+    expect(r1).toContain(`If it matches: ${DECISION_WORDS[dc.rules[0].decision]}.`)
+    const last = text(panelOf(outlook, { kind: 'rule', policyId: dc.id, ruleId: null }))
+    expect(last).toContain('Applies only if rule 1 does not match.')
   })
 
   it('where a later rule matched, the policy still says Depends and that rule is "If not" — never "Decided this sign-in"', () => {
-    const pol = view(hrms, 'hrms', [{ kind: 'policy', policyId: gd.id }])
+    const pol = panelOf(hrms, { kind: 'policy', policyId: gd.id })
     expect(text(pol)).toContain(`Depends Rule 1 · ${gd.rules[0].name} · Can’t tell: Device`)
     expect(text(pol)).not.toContain('Decided this sign-in')
-    expect(pol).not.toContain('insp__rule is-decided')
+    expect(pol).not.toContain('is-decided')
     expect(text(pol)).toMatch(new RegExp(`${esc(gd.rules[1].name)} If not`))
-    const r2 = text(view(hrms, 'hrms', [{ kind: 'rule', policyId: gd.id, ruleId: gd.rules[1].id }]))
-    expect(r2).toContain(`If rule 1 does not match ${DECISION_WORDS[gd.rules[1].decision]} · ${gd.name}`)
-    expect(r2).not.toContain('Decided this sign-in')
+    const r2 = text(panelOf(hrms, { kind: 'rule', policyId: gd.id, ruleId: gd.rules[1].id }))
+    expect(r2).toContain('Applies only if rule 1 does not match.')
   })
 
   it('a run that decides is unchanged: Decided this sign-in, the rule that matched, no If not', () => {
-    const out = panel([{ kind: 'policy', policyId: policy.id }])
+    const out = panel({ kind: 'policy', policyId: policy.id })
     expect(out).not.toContain('is-if-not')
     expect(text(out)).not.toContain('Depends')
   })
 })
 
-describe('the peeks, drawn', () => {
+describe('the other pages: a zone, a device profile, a person, an application', () => {
   const seen = t.policies.flatMap((p) => p.rules.flatMap((r) => objectsOfRule(r, t.activeRiskProfileId)))
   for (const kind of ['zone', 'device'] as const) {
-    it(`a ${kind} says what it is, the policies that use it, and the way into its library`, () => {
+    it(`a ${kind}: its overview card, the policies that use it, and the way into its library`, () => {
       const o = seen.find((x) => x.kind === kind)
       expect(o).toBeDefined()
       if (!o) return
-      const out = text(html(<PeekView target={o} onPush={noop} />))
-      expect(out).not.toContain('no longer there')
-      expect(out).toContain('Used by')
-      expect(text(panel([o]))).toMatch(kind === 'zone' ? /Open in Zones/ : /Open in Device profiles/)
+      const out = html(<PeekPage target={o} plan={plan} />)
+      expect(out).toContain('class="insp__hero"')
+      expect(text(out)).not.toContain('no longer there')
+      expect(text(out)).toContain('Used by')
+      expect(text(panel(o))).toMatch(kind === 'zone' ? /Open in Zones/ : /Open in Device profiles/)
     })
   }
 
   it('a person: who they are and the policies for them, and no library to leave for', () => {
-    const out = text(html(<PeekView target={{ kind: 'person', id: 'u-leo' }} onPush={noop} />))
+    const out = text(html(<PeekPage target={{ kind: 'person', id: 'u-leo' }} plan={plan} />))
     expect(out).toContain('Contractor')
     expect(out).toContain('Policies for them')
-    expect(text(panel([{ kind: 'person', id: 'u-leo' }]))).not.toMatch(/Open in /)
+    expect(text(panel({ kind: 'person', id: 'u-leo' }))).not.toMatch(/Open in /)
   })
 
-  it('a person: the default is in their list, last and marked Default, as on an application (6 Oct 2026)', () => {
+  it('the default is in a person’s and an application’s list, last and marked Default', () => {
     const theDefault = t.policies.find((p) => p.isSystem)!
     for (const target of [{ kind: 'person', id: 'u-leo' }, { kind: 'app', id: 'aws' }] as const) {
-      const out = text(html(<PeekView target={target} onPush={noop} />))
+      const out = text(html(<PeekPage target={target} plan={plan} />))
       expect(out).not.toContain('No policy yet')
       expect(out.endsWith(`${theDefault.name} Default`)).toBe(true)
     }
   })
 
-  it('an application: the policies on it, and Applications', () => {
-    const out = text(html(<PeekView target={{ kind: 'app', id: 'aws' }} onPush={noop} />))
+  it('an application: the policies on it, the one that decided marked, and Applications', () => {
+    const out = text(html(<PeekPage target={{ kind: 'app', id: 'aws' }} plan={plan} />))
     expect(out).toContain('Policies on it')
-    expect(text(panel([{ kind: 'app', id: 'aws' }]))).toContain('Open in Applications')
+    expect(out).toContain(`${policy.name} Decided this sign-in`)
+    expect(text(panel({ kind: 'app', id: 'aws' }))).toContain('Open in Applications')
   })
 
   it('an object that is gone says so', () => {
-    expect(text(html(<PeekView target={{ kind: 'zone', id: 'nope' }} onPush={noop} />))).toContain('no longer there')
+    expect(text(html(<PeekPage target={{ kind: 'zone', id: 'nope' }} plan={plan} />))).toContain('no longer there')
   })
 })
 
 describe('the way in, and the rules it keeps', () => {
-  it('the page opens it from the names on the run; the canvas bar has no Details (owner, 6 Oct 2026), kept behind its flag', () => {
+  it('the page puts one thing in the panel, fresh; the canvas bar has no Details, kept behind its flag', () => {
     expect(pageSrc).toContain('onInspect={INSPECTOR ? onInspect : undefined}')
-    expect(pageSrc).toContain("panel === 'inspect' && !fresh ? [...cur.stack.filter((x) => !sameTarget(x, t)), t] : [t]")
+    expect(pageSrc).toContain('setInspect({ target: t, plan })')
     expect(DETAILS_IN_BAR).toBe(false)
     expect(focusSrc).toContain('details={DETAILS_IN_BAR && landed')
     expect(barSrc).toContain('data-fn="details"')
+  })
+
+  it('the person and the application are presses of their own on the sign-in line, opening their pages', () => {
+    expect(pillSrc).toContain("onInspect({ kind: 'person', id: person.id }, true)")
+    expect(pillSrc).toContain("onInspect({ kind: 'app', id: app.id }, true)")
+    /* A group's stand-in is never presented as the person. */
+    expect(pillSrc).toContain('onInspect && person && !group ?')
   })
 
   it('read-only: no Save, no Delete; the ways out are Edit in builder and the library', () => {

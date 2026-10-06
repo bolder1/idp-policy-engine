@@ -1,41 +1,48 @@
-import { useId, type ReactNode } from 'react'
-import { AppWindow, Asterisk, ChevronRight, Gauge, Layers, MonitorSmartphone, Network, UserRound, Webhook, type LucideIcon } from 'lucide-react'
+import { type ReactNode } from 'react'
+import { Asterisk, Check, Gauge, Layers, MonitorSmartphone, Network, Webhook, type LucideIcon } from 'lucide-react'
 
 import { Face } from '../../faces'
+import { StatusPill } from '../../kit'
 import { AppLogo } from '../../logos/AppLogo'
 import { useBrand } from '../../store'
-import { factsOf, type Fact } from './inspect-facts'
+import type { EngineRun } from './engine-run'
+import { factsOf, heroFacts, type Fact } from './inspect-facts'
 import { PEEK_FALLBACK, type InspectTarget, type PeekKind, type PeekTarget } from './inspect-model'
 import { usedByPolicies } from './peek-model'
 
 /* -----------------------------------------------------------------------------
-   The inspector's parts and its peeks (owner, 6 Oct 2026: "a panel per kind";
-   later the same day: "beautify it — icons, spacing, hierarchy").
+   The details panel's parts, and its pages for everything that is not a policy
+   (owner, 6 Oct 2026, the second redo: "I don't want this multi-page thing — a
+   single page, at the top a card bearing the overview, then the rules opening
+   in the same page; remove the related part").
 
-   The parts are the builder inspector's own grammar (board.css `.bb__insp
-   .bb__sec`): a section is a brand-coloured mark and a semibold heading over a
-   body set in against a guide rule, the sections parted by an inset hairline.
-   A row is a name you can press, with its kind's mark at the left and a
-   chevron at the right. A kind's mark is the same everywhere it appears — the
-   panel's head, a row, a chip: a policy's stack of layers, a rule's number, an
-   application's own logo, a person's face.
+   ONE PAGE, NO WAY BACK. A press on a name on the canvas puts that one thing in
+   the panel; nothing in the panel opens another page over it. The pattern is
+   the detail panels on Mobbin (Airwallex's card details, Time2book's booking,
+   Navattic's visitor): an overview card at the top — the thing's mark, its name
+   and its standing, then its facts in a two-column grid — and under it the
+   lists that belong to it, quiet rows that are read, not pressed.
 
-   The peeks — a zone, a device profile, a risk profile, a hook, a person, an
-   application — say what the thing is and which policies it is in; read-only,
-   their way out is their own library page, at the panel's foot. Tokens only
-   (inspect.css).
+     Hero      the overview card (`.insp__hero`): mark · name · pill, the facts
+               grid, and a strip at its foot for what it did to this sign-in
+     Block     a titled section under it: a semibold heading, a quiet aside
+     PeekPage  a zone, a device profile, a risk profile, a hook, a person or an
+               application: its hero, then the policies it is in
+
+   A kind's mark is the same everywhere: a policy's layers, a rule's number, an
+   application's own logo, a person's face. Tokens only (inspect.css).
    -------------------------------------------------------------------------- */
 
 const PEEK_ICON: Record<Exclude<PeekKind, 'person' | 'app'>, LucideIcon> = { zone: Network, device: MonitorSmartphone, risk: Gauge, hook: Webhook }
 
-/** A kind's mark: the tile in the panel's head (or, `small`, at a row's start). */
+/** A kind's mark: the tile on the overview card (or, `small`, at a row's start). */
 export function KindMark({ target, small = false }: { target: InspectTarget; small?: boolean }) {
   const { apps, users, policies } = useBrand()
-  const size = small ? 13 : 16
+  const size = small ? 13 : 18
   let inner: ReactNode
   if (target.kind === 'app') {
     const app = apps.find((a) => a.id === target.id)
-    inner = <AppLogo appId={target.id} name={app?.name ?? 'Application'} size={small ? 16 : 20} />
+    inner = <AppLogo appId={target.id} name={app?.name ?? 'Application'} size={small ? 16 : 22} />
   } else if (target.kind === 'person') {
     const u = users.find((x) => x.id === target.id)
     return (
@@ -60,32 +67,50 @@ export function KindMark({ target, small = false }: { target: InspectTarget; sma
   )
 }
 
-/** A section of the panel, in the builder inspector's grammar; `aside` sits at the heading's right (a count, a scope). */
-export function Section({ id, title, icon: Icon, aside, children }: { id: string; title: string; icon: LucideIcon; aside?: ReactNode; children: ReactNode }) {
-  const uid = useId()
+/** One fact on the overview card: a quiet label over its value. A long value takes the card's full width. */
+export interface HeroFact {
+  label: string
+  value: ReactNode
+  wide?: boolean
+}
+
+/** The overview card at the top of every page: the mark, the name and its standing, the facts, and a strip at its foot. */
+export function Hero({ target, kicker, name, badge, facts, strip }: { target: InspectTarget; kicker: string; name: string; badge?: ReactNode; facts: HeroFact[]; strip?: ReactNode }) {
   return (
-    <section className="bb__sec insp__sec" aria-labelledby={`${uid}-${id}`}>
-      <div className="bb__sec__head">
-        <h3 id={`${uid}-${id}`}>
-          <Icon size={15} strokeWidth={2} aria-hidden />
-          {title}
-        </h3>
-        {aside}
+    <section className="insp__hero" aria-label={`${kicker}: ${name}`}>
+      <div className="insp__herohead">
+        <KindMark target={target} />
+        <div className="insp__heroname">
+          <span className="insp__kicker">{kicker}</span>
+          <b title={name}>{name}</b>
+        </div>
+        {badge}
       </div>
-      <div className="bb__sec__body">{children}</div>
+      {facts.length > 0 && (
+        <dl className="insp__herogrid">
+          {facts.map((f) => (
+            <div key={f.label} className={`insp__herofact${f.wide ? ' is-wide' : ''}`}>
+              <dt>{f.label}</dt>
+              <dd>{f.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {strip}
     </section>
   )
 }
 
-/** A row you can press: its mark, its name, what it is, a chevron. */
-export function Row({ mark, name, meta, onPress }: { mark: ReactNode; name: string; meta?: ReactNode; onPress: () => void }) {
+/** A titled section under the overview card. */
+export function Block({ title, aside, children, label }: { title: string; aside?: ReactNode; children: ReactNode; label?: string }) {
   return (
-    <button type="button" className="insp__row" onClick={onPress}>
-      {mark}
-      <span className="insp__rowname">{name}</span>
-      {meta && <span className="insp__rowmeta">{meta}</span>}
-      <ChevronRight size={14} strokeWidth={2} aria-hidden className="insp__chev" />
-    </button>
+    <section className="insp__block" aria-label={label ?? title}>
+      <div className="insp__blockhead">
+        <h3>{title}</h3>
+        {aside && <span className="insp__secmeta">{aside}</span>}
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -106,33 +131,54 @@ export function Facts({ rows }: { rows: Fact[] }) {
 
 const USED_HEAD: Record<PeekKind, string> = { zone: 'Used by', device: 'Used by', risk: 'Used by', hook: 'Used by', app: 'Policies on it', person: 'Policies for them' }
 
-export function PeekView({ target, onPush }: { target: PeekTarget; onPush: (t: InspectTarget) => void }) {
+/** A zone, a device profile, a risk profile, a hook, a person or an application, on one page. */
+export function PeekPage({ target, plan }: { target: PeekTarget; plan: EngineRun }) {
   const lib = useBrand()
   const rows = factsOf(target, lib)
   if (!rows) return <p className="insp__gone">This is no longer there.</p>
+  const name =
+    (target.kind === 'person'
+      ? lib.users.find((u) => u.id === target.id)?.name
+      : target.kind === 'app'
+        ? lib.apps.find((a) => a.id === target.id)?.name
+        : target.kind === 'zone'
+          ? lib.zones.find((z) => z.id === target.id)?.name
+          : target.kind === 'device'
+            ? lib.fingerprints.find((p) => p.id === target.id)?.name
+            : target.kind === 'hook'
+              ? lib.hooks.find((h) => h.id === target.id)?.name
+              : lib.riskProfiles.find((r) => r.id === target.id)?.name) ?? PEEK_FALLBACK[target.kind]
   const note = target.kind === 'zone' && !rows.slice(1).some(([, v]) => v) ? 'Matches any address and any place.' : ''
   const used = usedByPolicies(lib.policies, target, lib.activeRiskProfileId, lib.users)
-  const Icon = target.kind === 'person' || target.kind === 'app' ? null : PEEK_ICON[target.kind]
   return (
     <>
-      <Section id="about" title={`About this ${PEEK_FALLBACK[target.kind].toLowerCase()}`} icon={Icon ?? (target.kind === 'app' ? AppWindow : UserRound)}>
-        <Facts rows={rows} />
-        {note && <p className="insp__note">{note}</p>}
-      </Section>
-      <Section id="used" title={USED_HEAD[target.kind]} icon={Layers} aside={used.length > 0 ? <span className="insp__secmeta">{used.length === 1 ? '1 policy' : `${used.length} policies`}</span> : undefined}>
+      <Hero target={target} kicker={PEEK_FALLBACK[target.kind]} name={name} facts={heroFacts(rows)} strip={note ? <p className="insp__herostrip is-neutral">{note}</p> : undefined} />
+      <Block title={USED_HEAD[target.kind]} aside={used.length > 0 ? (used.length === 1 ? '1 policy' : `${used.length} policies`) : undefined}>
         {used.length === 0 ? (
           <p className="insp__gone">No policy yet.</p>
         ) : (
-          <ul className="insp__rows">
-            {used.map((p) => (
-              <li key={p.id}>
-                <Row mark={<KindMark target={{ kind: 'policy', policyId: p.id }} small />} name={p.name} meta={p.isSystem ? 'Default' : undefined} onPress={() => onPush({ kind: 'policy', policyId: p.id })} />
-              </li>
-            ))}
+          <ul className="insp__list">
+            {used.map((p) => {
+              const decided = plan.decider?.id === p.id
+              return (
+                <li key={p.id} className={`insp__item${decided ? ' is-decided' : ''}`}>
+                  <KindMark target={{ kind: 'policy', policyId: p.id }} small />
+                  <span className="insp__itemtext">
+                    <span className="insp__itemname">{p.name}</span>
+                    {decided && (
+                      <span className="insp__fate is-decided">
+                        <Check size={12} strokeWidth={2.4} aria-hidden />
+                        Decided this sign-in
+                      </span>
+                    )}
+                  </span>
+                  {p.isSystem ? <span className="insp__rowmeta">Default</span> : <StatusPill status={p.status} />}
+                </li>
+              )
+            })}
           </ul>
         )}
-      </Section>
+      </Block>
     </>
   )
 }
-

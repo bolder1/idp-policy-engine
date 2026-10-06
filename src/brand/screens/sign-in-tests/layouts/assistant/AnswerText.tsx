@@ -22,6 +22,8 @@ export interface AnswerTextProps {
   onCite?: (t: Target | null) => void
   /** The cite on show elsewhere (the view's lit thing): its phrase is drawn lit. */
   lit?: Target | null
+  /** Number the cited phrases (default). Off where the canvas has no numbers to match (Brief). */
+  numbers?: boolean
 }
 
 const EASE = [0.2, 0, 0, 1] as const
@@ -82,8 +84,8 @@ export function PartsLine({ parts, nums, animate, start = 0, onCite, lit, classN
   )
 }
 
-export function AnswerText({ answer, animate, onCite, lit = null }: AnswerTextProps) {
-  const nums = citeNumbers(answer)
+export function AnswerText({ answer, animate, onCite, lit = null, numbers = true }: AnswerTextProps) {
+  const nums = numbers ? citeNumbers(answer) : NO_NUMS
   const sentenceWords = answer.sentence.reduce((n, p) => n + p.text.split(/\s+/).filter(Boolean).length, 0)
   return (
     <div className={`ad-ans is-${answer.tone}${answer.known ? '' : ' is-unknown'}`}>

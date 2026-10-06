@@ -10,25 +10,6 @@
 .sit .bbtop__acts { gap: var(--space-4); }
 .sit-bar__sep { flex: none; width: 1px; height: 20px; background: var(--border-subtle); }
 
-/* The dedicated views, Focus and Brief: two quiet buttons, the pressed one in the selected blue. */
-.sit-views { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
-.sit-views__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: 30px;
-  padding: 0 10px;
-  border: var(--bw-thin) solid transparent;
-  border-radius: 6px;
-  background: none;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.sit-views__btn:hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
-.sit-views__btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
-.sit-views__btn.is-on { background: var(--accent-soft); border-color: var(--accent-soft-border); color: var(--accent-strong); }
 .sit-reason__btn { display: inline-flex; flex: none; }
 
 /* The guided tour, to come: a quiet button with a small tag. */
@@ -137,3 +118,26 @@
 }
 .sit-reason__mine textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .sit-reason__foot { display: flex; justify-content: flex-end; padding: var(--space-4) var(--space-7) var(--space-6); border-top: var(--bw-thin) solid var(--border-subtle); }
+
+/* Aruna's way in, on the canvas (owner, 4 Oct 2026: off the top bar, somewhere with more pull): beside the assistant
+   dock and clear of it, over every view and over Aruna herself (where the same button leaves). The button and its
+   entrance are jarvis-mode/'s.
+
+   THIS ELEMENT IS THE STAGE'S COORDINATE SPACE, NOT A CORNER. It was pinned to the bottom-right here, from when the
+   porthole only ever sat in the corner. It does not sit there any more: `aruna-entry-place.ts` measures the dock and
+   writes the porthole's top-left AGAINST THE STAGE into `--ae-x` / `--ae-y`, and `.sit-ae` applies them with
+   `translate` — so a container anchored to the corner added the stage's whole width and height to every placement,
+   and the porthole was translated about 1,200 px right and 700 px below the viewport. Nobody could see it.
+
+   Both offsets at once also left this box over-constrained with an absolutely positioned child, so it computed to
+   0 × 0 — which is why it reads as present in the DOM and occupies nothing.
+
+   `inset: 0` makes it the stage exactly, so a stage-relative number means what it says. It covers the canvas, hence
+   `pointer-events: none`; the porthole takes them back. */
+.sit-aruna-entry {
+  position: absolute;
+  z-index: 45;
+  inset: 0;
+  pointer-events: none;
+}
+.sit-aruna-entry > * { pointer-events: auto; }

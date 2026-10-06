@@ -1,19 +1,21 @@
 import { motion, useIsPresent } from 'motion/react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, ChevronsLeftRight, ChevronsRightLeft, Play, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, ChevronUp, ChevronsLeftRight, ChevronsRightLeft, Play, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 
 import type { Policy } from '../../data'
 import { CantTell, DecisionBadge } from '../../decision-badge'
 import { Face } from '../../faces'
 import { Button, TipDot } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
-import { attemptsOnSaid, decidedByLine, type AppBreakInResult, type AppBreakInRow, type AppFixOffer } from '../break-in-app'
-import { BREAK_IN_TIP, COUNT_CELLS, acceptedSaid, fixButton, fixLine, type Accepted, type CountKey } from '../break-in-model'
+import { attemptsOnSaid, decidedByLine, holesOf, type AppBreakInResult, type AppBreakInRow, type AppFixOffer } from '../break-in-app'
+import { AcceptForm } from '../break-in-view'
+import { BREAK_IN_TIP, COUNT_CELLS, acceptanceFor, acceptedSaid, canAccept, fixButton, fixLine, type Accepted, type CountKey } from '../break-in-model'
 import type { BreakInCounts } from '../gauntlet'
 import type { NameLookup } from '../predicate-prose'
 import type { SimEnv } from '../simulate'
 import { useSimEnv } from '../sim-env'
 import { ATTEMPTS_PANEL_ID, atLeast, attemptGroups, attemptOffer, cellTone, isHole, movedSaid, resultSpoken, rowNote, tenantSaid } from './attempts'
+import { ACCEPT_ATTEMPTS } from './phase'
 import { PANEL_SLIDE as SLIDE } from './sign-in-card'
 
 /* -----------------------------------------------------------------------------
@@ -109,7 +111,7 @@ export interface BreakInPanelProps {
 
 export function BreakInPanel({ result, appName, reduced, back, slide = true, wide, onToggleWidth, onClose, onBack, onPlay, onOpenRule, onFix }: BreakInPanelProps) {
   const present = useIsPresent()
-  const { users, policies, breakInAccepted } = useBrand()
+  const { users, policies, breakInAccepted, acceptBreakIn, account } = useBrand()
   const env = useSimEnv()
   const resolve = useNameLookup()
   const heading = useId()
@@ -117,6 +119,7 @@ export function BreakInPanel({ result, appName, reduced, back, slide = true, wid
   const [heldOpen, setHeldOpen] = useState(false)
   const { groups, held } = useMemo(() => attemptGroups(result.rows), [result.rows])
   const title = attemptsOnSaid(appName)
+  const holes = holesOf(result.counts)
   /* Its title takes the focus once it has arrived — at once where it swapped in for the why. */
   useEffect(() => {
     const t = window.setTimeout(() => titleRef.current?.focus({ preventScroll: true }), reduced || !slide ? 0 : SLIDE.duration * 1000)
@@ -137,6 +140,13 @@ export function BreakInPanel({ result, appName, reduced, back, slide = true, wid
       onPlay={onPlay}
       onOpenRule={onOpenRule}
       onFix={onFix}
+      onAccept={(r, reason) => {
+        const a = acceptanceFor(r.round, account.name, new Date().toISOString(), reason)
+        if (a && r.policyId) acceptBreakIn(r.policyId, r.id, a)
+      }}
+      onRestore={(r) => {
+        if (r.policyId) acceptBreakIn(r.policyId, r.id, null)
+      }}
     />
   )
 
@@ -169,8 +179,15 @@ export function BreakInPanel({ result, appName, reduced, back, slide = true, wid
       </div>
 
       <div className="bb__inspbody sit-att">
-        <div className="sit-att__counts">
-          <AttemptCells counts={result.counts} />
+        {/* One plain answer, not four counts: how many got through, out of how many were tried. */}
+        <div className={`sit-att__verdict ${holes > 0 ? 'is-hole' : 'is-clear'}`}>
+          <span className="sit-att__vmark" aria-hidden>
+            {holes > 0 ? <ShieldAlert size={18} strokeWidth={2.1} /> : <ShieldCheck size={18} strokeWidth={2.1} />}
+          </span>
+          <p className="sit-att__vsay">
+            <strong>{holes > 0 ? `${holes} got through` : 'None got through'}</strong>
+            <span>{result.rows.length} attempts tried</span>
+          </p>
           <TipDot text={BREAK_IN_TIP} label="About break-in attempts" />
         </div>
 
@@ -191,7 +208,7 @@ export function BreakInPanel({ result, appName, reduced, back, slide = true, wid
           <details className="sit-att__held" open={heldOpen} onToggle={(e) => setHeldOpen(e.currentTarget.open)}>
             <summary className="sit-att__heldsum">
               {heldOpen ? <ChevronDown size={14} strokeWidth={2} aria-hidden /> : <ChevronRight size={14} strokeWidth={2} aria-hidden />}
-              <span>Held</span>
+              <span>Blocked</span>
               <span className="sit-att__heldn">{held.length}</span>
             </summary>
             <ul className="sit-att__list">{held.map(row)}</ul>
@@ -215,6 +232,8 @@ function AttemptRow({
   onPlay,
   onOpenRule,
   onFix,
+  onAccept,
+  onRestore,
 }: {
   row: AppBreakInRow
   person: string
@@ -226,7 +245,13 @@ function AttemptRow({
   onPlay: (row: AppBreakInRow) => void
   onOpenRule: (row: AppBreakInRow) => void
   onFix: (row: AppBreakInRow, offer: AppFixOffer) => void
+  onAccept: (row: AppBreakInRow, reason: string) => void
+  onRestore: (row: AppBreakInRow) => void
 }) {
+  const [accepting, setAccepting] = useState(false)
+  const [open, setOpen] = useState(false)
+  const bodyId = useId()
+  const mayAccept = ACCEPT_ATTEMPTS && row.policyId !== null && canAccept(row)
   /* Asked of a hole only, as it is drawn, and kept for the run (attempts.ts `attemptOffer`). */
   const offer = useMemo(() => (isHole(row) ? attemptOffer(result, row, policies, env, accepted) : null), [row, result, policies, env, accepted])
   const by = decidedByLine(row)
@@ -234,40 +259,40 @@ function AttemptRow({
   const moved = offer ? movedSaid(result.counts, offer.preview.counts) : null
   const tenant = offer ? tenantSaid(offer.preview.line) : null
   return (
-    <li className={`sit-att__row is-${row.group}`}>
-      <button type="button" className="sit-att__play" title="Run this sign-in" onClick={() => onPlay(row)}>
+    <li className={`sit-att__row is-${row.group}${open ? ' is-open' : ''}`}>
+      {/* One line: who, what was tried, and a chevron. The rest — what happened and what to do — opens under it. */}
+      <button type="button" className="sit-att__head" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((o) => !o)}>
         <span className="sit-att__face" aria-hidden>
           <Face kind="user" name={person} size="sm" decorative />
         </span>
-        <span className="sit-att__text">
-          <span className="sit-att__name">
-            <span className="u-sr-only">Run: </span>
-            {row.name}
+        <span className="sit-att__name">{row.name}</span>
+        {row.accepted && (
+          <span className="sit-att__accepted" title={acceptedSaid(row.accepted)}>
+            Accepted
           </span>
-          <span className="sit-att__story">{row.story}</span>
-          {/* Each word with its badge, so a narrow panel breaks the line
-              between the two and never between "Got" and its answer; where
-              nothing decided one answer, Can't tell alone — no "Got". */}
-          <span className="sit-att__result" aria-hidden>
-            <span className="sit-att__pair">
-              <span>{atLeast(row) ? 'Expected at least' : 'Expected'}</span>
-              <DecisionBadge decision={row.expected} />
-            </span>
-            <span className="sit-att__dot">·</span>
-            {row.got ? (
-              <span className="sit-att__pair">
-                <span>Got</span>
-                <DecisionBadge decision={row.got} />
-              </span>
-            ) : (
-              <CantTell />
-            )}
-          </span>
-          <span className="u-sr-only">{resultSpoken(row)}</span>
-        </span>
-        <Play className="sit-att__go" size={13} strokeWidth={2.2} aria-hidden />
+        )}
+        {open ? <ChevronUp className="sit-att__chev" size={14} strokeWidth={2} aria-hidden /> : <ChevronDown className="sit-att__chev" size={14} strokeWidth={2} aria-hidden />}
       </button>
-      <div className="sit-att__foot">
+      <div id={bodyId} className="sit-att__body" hidden={!open}>
+        <p className="sit-att__story">{row.story}</p>
+        {/* Each word with its badge, so a narrow panel breaks the line between the two and never between "Got" and its
+            answer; where nothing decided one answer, Can't tell alone — no "Got". */}
+        <p className="sit-att__result">
+          <span className="sit-att__pair">
+            <span>{atLeast(row) ? 'Should be at least' : 'Should be'}</span>
+            <DecisionBadge decision={row.expected} />
+          </span>
+          <span className="sit-att__dot">·</span>
+          {row.got ? (
+            <span className="sit-att__pair">
+              <span>Got</span>
+              <DecisionBadge decision={row.got} />
+            </span>
+          ) : (
+            <CantTell />
+          )}
+          <span className="u-sr-only">{resultSpoken(row)}</span>
+        </p>
         {note && <p className="sit-att__note">{note}</p>}
         <p className="sit-att__byline">
           {row.policyId !== null ? (
@@ -277,11 +302,6 @@ function AttemptRow({
             </button>
           ) : (
             <span className="sit-att__by is-text">{by}</span>
-          )}
-          {row.accepted && (
-            <span className="sit-att__accepted" title={acceptedSaid(row.accepted)}>
-              Accepted
-            </span>
           )}
         </p>
         {offer && (
@@ -297,6 +317,36 @@ function AttemptRow({
                 Fix in policy
               </Button>
             </span>
+          </div>
+        )}
+        {row.accepted && (
+          <p className="sit-att__note">
+            {acceptedSaid(row.accepted)} · {row.accepted.reason}
+          </p>
+        )}
+        {accepting ? (
+          <AcceptForm
+            onCancel={() => setAccepting(false)}
+            onAccept={(reason) => {
+              setAccepting(false)
+              onAccept(row, reason)
+            }}
+          />
+        ) : (
+          <div className="sit-att__acts">
+            <Button variant="secondary" size="sm" icon={Play} onClick={() => onPlay(row)}>
+              Run this sign-in
+            </Button>
+            {mayAccept &&
+              (row.accepted ? (
+                <Button variant="ghost" size="sm" onClick={() => onRestore(row)}>
+                  Restore expectation
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setAccepting(true)}>
+                  Accept this result
+                </Button>
+              ))}
           </div>
         )}
       </div>

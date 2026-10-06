@@ -1,7 +1,5 @@
 import { useSyncExternalStore } from 'react'
 
-import { SHOWCASE } from './showcase'
-
 /* -----------------------------------------------------------------------------
    Light or dark, for the whole console and the end-user site alike.
 
@@ -30,9 +28,11 @@ export function readTheme(): Theme {
   }
 }
 
-/* The showcase build is light only — dark is not in the product yet (owner,
-   14 Sep; its toggle hidden 21 Sep) — whatever an earlier visit stored. */
-let current: Theme = SHOWCASE ? 'light' : readTheme()
+/* The showcase build was light only (owner, 14 Sep; its toggle hidden 21 Sep). The
+   Mode button is back at the top (owner, 4 Oct 2026: "we have a mode button at the
+   top … bring the old Mode button at the top"), and the Access checks canvas follows
+   it, so the stored theme holds in the showcase too. */
+let current: Theme = readTheme()
 const listeners = new Set<() => void>()
 
 function paint(theme: Theme): void {

@@ -169,32 +169,171 @@
 .sit-panel__saved:hover { border-color: var(--border-default); color: var(--text-primary); }
 .sit-panel__saved:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
-/* Identity (IdentityField.tsx): Entra's What If order — a label over each
-   field, the identity type's picker, then the builder's Who row for the one
-   chosen; under it every group a person is in, and a quiet line where that
-   is more than one, or who a group was tested as. */
+/* Identity (IdentityField.tsx): users and groups in one field, several at
+   once (owner, 5 Oct 2026) — the in-place field (identity-combo.tsx, Jira's
+   assignee field), its picks as chips; under it, for one pick only, every
+   group a person is in, and a quiet line where that is more than one, or
+   who a group was tested as. The section's heading names it, so no label
+   over it says Identity again. */
 .sit-ident { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .sit-ident__label { font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 16px; color: var(--text-secondary); }
-.sit-ident > .sit-ident__label:not(:first-child) { margin-top: var(--space-3); }
-.sit-ident > .bb__whorow.is-invalid { border-color: var(--fb-negative-border); }
-.sit-ident .sit-ident__val { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-3); text-align: left; }
-/* One choice: the dialog's ticks are round. */
-.sit-ident__list .bx-tick { border-radius: 50%; }
-.sit-ident__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sit-ident__groups { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .sit-ident__groups > .sit-ident__label { margin-right: var(--space-1); }
 .sit-ident__note { margin: 0; font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary); }
-/* The dialog's list: a heading between the policy's people and the rest. */
-.sit-ident__item { display: contents; }
-.sit-ident__head {
-  margin: 0;
-  padding: var(--space-3) var(--space-5) var(--space-2);
-  border-bottom: var(--bw-thin) solid var(--border-subtle);
-  background: var(--surface-sunken);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
-  color: var(--text-secondary);
+
+/* The field: at rest the answer — the chips, or the grey mark and Choose
+   users or groups — in a control's edge, the chevron saying it opens; open,
+   the same box holds the chips and the search after them, one blue edge for
+   focus. Its height is kept as it turns, so nothing under it moves. At rest
+   its press is one button under the chips, the whole field (`__open`): a
+   chip's body passes the press down to it, its × takes its own. */
+.sit-ident__field {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ctl-height-md);
+  padding: var(--space-3) calc(var(--space-3) + 14px + var(--space-3)) var(--space-3) var(--space-3);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border);
+  border-radius: var(--ctl-radius);
+  color: var(--text-body);
 }
+.sit-ident__field:hover { border-color: var(--ctl-border-hover); }
+.sit-ident__field:has(> .sit-ident__open:focus-visible),
+.sit-ident__field.is-open {
+  border-color: var(--ctl-border-focus);
+  box-shadow: 0 0 0 4px var(--focus-halo);
+}
+.sit-ident__field.is-open { cursor: text; background: var(--surface-raised); }
+.sit-ident__field.is-invalid { border-color: var(--fb-negative-border); }
+.sit-ident__open {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.sit-ident__open:focus-visible { outline: none; }
+/* What the field holds: the chips (and, open, the search), wrapping; at
+   rest they let a press through to the field, but for the chips themselves. */
+.sit-ident__chips {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  pointer-events: none;
+}
+.sit-ident__field.is-open .sit-ident__chips { pointer-events: auto; }
+.sit-ident__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); line-height: 20px; color: var(--text-primary); }
+.sit-ident__field.is-empty .sit-ident__name { color: var(--text-muted); }
+.sit-ident__field.is-empty .sit-ident__chips { gap: var(--space-3); }
+.sit-ident__chev { flex: none; color: var(--text-muted); }
+
+/* A pick: the console's one pill, neutral (selection is greyscale) — a
+   person's round face or a group's square, the name, its ×; "+N" is the
+   same pill, and opens the list. */
+.sit-ident__chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pill-gap);
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--pill-py) var(--space-1) var(--pill-py) var(--pill-py);
+  background: var(--fb-neutral-bg);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  border-radius: var(--pill-radius);
+  font: inherit;
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+  color: var(--fb-neutral-fg);
+  pointer-events: auto;
+  cursor: pointer;
+}
+/* The face's letters at the 12 px floor here alone: the shared small face's are 9. */
+.sit-ident__chip .bx-face { width: 20px; height: 20px; flex: none; font-size: var(--fs-xs); }
+.sit-ident__chipname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sit-ident__chipx {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sit-ident__chipx:hover { background: var(--state-hover-bg); color: var(--text-primary); }
+/* The × is a Tab stop: the field's own focus ring, small. */
+.sit-ident__chipx:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ctl-border-focus); color: var(--text-primary); }
+.sit-ident__chip.is-more { padding: var(--pill-py) var(--pill-px); }
+.sit-ident__chip.is-more:hover { border-color: var(--border-default); color: var(--text-primary); }
+/* Nothing chosen: the kind's mark in a grey disc, where a face will be — Jira's grey Unassigned. */
+.sit-ident__blank {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  background: var(--surface-sunken);
+  border: var(--bw-thin) solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+.sit-ident__blank.is-user { border-radius: var(--radius-full); }
+.sit-ident__blank.is-group { border-radius: 6px; }
+/* Open, the search's mark stands where the chevron did. */
+.sit-ident__searchico { position: absolute; top: calc(50% - 7px); right: var(--space-3); color: var(--text-tertiary); }
+/* The search is the field's own text, after the chips: no box of its own inside the field's. */
+.sit-ident__chips > .sit-ident__search,
+.sit-ident__chips > .sit-ident__search:hover,
+.sit-ident__chips > .sit-ident__search:focus-visible {
+  flex: 1 0 64px;
+  width: auto;
+  min-width: 64px;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+}
+.sit-ident__search::placeholder { color: var(--text-placeholder, var(--text-muted)); }
+/* The list (the Picker's, portalled): as wide as the field it drops from;
+   on top, the switch — Users | Groups, the page bar's segments (`.bseg`,
+   page-bar.tsx `FilterTabs`), the pop's width, out of the list's scroll so
+   it stays while the rows move; Clear all set off from the names by a rule;
+   inside a policy, its people under In this policy and Not in this policy,
+   small and quiet. */
+.sit-ident__pop { max-width: calc(100vw - 16px); }
+/* The list's faces read at the type floor too, as the chips' do (the shared face draws its initials at 10 px). */
+.sit-ident__pop .bx-face { font-size: var(--fs-xs); }
+.sit-ident__type { flex: none; padding: var(--space-2); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.sit-ident__type > .bseg { display: flex; flex-wrap: nowrap; }
+.sit-ident__type > .bseg > button { flex: 1 1 0; }
+.sit-ident__rule { height: 0; margin: var(--space-2) var(--space-2); border-top: var(--bw-thin) solid var(--border-subtle); }
+.sit-ident__clear .bx-picker__opttext strong { color: var(--text-secondary); }
+.sit-ident__sub { padding-top: var(--space-2); font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* Sign-in conditions: one condition frame per fact, the Inspector's gap apart.
    The left half says what is stated and is not a control, so it takes no
@@ -302,6 +441,21 @@
 /* Check access (and Saved sign-ins, where offered): pressed — the builder's
    blue, the active state — while the panel holds what it opened. */
 .hiw__act { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-4); margin-top: var(--space-7); }
+/* Recently blocked: the latest refusals, a press fills the form with one, View all opens them all (BlockedDrawer.tsx). */
+.hiw__blocked { width: min(100%, 440px); margin: var(--space-7) auto 0; border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-raised); text-align: left; }
+.hiw__blockedhead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) var(--space-5); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.hiw__blockedhead h3 { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.hiw__blockedall { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0; border: 0; background: none; font: inherit; font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer; }
+.hiw__blockedall:hover { color: var(--text-primary); }
+.hiw__blockedall:focus-visible,
+.hiw__blockedrow:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.hiw__blocked ul { margin: 0; padding: var(--space-2); list-style: none; }
+.hiw__blockedrow { display: flex; align-items: center; gap: var(--space-4); width: 100%; padding: var(--space-3) var(--space-4); border: 0; border-radius: var(--radius-sm); background: none; font: inherit; text-align: left; color: var(--text-body); cursor: pointer; }
+.hiw__blockedrow:hover { background: var(--surface-sunken); }
+.hiw__blockedrow > :first-child { flex: none; }
+.hiw__blockedtext { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.hiw__blockedwho { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--fs-md); color: var(--text-primary); }
+.hiw__blockedmeta { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--fs-xs); color: var(--text-tertiary); }
 .hiw__act .bx-btn[aria-pressed='true'] {
   background: var(--accent-soft);
   border-color: var(--accent-soft-border);
@@ -361,15 +515,25 @@
 .sit-att__row.is-got-through,
 .sit-att__row.is-weaker-factor { border-color: var(--fb-notice-border); }
 
-/* The press: the face, the words, the play mark — three tracks, the words the only one that grows. */
-.sit-att__play {
+/* The verdict: one plain answer at the head of the panel — how many got through, of how many tried. */
+.sit-att__verdict { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-5); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.sit-att__verdict.is-hole { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.sit-att__verdict.is-clear { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); }
+.sit-att__vmark { display: inline-grid; place-items: center; flex: none; }
+.sit-att__verdict.is-hole .sit-att__vmark { color: var(--fb-negative-fg); }
+.sit-att__verdict.is-clear .sit-att__vmark { color: var(--fb-positive-fg); }
+.sit-att__vsay { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; margin: 0; }
+.sit-att__vsay strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.sit-att__vsay span { font-size: var(--fs-xs); color: var(--text-secondary); }
+
+/* The row: one line that opens. The face, what was tried, a chevron; what happened and what to do come under it. */
+.sit-att__head {
   box-sizing: border-box;
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 14px;
-  align-items: start;
-  column-gap: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   width: 100%;
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border: 0;
   border-radius: var(--radius-lg);
   background: transparent;
@@ -378,21 +542,19 @@
   color: var(--text-primary);
   cursor: pointer;
 }
-.sit-att__play:hover { background: var(--surface-sunken); }
-.sit-att__play:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
-.sit-att__face { display: inline-grid; place-items: center; }
-.sit-att__text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
-.sit-att__name { font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 18px; color: var(--text-primary); }
-.sit-att__story { font-size: var(--fs-xs); line-height: 17px; color: var(--text-secondary); }
-.sit-att__result { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-1); font-size: var(--fs-xs); line-height: 20px; color: var(--text-tertiary); }
+.sit-att__head:hover { background: var(--surface-sunken); }
+.sit-att__head:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.sit-att__face { display: inline-grid; place-items: center; flex: none; }
+.sit-att__name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 18px; color: var(--text-primary); }
+.sit-att__chev { flex: none; color: var(--text-tertiary); }
+.sit-att__body { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 24px + var(--space-4)); }
+.sit-att__body[hidden] { display: none; }
+.sit-att__story { margin: 0; font-size: var(--fs-xs); line-height: 17px; color: var(--text-secondary); }
+.sit-att__result { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--fs-xs); line-height: 20px; color: var(--text-tertiary); }
 /* A word and its badge, kept on one line: the narrow panel breaks between the two pairs, never inside one. */
 .sit-att__pair { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
-.sit-att__go { margin-top: var(--space-1); color: var(--text-tertiary); }
-.sit-att__play:hover .sit-att__go { color: var(--text-link); }
+.sit-att__acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 
-/* Outside the press: who decided, and the fix. */
-.sit-att__foot { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 24px + var(--space-4)); }
-/* Why it sits under its heading, where Expected and Got do not say: quiet, one line's weight. */
 .sit-att__note { margin: 0; font-size: var(--fs-xs); line-height: 17px; color: var(--text-secondary); }
 .sit-att__byline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0; font-size: var(--fs-xs); line-height: 18px; }
 .sit-att__by {
@@ -426,6 +588,7 @@
 .sit-att__moved { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
 .sit-att__tenant { color: var(--text-tertiary); }
 .sit-att__fixact { display: inline-flex; margin-top: var(--space-1); }
+.sit-att__accept { display: inline-flex; margin-top: var(--space-1); }
 
 /* Held: last, folded behind its word and count (a native disclosure, its
    chevron the page's own mark, not the browser's). */

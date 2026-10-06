@@ -1,0 +1,252 @@
+/* -----------------------------------------------------------------------------
+   FOCUS'S TWO VIEWS (Focus2Layout.tsx): Classic v2's chain, down the canvas or
+   laid across it (classic2.css draws both shapes). The route that Horizontal
+   was — focus2-overview.ts places it, focus2-route.tsx draws its marks — is
+   kept behind Focus2Layout's ROUTE_MAP, and its rules below with it.
+
+   Both are drawn with Classic v2's own cards (classic2-chain.tsx, classic2.css)
+   — so what is here is only where the cards stand in Focus, the route's heads
+   evened out so the line runs through their middles, its slim rows, and the
+   line and branches between them.
+
+   TOKENS ONLY: the console's text, surface, border and feedback tokens for the
+   cards and rows (as classic2.css draws the cards), the `--fc-*` stage palette
+   for the line and branches, type, space and radius from tokens.css. The few
+   numbers that are geometry — the heads' one height — come off
+   focus2-overview.ts as a custom property on the band, so the CSS and the
+   placement read one value.
+
+   Colour is meaning: blue only on what the engine is reading now, green / red /
+   amber only on results, grey for what was passed over or never reached. No
+   orange, and no dots on the line: the stations are the cards.
+   -------------------------------------------------------------------------- */
+
+/* --- Vertical: Classic v2's chain ------------------------------------------------------------- */
+
+/* The chain's type is the canvas's own (Classic v2 stands on it directly; here the stage's world sets its own). */
+.rl-f2v,
+.f2o__station {
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.rl-f2v { position: relative; }
+.rl-f2v__room { overflow: hidden; }
+/* Classic v2's canvas pads its chain under the page head and over its dock; here the canvas's bar is under it, outside
+   the chain, and the world keeps the bar's room itself. Across (ONE CHAIN, TWO SHAPES in Focus2Layout.tsx) the row
+   stands where the view places it, `--rl-f2v-row-top` down under the brief's room, a step in from the world's edges so
+   a row zoomed to fit beside the questions panel never touches it. */
+.rl-f2v .rl-c2__chain { padding: var(--space-8) 0 0; }
+/* The sign-in node may be wider than the column (classic2.css), but never wider than the lane it stands in, less the
+   column's own inset (`--rl-f2v-lane`, Focus2Layout's room): beside the questions on a narrowed canvas its words wrap
+   rather than running under the panel (5 Oct 2026). Down only: across, the node keeps to its row's ceiling. */
+.rl-f2v .rl-c2__chain:not(.is-across) .rl-c2__first > .rl-c2__node {
+  max-width: min(calc(var(--bb-card) + var(--space-16) * 3), calc(var(--rl-f2v-lane, 100%) - 2 * var(--space-6)));
+}
+.rl-f2v .rl-c2__chain.is-across { padding: var(--rl-f2v-row-top, var(--space-8)) var(--space-5) 0; }
+
+/* --- Horizontal: the band, and the cards on the route ------------------------------------------ */
+
+/* The band stands out of the flow, so the Vertical chain arriving as it leaves never waits under it. */
+.rl-f2 .rl-f2__band {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+}
+/* The band carries no soft edge here: the map sits inside the room, and a station at its end is not leaving. */
+.rl-f2 .rl-f2__band.is-route {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+/* The cards' layer covers the band; on the route the rows that are not cards are under it, so it lets the pointer
+   through everywhere a card is not. */
+.rl-f2__band.is-route .rl-focus__track { pointer-events: none; }
+.rl-f2__band.is-route .rl-focus__slot { pointer-events: auto; }
+/* The landing's dim is the carousel's: on the route the line taking the verdict's colour is the landing. */
+.rl-f2__world.is-landing .rl-f2__band.is-route .rl-focus__slot .rl-focus__turn { opacity: 1; }
+
+/* A station: Classic v2's card at the station's width — a third of the chain's or less — so its head keeps its pieces
+   and lays them out for the width: the tile, the step and the card's own buttons on the first line, then what was
+   selected and its meta line under them across the card's whole width, each up to two lines. Every head stands at the
+   route's one height (`--f2o-head-h`, the tallest head's own words), its lines in the middle, so the line passes
+   through every head's middle. Kept on the band, not the route alone, so a station crossing into the carousel keeps
+   its shape as it fades. */
+.rl-f2__band .f2o__station .rl-c2__card > .bb__cardhead {
+  box-sizing: border-box;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  row-gap: var(--space-1);
+  min-height: var(--f2o-head-h);
+}
+.rl-f2__band .f2o__station .rl-c2__card > .bb__cardhead > .bb__title { display: contents; }
+.rl-f2__band .f2o__station .rl-c2__card > .bb__cardhead > .bb__idx { grid-column: 1; grid-row: 1; }
+.rl-f2__band .f2o__station .rl-c2__card .rl-c2__kicker { grid-column: 2; grid-row: 1; }
+.rl-f2__band .f2o__station .rl-c2__card .bb__title strong.rl-c2__name {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+.rl-f2__band .f2o__station .rl-c2__card .bb__title em.rl-c2__meta {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  align-items: flex-start;
+  margin-top: 0;
+  white-space: normal;
+}
+.rl-f2__band .f2o__station .rl-c2__card .rl-c2__nm,
+.rl-f2__band .f2o__station .rl-c2__card .rl-c2__mt {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+/* The meta line's mark sits on its first line. */
+.rl-f2__band .f2o__station .rl-c2__card .rl-c2__mk { min-height: calc(var(--fs-sm) * 1.4); }/* The builder's reading, narrower than it was sized for: a condition's value gives way, as the builder's own rule
+   says it should, rather than the row running out of the card. */
+.rl-f2__band .f2o__station .bb__ifbody > *,
+.rl-f2__band .f2o__station .bb__ifplain > * { min-width: 0; }
+/* The card the keys stand on once the story is told — Enter opens it as a card. Greyscale: the admin's, not the engine's. */
+.rl-f2__band.is-route .rl-focus__slot.is-marked .rl-c2__card { outline: var(--bw-thick) solid var(--border-strong); outline-offset: var(--space-1); }
+
+/* While the cards morph between the route and the carousel, nothing on them is filtered: a blur on a card that is
+   turning and growing is drawn again every frame, and it was what dropped frames mid-flight (measured, 5 Oct 2026).
+   The depth blur comes back over its own transition once they stand still; the arriving card's own rack is not on
+   these elements. `!important` because the reveal's resting `blur(0px)` is Motion's inline style. */
+.rl-f2__band.is-morphing .rl-focus__turn,
+.rl-f2__band.is-morphing .rl-f2__reveal {
+  filter: none !important;
+}
+/* The full face coming home is built at the press but not drawn until its card has landed (Focus2Layout's MORPH, whose
+   rack starts just after): drawn at the press, its first paint was the longest frame of the whole move. A keyframe
+   holds `content-visibility: hidden` for that long and lets go — no render is needed to show it. */
+.rl-f2__band .rl-focus__content.is-arriving { animation: f2o-unseen 0.58s linear; }
+@keyframes f2o-unseen {
+  from,
+  to {
+    content-visibility: hidden;
+  }
+}
+
+/* --- The layer under the cards: the line, the branches, the rows ------------------------------ */
+
+.f2o {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.f2o__svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+
+/* The line: one bold stroke between the stations' middles, seen in the gaps. */
+.f2o__line {
+  fill: none;
+  stroke: var(--fc-line-3);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke 0.24s var(--ease-standard);
+}
+.f2o__line.is-done { stroke: var(--fc-line-3); }
+.f2o__line.is-work { stroke: var(--fc-work); }
+.f2o__line.is-ok { stroke: var(--fc-ok); }
+.f2o__line.is-bad { stroke: var(--fc-bad); }
+.f2o__line.is-warn { stroke: var(--fc-warn); }
+.f2o__line.is-plain { stroke: var(--fc-text-3); }
+
+/* A branch: thin, from the line up or down the column's trunk to its row. */
+.f2o__branch {
+  fill: none;
+  stroke: var(--fc-line-2);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.f2o__branch.is-fail { stroke: var(--fc-bad); }
+.f2o__branch.is-warn { stroke: var(--fc-warn); }
+.f2o__branch.is-also {
+  stroke: var(--fc-warn);
+  stroke-dasharray: 4 4;
+}
+
+/* A row: a policy or a rule that is not the station, its name over what it came to — a card's head, small. Solid
+   where the engine read it, dashed where it never got to it. A rule the story read is a card's own slot drawn as one
+   (`is-card`), in the slot's flow rather than placed. */
+.f2o__row {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 0 var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  font-family: inherit;
+  text-align: left;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.f2o__row.is-card { position: relative; width: 100%; }
+.f2o__row:not(.is-read) { border-style: dashed; background: var(--surface-sunken); box-shadow: none; }
+.f2o__row[aria-hidden='true'] { pointer-events: none; }
+.f2o__row:hover { border-color: var(--border-default); box-shadow: var(--el-mid); }
+.f2o__row:focus-visible { outline: var(--bw-thick) solid var(--focus-halo); outline-offset: var(--bw-thin); }
+.f2o__rname,
+.f2o__rtext {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.f2o__rname {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+.f2o__rsays {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+  color: var(--text-tertiary);
+}
+.f2o__rmark { display: inline-grid; flex: none; place-items: center; }
+/* Read and failed: its ✕ in the negative tone, as a card's meta line marks it; can't tell, the notice tone. */
+.f2o__row.is-fail .f2o__rmark { color: var(--fb-negative-fg); }
+.f2o__row.is-warn .f2o__rmark,
+.f2o__row.is-warn .f2o__rtext { color: var(--fb-notice-fg); }
+/* Also covers the person, not used: amber, as the Tree view and the policies card say it. */
+.f2o__row.is-also {
+  border-color: var(--fb-notice-border);
+  background: var(--fb-notice-bg);
+}
+.f2o__row.is-also .f2o__rname { color: var(--text-primary); }
+.f2o__row.is-also .f2o__rsays { color: var(--fb-notice-fg); }
+.f2o__row.is-also:hover { border-color: var(--fb-notice-fg); }
+/* The fold: one line, the rows' own count. */
+.f2o__row.is-more { justify-content: center; }
+.f2o__row.is-more .f2o__rname { font-weight: var(--fw-regular); color: var(--text-tertiary); }
+/* A row an answer or the brief is about: the cards' own greyscale ring. */
+.f2o__row.is-lit { outline: var(--bw-thick) solid var(--text-secondary); outline-offset: var(--space-1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .f2o__line,
+  .f2o__row { transition: none; }
+}

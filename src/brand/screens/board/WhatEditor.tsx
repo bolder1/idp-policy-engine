@@ -24,7 +24,9 @@ import {
 import { Toggle } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import { Picker } from '../../picker'
-import { DEFAULT_DENY_MESSAGE, DENY_MESSAGE_MAX, type AccessDecision, type Rule } from '../../data'
+import { DENIAL_REASONS } from '../sign-in-tests/phase'
+import { DENY_ACTION_SUGGESTION, denyReasonOfRule } from '../testing/deny-reason'
+import { DEFAULT_DENY_MESSAGE, DENY_EXTRA_MAX, DENY_MESSAGE_MAX, type AccessDecision, type Rule } from '../../data'
 import { METHODS } from '../rule-form'
 import { METHOD_PREFIX, firstFactorPatch, firstFactorValue } from './first-factor'
 import { isPristine } from './parts'
@@ -559,6 +561,37 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
       <span className="bb__denycount" id={`${id}-count`}>
         {value.length}/{DENY_MESSAGE_MAX}
       </span>
+      {DENIAL_REASONS && (
+        <>
+          <label className="bb__thenlabel" htmlFor={`${id}-action`}>
+            Next step
+          </label>
+          <input
+            id={`${id}-action`}
+            type="text"
+            maxLength={DENY_EXTRA_MAX}
+            value={rule.denyAction ?? ''}
+            placeholder="What they can do, for example connect from the office"
+            onChange={(e) => onPatch({ denyAction: e.target.value === '' ? undefined : e.target.value })}
+          />
+          {!rule.denyAction && (
+            <button type="button" className="bb__denysuggest" onClick={() => onPatch({ denyAction: DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)] })}>
+              Use “{DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)]}”
+            </button>
+          )}
+          <label className="bb__thenlabel" htmlFor={`${id}-contact`}>
+            Contact
+          </label>
+          <input
+            id={`${id}-contact`}
+            type="text"
+            maxLength={DENY_EXTRA_MAX}
+            value={rule.denyContact ?? ''}
+            placeholder="Who to ask, for example the IT help desk"
+            onChange={(e) => onPatch({ denyContact: e.target.value === '' ? undefined : e.target.value })}
+          />
+        </>
+      )}
     </div>
   )
 }

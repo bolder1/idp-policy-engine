@@ -46,7 +46,7 @@ describe('Sign-in tests — out of the rail', () => {
   })
 
   it('lights All Policies (UNDER_ITEM) and the Policies parent (POLICY_SCREENS) while it is open', () => {
-    expect(shellSrc).toContain("policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests']")
+    expect(shellSrc).toContain("policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests', 'sign-in-activity']")
     const at = shellSrc.indexOf('const POLICY_SCREENS = [')
     expect(shellSrc.slice(at, shellSrc.indexOf(']', at))).toContain("'sign-in-tests'")
   })

@@ -1,215 +1,264 @@
 /* -----------------------------------------------------------------------------
-   Jarvis's own way in (JarvisMode.tsx): the bar's button, and the transition
-   over the stage — the suit's HUD coming online. Its beats are
-   jarvis-timing.ts's (MID 820 the swap, the dissolve from 1080, END 1700);
-   every keyframe below is a share of the 1700. Only transform, opacity and
-   clip-path move.
+   Aruna's way in (JarvisMode.tsx; code name Jarvis): the porthole on the
+   canvas, and the multiverse over the builder's region. Aruna's palette is
+   her own (PALETTE.md): warm black, the ember for her and the engine, the
+   flare and the spark for light — fixed values, never var(--accent) (slate)
+   or var(--brand) (Run's orange). The film's beats are jarvis-timing.ts's;
+   its layers move by the Web Animations API (aruna-entry-film.ts), so this
+   sheet only draws them. Only transform, opacity and clip-path move.
    -------------------------------------------------------------------------- */
 
-.sit-jx-btn {
+.sit-ae,
+.sit-mv {
+  --ae-ground: #0b0807;
+  --ae-ground-lit: #15100d;
+  --ae-ember: #ff6b2c;
+  --ae-flare: #ffa066;
+  --ae-spark: #ffd9c2;
+  --ae-paper: #f6ece6;
+  --ae-rim: rgba(255, 122, 61, 0.5);
+  --ae-glow: rgba(255, 107, 44, 0.34);
+}
+
+/* --- The porthole: placed by aruna-entry-place.ts (`--ae-x`, `--ae-y`, `data-place`) -------- */
+
+.sit-ae {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: var(--ae-x, 0px) var(--ae-y, 0px);
+}
+.sit-ae[data-ready] { transition: translate 280ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sit-ae:not([data-place]) { visibility: hidden; }
+
+/* The hairline to the ask: the porthole grew out of the dock. */
+.sit-ae__link {
+  position: absolute;
+  left: var(--ae-lx, 0px);
+  top: var(--ae-ly, 0px);
+  width: var(--ae-lw, 0px);
+  height: var(--ae-lh, 0px);
+  background: rgba(255, 107, 44, 0.38);
+  pointer-events: none;
+  transition: background-color 160ms ease;
+}
+.sit-ae[data-place='corner'] .sit-ae__link { display: none; }
+.sit-ae:has(.sit-jx-btn:hover) .sit-ae__link,
+.sit-ae:has(.sit-jx-btn:focus-visible) .sit-ae__link { background: rgba(255, 107, 44, 0.7); }
+
+/* The press itself: its own paint is the disc below (the bar pill's pressed rules in jarvis-chrome.css do not apply). */
+/* Her way in, as a button that says what it does.
+
+   It was a 48 px disc carrying a drawn mark — three of them over an afternoon, each quieter than the last, none of
+   them able to say the one thing the control is for. It sits beside "Ask about this sign-in…", and what it offers is
+   asking HER: a word says that, and a picture asks you to learn it first.
+
+   It keeps her ground rather than the console's, because it is a door into her world and not another control on this
+   page: warm near-black, an ember rim, a sunrise at 14 px, and the name the copy module already writes ("Ask Aruna",
+   "Leave Aruna"). The hover warms rather than moves — the halo, the breathing and the orbiting spark are gone with
+   the disc, and nothing on this button animates at rest. */
+.sit-ae .sit-jx-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  flex: none;
-  height: 30px;
-  padding: 0 12px 0 10px;
-  border: var(--bw-thin) solid var(--accent-soft-border);
-  border-radius: 999px;
-  background: var(--surface-raised);
-  color: var(--text-primary);
+  gap: 7px;
+  height: 34px;
+  margin: 0;
+  padding: 0 14px 0 11px;
+  border: 1px solid var(--ae-rim) !important;
+  border-radius: var(--radius-full);
+  background: var(--ae-ground) !important;
+  box-shadow: 0 6px 16px rgba(11, 8, 7, 0.22);
+  color: var(--ae-paper) !important;
   font: inherit;
   font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
-  transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.sit-jx-btn:hover { border-color: var(--accent); }
-.sit-jx-btn:focus-visible { outline: none; box-shadow: var(--focus-ring, 0 0 0 3px var(--accent-soft)); }
-.sit-jx-btn.is-on { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
-.sit-jx-mark { overflow: visible; }
-.sit-jx-mark circle { fill: none; stroke: var(--accent); stroke-width: 1.6; }
-.sit-jx-mark .sit-jx-mark__core { fill: var(--accent); stroke: none; }
-.sit-jx-btn.is-on .sit-jx-mark circle { stroke: #7ae6ff; }
-.sit-jx-btn.is-on .sit-jx-mark .sit-jx-mark__core { fill: #bff4ff; stroke: none; }
+.sit-ae .sit-jx-btn:hover,
+.sit-ae .sit-jx-btn:focus-visible { background: var(--ae-ground-lit) !important; border-color: var(--ae-ember) !important; }
+.sit-ae .sit-jx-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface-raised, #ffffff), 0 0 0 4px var(--focus-ring, #0d6efd);
+}
+.sit-ae .sit-jx-btn:active { background: var(--ae-ground) !important; }
+.sit-ae.is-busy .sit-jx-btn { cursor: default; }
 
-/* --- The transition: over the stage region, under nothing, never taking input --------------- */
+.sit-ae__ico { flex: none; color: var(--ae-ember); transition: color 160ms ease; }
+.sit-ae .sit-jx-btn:hover .sit-ae__ico,
+.sit-ae .sit-jx-btn:focus-visible .sit-ae__ico { color: var(--ae-flare); }
+.sit-ae__word { display: block; }
 
-.sit-jx {
-  --jx-navy: #050c18;
-  --jx-cyan: #3cc8f5;
-  --jx-cyan-hi: #7ae6ff;
-  --jx-ice: #dff8ff;
-  --jx-ox: 100%;
-  --jx-oy: 0px;
-  --jx-reach: 150%;
-  --jx-ring: 75vmax;
+/* While she is on, the rim is lit: the button now leaves her rather than opening her. */
+.sit-ae.is-on .sit-jx-btn { border-color: var(--ae-ember) !important; }
+.sit-ae.is-on .sit-ae__ico { color: var(--ae-flare); }
+
+/* The halo, the breathing disc and the orbiting spark went with the orb. Nothing on this button moves at rest, which
+   is what a button beside a text field should do. */
+
+/* A run landing (the host's `landed`): one ring leaves the porthole. */
+.sit-ae__ping {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--ae-ember);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The reveal: the kit Tip's look, placed by the porthole's own rule so it never sits on the dock. */
+.sit-ae__tip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--ae-tip-gap, 8px));
+  z-index: 2;
+  display: block;
+  padding: var(--space-4, 8px) var(--space-5, 12px);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-inverse, #1f2329);
+  color: var(--text-inverse, #ffffff);
+  box-shadow: var(--el-high, 0 8px 24px rgba(15, 23, 42, 0.22));
+  text-align: left;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  translate: 0 4px;
+  visibility: hidden;
+  transition: opacity 140ms ease, translate 140ms ease, visibility 0s linear 140ms;
+}
+.sit-ae__tip b { display: block; font-size: 13px; font-weight: var(--fw-semibold, 600); line-height: 18px; }
+.sit-ae__tip span { display: block; font-size: 12px; line-height: 17px; opacity: 0.8; }
+.sit-ae.is-revealed .sit-ae__tip { opacity: 1; translate: 0 0; visibility: visible; transition: opacity 140ms ease, translate 140ms ease; }
+.sit-ae[data-place='perched'] .sit-ae__tip { right: calc(100% + 10px); top: 50%; bottom: auto; translate: 4px -50%; }
+.sit-ae[data-place='perched'].is-revealed .sit-ae__tip { translate: 0 -50%; }
+.sit-ae.is-busy .sit-ae__tip { visibility: hidden; opacity: 0; }
+
+/* --- The multiverse: over the builder's region, under the porthole, never taking input --------- */
+
+.sit-mv {
   position: absolute;
   inset: 0;
   z-index: 40;
   overflow: hidden;
   pointer-events: none;
   contain: strict;
+  perspective: 1500px;
+  perspective-origin: 50% 46%;
 }
 
-/* The cover: the navy, opened from the Jarvis button's corner (in) and closed back into it (out). */
-.sit-jx__cover { position: absolute; inset: 0; will-change: clip-path; }
-.sit-jx.is-enter .sit-jx__cover { animation: sit-jx-open 1700ms linear both; }
-.sit-jx.is-exit .sit-jx__cover { animation: sit-jx-close 1700ms linear both; }
-@keyframes sit-jx-open {
-  0% { clip-path: circle(0px at var(--jx-ox) var(--jx-oy)); animation-timing-function: cubic-bezier(0.62, 0, 0.3, 1); }
-  31% { clip-path: circle(var(--jx-reach) at var(--jx-ox) var(--jx-oy)); }
-  100% { clip-path: circle(var(--jx-reach) at var(--jx-ox) var(--jx-oy)); }
-}
-@keyframes sit-jx-close {
-  0%, 69% { clip-path: circle(var(--jx-reach) at var(--jx-ox) var(--jx-oy)); animation-timing-function: cubic-bezier(0.62, 0, 0.3, 1); }
-  100% { clip-path: circle(0px at var(--jx-ox) var(--jx-oy)); }
-}
-
-/* The rings it dissolves in: annuli round the centre, each its own layer (a border, so only opacity moves).
-   Each overlaps the next by 2px, so no seam shows while they are whole. */
-.sit-jx__band {
+/* Her ground: annuli round where her reactor will be (each its own layer, so only opacity moves), and her grid. */
+.sit-mv__ground { position: absolute; inset: 0; opacity: 0; will-change: opacity; }
+.sit-mv.is-out .sit-mv__ground { opacity: 1; }
+.sit-mv__band {
   position: absolute;
-  left: 50%;
-  top: 46%;
+  left: var(--mv-cx, 50%);
+  top: var(--mv-cy, 46%);
   box-sizing: border-box;
-  width: calc(2 * var(--jx-ring) * var(--b-out) + 4px);
-  height: calc(2 * var(--jx-ring) * var(--b-out) + 4px);
+  width: calc(2 * var(--mv-ring, 75vmax) * var(--b-out) + 4px);
+  height: calc(2 * var(--mv-ring, 75vmax) * var(--b-out) + 4px);
   translate: -50% -50%;
-  border: calc(var(--jx-ring) * (var(--b-out) - var(--b-in)) + 4px) solid var(--jx-navy);
+  border: calc(var(--mv-ring, 75vmax) * (var(--b-out) - var(--b-in)) + 4px) solid var(--ae-ground);
   border-radius: 50%;
+  will-change: opacity;
 }
-.sit-jx__band.is-core { background: var(--jx-navy); }
-.sit-jx.is-enter .sit-jx__band { animation: sit-jx-fade-out 260ms cubic-bezier(0.3, 0, 0.3, 1) calc(var(--jx-dissolve) + var(--b-i) * 50ms) both; }
-.sit-jx.is-exit .sit-jx__band { animation: sit-jx-fade-in 280ms cubic-bezier(0.4, 0, 0.6, 1) calc(var(--b-ri) * 58ms) both; }
-@keyframes sit-jx-fade-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes sit-jx-fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-/* The grid field: the ground's own grid, brighter as it comes up, then settling into the ground under it
-   (the region's --bb-x / --bb-y / --bb-z, so the two line up). */
-.sit-jx__grid {
+.sit-mv__band.is-core { background: var(--ae-ground); }
+.sit-mv__grid {
   position: absolute;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%2370d6ff' stroke-opacity='0.2' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1.1' fill='%2370d6ff' fill-opacity='0.5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%23ff8a50' stroke-opacity='0.16' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1.1' fill='%23ff8a50' fill-opacity='0.42'/%3E%3C/svg%3E");
   background-size: calc(32px * var(--bb-z, 1)) calc(32px * var(--bb-z, 1));
   background-position: var(--bb-x, 0px) var(--bb-y, 0px);
   opacity: 0;
-}
-.sit-jx.is-enter .sit-jx__grid { animation: sit-jx-grid-in 1700ms linear both; }
-.sit-jx.is-exit .sit-jx__grid { animation: sit-jx-grid-out 1700ms linear both; }
-@keyframes sit-jx-grid-in {
-  0%, 14% { opacity: 0; }
-  34% { opacity: 1; }
-  62% { opacity: 0.55; }
-  88%, 100% { opacity: 0; }
-}
-@keyframes sit-jx-grid-out {
-  0% { opacity: 0; }
-  30%, 70% { opacity: 0.55; }
-  100% { opacity: 0.55; }
+  will-change: opacity;
 }
 
-/* The scan: one line of light across the region, a faint wake behind it. Its box is the region, so 100% is the region's height. */
-.sit-jx__scan { position: absolute; inset: 0; opacity: 0; will-change: transform, opacity; }
-.sit-jx__scan::before,
-.sit-jx__scan::after { content: ''; position: absolute; left: 0; right: 0; }
-.sit-jx__scan::before { top: -64px; height: 64px; background: rgba(60, 200, 245, 0.06); }
-.sit-jx__scan::after { top: -1px; height: 1px; background: var(--jx-cyan-hi); box-shadow: 0 0 10px 1px rgba(122, 230, 255, 0.85), 0 0 34px 4px rgba(60, 200, 245, 0.35); }
-.sit-jx.is-enter .sit-jx__scan { animation: sit-jx-scan-down 1700ms linear both; }
-.sit-jx.is-exit .sit-jx__scan { animation: sit-jx-scan-up 1700ms linear both; }
-@keyframes sit-jx-scan-down {
-  0%, 21% { transform: translateY(0%); opacity: 0; animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1); }
-  24% { opacity: 1; }
-  56% { opacity: 0.85; }
-  60% { transform: translateY(104%); opacity: 0; }
-  100% { transform: translateY(104%); opacity: 0; }
-}
-@keyframes sit-jx-scan-up {
-  0%, 10% { transform: translateY(104%); opacity: 0; animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1); }
-  13% { opacity: 0.9; }
-  44% { opacity: 0.8; }
-  47% { transform: translateY(0%); opacity: 0; }
-  100% { transform: translateY(0%); opacity: 0; }
-}
-
-/* The shock rings: thin outlines out from the centre as it dissolves (in), closing in on it (out). */
-.sit-jx__shock {
+/* The view as a sheet, and its parallels: frozen copies (aruna-entry-clone.ts) or ghosts of it. */
+.sit-mv__sheet,
+.sit-mv__echo {
   position: absolute;
-  left: 50%;
-  top: 46%;
-  width: calc(2 * var(--jx-ring));
-  height: calc(2 * var(--jx-ring));
-  margin: calc(-1 * var(--jx-ring)) 0 0 calc(-1 * var(--jx-ring));
+  inset: 0;
+  overflow: hidden;
+  transform-origin: 50% 46%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+.sit-mv.is-out .sit-mv__sheet { transform-origin: 50% 50%; }
+.sit-mv__echo { border-radius: 18px; opacity: 0; }
+.sit-mv__rim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 140, 90, 0.5);
+  pointer-events: none;
+}
+.sit-mv__rim.is-main { box-shadow: inset 0 0 0 1.5px rgba(255, 140, 90, 0.75); opacity: 0; }
+.sit-mv__frozen,
+.sit-mv__frozen * { animation: none !important; transition: none !important; pointer-events: none !important; }
+.sit-mv__frozen { overflow: hidden; }
+.sit-mv__echo.is-ghost,
+.sit-mv__sheet.is-ghost {
+  background-image: radial-gradient(circle, var(--mv-dot) 1px, transparent 1.4px);
+  background-size: 20px 20px;
+}
+.is-ghost.is-light { --mv-dot: #d3dae1; --mv-card: rgba(255, 255, 255, 0.95); }
+.is-ghost.is-dark { --mv-dot: rgba(120, 140, 160, 0.35); --mv-card: rgba(40, 58, 72, 0.9); }
+.sit-mv__echo > i { position: absolute; border-radius: 10px; background: var(--mv-card); }
+.sit-mv__echo > i.is-a { left: 30%; top: 20%; width: 42%; height: 42%; }
+.sit-mv__echo > i.is-b { left: 6%; top: 22%; width: 20%; height: 14%; opacity: 0.7; }
+.sit-mv__echo > i.is-c { left: 30%; bottom: 2%; width: 46%; height: 11%; }
+
+/* The press at the porthole: a ping out of it, its core's flare. */
+.sit-mv__ping,
+.sit-mv__flare {
+  position: absolute;
+  left: 100%;
+  top: 100%;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
   box-sizing: border-box;
-  border: 2px solid rgba(122, 230, 255, 0.85);
   border-radius: 50%;
-  /* A second, fainter rim just inside: the glow, without a blur to raster at this size. */
-  outline: 6px solid rgba(60, 200, 245, 0.12);
-  outline-offset: -9px;
   opacity: 0;
   will-change: transform, opacity;
 }
-.sit-jx.is-enter .sit-jx__shock { animation: sit-jx-shock-out 640ms cubic-bezier(0.2, 0.6, 0.3, 1) calc(var(--jx-dissolve) - 40ms + var(--k) * 95ms) both; }
-.sit-jx.is-exit .sit-jx__shock { animation: sit-jx-shock-in 560ms cubic-bezier(0.6, 0, 0.8, 0.4) calc(var(--k) * 95ms) both; }
-@keyframes sit-jx-shock-out {
-  0% { transform: scale(0.1); opacity: 0; }
-  12% { opacity: 0.9; }
-  100% { transform: scale(1.02); opacity: 0; }
-}
-@keyframes sit-jx-shock-in {
-  0% { transform: scale(1.02); opacity: 0; }
-  30% { opacity: 0.8; }
-  100% { transform: scale(0.1); opacity: 0; }
-}
+.sit-mv__ping { border: 1.5px solid var(--ae-ember); box-shadow: 0 0 14px rgba(255, 107, 44, 0.45); }
+.sit-mv__flare { background: radial-gradient(closest-side, rgba(255, 217, 194, 0.95), rgba(255, 107, 44, 0.5) 55%, rgba(255, 107, 44, 0)); }
 
-/* --- The iris: the arc reactor, at the region's centre ------------------------------------- */
+/* --- Her iris: rings at their own speeds round a bright core (moved by the film; drawn here) --- */
 
 .sit-jx__iris {
   position: absolute;
-  left: 50%;
-  top: 46%;
+  left: 0;
+  top: 0;
   width: 300px;
   height: 300px;
   margin: -150px 0 0 -150px;
   opacity: 0;
   will-change: transform, opacity;
 }
-.sit-jx.is-enter .sit-jx__iris { animation: sit-jx-iris-in 1700ms linear both; }
-.sit-jx.is-exit .sit-jx__iris { animation: sit-jx-iris-out 1700ms linear both; }
-@keyframes sit-jx-iris-in {
-  0%, 13% { transform: scale(0.5); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.25, 1); }
-  38% { transform: scale(1); opacity: 1; }
-  63% { transform: scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 0.6); }
-  77%, 100% { transform: scale(1.8); opacity: 0; }
-}
-@keyframes sit-jx-iris-out {
-  0%, 12% { transform: scale(1.7); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.25, 1); }
-  38% { transform: scale(1); opacity: 1; }
-  62% { transform: scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3); }
-  77%, 100% { transform: scale(0.02); opacity: 0; }
-}
 .sit-jx__irisin { position: absolute; inset: 0; }
 .sit-jx__r { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; will-change: transform; }
 .sit-jx__r circle { fill: none; }
-.sit-jx__r.is-r1 circle { stroke: rgba(122, 230, 255, 0.55); stroke-width: 2; }
-.sit-jx__r.is-r2 circle { stroke: var(--jx-cyan); stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(60, 200, 245, 0.7)); }
-.sit-jx__r.is-r3 line { stroke: rgba(122, 230, 255, 0.5); stroke-width: 1.2; }
-.sit-jx__r.is-r3 line.is-long { stroke: var(--jx-cyan-hi); stroke-width: 2; }
-.sit-jx__r.is-r4 .is-track { stroke: rgba(60, 200, 245, 0.22); stroke-width: 1; }
-.sit-jx__r.is-r4 .is-lit { stroke: var(--jx-cyan-hi); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 5px rgba(122, 230, 255, 0.9)); }
-.sit-jx__r.is-r5 circle { stroke: rgba(122, 230, 255, 0.75); stroke-width: 11; }
-/* Each ring turns at its own speed, its own way; and comes in at its own moment. */
-.sit-jx__r.is-r1 { animation: sit-jx-spin 22s linear infinite, sit-jx-appear 360ms ease-out 240ms both; }
-.sit-jx__r.is-r2 { animation: sit-jx-spin-back 5.5s linear infinite, sit-jx-appear 360ms ease-out 300ms both; }
+.sit-jx__r.is-r1 circle { stroke: rgba(255, 160, 102, 0.55); stroke-width: 2; }
+.sit-jx__r.is-r2 circle { stroke: var(--ae-ember); stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 107, 44, 0.7)); }
+.sit-jx__r.is-r3 line { stroke: rgba(255, 160, 102, 0.5); stroke-width: 1.2; }
+.sit-jx__r.is-r3 line.is-long { stroke: var(--ae-flare); stroke-width: 2; }
+.sit-jx__r.is-r4 .is-track { stroke: rgba(255, 107, 44, 0.22); stroke-width: 1; }
+.sit-jx__r.is-r4 .is-lit { stroke: var(--ae-flare); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 5px rgba(255, 160, 102, 0.9)); }
+.sit-jx__r.is-r5 circle { stroke: rgba(255, 160, 102, 0.75); stroke-width: 11; }
+/* Each ring turns at its own speed, its own way, and comes in at its own moment as the iris leaves the porthole. */
+.sit-jx__r.is-r1 { animation: sit-jx-spin 22s linear infinite, sit-jx-appear 360ms ease-out 200ms both; }
+.sit-jx__r.is-r2 { animation: sit-jx-spin-back 5.5s linear infinite, sit-jx-appear 360ms ease-out 260ms both; }
 .sit-jx__r.is-r3 { animation: sit-jx-spin 30s linear infinite; }
-.sit-jx__r.is-r4 { animation: sit-jx-spin 2.6s linear infinite, sit-jx-appear 300ms ease-out 380ms both; }
-.sit-jx__r.is-r5 { animation: sit-jx-spin-back 9s linear infinite, sit-jx-appear 300ms ease-out 330ms both; }
-.sit-jx.is-exit .sit-jx__r.is-r1 { animation-delay: 0s, 220ms; }
-.sit-jx.is-exit .sit-jx__r.is-r2 { animation-delay: 0s, 260ms; }
-.sit-jx.is-exit .sit-jx__r.is-r4 { animation-delay: 0s, 320ms; }
-.sit-jx.is-exit .sit-jx__r.is-r5 { animation-delay: 0s, 290ms; }
-/* The ticks spin in and lock. */
-.sit-jx__tickspin { position: absolute; inset: 0; will-change: transform, opacity; animation: sit-jx-tickspin 760ms cubic-bezier(0.16, 0.9, 0.3, 1) 260ms both; }
-.sit-jx.is-exit .sit-jx__tickspin { animation-delay: 220ms; }
+.sit-jx__r.is-r4 { animation: sit-jx-spin 2.6s linear infinite, sit-jx-appear 300ms ease-out 340ms both; }
+.sit-jx__r.is-r5 { animation: sit-jx-spin-back 9s linear infinite, sit-jx-appear 300ms ease-out 300ms both; }
+.sit-jx__tickspin { position: absolute; inset: 0; will-change: transform, opacity; animation: sit-jx-tickspin 760ms cubic-bezier(0.16, 0.9, 0.3, 1) 220ms both; }
 @keyframes sit-jx-tickspin {
   from { transform: rotate(-160deg) scale(1.3); opacity: 0; }
   to { transform: rotate(0deg) scale(1); opacity: 1; }
@@ -217,8 +266,6 @@
 @keyframes sit-jx-spin { to { transform: rotate(360deg); } }
 @keyframes sit-jx-spin-back { to { transform: rotate(-360deg); } }
 @keyframes sit-jx-appear { from { opacity: 0; } to { opacity: 1; } }
-
-/* The core: a bright disc that kindles, its bloom a shadow (no gradient). */
 .sit-jx__core {
   position: absolute;
   left: 50%;
@@ -227,19 +274,18 @@
   height: 44px;
   margin: -22px 0 0 -22px;
   border-radius: 50%;
-  background: #c8f6ff;
-  box-shadow: 0 0 0 5px rgba(60, 200, 245, 0.35), 0 0 22px 8px rgba(122, 230, 255, 0.7), 0 0 70px 24px rgba(60, 200, 245, 0.32);
+  background: var(--ae-spark);
+  box-shadow: 0 0 0 5px rgba(255, 107, 44, 0.35), 0 0 22px 8px rgba(255, 160, 102, 0.6), 0 0 70px 24px rgba(255, 107, 44, 0.3);
   will-change: transform, opacity;
-  animation: sit-jx-core 620ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 300ms both;
+  animation: sit-jx-core 620ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 160ms both;
 }
-.sit-jx.is-exit .sit-jx__core { animation-delay: 260ms; }
 @keyframes sit-jx-core {
   0% { transform: scale(0); opacity: 0; }
   55% { transform: scale(1.18); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* --- The wordmark: JARVIS decoding, and its status line ------------------------------------- */
+/* --- Her name over the full cover: ARUNA decoding, its rule, where it takes you ------------- */
 
 .sit-jx__brand {
   position: absolute;
@@ -250,19 +296,8 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  opacity: 0;
   will-change: opacity, transform;
-}
-.sit-jx.is-enter .sit-jx__brand { animation: sit-jx-brand-in 1700ms linear both; }
-.sit-jx.is-exit .sit-jx__brand { animation: sit-jx-brand-out 1700ms linear both; }
-@keyframes sit-jx-brand-in {
-  0%, 25% { opacity: 0; }
-  29%, 64% { opacity: 1; transform: none; }
-  76%, 100% { opacity: 0; transform: translateY(-8px); }
-}
-@keyframes sit-jx-brand-out {
-  0%, 16% { opacity: 0; }
-  21%, 64% { opacity: 1; transform: none; }
-  74%, 100% { opacity: 0; transform: translateY(6px); }
 }
 .sit-jx__word {
   display: flex;
@@ -271,37 +306,45 @@
   font-size: 34px;
   font-weight: 500;
   line-height: 40px;
-  color: var(--jx-ice);
-  text-shadow: 0 0 14px rgba(122, 230, 255, 0.75), 0 0 36px rgba(60, 200, 245, 0.4);
+  color: #fff1e8;
+  text-shadow: 0 0 14px rgba(255, 160, 102, 0.7), 0 0 36px rgba(255, 107, 44, 0.4);
   font-variant-numeric: tabular-nums;
 }
 .sit-jx__letter { display: inline-block; width: 0.78em; text-align: center; }
+.sit-jx__letter.is-glyph { color: #ffa574; }
 .sit-jx__rule {
   display: block;
   width: 220px;
   height: 1px;
-  background: var(--jx-cyan);
-  box-shadow: 0 0 8px rgba(60, 200, 245, 0.8);
+  background: var(--ae-ember);
+  box-shadow: 0 0 8px rgba(255, 107, 44, 0.8);
   transform: scaleX(0);
   will-change: transform;
+  animation: sit-jx-rule 300ms cubic-bezier(0.3, 0, 0.2, 1) 1060ms both;
 }
-.sit-jx.is-enter .sit-jx__rule { animation: sit-jx-rule 420ms cubic-bezier(0.3, 0, 0.2, 1) 760ms both; }
-.sit-jx.is-exit .sit-jx__rule { animation: sit-jx-rule 420ms cubic-bezier(0.3, 0, 0.2, 1) 520ms both; }
 @keyframes sit-jx-rule { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .sit-jx__status {
   margin: 0;
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.16em;
-  color: #9fe6fb;
+  letter-spacing: 0.04em;
+  color: #f0c3a6;
   clip-path: inset(0 100% 0 0);
   will-change: clip-path;
+  animation: sit-jx-type 220ms steps(13, end) 1090ms both;
 }
-.sit-jx.is-enter .sit-jx__status { animation: sit-jx-type 360ms steps(22, end) 880ms both; }
-.sit-jx.is-exit .sit-jx__status { animation: sit-jx-type 300ms steps(13, end) 620ms both; }
 @keyframes sit-jx-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 
+/* --- Reduced motion: the porthole still, the film only its ground (a crossfade) -------------- */
+
+.sit-mv.is-reduced > :not(.sit-mv__ground),
+.sit-mv.is-reduced .sit-mv__grid { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
-  .sit-jx { display: none; }
-  .sit-jx-btn { transition: none; }
+  .sit-ae[data-ready],
+  .sit-ae .sit-jx-btn,
+  .sit-ae__ico,
+  .sit-ae__tip,
+  .sit-ae.is-revealed .sit-ae__tip { transition: none; }
+  .sit-ae .sit-jx-btn:active .sit-ae__core { scale: 1; }
 }

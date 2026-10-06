@@ -1,11 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, type KeyboardEvent } from 'react'
 import { Copy, X } from 'lucide-react'
 
 import { Drawer, IconButton } from '../../kit'
 import type { Policy } from '../../data'
-import { useBrand, useNameLookup } from '../../store'
-import { policySentences, policyText, type PolicyLine } from '../predicate-prose'
+import { useBrand } from '../../store'
+import { policyText, type PolicyLine } from '../predicate-prose'
 import { readFoot, readVersions, storedVersions, type TextVersion } from './read-as-text'
+import { useLines } from './use-lines'
 import { Seg } from './Section'
 // read-as-text.css is imported in main.tsx, after kit.css — see there.
 
@@ -29,27 +30,6 @@ const VERSIONS: { value: TextVersion; label: string }[] = [
   { value: 'live', label: 'Live' },
 ]
 
-/* The version on screen and its lines. Draft first and chosen; when the live
-   rules stop differing — an edit undone, a draft saved — the choice goes,
-   and so does a Live that was picked. */
-function useLines(versions: { draft: Policy; live: Policy | null }) {
-  const store = useBrand()
-  const resolve = useNameLookup()
-  const [version, setVersion] = useState<TextVersion>('draft')
-  const hasLive = versions.live !== null
-  /* Back on Draft once the choice goes, so it returns on Draft too. */
-  useEffect(() => {
-    if (!hasLive) setVersion('draft')
-  }, [hasLive])
-  const shown = version === 'live' && versions.live ? versions.live : versions.draft
-  const lines = useMemo(
-    /* An application the tenant no longer has is said as gone, never as its id. */
-    () => policySentences(shown, resolve, (id) => store.apps.find((a) => a.id === id)?.name ?? 'a deleted application'),
-    [shown, resolve, store.apps],
-  )
-  return { version: versions.live ? version : 'draft', setVersion, lines }
-}
-
 /* Copy text: the lines as plain text, numbered. Where the clipboard cannot be
    written, the toast says so rather than claiming a copy. */
 function useCopy() {
@@ -61,7 +41,7 @@ function useCopy() {
   }
 }
 
-function ReadAsTextBody({
+export function ReadAsTextBody({
   lines,
   version,
   onVersion,

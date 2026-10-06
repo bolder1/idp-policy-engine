@@ -1,51 +1,51 @@
-import { useLayoutEffect, useRef, type CSSProperties, type RefObject } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { Sunrise } from 'lucide-react'
 
-import { Tip } from '../../../kit'
-import { JARVIS, JARVIS2, type RunLayoutId } from '../run-layout'
-import { JARVIS_DISSOLVE_MS, JARVIS_END_MS, JARVIS_MID_MS, signalJarvis, type JarvisPhase } from './jarvis-timing'
+import { useBrand } from '../../../store'
+import { resolveSignIn } from '../../tenant-resolver'
+import { useSimEnv } from '../../sim-env'
+import { useTestingSession } from '../../testing/session-state'
+import { factsOf } from '../../testing/sign-in-form'
+import { entryLine, entryName, type EntryAbout } from './aruna-entry-copy'
+import { runFilm, type FilmLayers } from './aruna-entry-film'
+import { useEntryPlace } from './aruna-entry-place'
+import { COPILOT_NAME } from './copilot-name'
+import { JARVIS_END_MS, JARVIS_MID_MS, noteJarvisEntry, signalJarvis, type JarvisPhase } from './jarvis-timing'
 import './jarvis-mode.css'
 import './jarvis-chrome.css'
 
 /* -----------------------------------------------------------------------------
-   Jarvis has its own way in (owner, 2 Oct 2026: "one personal favourite,
-   Jarvis — add a dedicated Jarvis button with a transition, a good real
-   Jarvis-type transition, and the whole experience should be special"). It
-   is on neither shelf of the Canvas switch: this button on the page's bar
-   takes the page INTO Jarvis — the transition plays over the stage, the run
-   is redrawn as Jarvis underneath it at its middle, and the page wears its
-   Jarvis chrome (`.sit.is-jarvis`, jarvis-chrome.css) while it is on — and
-   pressed again takes it back to the layout it came from, the same way out.
+   Aruna's way in (code name Jarvis), on the canvas (owner, 4 Oct 2026: "a
+   good button not at the top, somewhere in the canvas … have some more
+   attraction to that"; and "maybe a new multiverse-type thing that will be
+   opening").
 
-   The transition is the suit's HUD coming online (jarvis-timing.ts has the
-   beats): the page dims to deep navy from the button's corner; an arc-reactor
-   iris opens at the centre, its rings turning at their own speeds and its
-   ticks spinning in; a scan sweeps the region; the ground's grid comes up;
-   JARVIS decodes letter by letter over "Access analysis online"; then the
-   overlay dissolves outward in rings onto the HUD. The exit is the same film
-   backwards: the rings close in as the HUD collapses into the iris,
-   "Standing down", and the light returns into the button.
+   The porthole: a small disc of Aruna's own world — warm black, an ember
+   rim, her reactor mark — standing at the right end of the ask (the shared
+   AssistantDock), as the step up from asking to Aruna (aruna-entry-place.ts
+   places it). It breathes and one ember orbits while she waits; a reveal
+   says what she would do with THIS run (aruna-entry-copy.ts). Never an
+   orange fill: Run stays the page's one orange button; the orange here is
+   her mark's linework. Inside Aruna it is the way out.
 
-   Only transform, opacity and clip-path move (the letters' glyphs are
-   written straight to the DOM, no render per frame); it never takes input;
-   under reduced motion there is none at all (the page skips it, the CSS
-   hides it).
+   The opening (aruna-entry-film.ts, beats in jarvis-timing.ts): the view
+   lifts off as a sheet, parallel copies fan into depth over her warm
+   black, her iris comes through them from the porthole and lands on her
+   reactor as her replay begins. Always dark on the way in. The exit is the
+   reverse, into the porthole.
    -------------------------------------------------------------------------- */
 
 export { JARVIS_END_MS, JARVIS_MID_MS, type JarvisPhase }
 
-/** The arc-reactor mark: two rings and a core. */
-function ReactorMark() {
-  return (
-    <svg className="sit-jx-mark" viewBox="0 0 24 24" width="16" height="16" aria-hidden>
-      <circle className="sit-jx-mark__outer" cx="12" cy="12" r="9.5" />
-      <circle className="sit-jx-mark__inner" cx="12" cy="12" r="5.5" />
-      <circle className="sit-jx-mark__core" cx="12" cy="12" r="2.4" />
-    </svg>
-  )
-}
-
-/* The HUD's module, fetched as the pointer reaches the button: by the time the transition swaps the
-   layout under its cover, there is nothing left to load (the host's lazy import shares it). */
+/** Aruna's reactor mark, 48 px: a turning dashed ring, an inner ring, a core in its bloom, one orbiting ember. */
+/* Her mark was a drawn thing here — first a reactor of five concentric rings, then a sunrise, then a single lit
+   bead. All three were pictures on a 48 px disc, and the owner's answer to the third was to stop drawing: "remove this
+   and add a basic text based good button", with an icon if one helps. He is right, and the reason is that this button
+   has a job a picture cannot do — it sits beside "Ask about this sign-in…", and what it offers is asking HER. A word
+   says that; an orb asks you to learn what the orb means. The icon stays because a sunrise is her name, and at 14 px
+   beside a word it reads as a mark rather than as a scene. */
+/* The HUD's module, fetched as the pointer reaches the porthole: by the time the film swaps the layout under its
+   cover, there is nothing left to load (the host's lazy import shares it). */
 let warmed = false
 const warm = () => {
   if (warmed) return
@@ -53,67 +53,156 @@ const warm = () => {
   void import('../layouts/JarvisLayout')
 }
 
-/** The bar's Jarvis button: pressed while Jarvis is on. */
-export function JarvisButton({ on, onPress, busy = false }: { on: boolean; onPress: () => void; busy?: boolean }) {
+/** The run on the canvas, in the reveal's words: whose sign-in, and how it ended (the session's last run). */
+function useRunAbout(): EntryAbout | null {
+  const { users, policies, zones } = useBrand()
+  const { form } = useTestingSession()
+  const env = useSimEnv()
+  return useMemo(() => {
+    const person = users.find((u) => u.id === form.personId)
+    if (!person || !form.appId) return null
+    const res = resolveSignIn(policies, factsOf(form, zones).facts, env)
+    if (res.status === 'incomplete') return null
+    const outcome = res.status === 'depends' ? 'conflict' : res.decision === 'deny' ? 'deny' : 'allow'
+    return { person: person.name, outcome }
+  }, [users, policies, zones, form, env])
+}
+
+/** The reveal's dwell: shown after a short hover, at once on keyboard focus, gone on Esc, leave or press. */
+function useReveal() {
+  const [shown, setShown] = useState(false)
+  const timer = useRef(0)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const hide = () => {
+    window.clearTimeout(timer.current)
+    setShown(false)
+  }
+  const later = () => {
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setShown(true), 250)
+  }
+  const now = () => {
+    window.clearTimeout(timer.current)
+    setShown(true)
+  }
+  return { shown, hide, later, now }
+}
+
+/** A ring that leaves the porthole once as a run lands ("ask me about this"): needs the host's `landed`. */
+function useLandedPing(ref: RefObject<HTMLElement | null>, landed: boolean | undefined) {
+  const was = useRef(landed)
+  useEffect(() => {
+    const before = was.current
+    was.current = landed
+    const el = ref.current
+    if (!el || landed !== true || before !== false) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    el.animate(
+      [
+        { transform: 'scale(1)', opacity: 0.7 },
+        { transform: 'scale(2.9)', opacity: 0 },
+      ],
+      { duration: 700, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)' },
+    )
+  }, [ref, landed])
+}
+
+/**
+ * Aruna's porthole on the canvas: pressed while Aruna is on. `about` (optional) is the run on the canvas — else it
+ * is read from the session's last run; `landed` (optional) is false while a run plays and true once it lands.
+ */
+export function JarvisButton({
+  on,
+  onPress,
+  busy = false,
+  about,
+  landed,
+}: {
+  on: boolean
+  onPress: () => void
+  busy?: boolean
+  about?: EntryAbout | null
+  landed?: boolean
+}) {
+  const ref = useRef<HTMLSpanElement | null>(null)
+  const pingRef = useRef<HTMLSpanElement | null>(null)
+  const [docked, setDocked] = useState(false)
+  useEntryPlace(ref, setDocked)
+  useLandedPing(pingRef, landed)
+  const read = useRunAbout()
+  const reveal = useReveal()
+  const lineId = useId()
+  const name = entryName(on)
+  const line = entryLine(on, about === undefined ? read : about, docked)
+  const state = [on ? 'is-on' : '', busy ? 'is-busy' : '', landed === false ? 'is-running' : '', reveal.shown ? 'is-revealed' : '']
+    .filter(Boolean)
+    .join(' ')
   return (
-    <Tip text={on ? 'Leave Jarvis' : 'Enter Jarvis'} placement="bottom">
+    <span ref={ref} className={`sit-ae ${state}`}>
+      <span className="sit-ae__link" aria-hidden />
+      <span ref={pingRef} className="sit-ae__ping" aria-hidden />
       <button
         type="button"
         className={`sit-jx-btn${on ? ' is-on' : ''}`}
+        aria-label={name}
         aria-pressed={on}
         aria-busy={busy || undefined}
-        onPointerEnter={warm}
-        onFocus={warm}
+        aria-describedby={line ? lineId : undefined}
+        onPointerEnter={() => {
+          warm()
+          reveal.later()
+        }}
+        onPointerLeave={reveal.hide}
+        onFocus={(e) => {
+          warm()
+          if (e.currentTarget.matches(':focus-visible')) reveal.now()
+        }}
+        onBlur={reveal.hide}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && reveal.shown) {
+            e.stopPropagation()
+            reveal.hide()
+          }
+        }}
         onClick={() => {
           warm()
+          reveal.hide()
+          if (busy) return
+          if (!on) noteJarvisEntry()
           onPress()
         }}
       >
-        <ReactorMark />
-        Jarvis
+        <Sunrise className="sit-ae__ico" size={14} strokeWidth={2} aria-hidden />
+        <span className="sit-ae__word">{name}</span>
       </button>
-    </Tip>
+      {/* The name is on the button now, so the reveal carries only the invitation — it used to repeat the name in bold
+          over a button that did not say it. */}
+      {line && (
+        <span className="sit-ae__tip" role="tooltip" aria-hidden={!reveal.shown}>
+          <span id={lineId}>{line}</span>
+        </span>
+      )}
+    </span>
   )
 }
 
-/* Which Jarvis, beside the button while Jarvis is on (owner, 2 Oct 2026: "the older version is more simple and
-   better, so revert that and keep the current version as v2"): the first Jarvis, or v2 the Reactor. The console's
-   two-way switch (page-bar.tsx `FilterTabs`), in Jarvis's chrome; the version picked is the one the button enters. */
-const VERSIONS: readonly { value: RunLayoutId; label: string; tip: string }[] = [
-  { value: JARVIS, label: 'v1', tip: 'Jarvis' },
-  { value: JARVIS2, label: 'v2', tip: 'Jarvis v2 · the Reactor' },
-]
-export function JarvisVersion({ value, onChange }: { value: RunLayoutId; onChange: (v: RunLayoutId) => void }) {
-  return (
-    <div className="bseg sit-jx-ver" role="group" aria-label="Jarvis version">
-      {VERSIONS.map((v) => (
-        <Tip key={v.value} text={v.tip} placement="bottom">
-          <button type="button" aria-pressed={value === v.value} className={value === v.value ? 'is-on' : ''} onClick={() => onChange(v.value)}>
-            {v.label}
-          </button>
-        </Tip>
-      ))}
-    </div>
-  )
-}
-
-/* The rings the overlay dissolves in (enter) and closes in (exit), centre outward. */
+/* The rings the ground dissolves in, centre outward (from her reactor). */
 const BANDS = 7
 /* The wordmark, and the glyphs it decodes through. */
-const WORD = 'JARVIS'
+const WORD = COPILOT_NAME.toUpperCase()
 const GLYPHS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ0123456789/<>'
 /* The iris's tick ring: a mark every 6°, a long one every 30°. */
 const TICKS = Array.from({ length: 60 }, (_, i) => i * 6)
 
-/** The arc reactor at the centre: rings that turn at their own speeds round a bright core. */
-function Iris() {
+/** Aruna's iris: rings that turn at their own speeds round a bright core. */
+function Iris({ irisRef }: { irisRef: RefObject<HTMLDivElement | null> }) {
   const c = 150
   const at = (deg: number, r: number) => {
     const a = ((deg - 90) * Math.PI) / 180
     return { x: c + r * Math.cos(a), y: c + r * Math.sin(a) }
   }
   return (
-    <div className="sit-jx__iris">
+    <div ref={irisRef} className="sit-jx__iris">
       <div className="sit-jx__irisin">
         <svg className="sit-jx__r is-r1" viewBox="0 0 300 300" aria-hidden>
           <circle cx={c} cy={c} r={142} strokeDasharray="1.5 7.5" />
@@ -145,12 +234,12 @@ function Iris() {
 }
 
 /**
- * The wordmark, decoding: each letter lands in turn, the ones still to come
- * cycling through glyphs. Written straight to the letters' text, from the
- * transition's own clock — nothing renders per frame.
+ * The wordmark, decoding: each letter lands in turn, the ones still to come cycling through glyphs. Written straight
+ * to the letters' text, from the film's own clock — nothing renders per frame.
  */
-function useDecode(spans: RefObject<(HTMLSpanElement | null)[]>, from: number, each: number, phase: JarvisPhase) {
+function useDecode(spans: RefObject<(HTMLSpanElement | null)[]>, from: number, each: number, on: boolean) {
   useLayoutEffect(() => {
+    if (!on) return
     const els = spans.current ?? []
     const t0 = performance.now()
     let frame = 0
@@ -162,95 +251,118 @@ function useDecode(spans: RefObject<(HTMLSpanElement | null)[]>, from: number, e
       WORD.split('').forEach((ch, i) => {
         const el = els[i]
         if (!el) return
-        /* In: the letter resolves at from + i·each, cycling glyphs just before. Out (the exit): it scrambles away again late on. */
         const lands = from + i * each
-        const leaves = phase === 'exit' ? 1040 + (WORD.length - 1 - i) * 28 : Infinity
-        let text = ' '
-        if (t >= lands && t < leaves) text = ch
-        else if (t >= lands - 240 && t < leaves + 160) text = swap ? GLYPHS[Math.floor(Math.random() * GLYPHS.length)] : (el.textContent ?? text)
+        let text = ' '
+        if (t >= lands) text = ch
+        else if (t >= lands - 200) text = swap ? GLYPHS[Math.floor(Math.random() * GLYPHS.length)] : (el.textContent ?? text)
         if (el.textContent !== text) el.textContent = text
+        el.classList.toggle('is-glyph', text !== ch && text.trim() !== '')
       })
-      if (t < JARVIS_END_MS) frame = requestAnimationFrame(tick)
+      if (t < from + WORD.length * each + 40) frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [spans, from, each, phase])
+  }, [spans, from, each, on])
 }
 
-/** The way in and out, over the stage. */
+/** The way in and out, over the builder's region: the multiverse, always on Aruna's warm black. `stage` is kept for
+    the host's call; the ground is dark whatever it says (owner, 4 Oct 2026: Aruna opens dark "no matter what"). */
 export function JarvisTransition({ phase }: { phase: JarvisPhase; stage?: 'light' | 'dark' }) {
-  const ref = useRef<HTMLDivElement | null>(null)
+  const root = useRef<HTMLDivElement | null>(null)
+  const ground = useRef<HTMLDivElement | null>(null)
+  const grid = useRef<HTMLDivElement | null>(null)
+  const sheet = useRef<HTMLDivElement | null>(null)
+  const rim = useRef<HTMLSpanElement | null>(null)
+  const ping = useRef<HTMLSpanElement | null>(null)
+  const flare = useRef<HTMLSpanElement | null>(null)
+  const iris = useRef<HTMLDivElement | null>(null)
+  const brand = useRef<HTMLDivElement | null>(null)
+  const bands = useRef<(HTMLSpanElement | null)[]>([])
+  const echoes = useRef<(HTMLDivElement | null)[]>([])
   const letters = useRef<(HTMLSpanElement | null)[]>([])
-  useDecode(letters, phase === 'enter' ? 470 : 330, 52, phase)
+  useDecode(letters, JARVIS_MID_MS, 45, phase === 'enter')
 
-  /* Where the light leaves from and returns to (the Jarvis button), and how far the rings reach — by offsets
-     against the region; nothing here is transformed. */
   useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
     signalJarvis(phase)
-    const box = el.getBoundingClientRect()
-    const btn = document.querySelector('.sit-jx-btn')?.getBoundingClientRect()
-    const ox = btn ? btn.left + btn.width / 2 - box.left : box.width
-    const oy = btn ? btn.top + btn.height / 2 - box.top : 0
-    const reach = Math.hypot(Math.max(ox, box.width - ox), Math.max(oy, box.height - oy)) + 8
-    /* The rings' centre is the iris's (50%, 46%): far enough to reach the region's farthest corner. */
-    const ring = Math.hypot(box.width / 2, box.height * 0.54) + 8
-    el.style.setProperty('--jx-ox', `${ox}px`)
-    el.style.setProperty('--jx-oy', `${oy}px`)
-    el.style.setProperty('--jx-reach', `${reach}px`)
-    el.style.setProperty('--jx-ring', `${ring}px`)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the transition starts
+    const parts = [root, ground, grid, sheet, rim, ping, flare, iris, brand].map((r) => r.current)
+    if (parts.some((p) => !p)) return
+    const layers: FilmLayers = {
+      root: root.current!,
+      ground: ground.current!,
+      bands: bands.current.filter((b): b is HTMLSpanElement => !!b),
+      grid: grid.current!,
+      echoes: echoes.current.filter((e): e is HTMLDivElement => !!e),
+      sheet: sheet.current!,
+      rim: rim.current!,
+      ping: ping.current!,
+      flare: flare.current!,
+      iris: iris.current!,
+      brand: brand.current!,
+    }
+    return runFilm(phase, layers)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the film starts
   }, [])
 
   const step = 1 / BANDS
   return (
-    <div
-      ref={ref}
-      className={`sit-jx is-${phase}`}
-      style={{ '--jx-dissolve': `${JARVIS_DISSOLVE_MS}ms` } as CSSProperties}
-      aria-hidden
-    >
-      <div className="sit-jx__cover">
+    <div ref={root} className={`sit-jx sit-mv is-${phase}`} data-stage="dark" aria-hidden>
+      <div ref={ground} className="sit-mv__ground">
         {Array.from({ length: BANDS }, (_, i) => (
           <span
             key={i}
-            className={`sit-jx__band${i === 0 ? ' is-core' : ''}`}
-            style={
-              {
-                '--b-out': (i + 1) * step,
-                '--b-in': i * step,
-                '--b-i': i,
-                '--b-ri': BANDS - 1 - i,
-              } as CSSProperties
-            }
+            ref={(el) => {
+              bands.current[i] = el
+            }}
+            className={`sit-mv__band${i === 0 ? ' is-core' : ''}`}
+            style={{ '--b-out': (i + 1) * step, '--b-in': i * step } as CSSProperties}
           />
         ))}
-        <div className="sit-jx__grid" />
+        <div ref={grid} className="sit-mv__grid" />
       </div>
-      <div className="sit-jx__scan" />
-      {[0, 1, 2].map((k) => (
-        <span key={k} className="sit-jx__shock" style={{ '--k': k } as CSSProperties} />
-      ))}
-      <Iris />
-      <div className="sit-jx__brand">
-        <div className="sit-jx__word">
-          {WORD.split('').map((_, i) => (
-            <span
-              key={i}
-              ref={(el) => {
-                letters.current[i] = el
-              }}
-              className="sit-jx__letter"
-              style={{ '--i': i } as CSSProperties}
-            >
-              {' '}
-            </span>
-          ))}
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          ref={(el) => {
+            echoes.current[i] = el
+          }}
+          className={`sit-mv__echo${i < 2 ? ' is-far' : ' is-near'}`}
+        >
+          {i < 2 && (
+            <>
+              <i className="is-a" />
+              <i className="is-b" />
+              <i className="is-c" />
+            </>
+          )}
+          <span className="sit-mv__rim" />
         </div>
-        <span className="sit-jx__rule" />
-        <p className="sit-jx__status">{phase === 'enter' ? 'Access analysis online' : 'Standing down'}</p>
+      ))}
+      <div ref={sheet} className="sit-mv__sheet">
+        <span ref={rim} className="sit-mv__rim is-main" />
       </div>
+      <span ref={ping} className="sit-mv__ping" />
+      <span ref={flare} className="sit-mv__flare" />
+      <Iris irisRef={iris} />
+      {phase === 'enter' && (
+        <div ref={brand} className="sit-jx__brand">
+          <div className="sit-jx__word">
+            {WORD.split('').map((_, i) => (
+              <span
+                key={i}
+                ref={(el) => {
+                  letters.current[i] = el
+                }}
+                className="sit-jx__letter"
+              >
+                {' '}
+              </span>
+            ))}
+          </div>
+          <span className="sit-jx__rule" />
+          <p className="sit-jx__status">Access checks</p>
+        </div>
+      )}
+      {phase === 'exit' && <div ref={brand} className="sit-jx__brand" />}
     </div>
   )
 }

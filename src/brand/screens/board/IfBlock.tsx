@@ -349,7 +349,25 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
 
 /* --- The read-only block, for the card ------------------------------------- */
 
-export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolve: NameLookup; token?: ReactNode; terminal?: boolean }) {
+/* `mark`, read-only and nothing else (owner, 5 Oct 2026: Check access's
+   Classic v2 draws the rule that passed "exactly as the builder draws it",
+   plus what the sign-in made of each row): given, it is called once for the
+   who row (`'who'`) and once per condition (its id), and what it returns
+   stands at that row's right end. The builder never passes it, so its card
+   is drawn exactly as before. */
+export function IfBlock({
+  rule,
+  resolve,
+  token,
+  terminal,
+  mark,
+}: {
+  rule: Rule
+  resolve: NameLookup
+  token?: ReactNode
+  terminal?: boolean
+  mark?: (row: string) => ReactNode
+}) {
   /* Every card, as stored. People and groups are the rule's `who`, not
      conditions, so nothing here is filtered out and no alternative's letter
      can move. */
@@ -454,6 +472,7 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
                 except {whoExcept.join(', ')}
               </span>
             )}
+            {mark?.('who')}
           </IfSub>
         </>
       )}
@@ -568,6 +587,7 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
                 )}
                 <div className="bb__ifrow is-cond">
                   <CondReadout c={c} resolve={resolve} />
+                  {mark?.(c.id)}
                 </div>
               </Fragment>
             ))}

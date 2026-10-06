@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { useContext, type ReactNode } from 'react'
-import { Check, CircleHelp, Lock, Minus, X, type LucideIcon } from 'lucide-react'
+import { Check, ChevronRight, CircleHelp, Lock, Minus, X, type LucideIcon } from 'lucide-react'
 
 import type { LineStatus } from '../../testing/evidence'
 import type { CheckRow } from '../engine-run'
@@ -19,7 +19,8 @@ const MARK: Record<LineStatus, { Icon: LucideIcon; label: string }> = {
 }
 
 /** A check's or a moment's mark; it lands with a small spring the first time it is drawn while playing. */
-export function Mark({ status, working = false, label, pop = false, big = false }: { status: LineStatus | 'quiet'; working?: boolean; label?: string; pop?: boolean; big?: boolean }) {
+/** `deny`: a match whose rule then denies — its ✓ in the deny tone, a ring, never green. */
+export function Mark({ status, working = false, label, pop = false, big = false, deny = false }: { status: LineStatus | 'quiet'; working?: boolean; label?: string; pop?: boolean; big?: boolean; deny?: boolean }) {
   if (working) return <Spinner small={!big} />
   if (status === 'quiet') {
     return (
@@ -31,7 +32,7 @@ export function Mark({ status, working = false, label, pop = false, big = false 
   const { Icon, label: said } = MARK[status]
   return (
     <motion.span
-      className={`rl-focus__mark is-${status}${big ? ' is-big' : ''}`}
+      className={`rl-focus__mark is-${status}${big ? ' is-big' : ''}${deny ? ' is-deny' : ''}`}
       role="img"
       aria-label={label ?? said}
       initial={pop ? { scale: 0.3, opacity: 0 } : false}
@@ -105,7 +106,7 @@ export function NoteLines({ lines, fix }: { lines: readonly string[]; fix?: stri
 /* What it is; what the sign-in showed (a Who that passed: the way in, "via
    Engineering"); under it what the rule needs — the fact and the requirement
    never run together into one claim; then the mark. */
-export function CheckBody({ word, fact, by, need, status, working, label, pop }: { word: string; fact: string; by?: string; need: string; status: LineStatus | 'quiet'; working: boolean; label?: string; pop?: boolean }) {
+export function CheckBody({ word, fact, by, need, status, working, label, pop, chevron = false }: { word: string; fact: string; by?: string; need: string; status: LineStatus | 'quiet'; working: boolean; label?: string; pop?: boolean; chevron?: boolean }) {
   return (
     <>
       <span className="rl-focus__cword">{word}</span>
@@ -122,6 +123,7 @@ export function CheckBody({ word, fact, by, need, status, working, label, pop }:
         )}
       </span>
       <Mark status={status} working={working} label={working ? undefined : label} pop={pop} />
+      {chevron && <ChevronRight className="rl-focus__chev" size={14} strokeWidth={2.2} aria-hidden />}
     </>
   )
 }

@@ -11,6 +11,7 @@ import { factsOf, formOf, originPatch, type SignInForm } from '../testing/sign-i
 import { engineRun, policyFound, policyPhase, type EngineRule } from './engine-run'
 import type { ReactNode } from 'react'
 import type { FoldAsk } from './journey'
+import type { RunIdentity } from './layouts/types'
 import { Answer, EngineJourney, EngineLine } from './EngineJourney'
 import { PolicyCard, RuleLines, RuleRow, WhichCard, type PolicyFlag } from './PolicyStack'
 import { emptyDraft } from './sign-in-card'
@@ -22,6 +23,7 @@ import stackSrc from './PolicyStack.tsx?raw'
 import chainSrc from './RunChain.tsx?raw'
 import kitCss from '../../kit.css?raw'
 import identSrc from './IdentityField.tsx?raw'
+import comboSrc from './identity-combo.tsx?raw'
 import nodesSrc from './RunNodes.tsx?raw'
 import seeSrc from '../testing/WhatTheySee.tsx?raw'
 import playerSrc from '../testing/player/SignInPlayer.tsx?raw'
@@ -403,7 +405,10 @@ describe('at a glance — the settled chain', () => {
     /* With a strip, no Why? of its own: the strip is the press. */
     expect(hero).not.toContain('tj-hero__whybtn')
     /* Nothing to say: no count, no strip, no Why?. */
-    for (const x of [journey(arun), journey(home), out]) expect(x).not.toMatch(/tj-pnode__count|tj-hero__strip|tj-hero__whybtn/)
+    for (const x of [journey(arun), journey(home)]) expect(x).not.toMatch(/tj-pnode__count|tj-hero__strip|tj-hero__whybtn/)
+    /* A refusal has a why of its own — the reason, how to get in, what changed (DENIAL-REASONS) — so it keeps the quiet Why?, and still no count or strip. */
+    expect(out).not.toMatch(/tj-pnode__count|tj-hero__strip/)
+    expect(out).toContain('tj-hero__whybtn')
   })
 
   /* "The outcome card is awful" (owner, 1 Oct): fewer things, each said once. */
@@ -411,7 +416,7 @@ describe('at a glance — the settled chain', () => {
     const hero = stopOf(out, 'outcome')
     expect(hero).toMatch(/class="tj-hero is-negative is-open is-foldable has-see"/)
     const main = between(hero, '<div class="tj-hero__main"', '<div class="tj-hero__side"')
-    expect(text(main)).toBe('Deny Decided by Device compliance for Outlook and Dropbox · Nothing else matched')
+    expect(text(main)).toBe('Deny Decided by Device compliance for Outlook and Dropbox · Nothing else matched Why? No rule let this person in · Ref: default-deny')
     expect(main).toMatch(
       /<p class="tj-hero__by"[^>]*><span class="tj-hero__bylabel">Decided by<\/span><button type="button" class="tj-hero__bylink" title="Open Device compliance for Outlook and Dropbox"><span>Device compliance for Outlook and Dropbox · Nothing else matched<\/span><svg[^>]*lucide-arrow-up-right/,
     )
@@ -679,6 +684,68 @@ describe('while the engine works', () => {
     expect(done).toContain('tj-engine is-done')
     expect(text(done)).toMatch(/Checked 1 policy · 2 rules · 4 checks Replay/)
     expect(done).not.toContain('>Skip<')
+  })
+
+  /* Several identities in one Run (owner, 5 Oct 2026: "one run each, switch"), over the column canvas — the policy
+     builder's Check access: the sign-in row's chips (IdentityChips.tsx) at the pill's left, before the words. */
+  it('the engine line, several identities: a chip each at the pill’s left, the one told pressed, marked once the run has landed; one identity, none', () => {
+    const nameOf = (id: string) => t.directory.people.find((u) => u.id === id)!.name
+    const ids: RunIdentity[] = [
+      { key: 'arun', kind: 'user', name: nameOf('arun'), active: true, plan },
+      { key: 'group:finance', kind: 'group', name: 'Finance', active: false, plan: planOf(devon).plan },
+      { key: devon.personId!, kind: 'user', name: nameOf(devon.personId!), active: false, plan: planOf(devon).plan },
+    ]
+    const line = (identities: readonly RunIdentity[] | undefined, running: boolean) =>
+      renderToStaticMarkup(
+        <BrandProvider>
+          <EngineLine
+            text={running ? 'Finding the policy for GitHub Enterprise' : plan.summary}
+            running={running}
+            arrive={false}
+            smooth={false}
+            progress={null}
+            inert={false}
+            onSkip={noop}
+            onReplay={noop}
+            skipRef={{ current: null }}
+            replayRef={{ current: null }}
+            identities={identities}
+            onPickIdentity={noop}
+          />
+        </BrandProvider>,
+      )
+    const done = line(ids, false)
+    const pill = between(done, '<div class="tj-engine__pill has-ids"')
+    expect(pill).not.toBe('')
+    /* The chips first, then the words, Replay last. */
+    expect(pill.indexOf('class="sir__ids tj-engine__ids" role="group" aria-label="Identities"')).toBeGreaterThan(-1)
+    expect(pill.indexOf('aria-label="Identities"')).toBeLessThan(pill.indexOf('tj-engine__words'))
+    const tags = [...pill.matchAll(/<button[^>]*class="sir__id[^"]*"[^>]*>/g)].map((m) => m[0])
+    expect(tags.map((x) => /aria-pressed="(true|false)"/.exec(x)?.[1])).toEqual(['true', 'false', 'false'])
+    expect(tags[0]).toContain('class="sir__id is-on"')
+    expect(count(pill, 'class="sir__grp"')).toBe(1)
+    expect(count(pill, 'sir__idmark')).toBe(3)
+    const said = text(done)
+    const at = [nameOf('arun'), 'Finance', nameOf(devon.personId!), 'Checked 1 policy · 2 rules · 4 checks', 'Replay'].map((s) => said.indexOf(s))
+    expect(at.every((i) => i >= 0)).toBe(true)
+    expect([...at].sort((a, b) => a - b)).toEqual(at)
+    /* No count of them anywhere. */
+    expect(said).not.toMatch(/\b\d+ (identities|people|picks)\b/)
+    /* While the run plays: the chips, no marks — no result ahead of the story. */
+    const working = line(ids, true)
+    expect(working).toContain('aria-label="Identities"')
+    expect(count(working, 'sir__idmark')).toBe(0)
+    /* One identity: the pill as it always was. */
+    const one = line(ids.slice(0, 1), false)
+    expect(one).not.toContain('sir__ids')
+    expect(one).toContain('<div class="tj-engine__pill"')
+    expect(line(undefined, false)).toBe(one)
+    /* The column hands them over (the other views draw their own); the builder's Check access is a column. */
+    expect(tryJourneySrc).toContain('identities={asColumn ? identities : undefined}')
+    expect(tryJourneySrc).toContain('onPickIdentity={asColumn && identities ? onPickIdentity : undefined}')
+    /* The words' widest is what the rest of the pill leaves them, and the hairline starts past the chips. */
+    expect(css).toMatch(/\.tj-engine__ruler,\s*\.tj-engine__text \{[^}]*max-width: min\(560px, calc\(100cqi - 220px\), calc\(100cqi - var\(--space-9\) - var\(--tj-others, 0px\)\)\);/)
+    expect(css).toContain('.tj-engine__pill.has-ids .tj-engine__track { left: calc(var(--tj-chips, 0px) + var(--space-7)); }')
   })
 })
 
@@ -1274,7 +1341,8 @@ describe('nothing overlaps', () => {
     expect(kitCss).toMatch(/\.bx-faces > \.bx-tip:has\(\.bx-face\.is-group\) \+ \.bx-tip,\s*\.bx-faces > \.bx-tip \+ \.bx-tip:has\(\.bx-face\.is-group\) \{ margin-left: var\(--space-1\); \}/)
   })
 
-  it('the Identity row: the face alone once chosen, not the kind’s mark beside it', () => {
-    expect(identSrc).toContain('{!chosen && (')
+  it('the Identity field: the face once chosen, the kind’s dashed mark only while nothing is', () => {
+    expect(comboSrc).toMatch(/if \(name\) return <Face kind=\{kind\} name=\{name\} decorative \/>/)
+    expect(identSrc).toContain('<IdentityCombo')
   })
 })

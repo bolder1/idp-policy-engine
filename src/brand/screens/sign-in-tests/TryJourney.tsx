@@ -1,4 +1,5 @@
 import { animate, motion, useReducedMotion, type AnimationPlaybackControls } from 'motion/react'
+import type { BlockedRow } from './blocked'
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type LazyExoticComponent, type PointerEvent } from 'react'
 import { ChevronsDownUp, ChevronsUpDown, Maximize, ZoomIn, ZoomOut } from 'lucide-react'
 
@@ -15,19 +16,22 @@ import { decisionSig, liveSentence } from '../testing/selectors'
 import { useTestingSay, useTestingSession } from '../testing/session-state'
 import { CHANGED_BY_WORDS, changedBy, factsOf, type FormField, type SignInForm } from '../testing/sign-in-form'
 import type { AttemptsFrom } from './attempts'
-import { engineRun } from './engine-run'
+import { engineRun, type EngineRun } from './engine-run'
+import { LAST_ROW } from '../testing/evidence'
+import type { InspectTarget } from './inspect-model'
 import { Answer, EngineJourney, EngineLine } from './EngineJourney'
 import { HowItWorks } from './HowItWorks'
 import { heroFinding, type FoldAsk, type FoldMode } from './journey'
-import type { RunLayoutProps } from './layouts/types'
-import { OWN_EDIT, type RunLayoutId } from './run-layout'
+import type { RunIdentity, RunLayoutProps } from './layouts/types'
+import { OWN_EDIT, OWN_TOP, type RunLayoutId } from './run-layout'
 import { SignInNode } from './SignInCard'
-import type { TryPage } from './sign-in-card'
+import { identityOf, personPick, type TryPage } from './sign-in-card'
 import { useEngineRun } from './use-engine-run'
 
 /* The run's other layouts (run-layout.ts), each loaded only once it is
    chosen — so a layout being drawn never holds up the column, nor another. */
 const LAYOUTS: Record<Exclude<RunLayoutId, 'column'>, LazyExoticComponent<ComponentType<RunLayoutProps>>> = {
+  classic2: lazy(() => import('./layouts/ClassicV2Layout')),
   line: lazy(() => import('./layouts/LineLayout')),
   tree: lazy(() => import('./layouts/TreeLayout')),
   gates: lazy(() => import('./layouts/GatesLayout')),
@@ -41,6 +45,7 @@ const LAYOUTS: Record<Exclude<RunLayoutId, 'column'>, LazyExoticComponent<Compon
   synapse: lazy(() => import('./layouts/SynapseLayout')),
   pulse: lazy(() => import('./layouts/PulseLayout')),
   focus: lazy(() => import('./layouts/FocusLayout')),
+  focus2: lazy(() => import('./layouts/Focus2Layout')),
   brief: lazy(() => import('./layouts/BriefLayout')),
   circuit: lazy(() => import('./layouts/CircuitLayout')),
   stream: lazy(() => import('./layouts/StreamLayout')),
@@ -123,6 +128,17 @@ const LAYOUTS: Record<Exclude<RunLayoutId, 'column'>, LazyExoticComponent<Compon
    is not on; both versions go to the answer as its `columns`. Nothing else
    is drawn differently.
 
+   Several identities in one Run (owner, 5 Oct 2026: "one run each, switch"):
+   the page's Run covers every pick of the Identity field (`page.ran`), and
+   the canvas tells one — the sign-in that runs is that pick's. Every pick's
+   plan is made here, by the same pipeline as the one on screen, one object
+   per pick for the life of the run, and handed to the layouts with the way
+   to switch (`identities`, `onPickIdentity`; layouts/types.ts) — the one
+   told is the very plan the clock plays, so its chip and the canvas never
+   disagree. A switch is the host's: it loads that pick's sign-in, and the
+   canvas plays it as any run. The column draws the chips in its engine line
+   (EngineJourney.tsx `EngineLine`) — the builder's Check access is a column.
+
    Break-in attempts on the run's application (owner, 1 Oct 2026) are the
    page's to run and hand down (`breakIn`, SignInTests.tsx): the chain says
    them once the run is done, and Review attempts goes back up to the page,
@@ -187,6 +203,16 @@ export interface TryJourneyProps {
   panel?: 'form' | 'saved' | null
   /** A row of the why's "As each group" pressed: the sign-in runs again as "Anyone in <group>". */
   onAsGroup?: (groupId: string) => void
+  /** How to get in: a what-if pressed in the why runs that sign-in (get-in.ts). Absent, the why has no such section. */
+  onTryForm?: (form: SignInForm) => void
+  /** The empty canvas's Blocked sign-ins: opens the page's list of refused sign-ins. Absent (the builder), no button. */
+  onBlocked?: () => void
+  /** A refused sign-in in the empty canvas's block, pressed: the form is filled with it. */
+  onPickBlocked?: (r: BlockedRow) => void
+  /** Let in for a while: the Why's form (temp-access.ts). */
+  onGrant?: (policyId: string, person: { id: string; name: string }, until: string, reason: string) => void
+  /** The only policy a grant may go to (the builder's own). Absent, whichever refused. */
+  grantFor?: string
   /* The saved sign-in the run was loaded from, as it was loaded: what it
      expects, said beside the answer when the answer is not it — while the
      sign-in on the canvas is still that one. A break-in attempt's carries
@@ -203,6 +229,8 @@ export interface TryJourneyProps {
   /** Open policy and Open rule, from the answer, the cards and the why. Absent, the page's: that policy's builder, in Check access. */
   onOpenPolicy?: (policyId: string) => void
   onOpenRule?: (policyId: string, ruleId: string) => void
+  /** A policy or rule pressed on the run opens in the page's right-hand panel instead of leaving (inspect-model.ts), with the run on screen. */
+  onInspect?: (target: InspectTarget, plan: EngineRun, fresh?: boolean) => void
   /* The why in the page's right-hand panel (EngineJourney.tsx `why`): open,
      the panel's body, and the way to open or shut it. Absent, under the answer. */
   why?: { open: boolean; slot: HTMLElement | null; onOpen: (open: boolean) => void }
@@ -222,8 +250,12 @@ export interface TryJourneyProps {
   onEdit?: () => void
   editing?: boolean
   unrun?: boolean
+  /** A change pressed as a run ("Run with …"): the page patches the form and runs (layouts/types.ts `onRunWith`). */
+  onRunWith?: (patch: Partial<SignInForm>, field: FormField) => void
   /** Which layout the run is drawn in (run-layout.ts). Absent, the column. */
   layout?: RunLayoutId
+  /** A pick's chip pressed on the canvas's top bar: the host loads that pick's run of the same Run (layouts/types.ts). */
+  onPickIdentity?: (key: string) => void
 }
 
 export function TryJourney({
@@ -239,11 +271,17 @@ export function TryJourney({
   onSaved,
   panel = null,
   onAsGroup,
+  onTryForm,
+  onBlocked,
+  onPickBlocked,
+  onGrant,
+  grantFor,
   loaded = null,
   policy = null,
   run = null,
   onOpenPolicy,
   onOpenRule,
+  onInspect,
   why,
   breakIn = null,
   onReviewBreakIn,
@@ -251,7 +289,9 @@ export function TryJourney({
   onEdit,
   editing = false,
   unrun = false,
+  onRunWith,
   layout = 'column',
+  onPickIdentity,
 }: TryJourneyProps) {
   const store = useBrand()
   const { users, groups, apps, zones, fingerprints, policies, methods, defaultMethodId } = store
@@ -283,11 +323,42 @@ export function TryJourney({
   const substitute = right.spec.substitute
   const focus = draft?.id ?? null
   const ctx = useMemo(() => ({ people: users, apps, zones, rows }), [users, apps, zones, rows])
+  /* A Run of several picks (5 Oct 2026), while the sign-in on the canvas is
+     still the one it tells: every pick's plan, made as the one on screen is,
+     from the same facts with that pick's person. Keyed by the facts less the
+     person, so a switch between picks — a new form, the same facts — keeps
+     every plan, and the clock plays the very object a chip holds. */
+  const several = page.ran && page.ran.list.length > 1 ? page.ran : null
+  const told = several && personPick(several.list[several.active], users).personId === form.personId ? several : null
+  const factsKey = told ? JSON.stringify({ ...form, personId: null }) : ''
+  const picksKey = told ? told.list.join('\n') : ''
+  const pickPlans = useMemo(() => {
+    if (!factsKey) return null
+    const plans = new Map<string, EngineRun>()
+    for (const v of picksKey.split('\n')) {
+      const f = { ...form, personId: personPick(v, users).personId }
+      const fx = factsOf(f, zones).facts
+      const col = runColumns(specsFor(f.appId), policies, fx, env).at(-1)!
+      plans.set(v, engineRun({ res: col.resolution, policies, form: f, facts: fx, env, ctx, names, intro: 'none', substitute: col.spec.substitute, focus }))
+    }
+    return plans
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one plan per pick per run: the facts less the person and the picks, not the form object a switch replaces
+  }, [factsKey, picksKey, users, zones, specsFor, policies, env, ctx, names, focus])
+  const toldPlan = told ? (pickPlans?.get(told.list[told.active]) ?? null) : null
   /* The panel is the form: every run on the page begins with the engine. */
   const live = useMemo(
-    () => engineRun({ res, policies, form, facts, env, ctx, names, intro: 'none', substitute, focus }),
-    [res, policies, form, facts, env, ctx, names, substitute, focus],
+    () => toldPlan ?? engineRun({ res, policies, form, facts, env, ctx, names, intro: 'none', substitute, focus }),
+    [toldPlan, res, policies, form, facts, env, ctx, names, substitute, focus],
   )
+  /* What the layouts are handed for the top bar's chips: each pick, named, and its plan. */
+  const identities = useMemo<RunIdentity[] | undefined>(() => {
+    if (!told || !pickPlans) return undefined
+    return told.list.map((key, i) => {
+      const { kind, id } = identityOf(key)
+      const name = (kind === 'group' ? groups.find((g) => g.id === id)?.name : users.find((u) => u.id === id)?.name) ?? id
+      return { key, kind, name, active: i === told.active, plan: pickPlans.get(key)! }
+    })
+  }, [told, pickPlans, groups, users])
   const columns: ColumnView[] = useMemo(
     () => cols.map((c) => columnView(c, focus ?? '', policies, (id) => apps.find((a) => a.id === id)?.name ?? id)),
     [cols, focus, policies, apps],
@@ -393,13 +464,26 @@ export function TryJourney({
 
   // --- Actions ---
 
-  const replay = () => {
+  const playAgain = () => {
     onReplay?.()
     onPage((p) => ({ ...p, intro: 'none', pace: 'full', replay: true, prev: null, askSaveFor: null }))
     if (run) run.replay()
     else session.replay()
+  }
+  const replay = () => {
+    playAgain()
     window.requestAnimationFrame(() => skipRef.current?.focus())
   }
+  /* Another view plays the run on screen again from the start (owner, 4 Oct 2026: "whenever I change one view to
+     another, restart the flow so the user can see the animation"): a replay of the same run, never a new one (only
+     Run runs), and the focus stays where the pick left it. A run still waiting for Run is not played. */
+  const viewShown = useRef(layout)
+  useEffect(() => {
+    if (viewShown.current === layout) return
+    viewShown.current = layout
+    if (journey && !pending && !reduced) playAgain()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs as the view changes
+  }, [layout])
   /* Skip lands the run where it is (the clock's `land`). */
   const skip = () => clock.land()
   const { loadBoard } = session
@@ -418,8 +502,8 @@ export function TryJourney({
     },
     [loadBoard, go, form],
   )
-  const openPolicy = onOpenPolicy ?? toPolicy
-  const openRule = onOpenRule ?? toRule
+  const openPolicy = onInspect ? (policyId: string) => onInspect({ kind: 'policy', policyId }, shown) : (onOpenPolicy ?? toPolicy)
+  const openRule = onInspect ? (policyId: string, ruleId: string) => onInspect({ kind: 'rule', policyId, ruleId: ruleId === LAST_ROW ? null : ruleId }, shown) : (onOpenRule ?? toRule)
   /* The node and Add, steady across the run's steps (the node and the rules
      are memoised): they call the latest callbacks. */
   const latest = useRef({ onNode, onAdd, onSaved })
@@ -718,7 +802,7 @@ export function TryJourney({
         <div ref={canvasRef} className="tj-canvas">
           <div className="tj-scroll">
             <div className="tj-empty">
-              <HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} open={panel} primary={!policy} doorWhileOpen={!!policy} />
+              <HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} onBlocked={onBlocked} onPickBlocked={onPickBlocked} open={panel} primary={!policy} doorWhileOpen={!!policy} />
             </div>
           </div>
         </div>
@@ -746,6 +830,8 @@ export function TryJourney({
       skipRef={skipRef}
       replayRef={replayRef}
       edit={onEdit ? { onPress: OWN_EDIT.includes(layout) ? undefined : onEdit, open: editing, unrun } : undefined}
+      identities={asColumn ? identities : undefined}
+      onPickIdentity={asColumn && identities ? onPickIdentity : undefined}
     />
   )
 
@@ -756,7 +842,7 @@ export function TryJourney({
     return (
       <div ref={root} className="tj">
         <div ref={canvasRef} className={`tj-canvas is-layout is-${layout}`} tabIndex={-1} aria-label="Sign-in run">
-          {engineLine}
+          {!OWN_TOP.includes(layout) && engineLine}
           <Suspense fallback={null}>
             <Layout
               plan={shown}
@@ -766,6 +852,7 @@ export function TryJourney({
               reduced={reduced}
               jumped={jumped}
               runKey={page.played}
+              onLand={skip}
               form={form}
               rows={rows}
               asGroup={asGroupName}
@@ -781,10 +868,18 @@ export function TryJourney({
               onAdd={onAddField}
               onOpenPolicy={openPolicy}
               onOpenRule={openRule}
+              onInspect={onInspect ? (t, fresh) => onInspect(t, shown, fresh) : undefined}
               onAsGroup={onAsGroup}
               why={why}
               breakIn={breakIn}
               onReviewBreakIn={onReviewBreakIn}
+              onReplay={replay}
+              onRunWith={onRunWith}
+              onSave={onAskSave === noop ? undefined : onAskSave}
+              unrun={unrun}
+              editing={editing}
+              identities={identities}
+              onPickIdentity={identities ? onPickIdentity : undefined}
             />
           </Suspense>
         </div>
@@ -834,6 +929,9 @@ export function TryJourney({
           fold={fold}
           onFit={onFit}
           onAsGroup={onAsGroup}
+          onTryForm={onTryForm}
+          onGrant={onGrant}
+          grantFor={grantFor}
           why={why}
           breakIn={breakIn}
           onReviewBreakIn={onReviewBreakIn}

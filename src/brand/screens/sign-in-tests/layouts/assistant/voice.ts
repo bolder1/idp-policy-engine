@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 /* -----------------------------------------------------------------------------
-   The narrator (assistant/, shared by Brief and Focus): the Web Speech API,
+   The narrator (assistant/, shared by Focus, Brief and Jarvis): the Web Speech API,
    guarded, and the ears (speech input) where the browser has them.
 
    API (stable):
 
-     const n = useNarrator({ runKey, running, jumped, reduced })
+     const n = useNarrator({ runKey, running, jumped, reduced, persona? })
+                                            persona: NARRATOR_PERSONA (default) or
+                                            JARVIS_PERSONA — the timbre (one mute for all)
        n.say(line, opts?) → Promise<void>   resolves when the line ends — or at
                                             once when speech is missing, muted,
                                             or not allowed now — so a layout can
@@ -92,11 +94,12 @@ export function canSpeak(): boolean {
   }
 }
 
-/* A British English voice where there is one, else any English, else the default. */
-function pickVoice(s: SpeechSynthesis): SpeechSynthesisVoice | null {
+/* A British English voice where there is one, else any English, else the default (or the persona's own pick). */
+function pickVoice(s: SpeechSynthesis, persona?: VoicePersona): SpeechSynthesisVoice | null {
   try {
     const vs = s.getVoices()
     if (!vs || vs.length === 0) return null
+    if (persona?.pick) return persona.pick(vs)
     const gb = vs.filter((v) => /^en[-_]GB/i.test(v.lang))
     return gb.find((v) => /natural|neural|online/i.test(v.name)) ?? gb[0] ?? vs.find((v) => /^en/i.test(v.lang)) ?? null
   } catch {
@@ -104,11 +107,34 @@ function pickVoice(s: SpeechSynthesis): SpeechSynthesisVoice | null {
   }
 }
 
+/** A voice's timbre: its rate, pitch and which of the browser's voices (Jarvis's: a lower British male). */
+export interface VoicePersona {
+  rate: number
+  pitch: number
+  /** The voice, from the browser's; null for the default. */
+  pick?: (voices: readonly SpeechSynthesisVoice[]) => SpeechSynthesisVoice | null
+}
+
+/** The narrator's own voice (Focus, Brief). */
+export const NARRATOR_PERSONA: VoicePersona = { rate: 1.04, pitch: 1 }
+
+/** Jarvis's voice, as jarvis-voice.ts has it: a British male where there is one, a touch quicker and lower. */
+export const JARVIS_PERSONA: VoicePersona = {
+  rate: 1.05,
+  pitch: 0.95,
+  pick: (vs) => {
+    const gb = vs.filter((v) => /^en[-_]GB/i.test(v.lang))
+    return gb.find((v) => /male|daniel|george|arthur|ryan|oliver/i.test(v.name) && !/female/i.test(v.name)) ?? gb[0] ?? vs.find((v) => /^en/i.test(v.lang)) ?? null
+  },
+}
+
 export interface NarratorInput {
   runKey: number
   running: boolean
   jumped: boolean
   reduced: boolean
+  /** The voice's timbre (default NARRATOR_PERSONA). Mute is shared whatever the persona. */
+  persona?: VoicePersona
 }
 
 export interface SayOptions {
@@ -136,7 +162,11 @@ interface Current {
   timer: number
 }
 
-export function useNarrator({ runKey, running, jumped }: NarratorInput): Narrator {
+export function useNarrator({ runKey, running, jumped, persona = NARRATOR_PERSONA }: NarratorInput): Narrator {
+  const personaRef = useRef(persona)
+  useLayoutEffect(() => {
+    personaRef.current = persona
+  }, [persona])
   const [muted, setMutedState] = useState<boolean>(() => getMuted())
   const [speaking, setSpeaking] = useState<string | null>(null)
   const mutedRef = useRef(muted)
@@ -196,11 +226,12 @@ export function useNarrator({ runKey, running, jumped }: NarratorInput): Narrato
       }
       try {
         const u = new SpeechSynthesisUtterance(line)
-        const v = pickVoice(s)
+        const p = personaRef.current
+        const v = pickVoice(s, p)
         if (v) u.voice = v
         u.lang = v?.lang ?? 'en-GB'
-        u.rate = 1.04
-        u.pitch = 1
+        u.rate = p.rate
+        u.pitch = p.pitch
         const c: Current = { line, u, done: resolve, timer: 0 }
         u.onend = () => finish(c)
         u.onerror = () => finish(c)

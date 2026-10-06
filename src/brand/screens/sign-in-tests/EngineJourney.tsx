@@ -45,11 +45,21 @@ import {
   type SentenceView,
   type WhyTone,
 } from './journey'
+import { useReroutes } from './layouts/directions-reroute'
+import { IdentityChips, type ChipFold } from './layouts/shared/IdentityChips'
+import { identityChips } from './layouts/shared/sign-in-row'
+import type { RunIdentity } from './layouts/types'
 import { PolicyCard, RuleRow, Spinner, WhichCard } from './PolicyStack'
 import { ChainLink, FoldButton, Seg } from './RunChain'
 import { DeciderStop, PoliciesStop, SignInStop } from './RunNodes'
 import { stepMs } from './use-engine-run'
 import { WhyCard } from './WhyCard'
+import { emptyDraft } from './sign-in-card'
+import { recentChanges } from '../../change-log'
+import { DENY_REASON_WORD, denyReasonOf, denyRef } from './deny-reason'
+import type { DenyReason } from '../testing/deny-reason'
+import { getInOptions } from './get-in'
+import { DENIAL_REASONS, TEMP_ACCESS } from './phase'
 
 /* -----------------------------------------------------------------------------
    The engine run, drawn (TESTING-V4 §8.3–8.6, §11.1, §12.3–12.4): ONE
@@ -169,6 +179,8 @@ interface HeroContext {
   attemptsArrive: boolean
   /** They have come in for this run: an unfold after it finds them simply there. */
   onAttemptsIn: (() => void) | null
+  /** Why it was refused, for the admin (deny-reason.ts); null on anything else, and where the flag is off. */
+  reason: DenyReason | null
 }
 const Hero = createContext<HeroContext>({
   outcome: null,
@@ -186,6 +198,7 @@ const Hero = createContext<HeroContext>({
   attemptsOpen: false,
   attemptsArrive: false,
   onAttemptsIn: null,
+  reason: null,
 })
 
 const DECISION_ICON: Record<AccessDecision, LucideIcon> = { '1fa': ShieldCheck, '2fa': KeyRound, deny: Ban }
@@ -291,7 +304,7 @@ export const Answer = memo(function Answer({
   /** A break-in attempt played on a factor its attack beats: what was offered and what it needs (journey.ts `expectMark`). */
   weaker?: string | null
 }) {
-  const { outcome, landed, animate: moving, onOpenPolicy, open, onFold, finding, onWhy, whyOpen, whyId, attempts, onAttempts, attemptsOpen, attemptsArrive, onAttemptsIn } = useContext(Hero)
+  const { outcome, landed, animate: moving, onOpenPolicy, open, onFold, finding, onWhy, whyOpen, whyId, attempts, onAttempts, attemptsOpen, attemptsArrive, onAttemptsIn, reason } = useContext(Hero)
   const bodyId = useId()
   /* The slot under the words where What they see puts its label and its steps. */
   const [side, setSide] = useState<HTMLDivElement | null>(null)
@@ -451,6 +464,11 @@ export const Answer = memo(function Answer({
                   )}
                 </motion.p>
               )}
+              {reason && (
+                <motion.p className="tj-hero__reason" variants={line}>
+                  {DENY_REASON_WORD[reason]} · <span>{denyRef(reason)}</span>
+                </motion.p>
+              )}
               {versus && (
                 <motion.p className="tj-hero__vs" variants={line}>
                   {[versus.was, versus.now].map((c, i) => (
@@ -578,6 +596,18 @@ const EASE_OPEN = [0.32, 0.72, 0, 1] as const
    A conflict, named as the engine decides (`notice`), is said in the notice
    tone, its mark in place of the spinner: amber, not the blue of work.
 
+   Several identities in one Run (owner, 5 Oct 2026: "one run each, switch"),
+   over the column canvas — the policy builder's Check access, the page's
+   Column — a chip each stands at the pill's left, before the words, a
+   hairline apart: the sign-in row's chips (IdentityChips.tsx), the one the
+   canvas tells pressed, each marked with its answer once the run has landed.
+   A press on another switches the run to it (`onPickIdentity`).
+
+     [MI Maya Iyer ✓] [▣ Finance ✓] [RM Ravi Menon ✕] | ✓ Checked 1 policy · 2 rules · 3 checks  Replay
+
+   Short of room, the chips fold as the row's do — the whole names, the short
+   ones, the faces — and never the words first.
+
    The status region says only the stages (the clock above), so a screen
    reader hears "Checking rules in …" once, not every finding. */
 /** How long the pill takes to grow to a longer sentence, before the sentence comes in. */
@@ -597,6 +627,8 @@ export function EngineLine({
   replayRef,
   notice = false,
   edit,
+  identities,
+  onPickIdentity,
 }: {
   text: string
   running: boolean
@@ -616,6 +648,10 @@ export function EngineLine({
   notice?: boolean
   /** Edit sign-in: the form's panel, open or not, and whether the form has changes not run yet. No `onPress`: the layout has a pencil of its own, so only "Not run" is said here. Absent, neither. */
   edit?: { onPress?: () => void; open: boolean; unrun: boolean }
+  /** Every identity the last Run covered, in pick order (layouts/types.ts): a chip each at the pill's left. Absent, or one identity: none. */
+  identities?: readonly RunIdentity[]
+  /** A chip pressed: the canvas switches to that identity's run of the same Run. */
+  onPickIdentity?: (key: string) => void
 }) {
   /* The words box's width: the first sentence's at once, each after it
      eased to — measured by the ruler before the frame is painted. `said` is
@@ -635,6 +671,78 @@ export function EngineLine({
     shrinking.current = tween(width, w, { duration: 0.28, ease: EASE_IN_OUT })
   }
   useEffect(() => () => shrinking.current?.stop(), [])
+  /* The width the words box was last sent to, and for which sentence: its own, under the room the chips leave it. */
+  const aim = useRef({ text, w: 0 })
+
+  /* Several identities: the chips, folded to fit (`ChipFold`), the way the sign-in row folds its own — and never the
+     words first. The words' widest is the room the rest of the pill leaves them (`--tj-others`, journey.css): a
+     sentence cut where the chips are what took its room folds them a step, and one still too long at the faces is cut
+     with an ellipsis, as any sentence is. While the run plays they only fold further, so a long sentence passing does
+     not make them flicker; as it lands (its marks arrive), at a new width, or on a switch, they start whole again.
+     Each step is measured before the paint. */
+  const pill = useRef<HTMLDivElement | null>(null)
+  const chips = useMemo(() => identityChips(identities, !running), [identities, running])
+  const several = chips !== null
+  const chipsKey = chips ? chips.map((c) => `${c.key}:${c.active ? 1 : 0}:${c.mark ?? ''}`).join('|') : ''
+  const [room, setRoom] = useState(0)
+  const [fold, setFold] = useState<ChipFold>('name')
+  const fitFor = `${room}|${chipsKey}|${running ? '' : text}`
+  const [fitted, setFitted] = useState(fitFor)
+  if (fitted !== fitFor) {
+    setFitted(fitFor)
+    setFold('name')
+  }
+  useLayoutEffect(() => {
+    const host = pill.current?.parentElement
+    if (!host || !several) return
+    const measure = () => setRoom(host.clientWidth)
+    measure()
+    let ro: ResizeObserver | null = null
+    try {
+      ro = new ResizeObserver(measure)
+      ro.observe(host)
+    } catch {
+      /* No observer: the first measure holds. */
+    }
+    return () => ro?.disconnect()
+  }, [several])
+  useLayoutEffect(() => {
+    const p = pill.current
+    const r = ruler.current
+    const box = r?.parentElement
+    if (!p || !r || !box) return
+    /* Everything in the pill but the words — the chips, the mark, Replay, the pencil, its edges: the words' room is the
+       rest. And where the chips end: the hairline of the run's progress starts past them, under the words. */
+    const others = `${Math.ceil(p.getBoundingClientRect().width - box.getBoundingClientRect().width)}px`
+    const ids = several ? p.querySelector<HTMLElement>('.tj-engine__ids') : null
+    if (ids) {
+      p.style.setProperty('--tj-others', others)
+      p.style.setProperty('--tj-chips', `${ids.offsetLeft + ids.offsetWidth}px`)
+    } else if (p.style.getPropertyValue('--tj-others')) {
+      p.style.removeProperty('--tj-others')
+      p.style.removeProperty('--tj-chips')
+    } else return
+    if (ids && fold !== 'face' && r.scrollWidth > r.clientWidth + 1) {
+      /* Cut: a fold, if the chips are what cut it — without them the sentence would have more room. */
+      const cut = r.clientWidth
+      p.style.removeProperty('--tj-others')
+      const free = r.clientWidth
+      p.style.setProperty('--tj-others', others)
+      if (free > cut + 1) {
+        setFold(fold === 'name' ? 'short' : 'face')
+        return
+      }
+    }
+    /* A new fold moves the words' widest under the same sentence: the box follows at once, as the chips change at
+       once. A new sentence is the measure's below, which eases to it. */
+    const w = Math.ceil(r.getBoundingClientRect().width)
+    if (!measured.current || aim.current.text !== text || Math.abs(w - aim.current.w) <= 1) return
+    aim.current.w = w
+    if (shrinkTo.current !== null) shrinkTo.current = w
+    else width.jump(w)
+    /* Whatever widens a part of the pill: a fold, the chips and their marks, a sentence, the room, Skip or Replay, "Not run". */
+  }, [fold, several, chipsKey, text, room, running, edit?.unrun, width])
+
   useLayoutEffect(() => {
     const r = ruler.current
     shrinking.current?.stop()
@@ -645,6 +753,7 @@ export function EngineLine({
       return
     }
     const w = Math.ceil(r.getBoundingClientRect().width)
+    aim.current = { text, w }
     if (!measured.current || !smooth) {
       measured.current = true
       width.jump(w)
@@ -671,11 +780,13 @@ export function EngineLine({
   return (
     <div className={`tj-engine${running ? ' is-running' : ' is-done'}${tone ? ' is-notice' : ''}`} inert={inert || undefined}>
       <motion.div
-        className="tj-engine__pill"
+        ref={pill}
+        className={`tj-engine__pill${chips ? ' has-ids' : ''}`}
         initial={arrive ? { opacity: 0, y: -8 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: arrive ? 0.26 : 0, ease: EASE_OUT }}
       >
+        {chips && <IdentityChips chips={chips} fold={fold} onPick={onPickIdentity} className={`tj-engine__ids${fold === 'face' ? ' is-faces' : ''}`} />}
         <span className="tj-engine__icon">
           {tone ? (
             <span className="tj-engine__notice" aria-hidden>
@@ -853,6 +964,12 @@ export interface EngineJourneyProps {
      pressed — the sign-in runs again as "Anyone in <group>". Absent, its rows
      are only read. */
   onAsGroup?: (groupId: string) => void
+  /* How to get in (get-in.ts): a what-if pressed in the why runs that sign-in. Absent, the why has no such section. */
+  onTryForm?: (form: SignInForm) => void
+  /* Let in for a while: the policy that refused, the person, an end date and a reason (temp-access.ts). Absent, the why has no form. */
+  onGrant?: (policyId: string, person: { id: string; name: string }, until: string, reason: string) => void
+  /* The only policy a grant may go to: the builder's, whose Check access edits its draft. Absent, whichever policy refused (the page). */
+  grantFor?: string
   /* The why in the page's right-hand panel (owner, 1 Oct 2026: "for the
      conflict we should open the right side panel instead of opening under
      the outcome"): whether it is open, the panel's body to draw it in, and
@@ -936,6 +1053,9 @@ const showOf = (plan: EngineRun, s: number, vertical = false): Show => ({
   outcome: s >= plan.at.outcome,
 })
 
+/** The form `useReroutes` is handed while there is nothing to read (it returns none then). */
+const NO_FORM = emptyDraft('2026-01-01', '00:00')
+
 export function EngineJourney({
   plan,
   s,
@@ -964,6 +1084,9 @@ export function EngineJourney({
   onFit,
   glance: glanceOn = true,
   onAsGroup,
+  onTryForm,
+  onGrant,
+  grantFor,
   why,
   breakIn = null,
   onReviewBreakIn,
@@ -978,6 +1101,22 @@ export function EngineJourney({
   /* The person tested, by name, whatever the sentence says: the policy's lines name them. */
   const personName = (form?.personId && brand.users.find((u) => u.id === form.personId)?.name) || null
   const sentence = useSentenceView(form, plan, tenantPolicies, asGroup)
+  /* How to get in: the what-ifs that would have let a refused sign-in through (get-in.ts), read only where the page can run one. */
+  const lib = useMemo(() => ({ zones: brand.zones, fingerprints: brand.fingerprints }), [brand.zones, brand.fingerprints])
+  const rowsForForm = useMemo(() => rowsRead(tenantPolicies, null, form?.appId ?? null, lib), [tenantPolicies, form?.appId, lib])
+  const wantGetIn = DENIAL_REASONS && onTryForm !== undefined && !running && form !== null && denyReasonOf(plan) !== null
+  const reroutes = useReroutes(form ?? NO_FORM, rowsForForm, plan, wantGetIn, tenantPolicies)
+  const reason = DENIAL_REASONS ? denyReasonOf(plan) : null
+  const refused = reason !== null
+  const changes = useMemo(() => (DENIAL_REASONS && refused && plan.decider ? recentChanges(brand.changeLog, plan.decider.id, new Date()) : []), [refused, plan.decider, brand.changeLog])
+  const grant =
+    TEMP_ACCESS && DENIAL_REASONS && onGrant && refused && form?.personId && form.date && plan.decider && !plan.decider.isGlobalDefault && (grantFor === undefined || plan.decider.id === grantFor)
+      ? { today: form.date, onGrant: (until: string, reason: string) => onGrant(plan.decider!.id, { id: form.personId!, name: personName ?? form.personId! }, until, reason) }
+      : null
+  const getIn = useMemo(
+    () => (wantGetIn ? getInOptions(plan, reroutes.map((r) => ({ key: r.alt.key, label: r.alt.label, source: r.alt.source, plan: r.plan, form: r.form ?? undefined }))) : null),
+    [wantGetIn, plan, reroutes],
+  )
   const stage = useRef<HTMLElement | null>(null)
   const scroller = useRef<HTMLDivElement | null>(null)
   const [hot, setHot] = useState<NodeId | null>(null)
@@ -1341,11 +1480,15 @@ export function EngineJourney({
      alone, titled by them. Once the run is done, never during it. */
   const attempts = vertical && breakIn && decider ? breakIn.summary : null
   const finding = useMemo(() => (vertical ? heroFinding(plan) : null), [plan, vertical])
-  const whyHead = useMemo(() => (vertical ? (whyTitleOf(plan) ?? (attempts ? attemptsTitle(attempts) : null)) : null), [plan, vertical, attempts])
+  /* A refusal always has a why (the reason, how to get in, what changed), even with no finding to say: its title is the reason. */
+  const whyHead = useMemo(
+    () => (vertical ? (whyTitleOf(plan) ?? (reason ? { text: DENY_REASON_WORD[reason], tone: 'info' as const } : null) ?? (attempts ? attemptsTitle(attempts) : null)) : null),
+    [plan, vertical, attempts, reason],
+  )
   const items = useMemo(() => (vertical ? whyItems(plan) : []), [plan, vertical])
   const groupRows = useMemo(() => (vertical ? eachGroupRows(plan) : null), [plan, vertical])
   const counted = useMemo(() => (vertical ? findingsCount(plan) : null), [plan, vertical])
-  const hasWhy = whyHead !== null && items.length > 0
+  const hasWhy = whyHead !== null && (items.length > 0 || reason !== null)
   const whyOpen = (hasWhy || attempts !== null) && !running && (why ? why.open : nodes.why === true)
   /* Review attempts calls the page's latest: the answer is memoised. */
   const reviewLatest = useRef(onReviewBreakIn)
@@ -1481,8 +1624,9 @@ export function EngineJourney({
       attemptsOpen,
       attemptsArrive,
       onAttemptsIn,
+      reason,
     }),
-    [plan.outcome, landedOut, heroAnimate, deciderId, openDecider, heroOpen, heroFold, finding, heroWhy, whyOpen, whyId, heroAttempts, heroReview, attemptsOpen, attemptsArrive, onAttemptsIn],
+    [plan.outcome, landedOut, heroAnimate, deciderId, openDecider, heroOpen, heroFold, finding, heroWhy, whyOpen, whyId, heroAttempts, heroReview, attemptsOpen, attemptsArrive, onAttemptsIn, reason],
   )
   /* The decided path's colour, the outcome's (journey.ts `pathTone`): on the stage, for every part of the way. */
   const path = pathTone(plan)
@@ -1601,6 +1745,10 @@ export function EngineJourney({
                     onAdd={onAdd}
                     onAsGroup={onAsGroup}
                     breakIn={whyBreakIn}
+                    getIn={getIn}
+                    grant={grant}
+                    changes={changes}
+                    onGetIn={onTryForm}
                   />,
                   why.slot,
                 )
@@ -1631,6 +1779,10 @@ export function EngineJourney({
                     onAdd={onAdd}
                     onAsGroup={onAsGroup}
                     breakIn={whyBreakIn}
+                    getIn={getIn}
+                    grant={grant}
+                    changes={changes}
+                    onGetIn={onTryForm}
                   />
                 </motion.div>
               )}

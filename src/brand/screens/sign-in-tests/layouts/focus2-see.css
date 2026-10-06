@@ -1,0 +1,85 @@
+/* What they see as a thumbnail, and the popover it opens (focus2-see.tsx). Stage tokens only; the popover is drawn
+   into the view's root, so --fc-* resolve there. The thumbnail's scale is a plain CSS transform on a plain element:
+   Motion owns only the popover, whose scale is a prop. */
+
+.rl-f2see { display: flex; }
+
+.rl-f2see__thumb {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--fc-text-2);
+}
+.rl-f2see__hit {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+.rl-f2see__hit:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 3px; }
+.rl-f2see__frame {
+  position: relative;
+  display: block;
+  width: 144px;
+  height: 92px;
+  overflow: hidden;
+  border: var(--bw-thin) solid var(--fc-line-2);
+  border-radius: var(--radius-md);
+  background: var(--fc-sunken);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.rl-f2see__thumb:hover .rl-f2see__frame,
+.rl-f2see__thumb.is-open .rl-f2see__frame { border-color: var(--fc-line-3); box-shadow: var(--fc-shadow); }
+.rl-f2see__thumb:hover { color: var(--fc-text); }
+.rl-f2see__label { font-size: var(--fs-sm); line-height: 16px; }
+
+/* 480 wide, drawn at 0.3: the real page, small. Its heading, steps, switch and caption are not part of a picture. */
+.rl-f2see__scale { position: absolute; top: 0; left: 0; display: block; width: 480px; pointer-events: none; transform: scale(0.3); transform-origin: 0 0; }
+.rl-f2see__scale .tsee__title,
+.rl-f2see__scale .tsee__caption,
+.rl-f2see__scale .tsee__head { display: none; }
+
+.rl-f2see__scrim { position: fixed; z-index: 60; inset: 0; background: transparent; }
+.rl-f2see__pop {
+  position: fixed;
+  z-index: 61;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: var(--bw-thin) solid var(--fc-line);
+  border-radius: var(--radius-lg);
+  background: var(--fc-surface);
+  box-shadow: var(--fc-shadow-focus);
+  color: var(--fc-text);
+}
+.rl-f2see__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fc-text-3);
+  cursor: pointer;
+}
+.rl-f2see__close:hover { background: var(--fc-inset); color: var(--fc-text); }
+.rl-f2see__close:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 1px; }
+.rl-f2see__pop .tsee__title { margin-top: 0; padding-right: 32px; }

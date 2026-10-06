@@ -1,4 +1,6 @@
 /// <reference types="vite/client" />
+import policiesSrc from './Policies.tsx?raw'
+import { MULTI_IDENTITY } from './sign-in-tests/phase'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -11,28 +13,49 @@ import { attemptPlay, runBreakInOnApp } from './break-in-app'
 import { ATTEMPTS_PANEL_ID } from './sign-in-tests/attempts'
 import { BreakInPanel, type BreakInPanelProps } from './sign-in-tests/BreakInPanel'
 import { readersOf } from './sign-in-tests/engine-run'
+import { FilterTabs } from './page-bar'
 import { HowItWorks } from './sign-in-tests/HowItWorks'
 import { defaultPeopleContext, firstDecidedApp } from './sign-in-tests/library'
 import { TryJourney } from './sign-in-tests/TryJourney'
 import { TryPanel, type TryPanelProps } from './sign-in-tests/TryPanel'
 import {
+  CLEAR_ALL,
   GROUPS_HEADING,
   GROUP_PREFIX,
+  MAX_IDENTITIES,
   PANEL_ID,
   PEOPLE_HEADING,
+  USERS_HEADING,
+  asGroupOf,
+  bestIdentity,
   cardIssues,
   emptyDraft,
   factTokens,
+  forRun,
   groupNamesOf,
+  identitiesOfKind,
+  identityOf,
+  identityOptions,
+  identityRows,
   initialTryPage,
   issueToken,
   memberOf,
+  NO_ONE,
   newSignInPage,
+  openingKind,
+  otherKind,
   peopleTryForm,
   personPick,
   personPickerOptions,
+  picksOf,
+  rankedIdentities,
+  runNowOf,
+  runOfPicks,
+  switchPick,
   tokenTips,
   tryingPage,
+  unrunOf,
+  withIdentities,
   type TryPage,
 } from './sign-in-tests/sign-in-card'
 import { envOf, resolveSignIn } from './tenant-resolver'
@@ -52,6 +75,8 @@ import panelSrc from './sign-in-tests/TryPanel.tsx?raw'
 import nodeSrc from './sign-in-tests/SignInCard.tsx?raw'
 import hiwSrc from './sign-in-tests/HowItWorks.tsx?raw'
 import identSrc from './sign-in-tests/IdentityField.tsx?raw'
+import comboSrc from './sign-in-tests/identity-combo.tsx?raw'
+import stageCss from './sign-in-tests/panel-stage.css?raw'
 import phaseSrc from './sign-in-tests/phase.ts?raw'
 import attemptsSrc from './sign-in-tests/BreakInPanel.tsx?raw'
 import attemptsModelSrc from './sign-in-tests/attempts.ts?raw'
@@ -144,8 +169,8 @@ function panel(form: SignInForm, over: Partial<TryPanelProps> = {}) {
     boundaries: boundariesOf(form, rows, {}, t.policies, env, t.zones),
     tips: form.appId ? tokenTips(readersOf(t.policies, form.appId, lib)) : {},
     reduced: false,
-    asGroup: null,
-    onPerson: noop,
+    identities: picksOf(form),
+    onIdentities: noop,
     onPatch: noop,
     onRun: noop,
     saved: t.savedSignIns ?? [],
@@ -167,6 +192,48 @@ function panel(form: SignInForm, over: Partial<TryPanelProps> = {}) {
   )
 }
 const rowId = (token: Parameters<typeof tokenDomId>[1]) => tokenDomId(PANEL_ID, token)
+
+describe('Sign-in tests — the Identity field is one person or one group (owner, 5 Oct 2026: single select, as it was)', () => {
+  it('is the single field, with its identity type, and no chips, while the multi-select is behind its flag', () => {
+    expect(MULTI_IDENTITY).toBe(false)
+    const out = panel(emptyDraft(TODAY, '09:30'))
+    expect(out).toContain('Identity type')
+    expect(out).not.toContain('sit-ident__chips')
+    expect(phaseSrc).toContain('export const MULTI_IDENTITY: boolean = false')
+    expect(panelSrc).toContain('onPick={(value) => onIdentities([value])}')
+  })
+})
+
+describe('Sign-in tests — the help desk’s blocked sign-ins (DENIAL-REASONS step 4)', () => {
+  it('the empty Access checks canvas has a Recently blocked block under Check access when the page offers the list, and none in the builder', () => {
+    const withIt = renderToStaticMarkup(
+      <BrandProvider>
+        <HowItWorks onCheck={() => {}} onBlocked={() => {}} onPickBlocked={() => {}} />
+      </BrandProvider>,
+    )
+    expect(text(block(withIt, 'section', 'hiw__blocked'))).toMatch(/^Recently blocked View all .+/)
+    expect((withIt.match(/class="hiw__blockedrow"/g) ?? []).length).toBe(3)
+    expect(withIt.indexOf('Check access')).toBeLessThan(withIt.indexOf('Recently blocked'))
+    expect(
+      renderToStaticMarkup(
+        <BrandProvider>
+          <HowItWorks onCheck={() => {}} />
+        </BrandProvider>,
+      ),
+    ).not.toContain('Recently blocked')
+    expect(pageSrc).toContain("onBlocked={DENIAL_REASONS ? () => setPanel('blocked') : undefined}")
+    /* A panel in the form's slot, like Saved sign-ins — not a slider over the page. */
+    expect(pageSrc).toContain('<BlockedPanel key="blocked"')
+    expect(pageSrc).not.toContain('<BlockedDrawer')
+  })
+
+  it('are not in the form any more, nor a button on the Policies page (owner, 6 Oct 2026): they open in a panel on Access checks', () => {
+    const out = panel(emptyDraft(TODAY, '09:30'))
+    expect(out).not.toContain('Find a blocked sign-in')
+    expect(out).not.toContain('Sign-in activity')
+    expect(policiesSrc).not.toContain('<BlockedDrawer')
+  })
+})
 
 describe('Sign-in tests — the builder’s layout (§14.1)', () => {
   const out = page('try')
@@ -207,12 +274,23 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
   it('the bar holds no buttons, and on arrival nor does the canvas: the form is open beside it, Run its one orange', () => {
     const bar = block(out, 'header', 'bbtop')
     expect(bar).not.toContain('sit__savedbtn')
-    /* While the run's layouts are compared (phase.ts), the bar carries only the comparison tools: the Canvas
-       dropdowns, the dedicated views, Reasoning and the Guided tour to come — never an orange button. */
+    /* While the run's layouts are compared (phase.ts), the bar carried only the Canvas dropdowns — no version switch
+       (Focus v1 archived), never an orange button; Aruna's way in on the canvas (4 Oct 2026). Then one view on the page
+       (owner, 5 Oct 2026: "hide the rest: the archive, favourites and the canvas type"): neither dropdown, and no way into
+       Aruna anywhere on it — both kept in the code behind their flags (run-layout.ts CANVAS_PICKER, ARUNA_ENTRY). */
     expect(bar).not.toContain('bx-btn--brand')
-    expect(bar).toContain('aria-label="Dedicated views"')
-    expect(pageSrc).toContain('CANVAS_OPTIONS ? (')
+    expect(bar).not.toContain('aria-label="Canvas layout"')
+    expect(bar).not.toContain('aria-label="Show layouts"')
+    expect(bar).not.toContain('sit__canvassw')
+    expect(bar).not.toContain('aria-label="Focus version"')
+    expect(out).not.toContain('sit-jx-btn')
+    expect(out).not.toContain('sit-aruna-entry')
+    expect(text(out)).not.toContain('Ask Aruna')
+    expect(pageSrc).toContain('CANVAS_OPTIONS && CANVAS_PICKER ? (')
+    expect(pageSrc).toContain('{ARUNA_ENTRY && (')
+    /* The empty canvas holds a Recently blocked block, not a button (owner, 5 Oct 2026): the form is open beside it, so no door. */
     expect(out).not.toContain('hiw__act')
+    expect(text(block(out, 'section', 'hiw__blocked'))).toMatch(/^Recently blocked View all /)
     expect(out).toContain('<aside class="bb__insp sit-panel"')
     const orange = out.match(/<button[^>]*bx-btn--brand[^>]*>[\s\S]*?<\/button>/g) ?? []
     expect(orange.map(text)).toEqual(['Run'])
@@ -221,7 +299,7 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
     expect(hiwSrc).toContain("variant={primary && open !== 'form' ? 'brand' : 'secondary'}")
     expect(hiwSrc).toContain("pressed={open === 'form'}")
     expect(tryPageSrc).toContain(
-      '<HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} open={panel} primary={!policy} doorWhileOpen={!!policy} />',
+      '<HowItWorks reduced={reduced} onCheck={onPressNode} onSaved={onSaved ? onSavedNow : undefined} onBlocked={onBlocked} onPickBlocked={onPickBlocked} open={panel} primary={!policy} doorWhileOpen={!!policy} />',
     )
     expect(rules(pageCss)).toMatch(/\.hiw__act \.bx-btn\[aria-pressed='true'\] \{\s+background: var\(--accent-soft\);/)
   })
@@ -277,7 +355,7 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
     expect(pageSrc).toMatch(/<AnimatePresence initial=\{false\}>\s+\{panelOpen && \(\s+<TryPanel\s+key="panel"/)
     expect(pageSrc.indexOf('<div className="sit__stage">')).toBeLessThan(pageSrc.indexOf('<AnimatePresence'))
     /* The form, or (a later phase) the saved sign-ins: one panel at a time — the form on an empty canvas's arrival, none on a revisit's run. */
-    expect(pageSrc).toContain("const [panel, setPanel] = useState<'form' | 'saved' | 'why' | 'break-in' | null>(() => (tryPage.mode === 'form' ? 'form' : null))")
+    expect(pageSrc).toContain("const [panel, setPanel] = useState<'form' | 'saved' | 'blocked' | 'why' | 'break-in' | 'inspect' | null>(() => (tryPage.mode === 'form' ? 'form' : null))")
     expect(pageSrc).toContain("const panelOpen = panel === 'form'")
     expect(rules(pageCss)).toMatch(/\.sit__stage \{[^}]*grid-column: 2;[^}]*grid-row: 1;[^}]*position: relative;/)
     /* The journey's canvas stands on the region's ground, not a frame of its own.
@@ -314,7 +392,7 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
     expect(shellSrc).not.toContain("label: 'Sign-in tests'")
     const screens = shellSrc.slice(shellSrc.indexOf('const POLICY_SCREENS = ['), shellSrc.indexOf(']', shellSrc.indexOf('const POLICY_SCREENS = [')))
     expect(screens).toContain("'sign-in-tests'")
-    expect(shellSrc).toContain("policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests']")
+    expect(shellSrc).toContain("policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests', 'sign-in-activity']")
   })
 })
 
@@ -333,14 +411,16 @@ describe('Sign-in tests — the panel (§14.2)', () => {
     expect(panel(arun, { title: 'Arun Patel in the office' })).toContain('title="Arun Patel in the office">Arun Patel in the office</h2>')
     /* The loaded sign-in is held whole now — its name, the form and what it expects (the answer says "Expected …" when it fails). */
     expect(pageSrc).toContain('title={loaded?.name ?? ACCESS_CHECK}')
-    expect(pageSrc).toMatch(/setTryPage\(\(pg\) => \(\{ \.\.\.pg, draft: next, touched \}\)\)\s+setLoaded\(null\)/)
+    expect(pageSrc).toMatch(/setTryPage\(\(pg\) => \(\{ \.\.\.pg, draft: next, touched, identities \}\)\)\s+setLoaded\(null\)/)
   })
 
   /* Entra's What If, in order (owner, 1 Oct 2026: "an Entra-style thing:
      first select the identity, with the identity type; the list of users
      and groups as we have it in policy creation … call it Application …
-     Sign-in conditions"). Use a saved sign-in is a later phase. */
-  it('empty: Identity — its type, then the builder’s Who row — and Application, in the Inspector’s section grammar; no saved sign-ins in this phase', () => {
+     Sign-in conditions"); the identity type folded into the one field
+     (owner, 5 Oct 2026: "I think we can combine both and it can be multiple
+     select"). Use a saved sign-in is a later phase. */
+  it.skipIf(!MULTI_IDENTITY)('empty: Identity — one field for users and groups, no identity type — and Application, in the Inspector’s section grammar; no saved sign-ins in this phase', () => {
     const o = panel(emptyDraft(TODAY, '09:30'))
     const body = block(o, 'div', 'bb__inspbody')
     expect(body).not.toContain('sit-panel__saved')
@@ -352,34 +432,62 @@ describe('Sign-in tests — the panel (§14.2)', () => {
       ['app-window', 'Application'],
     ])
     const ident = block(body, 'div', 'sit-ident')
-    expect(ident).toContain('aria-label="Identity type"')
-    expect(ident.indexOf('aria-label="Identity type"')).toBeLessThan(ident.indexOf(`id="${rowId('person')}"`))
-    expect(ident).toContain(`<div id="${rowId('person')}" class="bb__whorow is-empty">`)
-    expect(text(ident)).toContain('None selected yet')
-    expect(ident).toContain('aria-label="Choose a user"')
+    expect(ident).not.toContain('Identity type')
+    expect(identSrc).not.toContain("from '../../picker'")
+    /* One field: its press is one button under the chips, the whole field, named for what it holds. */
+    expect(ident).toMatch(new RegExp(`<div class="sit-ident__field is-empty"><button id="${rowId('person')}" type="button" class="sit-ident__open"`))
+    const field = ident.match(new RegExp(`<button[^>]*id="${rowId('person')}"[^>]*>`))![0]
+    expect(field).toContain('aria-haspopup="listbox"')
+    expect(field).toContain('aria-expanded="false"')
+    expect(field).toContain('aria-label="Identity: Choose users or groups"')
+    expect(text(ident)).toBe('Choose users or groups')
+    expect(ident).toContain('class="sit-ident__blank is-user"')
     expect(body).toContain('aria-label="Application"')
     expect(text(body)).toContain('Choose an application')
     expect(text(body)).not.toContain('Sign-in conditions')
     expect(factTokens({ appId: null }, rowsRead(t.policies, null, null, lib))).toEqual([])
   })
 
-  it('Identity: User or Group, chosen from the builder’s Who dialog for one — a person with every group, a group standing for one of its members', () => {
+  it.skipIf(!MULTI_IDENTITY)('Identity: users and groups chosen in place like Jira’s assignee — no dialog; a person with every group, a group standing for one of its members', () => {
     /* A person in two groups says both, and that the outcome shows each (the owner's Tanmay case). */
     const maya = panel({ ...arun, personId: 'u-maya' })
     const ident = block(maya, 'div', 'sit-ident')
-    expect(ident).toContain(`<div id="${rowId('person')}" class="bb__whorow is-set">`)
+    expect(ident).toMatch(new RegExp(`<div class="sit-ident__field is-set"><button id="${rowId('person')}" type="button" class="sit-ident__open"`))
+    expect(ident).toContain('aria-label="Identity: Maya Iyer"')
+    expect(ident).toContain('aria-label="Remove Maya Iyer"')
     expect(text(ident)).toContain('Maya Iyer')
     expect(text(ident)).toContain('Member of Engineering Finance')
     expect(text(ident)).toContain('In 2 groups: the outcome shows what each group gets.')
-    expect(ident).toContain('aria-label="Change the user"')
-    /* One choice: the builder's dialog rows, round ticks, a press chooses and closes. */
-    expect(identSrc).toContain('<Modal')
-    expect(identSrc).toContain('role="radiogroup"')
-    expect(identSrc).toMatch(/className=\{`bb__whoitem\$\{on \? ' is-on' : ''\}`\} onClick=\{\(\) => onPick\(r\.value\)\}/)
-    expect(rules(pageCss)).toContain('.sit-ident__list .bx-tick { border-radius: 50%; }')
-    /* Changing the type opens the other kind's list; closed without a choice, the type is what it was. */
-    expect(identSrc).toContain('onChange={(v) => setPicking(v as Kind)}')
-    expect(identSrc).toContain('const kind = picking ?? held')
+    /* In place: no Modal, no radios — a combobox over a listbox, the Picker's own list. */
+    expect(identSrc).not.toContain('<Modal')
+    expect(identSrc).not.toContain('radio')
+    expect(comboSrc).toContain('role="combobox"')
+    expect(comboSrc).toContain('aria-expanded="true"')
+    expect(comboSrc).toContain('role="listbox"')
+    expect(comboSrc).toContain('aria-multiselectable="true"')
+    expect(comboSrc).toContain('className={`bx-picker__pop sit-ident__pop')
+    expect(comboSrc).toContain('appRoot()')
+    /* Esc closes the list, keeps the picks and stops there; the search keeps the focus while the list is pressed. */
+    expect(comboSrc).toMatch(/if \(e\.key === 'Escape'\) \{\s+e\.preventDefault\(\)\s+e\.stopPropagation\(\)\s+close\(true\)/)
+    expect(comboSrc).toContain('onMouseDown={(e) => e.preventDefault()}')
+    /* Reopened with something chosen: Clear all, then the shown kind's picks on top (as the list opened), then the rest of that kind. */
+    expect(comboSrc).toContain('const mine = identitiesOfKind(options, kind)')
+    expect(comboSrc).toContain('const rows: readonly IdentityOption[] = needle ? rankedIdentities(mine, needle) : identityRows(mine, pinned, value.length > 0)')
+    expect(comboSrc).toMatch(/const start = \(typed: string, first = false\) => \{[\s\S]*?setPinned\(value\)/)
+    expect(personPick(NO_ONE, t.directory.people)).toEqual({ personId: null, asGroup: null })
+    /* Its list: Users — people with their groups (or email) — then Groups, those with somebody in them and their count. */
+    const listed = identityOptions(t.directory.people, t.groups)
+    expect([...new Set(listed.map((o) => o.heading))]).toEqual([USERS_HEADING, GROUPS_HEADING])
+    expect(listed.find((o) => o.value === 'u-maya')).toMatchObject({ kind: 'user', name: 'Maya Iyer', meta: 'Engineering, Finance', heading: 'Users' })
+    expect(listed.filter((o) => o.kind === 'user').every((o) => o.heading === 'Users' && o.sub === undefined && !o.value.startsWith(GROUP_PREFIX))).toBe(true)
+    const groupsListed = listed.filter((o) => o.kind === 'group')
+    expect(groupsListed.length).toBeGreaterThan(0)
+    expect(groupsListed.every((o) => o.value.startsWith(GROUP_PREFIX) && / members?$/.test(o.meta) && o.heading === 'Groups')).toBe(true)
+    /* Each row draws its own mark: a person's round face, a group's square — and Clear all the list's own. */
+    expect(comboSrc).toContain('<Mark kind={clear ? kind : o.kind} name={clear ? null : o.name} />')
+    /* Dark stage: the list is a Picker pop, darkened while its search is expanded in the panel. */
+    expect(stageCss).not.toContain('bx-modal')
+    expect(stageCss).toContain(".sit-ident__pop .bx-picker__opt.is-cursor")
   })
 
   it('an application chosen: Sign-in conditions holds only the facts its rules read, each a condition row with a TipDot naming the reader', () => {
@@ -414,13 +522,13 @@ describe('Sign-in tests — the panel (§14.2)', () => {
     expect(rules(pageCss)).not.toMatch(/\.sit-fact\b[^{]*\{[^}]*(transform|transition)/)
   })
 
-  it('Run with a person or an application missing: the reason under that row, the picker marked — Run stays pressable', () => {
+  it.skipIf(!MULTI_IDENTITY)('Run with a person or an application missing: the reason under that row, the picker marked — Run stays pressable', () => {
     const draft = emptyDraft(TODAY, '09:30')
     const issues = cardIssues(draft, rowsRead(t.policies, null, null, lib), t.zones)
     expect(issueToken(issues)).toBe('person')
     const o = panel(draft, { issues })
     const who = block(o, 'div', 'sit-ident')
-    expect(who).toContain(`<div id="${rowId('person')}" class="bb__whorow is-empty is-invalid">`)
+    expect(who).toMatch(new RegExp(`<div class="sit-ident__field is-empty is-invalid"><button id="${rowId('person')}" type="button" class="sit-ident__open"[^>]*aria-invalid="true"`))
     expect(who).toMatch(/<p class="bb__diag is-error" role="alert"><svg[^>]*lucide-circle-x[^>]*>[\s\S]*?<\/svg><span>Choose a person<\/span><\/p>/)
     expect(o).toMatch(/<span>Choose an application<\/span><\/p>/)
     expect(o.match(/<button[^>]*bx-btn--brand[^>]*>/)![0]).not.toContain('disabled')
@@ -439,7 +547,9 @@ describe('Sign-in tests — the panel (§14.2)', () => {
   })
 
   it('on demand: Run and a saved sign-in shut it and hand the focus to the canvas; its X and Escape shut it', () => {
-    expect(pageSrc).toMatch(/const f = loaded && same\(draft, loaded\.form\) \? loaded\.form : forRun\(draft, rows\)\s+const prev = tryPage\.mode === 'journey' && !same\(f, session\.form\) \? session\.form : null\s+const askSaveFor = tryPage\.askSaveFor\s+toCanvas\(\(\) => start\(f, 'full', \{ askSaveFor, prev \}\)\)/)
+    expect(pageSrc).toMatch(
+      /const f = loaded && same\(draft, loaded\.form\) \? loaded\.form : forRun\(draft, rows\)\s+const before = tryPage\.mode === 'journey' \? \{ form: session\.form, list: ranPicks\(tryPage, session\.form\) \} : null\s+const \{ form: first, ran: covered, prev \} = runOfPicks\(f, tryPage\.identities, users, before\)\s+const askSaveFor = tryPage\.askSaveFor\s+toCanvas\(\(\) => start\(first, 'full', \{ askSaveFor, prev, ran: covered \}\)\)/,
+    )
     /* The panel slides out first; the run begins on the whole canvas once it has gone. */
     expect(pageSrc).toMatch(/const toCanvas = \(begin: \(\) => void\) => \{\s+const wasOpen = panel !== null\s+setPanel\(null\)\s+setSaveOpen\(false\)\s+setSavedAt\(null\)/)
     expect(pageSrc).toMatch(/const go = \(keepFocus: boolean\) => \{\s+begin\(\)\s+if \(!keepFocus\) setFocusRun\(\(n\) => n \+ 1\)\s+\}/)
@@ -475,7 +585,7 @@ describe('Sign-in tests — the panel (§14.2)', () => {
 
   it('a saved sign-in — its panel and the form’s row — fills the panel and names it, and Run takes the focus (only Run runs, 2 Oct)', () => {
     const tried = pageSrc.slice(pageSrc.indexOf('const trySaved = (sv: SavedSignIn) => {'), pageSrc.indexOf('/* The form has changes'))
-    expect(tried).toMatch(/const f = formOf\(sv\.facts, zones\)\s+setAsGroup\(null\)\s+setLoaded\(\{ name: sv\.name, form: f, expected: sv\.expected \}\)\s+setTryPage\(\(pg\) => \(\{ \.\.\.pg, draft: f, touched: \[\] \}\)\)/)
+    expect(tried).toMatch(/const f = formOf\(sv\.facts, zones\)\s+setLoaded\(\{ name: sv\.name, form: f, expected: sv\.expected \}\)\s+setTryPage\(\(pg\) => \(\{ \.\.\.pg, draft: f, touched: \[\], identities: picksOf\(f\) \}\)\)/)
     expect(tried).toContain('openPanel(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))')
     expect(tried).not.toContain('start(')
     expect(tried).not.toContain('toCanvas(')
@@ -527,13 +637,278 @@ describe('Sign-in tests — the Person picker (§13.3)', () => {
     expect(personPick('Maya', users)).toEqual({ personId: 'Maya', asGroup: null })
   })
 
-  it('the Identity row shows the group while its member runs, and who that is', () => {
-    const o = panel({ ...arun, personId: 'priya' }, { asGroup: 'finance' })
+  it.skipIf(!MULTI_IDENTITY)('the Identity row shows the group while its member runs, and who that is', () => {
+    const o = panel({ ...arun, personId: 'priya' }, { identities: [`${GROUP_PREFIX}finance`] })
     const ident = block(o, 'div', 'sit-ident')
-    expect(ident).toContain(`<div id="${rowId('person')}" class="bb__whorow is-set">`)
-    expect(text(ident)).toContain('Finance')
+    expect(ident).toMatch(new RegExp(`<div class="sit-ident__field is-set"><button id="${rowId('person')}" type="button" class="sit-ident__open"[^>]*aria-label="Identity: Finance"`))
+    /* Its chip: the group's square, its name, its ×. */
+    const chip = block(ident, 'span', 'sit-ident__chip')
+    expect(chip).toContain('bx-face is-group')
+    expect(text(chip)).toMatch(/^FI Finance$/)
+    expect(chip).toContain('aria-label="Remove Finance"')
     expect(text(ident)).toMatch(/Tested as \S/)
-    expect(pageSrc).toMatch(/const pickPerson = \(value: string, now = false\) => \{\s+const pick = personPick\(value, users\)\s+setAsGroup\(pick\.asGroup\)\s+patch\(\{ personId: pick\.personId \}, 'person', now\)/)
+    expect(text(ident)).not.toContain('Member of')
+    /* "Run as Finance only": the picks become that group alone, and its member runs at once. */
+    expect(pageSrc).toContain("const pickPerson = (value: string, now = false) => patch({ personId: personPick(value, users).personId }, 'person', now, [value])")
+  })
+})
+
+/* Users and groups in one field, several at once, one run each (owner, 5 Oct
+   2026: "I think we can combine both and it can be multiple select" — and
+   Run, asked what it does with several: "one run each, switch"). */
+describe('Sign-in tests — the Identity field takes several, and Run runs each', () => {
+  const people = t.directory.people
+  const listed = identityOptions(people, t.groups)
+  const maya = 'u-maya'
+  const finance = `${GROUP_PREFIX}finance`
+  const priya = personPick(finance, people).personId!
+  const third = listed.find((o) => o.kind === 'user' && o.value !== maya && o.value !== priya)!.value
+  const ran = (over: Partial<TryPage>, form: SignInForm): TryPage => ({ ...settled(form), ...over })
+
+  it('one field, each row its own kind — the picks ticked at the top of their heading, Clear all on top', () => {
+    const fresh = identityRows(listed, [], false)
+    expect([...new Set(fresh.map((o) => o.heading))]).toEqual(['Users', 'Groups'])
+    expect(fresh).not.toContain(CLEAR_ALL)
+    const open = identityRows(listed, [finance, maya], true)
+    expect(open[0]).toBe(CLEAR_ALL)
+    expect(CLEAR_ALL).toMatchObject({ value: NO_ONE, name: 'Clear all' })
+    const users = open.filter((o) => o.heading === 'Users')
+    const groups = open.filter((o) => o.heading === 'Groups')
+    expect(users[0].value).toBe(maya)
+    expect(groups[0].value).toBe(finance)
+    expect(open.filter((o) => o.value === maya)).toHaveLength(1)
+    expect(open).toHaveLength(listed.length + 1)
+    /* Inside a policy its people come under In this policy, then Not in this policy — under Users, the picks above them. */
+    const hrms = t.policies.find((p) => p.id === 'sc-hrms-office')!
+    const scoped = identityOptions(people, t.groups, hrms.audience)
+    expect([...new Set(scoped.filter((o) => o.kind === 'user').map((o) => o.sub))]).toEqual(['In this policy', 'Not in this policy'])
+    expect(scoped.filter((o) => o.kind === 'group').every((o) => o.sub === undefined)).toBe(true)
+    const pinned = identityRows(scoped, [maya], true)
+    expect(pinned[1]).toMatchObject({ value: maya, heading: 'Users', sub: undefined })
+    expect(comboSrc).toContain('<li className="bx-picker__head sit-ident__sub" role="presentation">')
+  })
+
+  /* Users or Groups first, then that kind's list alone, in the one dropdown
+     (owner, 5 Oct 2026: "I want the user to first select a user or group,
+     and based on that selection display the list in a single dropdown"). */
+  it('the list: a switch on top — Users | Groups, a group named Identity type, Users pressed with nothing picked — and that kind alone under it, no Users or Groups heading', () => {
+    /* The switch is the page bar's segments: a group of pressed buttons, Users first. */
+    const sw = renderToStaticMarkup(<FilterTabs label="Identity type" value="user" options={[{ value: 'user', label: USERS_HEADING }, { value: 'group', label: GROUPS_HEADING }]} onChange={() => {}} />)
+    expect(sw).toMatch(/^<div class="bseg" role="group" aria-label="Identity type"><button type="button" aria-pressed="true" class="is-on">Users<\/button><button type="button" aria-pressed="false" class="">Groups<\/button><\/div>$/)
+    expect(comboSrc).toContain("import { FilterTabs } from '../page-bar'")
+    expect(comboSrc).toMatch(/const KINDS: \{ value: IdentityKind; label: string \}\[\] = \[\s+\{ value: 'user', label: USERS_HEADING \},\s+\{ value: 'group', label: GROUPS_HEADING \},\s+\]/)
+    expect(comboSrc).toContain('<FilterTabs label="Identity type" value={kind} options={KINDS} onChange={flip} />')
+    /* First in the pop, out of the list's scroll, so it stays while the rows move. */
+    expect(comboSrc).toMatch(/onKeyDown=\{onPopKey\}\s+>\s+<div className="sit-ident__type">\s+<FilterTabs/)
+    expect(rules(pageCss)).toContain('.sit-ident__type { flex: none; padding: var(--space-2); border-bottom: var(--bw-thin) solid var(--border-subtle); }')
+    expect(rules(pageCss)).toContain('.sit-ident__type > .bseg > button { flex: 1 1 0; }')
+    /* Opens on the last pick's kind; nothing picked, Users. */
+    expect(openingKind([])).toBe('user')
+    expect(openingKind([maya, finance])).toBe('group')
+    expect(openingKind([finance, maya])).toBe('user')
+    expect([otherKind('user'), otherKind('group')]).toEqual(['group', 'user'])
+    expect(comboSrc).toMatch(/const start = \(typed: string, first = false\) => \{\s+const k = openingKind\(value\)[\s\S]*?setKind\(k\)/)
+    /* Each list holds its own kind and nothing else, and no Users or Groups heading is drawn: the switch says it. */
+    const userList = identityRows(identitiesOfKind(listed, 'user'), [], false)
+    const groupList = identityRows(identitiesOfKind(listed, 'group'), [], false)
+    expect(userList.length).toBeGreaterThan(0)
+    expect(groupList.length).toBeGreaterThan(0)
+    expect(userList.every((o) => o.kind === 'user' && !o.value.startsWith(GROUP_PREFIX))).toBe(true)
+    expect(groupList.every((o) => o.kind === 'group' && o.value.startsWith(GROUP_PREFIX))).toBe(true)
+    expect(userList.length + groupList.length).toBe(listed.length)
+    expect(comboSrc).not.toContain('bx-picker__head u-label')
+    expect(comboSrc).not.toContain('o.heading !== prev?.heading')
+    expect(comboSrc).toContain('aria-label={KINDS.find((k) => k.value === kind)?.label}')
+  })
+
+  it('picks persist across a switch: each list ticks its own kind’s picks on top, Clear all on top of both, and a switch changes no pick', () => {
+    const picks = [maya, finance]
+    const users = identityRows(identitiesOfKind(listed, 'user'), picks, true)
+    const groups = identityRows(identitiesOfKind(listed, 'group'), picks, true)
+    expect(users.slice(0, 2).map((o) => o.value)).toEqual([NO_ONE, maya])
+    expect(groups.slice(0, 2).map((o) => o.value)).toEqual([NO_ONE, finance])
+    expect(users.some((o) => o.value === finance)).toBe(false)
+    expect(groups.some((o) => o.value === maya)).toBe(false)
+    /* The switch re-pins and moves the cursor; it never changes the picks. */
+    const flip = comboSrc.slice(comboSrc.indexOf('const flip = (k: IdentityKind) => {'), comboSrc.indexOf('const toggle = '))
+    expect(flip).toMatch(/if \(k === kind\) return\s+setKind\(k\)\s+setPinned\(value\)\s+setCursor\(cursorOf\(k, q\)\)/)
+    expect(flip).not.toContain('onChange(')
+    /* Clear all empties the field: both kinds. */
+    expect(comboSrc).toMatch(/if \(o\.value === NO_ONE\) \{\s+onChange\(\[\]\)/)
+    /* The cap counts every pick, so past five the rows not picked are off in either list. */
+    expect(comboSrc).toContain('const full = value.length >= MAX_IDENTITIES')
+  })
+
+  it('a search reads the shown kind; matching nothing there but something in the other, one button — "Search groups" or "Search users" — that flips the switch and keeps the words', () => {
+    const users = identitiesOfKind(listed, 'user')
+    const groups = identitiesOfKind(listed, 'group')
+    /* "maya" under Groups: nothing; under Users: Maya. */
+    expect(rankedIdentities(groups, 'maya')).toEqual([])
+    expect(rankedIdentities(users, 'maya').map((o) => o.value)).toContain(maya)
+    /* "fin" under Groups: Finance, Enter's pick. */
+    expect(bestIdentity(rankedIdentities(groups, 'fin'), 'fin')?.value).toBe(finance)
+    expect(comboSrc).toContain('const elsewhere = needle !== \'\' && rows.length === 0 && rankedIdentities(identitiesOfKind(options, other), needle).length > 0')
+    expect(comboSrc).toMatch(/action=\{\s+elsewhere \? \(\s+<Button size="sm" onClick=\{searchOther\}>\s+Search \{NOUN\[other\]\}\s+<\/Button>/)
+    /* Pressed from the keyboard the button goes as the rows come, so the focus goes back to the search. */
+    expect(comboSrc).toMatch(/const searchOther = \(\) => \{\s+flip\(other\)\s+input\.current\?\.focus\(\)/)
+    expect(comboSrc).toContain("const NOUN: Record<IdentityKind, string> = { user: 'users', group: 'groups' }")
+    expect(comboSrc).toContain("blurb={elsewhere ? undefined : 'Try another name.'}")
+    /* Enter on that empty list takes the same way. */
+    expect(comboSrc).toMatch(/if \(rows\[at\]\) toggle\(rows\[at\]\)\s+else if \(elsewhere\) flip\(other\)/)
+    /* The search's words say what it reads: "Search users", "Search groups". */
+    expect(comboSrc).toContain('const search = `Search ${NOUN[kind]}`')
+    expect(identSrc).not.toContain('Search users or groups')
+  })
+
+  it('the keys: ← and → flip the switch only with nothing typed; its buttons are Tab stops — the list portalled, so Tab is routed by hand; the row cursor follows a moving pointer, not one a list shrinks under', () => {
+    expect(comboSrc).toMatch(/if \(\(e\.key === 'ArrowLeft' \|\| e\.key === 'ArrowRight'\) && !q\) \{\s+e\.preventDefault\(\)\s+flip\(other\)\s+return/)
+    /* Tab from the search on to the switch; the switch's first back to the search; the list's last on past the field. */
+    expect(comboSrc).toMatch(/if \(e\.key === 'Tab' && !e\.shiftKey\) \{\s+const first = tabbables\(pop\.current\)\[0\]/)
+    expect(comboSrc).toMatch(/if \(e\.shiftKey && i <= 0\) \{\s+e\.preventDefault\(\)\s+input\.current\?\.focus\(\)\s+\} else if \(!e\.shiftKey && i === stops\.length - 1\) \{\s+e\.preventDefault\(\)\s+onward\(\)/)
+    expect(comboSrc).toContain('onKeyDown={onPopKey}')
+    /* Esc in the switch closes the list and stops there, as in the search. */
+    expect(comboSrc).toMatch(/const onPopKey = \(e: KeyboardEvent<HTMLDivElement>\) => \{\s+if \(e\.key === 'Escape'\) \{\s+e\.preventDefault\(\)\s+e\.stopPropagation\(\)\s+close\(true\)/)
+    /* Focus moving between the field and its list keeps it open; leaving both closes it. */
+    expect(comboSrc).toContain('if (!field.current?.contains(to) && !pop.current?.contains(to)) setOpen(false)')
+    /* The cursor: a pointer that moves, and the best match on every keystroke. */
+    expect(comboSrc).toContain('onMouseMove={() => setCursor(o.value)}')
+    expect(comboSrc).not.toContain('onMouseEnter')
+    expect(comboSrc).toMatch(/setQ\(e\.target\.value\)\s+\/\*[^*]*\*\/\s+setCursor\(cursorOf\(kind, e\.target\.value\)\)/)
+  })
+
+  it('a search keeps Users before Groups, and Enter takes the best name match wherever it is listed', () => {
+    /* Where both kinds match, every user comes before the first group. */
+    const both = rankedIdentities(listed, 'a')
+    const lastUser = both.map((o) => o.kind).lastIndexOf('user')
+    expect(lastUser).toBeGreaterThanOrEqual(0)
+    expect(both.findIndex((o) => o.kind === 'group')).toBeGreaterThan(lastUser)
+    /* A person is found by name or email, not by the groups on their second line (5 Oct 2026): "fin" finds the
+       Finance group, not every Finance member — so under Users it offers "Search groups". */
+    const found = rankedIdentities(listed, 'fin')
+    const member = listed.find((o) => o.kind === 'user' && /finance/i.test(o.meta) && !o.hay.includes('fin'))
+    expect(member).toBeDefined()
+    expect(found).not.toContain(member)
+    expect(bestIdentity(found, 'fin')?.value).toBe(finance)
+  })
+
+  it('a press on a row picks it or puts it back, and the list stays open — the search emptied, the cursor on the row', () => {
+    const toggle = comboSrc.slice(comboSrc.indexOf('const toggle = (o: IdentityOption) => {'), comboSrc.indexOf('const remove = '))
+    expect(toggle).not.toContain('close(')
+    expect(toggle).toMatch(/onChange\(on \? value\.filter\(\(v\) => v !== o\.value\) : \[\.\.\.value, o\.value\]\)\s+setQ\(''\)\s+setCursor\(o\.value\)/)
+    expect(comboSrc).toContain('aria-selected={on}')
+    expect(comboSrc).toContain('const on = !clear && value.includes(o.value)')
+    /* Enter toggles the cursor's row; Backspace with nothing typed takes the last chip off. */
+    expect(comboSrc).toContain('if (rows[at]) toggle(rows[at])')
+    expect(comboSrc).toMatch(/if \(e\.key === 'Backspace' && !q && value\.length > 0\) \{\s+e\.preventDefault\(\)\s+onChange\(value\.slice\(0, -1\)\)/)
+  })
+
+  it('five at most: past five the rows not picked are off, "Up to 5" on hover, and a press on one picks nothing', () => {
+    expect(MAX_IDENTITIES).toBe(5)
+    expect(comboSrc).toContain('const FULL = `Up to ${MAX_IDENTITIES}`')
+    expect(comboSrc).toContain('const off = !clear && !on && full')
+    expect(comboSrc).toContain('aria-disabled={off || undefined}')
+    expect(comboSrc).toContain('title={off ? FULL : undefined}')
+    expect(comboSrc).toContain('if (!on && full) return')
+  })
+
+  it.skipIf(!MULTI_IDENTITY)('at rest the picks are chips — face or square, name, a Remove button — and two or more say nothing under the field', () => {
+    const o = panel({ ...arun, personId: maya }, { identities: [maya, finance, third] })
+    const ident = block(o, 'div', 'sit-ident')
+    const name = (v: string) => listed.find((x) => x.value === v)!.name
+    expect(ident).toContain(`aria-label="Identity: Maya Iyer, Finance, ${name(third)}"`)
+    const chips = [...ident.matchAll(/<span class="sit-ident__chip" title="([^"]+)">([\s\S]*?)<\/button><\/span>/g)]
+    expect(chips.map((m) => m[1])).toEqual(['Maya Iyer', 'Finance', name(third)])
+    expect(chips.map((m) => (m[2].match(/bx-face is-(user|group)/) ?? [])[1])).toEqual(['user', 'group', 'user'])
+    for (const m of chips) expect(m[2]).toContain(`aria-label="Remove ${m[1]}"`)
+    /* Each × is a Tab stop (5 Oct 2026); a press of the mouse on it takes no focus. */
+    expect(ident).toMatch(/<button type="button" class="sit-ident__chipx" aria-label="Remove Maya Iyer">/)
+    expect(ident).not.toMatch(/tabindex="-1" class="sit-ident__chipx"/)
+    /* Delete or Backspace on a focused ×, or Enter on it, takes that chip and the focus on to the next ×, else the field. */
+    expect(comboSrc).toMatch(/if \(e\.key !== 'Delete' && e\.key !== 'Backspace'\) return\s+e\.preventDefault\(\)\s+e\.stopPropagation\(\)\s+remove\(i, true\)/)
+    expect(comboSrc).toContain('remove(i, e.detail === 0)')
+    expect(comboSrc).toContain("const to = chipBox.current?.querySelectorAll<HTMLElement>('.sit-ident__chipx')[i] ?? (open ? input.current : button.current)")
+    expect(rules(pageCss)).toContain('.sit-ident__chipx:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ctl-border-focus); color: var(--text-primary); }')
+    /* The face's letters in a chip at the 12 px floor — the chip's alone, the shared face untouched. */
+    expect(rules(pageCss)).toContain('.sit-ident__chip .bx-face { width: 20px; height: 20px; flex: none; font-size: var(--fs-xs); }')
+    expect(text(ident)).not.toMatch(/Member of|Tested as|In \d groups/)
+    /* One pill family, greyscale: the badge's own geometry and the neutral tone; never orange. */
+    const css = rules(pageCss)
+    const chip = css.match(/\.sit-ident__chip \{[^}]*\}/)![0]
+    for (const v of ['--pill-radius', '--pill-fs', '--pill-line', '--fb-neutral-bg', '--fb-neutral-border', '--fb-neutral-fg']) expect(chip).toContain(v)
+    expect(css).not.toMatch(/\.sit-ident__chip[^{]*\{[^}]*(--brand|--accent)/)
+    /* "+N" past two lines, measured from the chips again whenever they change. */
+    expect(comboSrc).toContain('const CHIP_LINES = 2')
+    expect(comboSrc).toContain('if (lines.length > CHIP_LINES) setFit(fit - 1)')
+    expect(comboSrc).toContain('+{rest.length}')
+  })
+
+  it('the picks are the page’s, the draft’s person the first pick’s; a sign-in from elsewhere brings its one person', () => {
+    const base = settled({ ...arun, personId: null })
+    const next = withIdentities(base, [finance, maya], people)
+    expect(next.identities).toEqual([finance, maya])
+    expect(next.draft.personId).toBe(priya)
+    expect(withIdentities(next, [], people).draft.personId).toBeNull()
+    expect(picksOf(arun)).toEqual(['arun'])
+    expect(initialTryPage(1, TODAY, '09:30').identities).toEqual([])
+    expect(initialTryPage(4, TODAY, '09:30', arun).identities).toEqual(['arun'])
+    expect(tryingPage({ ...next, ran: { list: [finance, maya], active: 1 } }, arun)).toMatchObject({ identities: ['arun'], ran: undefined })
+    expect(newSignInPage(next, 5, TODAY, '10:00').identities).toEqual([])
+  })
+
+  it('Run makes one sign-in per pick from the same facts, the canvas telling the first; "Changed by" compares that pick with itself', () => {
+    const f = forRun({ ...arun, personId: maya }, rowsRead(t.policies, null, 'github', lib))
+    const go = runOfPicks(f, [maya, finance, third], people, null)
+    expect(go.form).toEqual({ ...f, personId: maya })
+    expect(go.ran).toEqual({ list: [maya, finance, third], active: 0 })
+    expect(go.prev).toBeNull()
+    /* A group's first: its member runs. */
+    expect(runOfPicks(f, [finance], people, null).form.personId).toBe(priya)
+    /* Run again after a switch to Finance: Maya's last run is what she is compared with, not Finance's. */
+    const onFinance = { ...f, personId: priya }
+    expect(runOfPicks(f, [maya, finance], people, { form: onFinance, list: [maya, finance] }).prev).toBeNull()
+    const moved = { ...f, device: { kind: 'none' as const } }
+    expect(runOfPicks(moved, [maya, finance], people, { form: onFinance, list: [maya, finance] }).prev).toEqual({ ...f, personId: maya })
+    /* A first pick the last Run did not cover is compared with the run on the canvas, as before. */
+    expect(runOfPicks(f, [third], people, { form: onFinance, list: [maya, finance] }).prev).toEqual(onFinance)
+    expect(pageSrc).toContain('const before = tryPage.mode === \'journey\' ? { form: session.form, list: ranPicks(tryPage, session.form) } : null')
+  })
+
+  it('a chip switch loads another pick’s run of the same Run; a press that runs keeps the pick the canvas tells', () => {
+    const f = { ...arun, personId: maya }
+    const page = ran({ identities: [maya, finance], ran: { list: [maya, finance], active: 0 } }, f)
+    const to = switchPick(page, f, finance, people)!
+    expect(to.form).toEqual({ ...f, personId: priya })
+    expect(to.ran).toEqual({ list: [maya, finance], active: 1 })
+    expect(switchPick(page, f, maya, people)).toBeNull()
+    expect(switchPick(page, f, third, people)).toBeNull()
+    expect(switchPick({ ...page, ran: undefined }, f, finance, people)).toBeNull()
+    /* On Finance, "Run with …" runs both again and stays on Finance; "Run as Finance only" is Finance alone. */
+    const onFinance = ran({ identities: [maya, finance], ran: to.ran }, to.form)
+    expect(runNowOf(f, [maya, finance], onFinance, to.form, people)).toEqual({ form: { ...f, personId: priya }, ran: { list: [maya, finance], active: 1 } })
+    expect(runNowOf(f, [third], onFinance, to.form, people).ran).toEqual({ list: [third], active: 0 })
+    expect(asGroupOf(onFinance, to.form, people)).toBe('finance')
+    expect(asGroupOf(page, f, people)).toBeNull()
+    /* A sign-in loaded from elsewhere under the Run: no group claimed for it. */
+    expect(asGroupOf(onFinance, f, people)).toBeNull()
+    /* The page wires the chips: that pick's sign-in, played from the start, its prev none. */
+    expect(pageSrc).toMatch(/const showPick = \(key: IdentityValue\) => \{\s+const to = switchPick\(tryPage, session\.form, key, users\)\s+if \(to\) start\(to\.form, 'full', \{ ran: to\.ran \}\)/)
+    expect(pageSrc).toContain('onPickIdentity={showPick}')
+    expect(pageSrc).toContain('const asGroup = asGroupOf(tryPage, ranForm, users)')
+  })
+
+  it('not run while the picks differ from the last Run’s — the person aside, since each pick runs as its own', () => {
+    const rowsGh = rowsRead(t.policies, null, 'github', lib)
+    const f = { ...arun, personId: maya }
+    const page = ran({ identities: [maya, finance], ran: { list: [maya, finance], active: 1 }, draft: f }, f)
+    const onFinance = { ...f, personId: priya }
+    expect(unrunOf(page, onFinance, rowsGh)).toBe(false)
+    expect(unrunOf({ ...page, identities: [maya] }, onFinance, rowsGh)).toBe(true)
+    expect(unrunOf({ ...page, identities: [finance, maya] }, onFinance, rowsGh)).toBe(true)
+    expect(unrunOf({ ...page, draft: { ...f, device: { kind: 'none' } } }, onFinance, rowsGh)).toBe(true)
+    expect(unrunOf({ ...page, mode: 'form' }, onFinance, rowsGh)).toBe(false)
+    /* A run of one sign-in: its person is its one pick. */
+    expect(unrunOf({ ...page, ran: undefined, identities: [maya] }, f, rowsGh)).toBe(false)
+    expect(identityOf(finance)).toEqual({ value: finance, kind: 'group', id: 'finance' })
   })
 })
 
@@ -552,7 +927,7 @@ describe('Sign-in tests — the canvas before the first run (§12.3, §14.3)', (
     expect(hiw).toMatch(
       /^<section class="hiw" aria-labelledby="[^"]+"><svg class="hiw__ill" viewBox="0 0 220 136" role="img" aria-label="A sign-in screen, its access checked">[\s\S]*?<\/svg><h2 id="[^"]+" class="hiw__head">Check what access someone gets<\/h2>/,
     )
-    expect(text(hiw)).toBe(
+    expect(text(hiw.replace(/<section class="hiw__blocked"[\s\S]*?<\/section>/, ''))).toBe(
       'Check what access someone gets Choose who signs in, to which application, and from where. Your policies are checked in order, as a real sign-in is. Which policy decides Which rule matched, and why What the person sees',
     )
     const gets = [...hiw.matchAll(/<li><svg[^>]*class="lucide lucide-([a-z-]+)/g)].map((m) => m[1])
@@ -605,7 +980,7 @@ describe('Sign-in tests — the canvas before the first run (§12.3, §14.3)', (
     expect([...go.matchAll(/<button/g)]).toHaveLength(1)
     expect(empty).not.toContain('Saved sign-ins')
     expect(shut).not.toContain('Saved sign-ins')
-    expect(pageSrc).toContain("onNode={() => openPanel(() => focusRow('person'))}")
+    expect(pageSrc).toContain("onNode={() => openPanel(() => focusRow('person', true))}")
     expect(tryPageSrc).toContain('const onPressNode = useCallback(() => latest.current.onNode(), [])')
     /* The panel opens first, and the row takes the focus once it has slid in. */
     expect(pageSrc).toContain('onAdd={(f) => openPanel(() => focusRow(tokenOfField(f), true))}')
@@ -702,21 +1077,24 @@ describe('Sign-in tests — the run on the canvas (§14.3)', () => {
 
   it('the person node opens the panel on its Person picker', () => {
     expect(tryPageSrc).toContain('onPressPerson={onPressNode}')
-    expect(pageSrc).toContain("onNode={() => openPanel(() => focusRow('person'))}")
+    expect(pageSrc).toContain("onNode={() => openPanel(() => focusRow('person', true))}")
     expect(nodeSrc).not.toMatch(/Pencil|BookmarkPlus/)
   })
 
   it('every run on the page begins with the engine; only Run runs — a changed field waits for it, "Run as" runs at once at the edit pace', () => {
     /* With, inside a policy (1 Oct, the builder's Check access), its draft standing in and its own trace. */
     expect(tryPageSrc).toContain("engineRun({ res, policies, form, facts, env, ctx, names, intro: 'none', substitute, focus })")
-    const door = pageSrc.slice(pageSrc.indexOf('const patch = (p: Partial<SignInForm>, field: FormField, now = false) => {'), pageSrc.indexOf('/* The Person picker'))
+    const door = pageSrc.slice(
+      pageSrc.indexOf('const patch = (p: Partial<SignInForm>, field: FormField, now = false, picks?: readonly IdentityValue[]) => {'),
+      pageSrc.indexOf('/* "Run as Finance only"'),
+    )
     expect(door).toContain("if (!now || tryPage.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return")
-    expect(door).toContain('if (same(f, session.form)) return')
-    expect(door).toContain("start(f, 'edit', { prev: session.form })")
+    expect(door).toContain('if (same(f, session.form) && covered.list.join() === ranPicks(tryPage, session.form).join()) return')
+    expect(door).toContain("start(f, 'edit', { prev: session.form, ran: covered })")
     expect(pageSrc).toContain('onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}')
-    expect(pageSrc).toContain("toCanvas(() => start(f, 'full', { askSaveFor, prev }))")
-    /* Changes not run yet: in the facts the application's rules read; said in the foot and on Edit sign-in. */
-    expect(pageSrc).toContain("const unrun = tryPage.mode === 'journey' && !same(forRun(draft, rows), forRun(session.form, rows))")
+    expect(pageSrc).toContain("toCanvas(() => start(first, 'full', { askSaveFor, prev, ran: covered }))")
+    /* Changes not run yet: in the facts the application's rules read, or the picks; said in the foot and on Edit sign-in. */
+    expect(pageSrc).toContain('const unrun = unrunOf(tryPage, session.form, rows)')
     expect(pageSrc).toContain('unrun={unrun}')
     expect(pageSrc).toMatch(/const start = [\s\S]*?session\.load\(f\)/)
     expect(pageSrc).not.toContain('session.patch(')
@@ -802,7 +1180,9 @@ describe('Sign-in tests — the sheets and the words', () => {
       expect(css.replace('animation: none;', ''), name).not.toMatch(/transform|transition|translate|scale\(|rotate|@keyframes|animation/)
       expect(css, name).not.toMatch(/dashed|dotted/)
       const sizes = [...css.matchAll(/font-size:\s*([^;]+);/g)].map((m) => m[1].trim())
-      sizes.forEach((s) => expect(['var(--fs-xs)', 'var(--fs-sm)', 'var(--fs-md)', 'var(--fs-xl)'], `${name} ${s}`).toContain(s))
+      sizes.forEach((s) => expect(['var(--fs-xs)', 'var(--fs-sm)', 'var(--fs-md)', 'var(--fs-xl)', 'var(--pill-fs)'], `${name} ${s}`).toContain(s))
+      /* The pill's own size (12 px in both looks) only on the one pill the sheet draws: the Identity field's chip (5 Oct 2026). */
+      expect([...css.matchAll(/([^{}]+)\{[^}]*font-size:\s*var\(--pill-fs\)/g)].map((m) => m[1].trim()), name).toEqual(name === 'sign-in-tests.css' ? ['.sit-ident__chip'] : [])
       /* The one larger size: the empty canvas's headline (1 Oct 2026). */
       expect([...css.matchAll(/([^{}]+)\{[^}]*font-size:\s*var\(--fs-xl\)/g)].map((m) => m[1].trim()), name).toEqual(name === 'sign-in-tests.css' ? ['.hiw .hiw__head'] : [])
     }
@@ -853,13 +1233,14 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
         />
       </BrandProvider>,
     )
-  /* Each row, by card: its press, and what stands outside it. */
+  /* Each row, by card: its one-line head, and the body that opens under it. */
   const rowsOf = (o: string) =>
     [...o.matchAll(/<li class="sit-att__row is-([a-z-]+)">([\s\S]*?)<\/li>(?=<li class="sit-att__row|<\/ul>)/g)].map((m) => {
       const html = m[2]
-      const press = html.slice(0, html.indexOf('</button>') + '</button>'.length)
-      const foot = html.slice(html.indexOf('<div class="sit-att__foot">'))
-      return { group: m[1], html, press, foot, name: text(between(press, '<span class="sit-att__name">', '<span class="sit-att__story">')).replace(/^Run: /, '') }
+      const head = html.slice(0, html.indexOf('</button>') + '</button>'.length)
+      const body = html.slice(html.indexOf('<div id='))
+      /* `press` and `foot` are the body: what the old row split in two now opens together. */
+      return { group: m[1], html, head, body, press: body, foot: body, name: text(between(head, '<span class="sit-att__name">', '</span>')) }
     })
   const between = (o: string, a: string, b: string) => o.slice(o.indexOf(a), o.indexOf(b, o.indexOf(a)))
   const aws = attempts('aws')
@@ -878,58 +1259,68 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
     expect(panelSrc).toContain('const SLIDE = PANEL_SLIDE')
   })
 
-  it('the four counts once, with what they are and are not; then each result’s heading, in order, no number beside it', () => {
-    expect(aws.match(/class="tj-cells"/g)).toHaveLength(1)
-    expect(block(aws, 'div', 'sit-att__counts')).toContain('aria-label="About break-in attempts"')
+  it('a verdict, not four counts: one plain line — how many got through, of how many tried — then each result’s heading, in order, no number beside it', () => {
+    expect(aws).not.toContain('class="tj-cells"')
+    const verdict = block(aws, 'div', 'sit-att__verdict')
+    expect(verdict).toMatch(/^<div class="sit-att__verdict is-hole">/)
+    expect(text(verdict)).toMatch(/^\d+ got through 15 attempts tried/)
+    expect(verdict).toContain('aria-label="About break-in attempts"')
+    /* Where none got through it says so, in the clear tone. */
+    expect(attemptsSrc).toContain("holes > 0 ? `${holes} got through` : 'None got through'")
+    expect(attemptsSrc).toContain("holes > 0 ? 'is-hole' : 'is-clear'")
     const heads = [...aws.matchAll(/<h3 id="[^"]+" class="sit-att__gh">([^<]+)<\/h3>/g)].map((m) => text(m[1]))
     expect(heads).toEqual(['Got through', 'Less than asked', 'Locked out', "Can't tell"])
   })
 
-  it('Held last and folded, its count on the fold — the one place it is said — a native disclosure the page’s Escape lets be', () => {
+  it('what was blocked, last and folded, its count on the fold — the one place it is said — a native disclosure the page’s Escape lets be', () => {
     const held = block(aws, 'details', 'sit-att__held')
-    expect(held).toMatch(/^<details class="sit-att__held"><summary class="sit-att__heldsum"><svg[^>]*lucide-chevron-right[^>]*>[\s\S]*?<\/svg><span>Held<\/span><span class="sit-att__heldn">8<\/span><\/summary>/)
+    expect(held).toMatch(/^<details class="sit-att__held"><summary class="sit-att__heldsum"><svg[^>]*lucide-chevron-right[^>]*>[\s\S]*?<\/svg><span>Blocked<\/span><span class="sit-att__heldn">8<\/span><\/summary>/)
     expect(held).not.toContain(' open=""')
     expect(rowsOf(held).every((r) => r.group === 'held')).toBe(true)
     expect(rowsOf(held)).toHaveLength(8)
     expect(aws.indexOf('class="sit-att__held"')).toBeGreaterThan(aws.lastIndexOf('class="sit-att__gh"'))
-    /* Escape waits for anything expanded in a panel: the fold is not, so Escape still shuts the panel with it open. */
-    expect(held).not.toContain('aria-expanded')
-    expect(pageSrc).toContain(`if (document.querySelector('.sit-panel [aria-expanded="true"]')) return`)
+    expect(held).not.toContain('aria-expanded="true"')
   })
 
-  it('a row: the press that plays it — the face, the attempt, its one line, Expected and Got — and outside it who decided, a link into the builder', () => {
+  it('a row is one line that opens: the face and what was tried, a chevron — and under it, shut, what happened, who decided, and what to do, with its own Run this sign-in', () => {
     const rows = rowsOf(aws)
     expect(rows).toHaveLength(15)
     for (const r of rows) {
-      expect(r.press, r.name).toMatch(/^<button type="button" class="sit-att__play" title="Run this sign-in"><span class="sit-att__face" aria-hidden="true"><span class="bx-face is-user is-sm"/)
-      /* Nothing pressable inside the press. */
-      expect(r.press.slice(1), r.name).not.toContain('<button')
-      /* Who decided first — after the one quiet line, where the row needs one. */
-      expect(r.foot, r.name).toMatch(/^<div class="sit-att__foot">(<p class="sit-att__note">[^<]+<\/p>)?<p class="sit-att__byline">/)
-      /* Each word with its badge, so a narrow panel never breaks "Got" from its answer. */
-      expect(r.press, r.name).toMatch(/<span class="sit-att__result" aria-hidden="true"><span class="sit-att__pair"><span>Expected( at least)?<\/span><span class="bx-badge/)
+      expect(r.head, r.name).toMatch(/^<button type="button" class="sit-att__head" aria-expanded="false" aria-controls="[^"]+"><span class="sit-att__face" aria-hidden="true"><span class="bx-face is-user is-sm"/)
+      /* Nothing pressable inside the head, and the body shut until it is pressed. */
+      expect(r.head.slice(1), r.name).not.toContain('<button')
+      expect(r.body, r.name).toMatch(/^<div id="[^"]+" class="sit-att__body" hidden="">/)
+      /* The body: what was tried, then should-be and got, each word with its badge. */
+      expect(r.body, r.name).toMatch(/<p class="sit-att__story">[^<]+<\/p><p class="sit-att__result"><span class="sit-att__pair"><span>Should be( at least)?<\/span><span class="bx-badge/)
+      /* Run this sign-in is a button of its own, not the whole row. */
+      expect(text(r.body), r.name).toContain('Run this sign-in')
     }
     const proxy = rows.find((r) => r.name === 'Finance account behind a known proxy')!
-    expect(text(between(proxy.press, '<span class="sit-att__story">', '</span>'))).toBe('A finance user appears from a commercial proxy on a device whose fingerprint has changed.')
-    expect(text(between(proxy.press, '<span class="sit-att__result"', '<span class="u-sr-only">E'))).toBe('Expected Deny · Got Allow with 2FA')
-    expect(proxy.press).toContain('<span class="u-sr-only">Expected Deny, got Allow with 2FA</span>')
-    expect(proxy.foot).toMatch(/<button type="button" class="sit-att__by" title="Open AWS billing for Finance"><span>Decided by AWS billing for Finance · Rule 1<\/span><svg[^>]*lucide-arrow-up-right/)
+    expect(text(between(proxy.body, '<p class="sit-att__story">', '</p>'))).toBe('A finance user appears from a commercial proxy on a device whose fingerprint has changed.')
+    expect(text(between(proxy.body, '<p class="sit-att__result"', '<span class="u-sr-only">'))).toBe('Should be Deny · Got Allow with 2FA')
+    expect(proxy.body).toContain('<span class="u-sr-only">Expected Deny, got Allow with 2FA</span>')
+    expect(proxy.body).toMatch(/<button type="button" class="sit-att__by" title="Open AWS billing for Finance"><span>Decided by AWS billing for Finance · Rule 1<\/span><svg[^>]*lucide-arrow-up-right/)
     /* A sign-in nobody can tell: Can't tell, the policy named without a rule. */
     const tor = rows.find((r) => r.name === 'Executive account from a Tor exit')!
-    expect(text(between(tor.press, '<span class="sit-att__result"', '<span class="u-sr-only">E'))).toBe("Expected Deny · Can't tell")
-    expect(tor.press).toContain(`<span class="u-sr-only">Expected Deny, can't tell</span>`.replace("'", '&#x27;'))
-    /* What would settle it, then who decided. */
-    expect(text(tor.foot)).toMatch(/^Needs: \S.* Decided by Global Default Policy$/)
+    expect(text(between(tor.body, '<p class="sit-att__result"', '<span class="u-sr-only">'))).toBe("Should be Deny · Can't tell")
+    expect(text(tor.body)).toMatch(/Needs: \S.* Decided by Global Default Policy/)
     /* A threat stopped harder than its card asks held: what it asks is a floor. */
     const contractor = rows.find((r) => r.name === 'Contractor on an unmanaged device')!
-    expect([contractor.group, text(between(contractor.press, '<span class="sit-att__result"', '<span class="u-sr-only">E'))]).toEqual(['held', 'Expected at least Allow with 2FA · Got Deny'])
+    expect([contractor.group, text(between(contractor.body, '<p class="sit-att__result"', '<span class="u-sr-only">'))]).toEqual(['held', 'Should be at least Allow with 2FA · Got Deny'])
+  })
+
+  it('pressing the head opens it (aria-expanded), and the body is the only thing hidden', () => {
+    expect(attemptsSrc).toContain("const [open, setOpen] = useState(false)")
+    expect(attemptsSrc).toContain('onClick={() => setOpen((o) => !o)}')
+    expect(attemptsSrc).toContain('hidden={!open}')
+    expect(rules(pageCss)).toMatch(/\.sit-att__body\[hidden\] \{ display: none; \}/)
   })
 
   it('a Weaker factor row says the factor its badges cannot: what was offered, and what the attack needs', () => {
     const relay = rowsOf(attempts('github')).find((r) => r.name === 'Sign-in relayed through a phishing proxy')!
     expect(relay.group).toBe('weaker-factor')
-    expect(text(between(relay.press, '<span class="sit-att__result"', '<span class="u-sr-only">E'))).toBe('Expected Allow with 2FA · Got Allow with 2FA')
-    expect(relay.foot).toContain('<p class="sit-att__note">Second factor: miniOrange Push · standard · needs phishing-resistant</p>')
+    expect(text(between(relay.body, '<p class="sit-att__result"', '<span class="u-sr-only">'))).toBe('Should be Allow with 2FA · Got Allow with 2FA')
+    expect(relay.body).toContain('<p class="sit-att__note">Second factor: miniOrange Push · standard · needs phishing-resistant</p>')
     const css = rules(pageCss)
     expect(css).toMatch(/\.sit-att__pair \{ display: inline-flex; align-items: center; gap: var\(--space-2\); white-space: nowrap; \}/)
     expect(css).toMatch(/\.sit-att__note \{[^}]*font-size: var\(--fs-xs\);/)
@@ -937,36 +1328,34 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
 
   it('a hole’s fix, before anything is done: what the rule becomes, what it moves, across the tenant only when something there does, and Fix in policy — a plain secondary; the panel has no orange', () => {
     const proxy = rowsOf(aws).find((r) => r.name === 'Finance account behind a known proxy')!
-    const fix = block(proxy.foot, 'div', 'sit-att__fix')
+    const fix = block(proxy.body, 'div', 'sit-att__fix')
     expect(text(between(fix, '<p class="sit-att__fixline">', '</p>'))).toBe('Add this rule Deny sign-ins from outside India — If not in zone India → Deny · at position 1')
-    /* The count it moves at its new number — the cell says the old one — and across the tenant only what moves. */
     expect(fix).toContain('<p class="sit-att__moved">Got through now 2</p>')
     expect(text(between(fix, '<p class="sit-att__tenant">', '</p>'))).toMatch(/^Of [\d,]+ modelled sign-ins: Now denied \d+$/)
     const btn = fix.match(/<button[^>]*class="bx-btn[^"]*"[^>]*>[\s\S]*?<\/button>/)![0]
-    /* The kit's secondary: its neutral role. */
     expect(btn).toContain('bx-btn--neutral')
     expect(text(btn)).toBe('Fix in policy')
     expect(btn).toContain('lucide-arrow-up-right')
     expect(aws).not.toContain('bx-btn--brand')
     /* Only that row's card names a fix that fits and is never looser: the rest of AWS's holes have none. */
-    expect(rowsOf(aws).filter((r) => r.foot.includes('sit-att__fix')).map((r) => r.name)).toEqual(['Finance account behind a known proxy'])
+    expect(rowsOf(aws).filter((r) => r.body.includes('sit-att__fix"')).map((r) => r.name)).toEqual(['Finance account behind a known proxy'])
   })
 
   it('no fix for a row that held, for the Global Default, nor where none fits — the link into the builder is the way', { timeout: 30_000 }, () => {
     for (const app of ['outlook', 'github', 'slack', 'box', 'hrms']) {
       for (const r of rowsOf(attempts(app))) {
-        if (r.group === 'held' || r.group === 'locked-out' || r.group === 'extra-prompts' || r.group === 'cant-tell') expect(r.foot, `${app} ${r.name}`).not.toContain('sit-att__fix')
+        if (r.group === 'held' || r.group === 'locked-out' || r.group === 'extra-prompts' || r.group === 'cant-tell') expect(r.body, `${app} ${r.name}`).not.toContain('sit-att__fix"')
       }
     }
     const risk = rowsOf(attempts('box')).find((r) => r.name === 'High risk signal from inside the office')!
-    expect([risk.group, text(risk.foot)]).toEqual(['got-through', 'Decided by Global Default Policy · Rule 1'])
+    expect([risk.group, text(risk.body).replace(/^.*?Decided by/, 'Decided by')]).toEqual(['got-through', 'Decided by Global Default Policy · Rule 1 Run this sign-in Accept this result'])
     /* Asked of a hole as it is drawn, kept for the run — never of a row that held. */
     expect(attemptsSrc).toContain('const offer = useMemo(() => (isHole(row) ? attemptOffer(result, row, policies, env, accepted) : null), [row, result, policies, env, accepted])')
   })
 
   it('a row pressed plays it as an access check: the form filled with the attempt on this application, named for it, its expectation the answer’s — the panel shut for the run', () => {
     expect(pageSrc).toMatch(
-      /const playAttempt = \(row: AppBreakInRow\) => \{\s+if \(!attempts\) return\s+const p = attemptPlay\(row, attempts\.result\.appId, policies\)\s+const f = formOf\(p\.facts, zones\)\s+setAsGroup\(null\)\s+setLoaded\(\{ name: p\.name, form: f, expected: p\.expected, weaker: p\.weaker \}\)\s+toCanvas\(\(\) => start\(f, 'full', \{ draft: f, touched: \[\] \}\)\)/,
+      /const playAttempt = \(row: AppBreakInRow\) => \{\s+if \(!attempts\) return\s+const p = attemptPlay\(row, attempts\.result\.appId, policies\)\s+const f = formOf\(p\.facts, zones\)\s+setLoaded\(\{ name: p\.name, form: f, expected: p\.expected, weaker: p\.weaker \}\)\s+toCanvas\(\(\) => start\(f, 'full', \{ draft: f, touched: \[\], identities: picksOf\(f\) \}\)\)/,
     )
     expect(pageSrc).toContain('onPlay={playAttempt}')
     /* The run it plays is the one the row was judged on: the same policy, the same answer. */
@@ -983,6 +1372,17 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
     expect(pageSrc).toMatch(/go\(row\.ruleRef \? \{ name: 'board', policyId: row\.policyId, open: 'try', rule: row\.ruleRef \} : \{ name: 'board', policyId: row\.policyId, open: 'try' \}\)/)
     expect(pageSrc).toContain("go({ name: 'board', policyId: offer.policy.id, fix: { card: row.id, app: attempts.result.appId } })")
     expect(pageSrc).toContain('session.loadBoard(policyId, formOf(attemptFacts(row.round.challenge, attempts.result.appId), zones))')
+  })
+
+  it('Accept this result: offered on a row that has a result to agree with, the page records it with who and why, and Restore undoes it', () => {
+    expect(phaseSrc).toContain('export const ACCEPT_ATTEMPTS: boolean = true')
+    const offered = t.apps.map((a) => attempts(a.id)).filter((o) => o.includes('Accept this result'))
+    expect(offered.length).toBeGreaterThan(0)
+    expect(attemptsSrc).toContain('const a = acceptanceFor(r.round, account.name, new Date().toISOString(), reason)')
+    expect(attemptsSrc).toContain('if (a && r.policyId) acceptBreakIn(r.policyId, r.id, a)')
+    expect(attemptsSrc).toContain('if (r.policyId) acceptBreakIn(r.policyId, r.id, null)')
+    /* Held and can't-tell rows have nothing to agree with. */
+    expect(attemptsSrc).toContain('const mayAccept = ACCEPT_ATTEMPTS && row.policyId !== null && canAccept(row)')
   })
 
   it('the page: run once per policies, application, env and acceptances — the store’s own — and only with the edition’s Break-in test and the phase’s flag on', () => {
@@ -1011,10 +1411,10 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
     /* Pressed again on the answer, the strip shuts them. */
     expect(pageSrc).toMatch(/if \(from === 'outcome' && panel === 'break-in'\) \{\s+closePanel\(\)\s+return\s+\}/)
     /* Every run begins by shutting the why and the attempts — Replay too, which is the journey's. */
-    expect(pageSrc).toContain("const shutBeside = () => setPanel((p) => (p === 'why' || p === 'break-in' ? null : p))")
+    expect(pageSrc).toContain("const shutBeside = () => setPanel((p) => (p === 'why' || p === 'break-in' || p === 'inspect' ? null : p))")
     expect(pageSrc).toMatch(/setSubmitted\(false\)\s+setSaveOpen\(false\)\s+shutBeside\(\)\s+session\.load\(f\)/)
     expect(pageSrc).toContain('onReplay={shutBeside}')
-    expect(tryPageSrc).toMatch(/const replay = \(\) => \{\s+onReplay\?\.\(\)/)
+    expect(tryPageSrc).toMatch(/const playAgain = \(\) => \{\s+onReplay\?\.\(\)/)
   })
 
   it('the why’s X gives the focus back to what opened it on the answer — its strip or Why? — else Replay', () => {
@@ -1023,10 +1423,10 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
     expect(pageSrc).toMatch(/if \(from === 'why'\) \{\s+const back = document\.querySelector<HTMLElement>\(WHY_DOOR\) \?\? at\('\.tj-engine__replay button'\)/)
   })
 
-  it('nothing overlaps: the press is three tracks, and who decided and the fix stand under it on the words’ own edge', () => {
+  it('nothing overlaps: the head is one row of face, name and chevron, and what opens stands on the name’s own edge', () => {
     const css = rules(pageCss)
-    expect(css).toMatch(/\.sit-att__play \{[^}]*display: grid;[^}]*grid-template-columns: 24px minmax\(0, 1fr\) 14px;/)
-    expect(css).toMatch(/\.sit-att__foot \{[^}]*padding: 0 var\(--space-4\) var\(--space-4\) calc\(var\(--space-4\) \+ 24px \+ var\(--space-4\)\);/)
+    expect(css).toMatch(/\.sit-att__head \{[^}]*display: flex;[^}]*align-items: center;/)
+    expect(css).toMatch(/\.sit-att__body \{[^}]*padding: 0 var\(--space-4\) var\(--space-4\) calc\(var\(--space-4\) \+ 24px \+ var\(--space-4\)\);/)
     expect(css).toMatch(/\.sit-att__row \{ display: flex; flex-direction: column;/)
   })
 

@@ -867,3 +867,43 @@ fieldset.bz7__rangecol:has(.bx-picker__trigger.is-open) {
 /* `pretty`, so a fact never ends on one word alone ("exits." did, at 380px). */
 .bz7n-point__facts p { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); text-wrap: pretty; }
 .bz7n-point__facts p + p { margin-top: var(--space-3); }
+
+/* --- Blue note (zone-notes.tsx `BlueNote`) --------------------------------------------------------------------------
+   Classic's card in the info blue: the kind on the left in the UI face, the example on the right in monospace on a white
+   chip, a rule, then the facts. Static, so no motion and no transform. Tokens only. */
+.bz7n-blue {
+  padding: var(--space-6);
+  background: var(--fb-info-bg);
+  border: var(--bw-thin) solid var(--fb-info-border);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+}
+.bz7n-blue__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--fb-info-fg);
+}
+.bz7n-blue__rows { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; }
+.bz7n-blue__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
+.bz7n-blue__row dt { min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bz7n-blue__row dd { flex: none; margin: 0; max-width: 60%; }
+.bz7n-blue__row code {
+  display: inline-block;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: var(--bw-thin) solid var(--fb-info-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+.bz7n-blue__facts { margin: var(--space-5) 0 0; padding: var(--space-5) 0 0 var(--space-6); border-top: var(--bw-thin) solid var(--fb-info-border); font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+.bz7n-blue__facts li + li { margin-top: var(--space-2); }

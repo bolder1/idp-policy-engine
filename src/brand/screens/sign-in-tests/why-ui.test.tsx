@@ -617,7 +617,9 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
       const { plan } = planOf(saved(id))
       expect(findingsCount(plan), id).toBeNull()
       expect(heroFinding(plan), id).toBeNull()
-      expect(o, id).not.toMatch(/tj-pnode__count|tj-hero__strip|tj-hero__whybtn|tj-why|tj-pol__flag|tj-rail__chip is-conflict/)
+      /* A refusal keeps the quiet Why? (its reason, how to get in); nothing else is said of any of them. */
+      const refused = plan.outcome.decision === 'deny'
+      expect(o, id).not.toMatch(refused ? /tj-pnode__count|tj-hero__strip|tj-pol__flag|tj-rail__chip is-conflict/ : /tj-pnode__count|tj-hero__strip|tj-hero__whybtn|tj-why|tj-pol__flag|tj-rail__chip is-conflict/)
     }
   })
 
@@ -753,7 +755,7 @@ describe('the why, opened and closed', () => {
     /* The policy folds to its line too, and is given back as the why closes. */
     expect(journeySrc).toContain('policyBeforeWhy.current = f.nodes.policy')
     expect(journeySrc).toContain('nodes.policy = false')
-    expect(journeySrc).toContain('const hasWhy = whyHead !== null && items.length > 0')
+    expect(journeySrc).toContain('const hasWhy = whyHead !== null && (items.length > 0 || reason !== null)')
     expect(journeySrc).toContain('if (opening) whyTitle.current?.focus({ preventScroll: true })')
     /* Back to what opened it: the quiet Why?, or the strip where there is a finding. */
     expect(journeySrc).toContain("else stage.current?.querySelector<HTMLElement>('.tj-hero__whybtn, button.tj-hero__strip')?.focus({ preventScroll: true })")
@@ -973,7 +975,7 @@ describe('break-in attempts, on the answer and in the why', () => {
     /* The ⓘ moves to the section's foot, beside Review attempts. */
     expect(sectionOf(w)).toMatch(/<div class="tj-why__attfoot"><span class="bx-tip"><button type="button" class="bx-tipdot" aria-label="About break-in attempts">/)
     /* The journey's own title for it, and the why it may open. */
-    expect(journeySrc).toContain('whyTitleOf(plan) ?? (attempts ? attemptsTitle(attempts) : null)')
+    expect(journeySrc).toContain("(whyTitleOf(plan) ?? (reason ? { text: DENY_REASON_WORD[reason], tone: 'info' as const } : null) ?? (attempts ? attemptsTitle(attempts) : null))")
     expect(journeySrc).toContain('breakIn={whyBreakIn}')
     expect(BREAK_IN_TIP).toBe('Scripted sign-ins against these rules; not breach likelihood.')
   })
@@ -1007,5 +1009,116 @@ describe('break-in attempts, on the answer and in the why', () => {
     for (const w of [text(withAttempts(ARUN_AWS, summaryOn('aws'))), text(withAttempts(PRIYA_GOOGLE, summaryOn('google-workspace'))), text(whyWith(saved('ssi-maya-aws'), summaryOn('aws')))]) {
       expect(w).not.toMatch(/\b(AI|assistant|log ?ins?|logs in|gauntlet|blast radius|rehearse|grade)\b/i)
     }
+  })
+})
+
+describe('Why — How to get in (DENIAL-REASONS step 5)', () => {
+  const form = MAYA_GITHUB
+  const getIn = [{ key: 'from:office', label: 'From Office network', decision: '1fa' as AccessDecision, source: 'rule 2', form }]
+  function WhyGetIn({ withPress }: { withPress: boolean }) {
+    const resolve = useNameLookup()
+    const { plan } = planOf(form)
+    return (
+      <WhyCard
+        plan={plan}
+        items={whyItems(plan)}
+        groups={eachGroupRows(plan)}
+        headline={whyTitle(plan) ?? { text: 'Why', tone: 'info' }}
+        policies={t.policies}
+        resolve={resolve}
+        person={t.directory.people.find((u) => u.id === form.personId)!.name}
+        id="why"
+        interactive
+        onClose={noop}
+        onOpenRule={noop}
+        onOpenPolicy={noop}
+        onAdd={noop}
+        getIn={getIn}
+        onGetIn={withPress ? noop : undefined}
+      />
+    )
+  }
+  const html = (withPress: boolean) =>
+    renderToStaticMarkup(
+      <BrandProvider>
+        <WhyGetIn withPress={withPress} />
+      </BrandProvider>,
+    )
+
+  it('offers Let in for a while only where the page can grant it, and the Copy summary beside the close', () => {
+    function WhyGrant({ grant }: { grant: boolean }) {
+      const resolve = useNameLookup()
+      const { plan } = planOf(form)
+      return (
+        <WhyCard
+          plan={plan}
+          items={whyItems(plan)}
+          groups={eachGroupRows(plan)}
+          headline={whyTitle(plan) ?? { text: 'Why', tone: 'info' }}
+          policies={t.policies}
+          resolve={resolve}
+          person="Maya Iyer"
+          id="why"
+          interactive
+          onClose={noop}
+          onOpenRule={noop}
+          onOpenPolicy={noop}
+          onAdd={noop}
+          grant={grant ? { today: '2026-09-28', onGrant: noop } : null}
+        />
+      )
+    }
+    const out = (grant: boolean) =>
+      renderToStaticMarkup(
+        <BrandProvider>
+          <WhyGrant grant={grant} />
+        </BrandProvider>,
+      )
+    expect(out(true)).toContain('Let in for a while')
+    expect(out(false)).not.toContain('Let in for a while')
+    expect(out(true)).toContain('aria-label="Copy summary"')
+  })
+
+  it('says what changed on the policy that refused, who changed it and when, and nothing when there is no change', () => {
+    function WhyChanged({ on }: { on: boolean }) {
+      const resolve = useNameLookup()
+      const { plan } = planOf(form)
+      return (
+        <WhyCard
+          plan={plan}
+          items={whyItems(plan)}
+          groups={eachGroupRows(plan)}
+          headline={whyTitle(plan) ?? { text: 'Why', tone: 'info' }}
+          policies={t.policies}
+          resolve={resolve}
+          person="Maya Iyer"
+          id="why"
+          interactive
+          onClose={noop}
+          onOpenRule={noop}
+          onOpenPolicy={noop}
+          onAdd={noop}
+          changes={on ? [{ id: 'c1', policyId: 'p', policyName: 'AWS for engineering teams', at: new Date(Date.now() - 2 * 86_400_000).toISOString(), by: 'Jaspreet Toor', lines: ['Added “Contractors away from the office”'] }] : []}
+        />
+      )
+    }
+    const out = (on: boolean) =>
+      renderToStaticMarkup(
+        <BrandProvider>
+          <WhyChanged on={on} />
+        </BrandProvider>,
+      )
+    const html = out(true)
+    expect(html).toContain('What changed')
+    expect(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).toContain('AWS for engineering teams · 2 days ago · Jaspreet Toor')
+    expect(html).toContain('Added “Contractors away from the office”')
+    expect(out(false)).not.toContain('What changed')
+  })
+
+  it('lists the what-ifs that let them in, each a button, and nothing when the page cannot run one', () => {
+    const out = html(true)
+    expect(out).toContain('How to get in')
+    expect(out).toMatch(/<button[^>]*class="tj-why__grow"[^>]*>.*From Office network/)
+    expect(html(false)).not.toContain('How to get in')
   })
 })

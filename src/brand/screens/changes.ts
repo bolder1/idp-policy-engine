@@ -136,6 +136,7 @@ export function describeChanges(
 
     if (factorKey(before) !== factorKey(r)) out.push(`Authentication settings changed on “${r.name}”`)
     if ((before.denyMessage ?? '') !== (r.denyMessage ?? '')) out.push(`Deny message changed on “${r.name}”`)
+    if ((before.denyAction ?? '') !== (r.denyAction ?? '') || (before.denyContact ?? '') !== (r.denyContact ?? '')) out.push(`Deny next step changed on “${r.name}”`)
   })
 
   /* The last rule decides every sign-in no rule above catches, so a change to it

@@ -1,0 +1,82 @@
+/* -----------------------------------------------------------------------------
+   THE BRIEF, INSIDE FOCUS (focus2-brief.tsx): the Brief view's sentence over
+   the cards, or alone on the canvas.
+
+   Everything the sentence looks like is the Brief view's own — brief.css and
+   brief-text.css, the `--bf-*` palette by `data-stage`, the quiet underlines —
+   and none of it is restated here. What is here is only what Focus adds: the
+   block's place in the world, the two sizes it moves between, and the unseen
+   copy the cards are placed by.
+
+   The two sizes are custom properties registered as lengths, so each resolves
+   to pixels: Motion reads them at the start of a move (focus2-brief.tsx) and
+   animates the font size between them, and a static paint draws whichever is
+   current straight from the token.
+   -------------------------------------------------------------------------- */
+
+@property --f2b-alone {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+@property --f2b-head {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+/* Over the band's empty top, so the phrases take the pointer; under the band's focus ring (focus.css, 35). Centred in
+   the world by its auto margins: the world is the path's room, so the block keeps the open card's centre line. */
+.rl-brief.rl-f2b {
+  /* Alone, the Brief view's own size (brief.css, narrow included); over the cards, a step or two under it. */
+  --f2b-alone: var(--bf-say);
+  --f2b-head: var(--fs-2xl);
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: block;
+  margin-inline: auto;
+  overflow: hidden;
+}
+.rl-brief.rl-f2b.is-narrow { --f2b-head: var(--fs-xl); }
+
+/* The room inside the clip, above and below: a focus ring and the underline under the last line are never cut by it.
+   None at the sides, so the sentence's column is the width it is handed — alone, exactly the Brief view's, and so its
+   lines break where the Brief view's do. */
+.rl-f2b__body,
+.rl-f2b__ghost {
+  box-sizing: border-box;
+  padding: var(--space-2) 0 var(--space-4);
+}
+.rl-f2b__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The sentence takes the block's size, which Motion moves; the finding line keeps Brief's own. */
+.rl-brief.rl-f2b .rl-f2b__say .rl-brief__sentence:not(.is-after),
+.rl-brief.rl-f2b .rl-f2b__ghost .rl-brief__sentence:not(.is-after) {
+  font-size: inherit;
+}
+.rl-f2b__find { display: flex; justify-content: center; }
+
+/* "How it was decided", alone: Brief's own quiet button, opening and closing with its row. */
+.rl-f2b__how {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  padding-bottom: var(--space-2);
+}
+
+/* The headline as it will stand, unseen: its height is where the cards go. */
+.rl-f2b__ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.rl-f2b__ghost .rl-brief__answer { font-size: var(--f2b-head); }

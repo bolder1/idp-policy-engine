@@ -217,6 +217,7 @@ const POLICY_SCREENS = [
   'methods',
   'display-tokens',
   'sign-in-tests',
+  'sign-in-activity',
 ]
 
 /* The two builders, which want the rail out of the way.
@@ -241,7 +242,7 @@ const RAIL_SHUT_SCREENS = [...BUILDER_SCREENS, 'sign-in-tests']
    opened from its bar; Display tokens is opened only from Authentication
    methods, so that is where the rail says you are. */
 const UNDER_ITEM: Record<string, string[]> = {
-  policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests'],
+  policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests', 'sign-in-activity'],
   methods: ['display-tokens'],
 }
 
@@ -457,19 +458,18 @@ export function Shell({ children }: { children: ReactNode }) {
               uncommenting this line. */}
           {/* Each icon shows its name in a Tip. A native title never reached a
               keyboard. */}
-          {/* Light only in the showcase build — see theme-mode.ts. */}
-          {!SHOWCASE && (
-            <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
-              <button
-                type="button"
-                className="bshell__icon"
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-              >
-                {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
-              </button>
-            </Tip>
-          )}
+          {/* The Mode button, in the showcase build too (owner, 4 Oct 2026: "bring the old Mode button at the
+              top"); the Access checks canvas follows it (canvas-shelf.ts `useStageFollowsTheme`). */}
+          <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+            <button
+              type="button"
+              className="bshell__icon"
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+            >
+              {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
+            </button>
+          </Tip>
           <Tip text={`Documentation. ${NOT_BUILT}`}>
             <button type="button" className="bshell__icon is-inert" aria-label="Documentation" aria-disabled="true">
               <BookOpen size={20} strokeWidth={1.7} />

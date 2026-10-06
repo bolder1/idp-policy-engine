@@ -3,7 +3,9 @@ import type { ReactNode } from 'react'
 import { Ban, Check, ChevronLeft, ChevronRight, Fingerprint, KeyRound, Lock, Mail, QrCode, RotateCw, Smartphone, CreditCard } from 'lucide-react'
 
 import { initials } from '../../../data'
+import { TENANT_DENY_CONTACT } from '../../../data'
 import { AppLogo } from '../../../logos/AppLogo'
+import { DENIAL_REASONS } from '../../sign-in-tests/phase'
 import { EASE_OUT, PRESS, PRESS_T, isPressing, usePlay, useTyped } from './play-state'
 import { SIGN_IN_DOMAIN, type FieldKey, type Page, type Remember, type Sheet, type WaitIcon } from './script'
 import { BrowserSheet } from './Sheets'
@@ -195,7 +197,7 @@ function PageBody({ page }: { page: Page }) {
         </div>
       )
     case 'denied':
-      return <Denied message={page.message} />
+      return <Denied message={page.message} action={page.action} contact={page.contact} />
     case 'signed-in':
       return null
   }
@@ -359,7 +361,7 @@ function Grid({ size, pattern, lit, remember }: { size: number; pattern: number[
   )
 }
 
-function Denied({ message }: { message: string }) {
+function Denied({ message, action, contact }: { message: string; action?: string; contact?: string }) {
   const { reduced } = usePlay()
   return (
     <motion.div
@@ -379,6 +381,8 @@ function Denied({ message }: { message: string }) {
       </motion.span>
       <p className="tpw__h">Access denied</p>
       <p className="tpw__msg">{message}</p>
+      {action && <p className="tpw__msg">{action}</p>}
+      {DENIAL_REASONS && <p className="tpw__msg">Contact: {contact ?? TENANT_DENY_CONTACT}</p>}
       <span className="tpw__link">Back to sign in</span>
     </motion.div>
   )

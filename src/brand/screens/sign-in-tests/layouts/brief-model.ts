@@ -6,7 +6,7 @@ import type { TokenValue } from '../../testing/sign-in-sentence'
 
 /* -----------------------------------------------------------------------------
    The brief's model (BriefLayout.tsx), pure: the run said as ONE sentence,
-   answer first, whose key phrases cite the evidence cards under it — and,
+   answer first, whose key phrases cite the evidence under it — and,
    for every part of it, the step it is written at, so the sentence is built
    as the engine reaches each thing. Every word comes from the plan.
 
@@ -14,10 +14,11 @@ import type { TokenValue } from '../../testing/sign-in-sentence'
      engineering teams [2] applies through Engineering [1], and rule 2 [3]
      matches because the Windows 11 laptop meets Compliant devices [4].
 
-   The cards, in the engine's order, are numbered as they are present:
-   who (the person and the group that let them in), policy (the stack, the
-   one that applies lit), rule (the rules in order), check (the one that
-   decided it), outcome (the factors, what they see).
+   The parts, in the engine's order: who (the person and the group that let
+   them in), policy (the one that applies), rule (the rule that matched),
+   check (the one that decided it), outcome (the factors, what they see).
+   Each cited part lights its step in the panel's "How it was decided" and
+   back (brief-evidence.ts, brief-panel.tsx); `num` orders them for the dock's ‹ ›.
    -------------------------------------------------------------------------- */
 
 export type CiteId = 'who' | 'policy' | 'rule' | 'check' | 'outcome'
@@ -26,10 +27,11 @@ export const CITE_LABEL: Record<CiteId, string> = { who: 'Who', policy: 'Policy'
 
 export type Tone = 'positive' | 'negative' | 'notice' | 'neutral'
 
-/* What the admin picked in the Configure panel, named in the sentence: each
-   kind its own colour (brief.css) — who blue, the application orange, the
-   conditions violet. The engine's things (the policy, the rule) and the
-   answer keep their own ink. */
+/* What the admin picked in the Configure panel, named in the sentence. The
+   words are ink (owner, 3 Oct 2026: "only icons are enough; you can add colour
+   to the icons only"): the colour lives on the mark before them — the face and
+   a group's people blue, the application its own logo, a condition's mark
+   violet (brief.css). The answer's words keep the outcome's tone. */
 export type Entity = 'person' | 'group' | 'app' | 'condition'
 
 /** The mark drawn before a named thing, sized to the text. */
@@ -43,7 +45,7 @@ export type Glyph =
   | { kind: 'rule' }
   | { kind: 'outcome'; decision: AccessDecision | 'depends' }
 
-/** A run of a part's words: plain, or a picked thing in its colour, with its mark before it. */
+/** A run of a part's words: plain, or a picked thing with its mark before it. */
 export interface Seg {
   text: string
   entity?: Entity
@@ -77,8 +79,10 @@ export interface BriefModel {
   num: Partial<Record<CiteId, number>>
   decisive: Decisive | null
   tone: Tone
-  /** The steps each card's content arrives at. */
+  /** The step each part's evidence starts to arrive at (its note's first line). */
   cardAt: Record<CiteId, number>
+  /** The step each part is PROVEN at: its evidence is written then. */
+  provenAt: Record<CiteId, number>
 }
 
 export interface BriefInput {
@@ -91,9 +95,9 @@ export interface BriefInput {
   via: Via | null
   /** The second factor's name, for "with 2FA (miniOrange Push)". */
   second: string
-  /** The person's own name ('' when signed in as a group's member), for their face and their colour. */
+  /** The person's own name ('' when signed in as a group's member), for their face. */
   name?: string
-  /** The person's groups (or the group chosen), by name: blue wherever named. */
+  /** The person's groups (or the group chosen), by name: their mark wherever named. */
   groups?: readonly string[]
   /** The application's id, for its logo. */
   appId?: string | null
@@ -143,7 +147,7 @@ export function checkPicks(c: CheckRow, inp: Pick<BriefInput, 'name' | 'groups' 
   return [{ text: c.value, entity: 'condition', glyph }]
 }
 
-/** The person (their face) and their groups, as picks; `marks` false for words tinted alone. */
+/** The person (their face) and their groups, as picks; `marks` false for the words alone. */
 function whoPicks(inp: Pick<BriefInput, 'name' | 'groups'>, marks: boolean): Seg[] {
   const out: Seg[] = []
   if (inp.name) out.push({ text: inp.name, entity: 'person', glyph: marks ? { kind: 'face', name: inp.name } : undefined })
@@ -237,7 +241,7 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
   let k = 0
   const t = (text: string, when: number, extra: Partial<Part> = {}) => parts.push({ key: `p${k++}`, text, at: when, ...extra })
 
-  /* The picked things, in their colours and marks. */
+  /* The picked things, with their marks. */
   const whoSegs = (text: string): Seg[] =>
     inp.name ? splitBy(text, [{ text: inp.name, entity: 'person', glyph: { kind: 'face', name: inp.name } }]) : splitBy(text, whoPicks({ groups: inp.groups }, true))
   const appSegs = (): Seg[] => [{ text: inp.app, entity: 'app', glyph: inp.appId ? { kind: 'logo', appId: inp.appId, name: inp.app } : undefined }]
@@ -257,6 +261,7 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
     check: dRule && decisive ? Math.min(atOut, dRule.checkAt[decisive.check] ?? atCheck) : atOut,
     outcome: atOut,
   }
+  const provenAt: Record<CiteId, number> = { who: atPol, policy: atPol, rule: atRule, check: atCheck, outcome: atOut }
 
   /* The answer first. */
   const decided = o.status === 'decided' && o.decision ? o.decision : null
@@ -288,7 +293,7 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
     t(': ', atOut)
     t(o.view.line || 'no policy decides', atOut, { cite: 'outcome', answer: true })
     t('.', atOut)
-    return { parts, after: [], cites, num, decisive, tone, cardAt }
+    return { parts, after: [], cites, num, decisive, tone, cardAt, provenAt }
   }
 
   /* Then the policy, and how it covers them. */
@@ -355,10 +360,10 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
     after.push({ key: 'a0', text: f.line, segs: splitBy(f.line, whoPicks({ groups: inp.groups }, false)), at: atOut, cite: cites.includes(cite) ? cite : undefined, notice: true })
     after.push({ key: 'a1', text: '.', at: atOut })
   }
-  return { parts, after, cites, num, decisive, tone, cardAt }
+  return { parts, after, cites, num, decisive, tone, cardAt, provenAt }
 }
 
-/** What the engine is working on at step `s`, as a card: blue there, and only there. */
+/** What the engine is working on at step `s`, as a part: blue there, and only there. */
 export function workingCite(plan: EngineRun, s: number, decisive: Decisive | null): CiteId | null {
   const step = plan.steps[s]
   if (!step || s >= plan.steps.length - 1) return null

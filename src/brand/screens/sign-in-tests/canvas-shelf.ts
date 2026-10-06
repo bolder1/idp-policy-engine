@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { useTheme } from '../../theme-mode'
 
 import { DEFAULT_FAVOURITES, RUN_LAYOUTS, type RunLayoutId } from './run-layout'
 
@@ -98,6 +100,35 @@ export function useLayoutNotes(): [Partial<Record<RunLayoutId, string>>, (id: Ru
     [setNotes],
   )
   return [notes, write]
+}
+
+/** The stage follows the console's Mode button at the top (owner, 4 Oct 2026: "we have a mode button at the top, so
+    remove it from here"): no view's dock carries a stage button while this is on (each toggle reads it). */
+export const STAGE_FROM_TOP = true
+
+/** Keeps the stage on the console's light / dark: on arrival, and each time the Mode button is pressed. Aruna opens
+    dark whatever it says (`forceDark` on arrival; the page's toggleJarvis on entering). */
+export function useStageFollowsTheme(forceDark: boolean) {
+  const [theme] = useTheme()
+  const seen = useRef<string | null>(null)
+  useEffect(() => {
+    if (seen.current === theme) return
+    const first = seen.current === null
+    seen.current = theme
+    setCheckStage(first && forceDark ? 'dark' : theme)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- arrival and each press of the Mode button only
+  }, [theme])
+  return theme
+}
+
+/** Set the stage for every view that has one (as each view's own toggle does): Aruna always opens dark (owner, 4 Oct 2026). */
+export function setCheckStage(stage: 'light' | 'dark') {
+  try {
+    window.localStorage.setItem(STAGE_KEY, stage)
+  } catch {
+    /* Storage refused: the stage holds for this visit. */
+  }
+  window.dispatchEvent(new Event(STAGE_EVENT))
 }
 
 const readStage = (): 'light' | 'dark' => {

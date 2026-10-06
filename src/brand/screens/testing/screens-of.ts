@@ -28,7 +28,7 @@ export type ScreenStep =
   | { kind: 'first-method'; method: string; prompt: 'passkey' | 'link' | 'other' }
   /** The second factor. `method` is null when the rule names one nobody can be offered. */
   | { kind: 'second'; method: AuthMethod | null; name: string; prompt: EnrolKind; masked: string; rememberDays: number | null }
-  | { kind: 'deny'; message: string }
+  | { kind: 'deny'; message: string; action?: string; contact?: string }
 
 export interface SignInScreens {
   decision: AccessDecision
@@ -116,7 +116,7 @@ function firstStep(rule: Partial<Rule>, ctx: ScreensContext): ScreenStep {
 }
 
 function stepsOf(rule: Partial<Rule> & Pick<Rule, 'decision'>, ctx: ScreensContext): ScreenStep[] {
-  if (rule.decision === 'deny') return [{ kind: 'deny', message: rule.denyMessage ?? DEFAULT_DENY_MESSAGE }]
+  if (rule.decision === 'deny') return [{ kind: 'deny', message: rule.denyMessage ?? DEFAULT_DENY_MESSAGE, action: rule.denyAction, contact: rule.denyContact }]
   const first = firstStep(rule, ctx)
   if (rule.decision === '1fa') return [first]
   const { method, name } = secondMethod(rule, ctx)

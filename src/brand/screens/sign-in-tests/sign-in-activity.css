@@ -1,0 +1,51 @@
+/* Sign-in activity (SignInActivity.tsx). Tokens only. The table is the policies table's own (`btable`); these are the
+   page's few additions: the row that opens, its muted cells and the detail under it. */
+.sia__when { white-space: nowrap; }
+.sia__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.sia__toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.sia__chev { flex: none; color: var(--text-tertiary); transition: transform 0.15s ease; }
+.sia__row.is-open .sia__chev { transform: rotate(90deg); }
+.sia__app { display: inline-flex; align-items: center; gap: var(--space-3); }
+.sia__muted { color: var(--text-tertiary); }
+.sia__detail > td { background: var(--surface-sunken); }
+.sia__panel { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-3) 0; }
+.sia__lines { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; }
+.sia__lines > div { display: flex; gap: var(--space-5); font-size: var(--fs-sm); }
+.sia__lines dt { flex: none; width: 96px; color: var(--text-tertiary); }
+.sia__lines dd { margin: 0; color: var(--text-primary); }
+.sia__acts { display: flex; align-items: center; gap: var(--space-3); }
+.sia__copy { flex: none; }
+
+/* The reasons report: why the week's refusals were refused, each a filter. */
+.sia__why { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-5); }
+.sia__whylabel { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.sia__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.sia__chip:hover { background: var(--surface-sunken); }
+.sia__chip[aria-pressed='true'] { border-color: var(--text-secondary); background: var(--surface-sunken); }
+.sia__chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.sia__chipn { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+/* The Sign-ins / Changes tabs, under the head as on the device profile page. */
+.sia__tabs { margin: var(--space-2) 0 var(--space-5); }

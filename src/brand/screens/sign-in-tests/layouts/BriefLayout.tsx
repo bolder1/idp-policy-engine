@@ -1,271 +1,319 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'motion/react'
-import { ArrowRight, ChevronLeft, ChevronRight, Pencil, Undo2, Users } from 'lucide-react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { ChevronLeft, ChevronRight, PanelRight } from 'lucide-react'
 
-import { Face } from '../../../faces'
-import { AppLogo } from '../../../logos/AppLogo'
-import { Tip } from '../../../kit'
-import { useBrand } from '../../../store'
-import { useSimEnv } from '../../sim-env'
-import { sentenceTokens, tokenValue, type SentenceContext } from '../../testing/sign-in-sentence'
-import { audienceViaOf } from '../conflicts'
-import { activeNode } from '../engine-run'
 import { stepMs } from '../use-engine-run'
-import { briefOf, workingCite, type CiteId } from './brief-model'
-import { OutcomeCard } from './brief-outcome'
-import type { CardState } from './brief-parts'
-import { CheckCard, RuleCard } from './brief-rule-check'
+import { AnswerText } from './assistant/AnswerText'
+import { ASSISTANT_DOCK_PAD, AssistantDock, DockButton, DockSep } from './assistant/AssistantDock'
+import type { Action, Answer, Target } from './assistant/intents'
+import { useNarrator } from './assistant/voice'
+import { useWhatIfs } from './assistant/what-if'
+import { citeOfTarget, evidenceOf, howStepsOf, rowLitOf, spokenOf } from './brief-evidence'
+import { alsoCoversOf } from './brief-how'
+import { BRIEF_NARROW, briefWidth, useBriefRun } from './brief-input'
+import { workingCite, type CiteId } from './brief-model'
+import { HowPanel } from './brief-panel'
 import { Sentence } from './brief-sentence'
-import { PolicyCard, WhoCard } from './brief-who-policy'
-import { FollowUps, type Ask } from './brief-follow'
 import { useBriefStage } from './brief-stage'
+import { textOf } from './brief-text'
+import { BriefText0 } from './brief-text-0'
+import { TextAnnounce } from './brief-text-parts'
 import { BriefStageToggle } from './brief-theme'
-import { useWhatIfs, type WhatIf } from './brief-whatif'
-import { Thread } from './brief-thread'
-import { whyNotsOf, type WhyNot } from './brief-why'
 import { RunStage, type StageView } from './RunStage'
-import { ValueMark } from '../SignInCard'
+import { SignInRow } from './shared/SignInRow'
 import type { RunLayoutProps } from './types'
 import './brief.css'
-import './brief-cards.css'
-import './brief-follow.css'
+import './brief-text.css'
 
 /* -----------------------------------------------------------------------------
-   The run as a BRIEF (run-layout.ts `brief`): the answer first, with its
-   evidence one press away — an AI answer with citations.
+   The run as a BRIEF (run-layout.ts `brief`): the answer first, as one
+   sentence, and nothing else on the canvas (owner, 3 Oct 2026: "remove the
+   evidence and add a button only … on the main screen show the text and the
+   AI ask thing only"):
 
-     ┌ Maya Iyer → AWS Console · Office network · Windows 11 laptop ✎ ┐
-     Maya Iyer¹ gets into AWS Console on one factor⁵: AWS for engineering
-     teams² applies through Engineering¹, and rule 2³ matches because the
-     Windows 11 laptop meets Compliant devices⁴.
-     [1 Who] [2 Policies] [3 Rules] [4 Check] [5 Outcome]
-     Why not rule 1? Who · Maya Iyer is not in Contractors
-     (follow-ups)
+     [ Maya Iyer → AWS Console | Office network · Windows 11 laptop | ✎ ↻ Replay ]   the shared sign-in row
+       Maya Iyer gets into AWS Console on one factor: AWS for engineering
+       teams applies through Engineering, and rule 2 matches because the
+       Windows 11 laptop meets Compliant devices.                              the sentence (brief-sentence.tsx)
+       ⚠ the conflict line, when there is one
+                         ▯ How it was decided                                   one quiet button
+     [ Ask about this sign-in…                         ] [− 100% + ⤢ | ‹ › | ☾ 🔊]  the shared dock
 
-   The sentence is laid out whole from the first frame and written as the
-   engine reaches each thing (brief-sentence.tsx); the cards fill as their
-   step comes (brief-*.tsx). Everything is drawn from `s`.
+   The evidence is in the page's RIGHT-HAND PANEL (brief-panel.tsx), drawn
+   into its body (`props.why.slot`) with a portal, as EngineJourney.tsx draws
+   the Why there. It opens from the button (pressed again, its X, or Escape
+   shuts it), from a cited part of the sentence (on that part's step, lit),
+   from the dock's ‹ › and ← →, and from the assistant ("How was it
+   decided?", "What will Maya see?", "Show every check"). With no page panel
+   (the builder's Check access) it opens under the button instead.
+
+   The sentence's parts blur in as the engine proves each (its `at` step). A
+   part and its step light each other (hovered or focused) and pin together
+   (pressed). Words are ink; colour is on icons and on what it means.
    -------------------------------------------------------------------------- */
 
-const firstName = (name: string): string => name.trim().split(/\s+/)[0] || name
+/* The text: the sentence as it is (owner, 3 Oct 2026 — of five more versions tried behind a switch, "the 0 one is the
+   best": today's sentence, its underlines quiet until the pointer is over it). */
+const Text = BriefText0
 
 export default function BriefLayout(props: RunLayoutProps) {
-  const { running, reduced, jumped, runKey, rows, asGroup, onPressPerson } = props
+  const { plan, s, running, reduced, jumped, runKey, rows, form, screens, animate } = props
   const [theme, setTheme] = useBriefStage()
-  const brand = useBrand()
-  const { users, groups, apps, zones } = brand
-  const env = useSimEnv()
   const stage = useRef<StageView | null>(null)
   const worldRef = useRef<HTMLDivElement | null>(null)
+  const howBtn = useRef<HTMLButtonElement | null>(null)
+  const [zoom, setZoom] = useState(1)
+  const narrator = useNarrator({ runKey, running, jumped, reduced })
 
-  /* Interaction: what is hovered, what is pinned, the rows pressed — all let go on a new run. */
+  /* What is lit: hovered here, hovered in the dock's answer, pinned, the answer on show — all let go on a new run. */
   const [hot, setHot] = useState<CiteId | null>(null)
+  const [dockHot, setDockHot] = useState<CiteId | null>(null)
   const [pinned, setPinned] = useState<CiteId | null>(null)
-  const [selPolicy, setSelPolicy] = useState<string | null>(null)
-  const [selRule, setSelRule] = useState<number | null>(null)
-  const [selCheck, setSelCheck] = useState<number | null>(null)
-  const [hotWhy, setHotWhy] = useState<WhyNot | null>(null)
-  const [openWhy, setOpenWhy] = useState<string | null>(null)
-  const [see, setSee] = useState(false)
-  const [ask, setAsk] = useState<Ask | null>(null)
-  /* A what-if briefed in place of the run: marked, with a way back; the page's sign-in is never changed. */
-  const [preview, setPreview] = useState<WhatIf | null>(null)
+  const [seeAt, setSeeAt] = useState(0)
+  const [answerOn, setAnswerOn] = useState<Answer | null>(null)
+  /* How it was decided, with no page panel: open under the button. */
+  const [inlineOpen, setInlineOpen] = useState(false)
   const [seen, setSeen] = useState(runKey)
   if (seen !== runKey) {
     setSeen(runKey)
     setHot(null)
+    setDockHot(null)
     setPinned(null)
-    setSelPolicy(null)
-    setSelRule(null)
-    setSelCheck(null)
-    setHotWhy(null)
-    setOpenWhy(null)
-    setSee(false)
-    setAsk(null)
-    setPreview(null)
+    setSeeAt(0)
+    setAnswerOn(null)
+    setInlineOpen(false)
   }
-  if (preview && running) setPreview(null)
-  /* A what-if briefed (or let go): its own evidence, nothing pressed. */
-  const [seenPreview, setSeenPreview] = useState<string | null>(null)
-  if ((preview?.key ?? null) !== seenPreview) {
-    setSeenPreview(preview?.key ?? null)
-    setSelPolicy(null)
-    setSelRule(null)
-    setSelCheck(null)
-    setPinned(null)
-    setSee(false)
-    setOpenWhy(null)
-  }
-  const plan = preview?.plan ?? props.plan
-  const form = preview?.form ?? props.form
-  const screens = preview?.screens ?? props.screens
-  const s = preview ? plan.steps.length - 1 : props.s
-  const animate = preview ? !reduced : props.animate
-  const onPin = useCallback((c: CiteId) => setPinned((p) => (p === c ? null : c)), [])
-  const lit: CiteId | null = hot ?? hotWhy?.cite ?? pinned
+  const lit: CiteId | null = hot ?? dockHot ?? pinned ?? citeOfTarget(answerOn?.focus ?? null)
+  /* The panel opening narrows the canvas and the sentence wraps again under a still pointer: the part it lands on is
+     not hovered by the admin, so for a moment after a press opens the panel a hover is not taken (the press is). */
+  const holdHot = useRef(0)
+  const onHot = useCallback((c: CiteId | null) => {
+    if (c !== null && performance.now() < holdHot.current) return
+    setHot(c)
+  }, [])
 
-  /* Who signed in to what. */
-  const person = users.find((u) => u.id === form.personId) ?? null
-  const app = apps.find((a) => a.id === form.appId) ?? null
-  const appName = plan.appName || app?.name || 'the application'
-  const personName = asGroup ? `A member of ${asGroup}` : (person?.name ?? plan.conflicts?.personName ?? 'Someone')
-  const first = asGroup ? 'them' : person ? firstName(person.name) : 'them'
-  const memberGroups = useMemo(() => {
-    if (!person) return []
-    const ids = [person.groupId, ...(person.alsoGroupIds ?? [])].filter((x, i, a) => x && a.indexOf(x) === i)
-    return ids.map((id) => ({ id, name: groups.find((g) => g.id === id)?.name ?? id }))
-  }, [person, groups])
-
-  /* How the deciding policy covers them: its audience, asked as the resolver does. */
-  const deciderPolicy = useMemo(() => {
-    const list = props.policies ?? brand.policies
-    return plan.decider ? (list.find((p) => p.id === plan.decider!.id) ?? null) : null
-  }, [plan.decider, props.policies, brand.policies])
-  const via = useMemo(() => {
-    try {
-      return deciderPolicy && person ? audienceViaOf(deciderPolicy, person, env) : null
-    } catch {
-      return null
-    }
-  }, [deciderPolicy, person, env])
-  const second = useMemo(() => {
-    const sc = screens.find((x) => x.decision === '2fa')
-    const st = sc?.steps.find((x) => x.kind === 'second')
-    return st && st.kind === 'second' ? st.name : ''
-  }, [screens])
-
-  const whyNots = useMemo(() => whyNotsOf(plan, first), [plan, first])
-  const canChange = rows.rows.has('place') || rows.rows.has('device') || rows.rows.has('risk')
-  const whatIfs = useWhatIfs(props.form, rows, props.plan, ask === 'change' && !running && !preview)
-
-  /* The sign-in's facts, for the line on top. */
-  const facts = useMemo(() => {
-    const ctx: SentenceContext = { people: users, apps, zones, rows }
-    return sentenceTokens(rows)
-      .filter((t) => t !== 'person' && t !== 'app')
-      .map((t) => tokenValue(t, form, ctx))
-  }, [rows, form, users, apps, zones])
-
-  /* The sentence, its picked things marked: the person's face, their groups, the application's logo, the facts' marks. */
-  const groupNames = useMemo(() => (asGroup ? [asGroup] : memberGroups.map((g) => g.name)), [asGroup, memberGroups])
-  const model = useMemo(
-    () => briefOf(plan, { person: personName, first, app: appName, via, second, name: asGroup ? '' : (person?.name ?? ''), groups: groupNames, appId: app?.id ?? form.appId, facts }),
-    [plan, personName, first, appName, via, second, asGroup, person, groupNames, app, form.appId, facts],
-  )
+  /* Who signed in to what, how the deciding policy covers them, and the sentence: brief-input.ts, which Focus reads
+     too for its brief (Focus2Layout.tsx, focus2-brief.tsx), so the two never say different things. */
+  const { person, app, appName, groupName, personName, first, memberGroups, via, facts, briefIn, model } = useBriefRun(props)
+  /* The plainer sentence, for versions 1–5. */
+  const text = useMemo(() => textOf(plan, briefIn, model), [plan, briefIn, model])
 
   const last = s >= plan.steps.length - 1
   const landed = last || (plan.at.outcome >= 0 && s >= plan.at.outcome)
   const working = landed ? null : workingCite(plan, s, model.decisive)
   const durOf = useCallback((at: number) => stepMs(plan, at), [plan])
-  const stateOf = (c: CiteId): CardState => (working === c ? 'working' : landed || s >= model.cardAt[c] ? 'settled' : 'waiting')
 
-  /* A what-if: the facts it changed, marked in the line on top. */
-  const changedFacts = useMemo(() => {
-    if (!preview) return new Set<string>()
-    const ctx: SentenceContext = { people: users, apps, zones, rows }
-    const was = new Map(sentenceTokens(rows).map((t) => [t, tokenValue(t, props.form, ctx).text]))
-    return new Set(facts.filter((v) => was.get(v.token) !== v.text).map((v) => v.token as string))
-  }, [preview, facts, rows, props.form, users, apps, zones])
+  /* The evidence (brief-evidence.ts), and its steps for the panel. */
+  const ev = useMemo(
+    () => evidenceOf(plan, model, { first, asGroup: groupName, name: groupName ? '' : (person?.name ?? ''), groups: memberGroups, via, appName, screens }),
+    [plan, model, first, groupName, person, memberGroups, via, appName, screens],
+  )
+  const steps = useMemo(() => howStepsOf(ev), [ev])
 
-  /* Later policies that also cover them: by group (the Who card) and by id (the Policy card). */
-  const conflictIds = useMemo(() => new Set((plan.conflicts?.findings ?? []).filter((f) => f.tone === 'conflict').map((f) => f.target.policyId)), [plan.conflicts])
-  const alsoByGroup = useMemo(() => {
-    const m = new Map<string, { name: string; conflict: boolean }>()
-    for (const pc of plan.conflicts?.policies ?? []) for (const g of pc.via.groups) if (!m.has(g.id)) m.set(g.id, { name: pc.policyName, conflict: conflictIds.has(pc.policyId) })
-    return m
-  }, [plan.conflicts, conflictIds])
-  const alsoById = useMemo(() => new Map((plan.conflicts?.policies ?? []).map((pc) => [pc.policyId, conflictIds.has(pc.policyId)])), [plan.conflicts, conflictIds])
+  // --- How it was decided: the page's right-hand panel (else under the button) ---
+  const why = props.why ?? null
+  const open = landed && (why ? why.open : inlineOpen)
+  const panelId = useId()
+  /* Read at the press: the page's panel, as it stands. */
+  const whyRef = useRef(why)
+  useLayoutEffect(() => {
+    whyRef.current = why
+  })
+  const setOpen = useCallback((o: boolean) => {
+    const w = whyRef.current
+    if (w) w.onOpen(o)
+    else setInlineOpen(o)
+    if (!o) setPinned(null)
+  }, [])
+  /* Shut from the panel (its X, Escape): the pin goes, and the focus comes back to the button when it was left on nothing. */
+  const wasOpen = useRef(open)
+  useEffect(() => {
+    const was = wasOpen.current
+    wasOpen.current = open
+    if (!was || open) return
+    setPinned(null)
+    const id = window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => {
+        const a = document.activeElement
+        const lost = !a || a === document.body || !a.isConnected
+        if (lost && !document.querySelector('.sit-panel:not(.sit-whypanel)')) howBtn.current?.focus({ preventScroll: true })
+      }),
+    )
+    return () => window.cancelAnimationFrame(id)
+  }, [open])
 
-  /* The check card: the rule pressed (its failing check, or its first), else the check that decided it. */
-  const dec = model.decisive
-  const checkRule = selRule ?? dec?.rule ?? null
-  const checkIx = (() => {
-    if (checkRule === null) return 0
-    if (selCheck !== null) return selCheck
-    if (selRule === null) return dec?.check ?? 0
-    const r = plan.rules[selRule]
-    return r?.failing ?? r?.checks.findIndex((c) => c.status === 'unknown') ?? 0
-  })()
-  const isDecisive = selRule === null || (dec !== null && selRule === dec.rule && (selCheck ?? dec.check) === dec.check)
+  /* A cited part pressed: once landed it opens the panel on its step (pressed again, open, lets go); before, it only pins. */
+  const onPress = useCallback(
+    (c: CiteId) => {
+      if (!landed) {
+        setPinned((p) => (p === c ? null : c))
+        return
+      }
+      if (open && pinned === c) {
+        setPinned(null)
+        return
+      }
+      setPinned(c)
+      if (!open) {
+        holdHot.current = performance.now() + 700
+        setHot(null)
+        setOpen(true)
+      }
+    },
+    [landed, open, pinned, setOpen],
+  )
+  /* A version's own press: the panel open on a part's step, pinned (before the landing, it only pins). */
+  const onOpenStep = useCallback(
+    (c: CiteId) => {
+      setPinned(c)
+      if (!landed || open) return
+      holdHot.current = performance.now() + 700
+      setHot(null)
+      setOpen(true)
+    },
+    [landed, open, setOpen],
+  )
 
-  // --- The camera ---
+  // --- The camera: the brief fits at 100%; a new run, a landing or a new width fits it again ---
   const fitted = useRef<number | null>(null)
   useLayoutEffect(() => {
-    const v = stage.current
-    if (!v) return
     fitted.current = landed ? runKey : null
-    v.fit({ max: 1, jump: true })
+    stage.current?.fit({ max: 1, jump: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a new run, and on mount
   }, [runKey])
-  useEffect(() => {
-    if (!running || landed) return
-    const node = activeNode(plan, s)
-    const el = node ? worldRef.current?.querySelector(`[data-node="${node}"]`) : null
-    if (el) stage.current?.follow(el, { lazy: true, jump: reduced })
-  }, [s, running, landed, plan, reduced])
   useEffect(() => {
     if (!landed || fitted.current === runKey) return
     fitted.current = runKey
     stage.current?.fit({ max: 1, jump: reduced || jumped || !animate })
   }, [landed, runKey, reduced, jumped, animate])
 
-  /* An answer opened under the follow-ups: brought into view. A what-if briefed, or let go: the whole of it fitted. */
-  useEffect(() => {
-    if (!ask) return
-    const id = window.requestAnimationFrame(() => stage.current?.follow(worldRef.current?.querySelector('.rl-brief__reply'), { lazy: true, y: 0.62, jump: reduced }))
-    return () => window.cancelAnimationFrame(id)
-  }, [ask, reduced])
-  const firstPreview = useRef(true)
-  useEffect(() => {
-    if (firstPreview.current) {
-      firstPreview.current = false
-      return
-    }
-    const id = window.requestAnimationFrame(() => stage.current?.fit({ max: 1, jump: reduced }))
-    return () => window.cancelAnimationFrame(id)
-  }, [preview, reduced])
-
-  /* The world's width: the canvas's, within reason, so the brief reads at full size. */
-  const [width, setWidth] = useState(1240)
+  /* The canvas's width: the world's, and the sentence's floor size when it is narrow. */
+  const [canvas, setCanvas] = useState(1240)
   useEffect(() => {
     const ground = worldRef.current?.closest('.rstage')
     if (!ground || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver((es) => {
       const w = es[0]?.contentRect.width ?? 0
-      if (w <= 0) return
-      const next = Math.round(Math.min(1280, Math.max(960, w - 96)) / 8) * 8
-      setWidth((cur) => (Math.abs(cur - next) >= 8 ? next : cur))
+      if (w > 0) setCanvas((cur) => (Math.abs(cur - w) >= 8 ? Math.round(w) : cur))
     })
     ro.observe(ground)
     return () => ro.disconnect()
   }, [])
+  const width = briefWidth(canvas)
+  const narrow = canvas < BRIEF_NARROW
+  /* A new width (the panel opening or shutting), or the evidence opening under the button: fitted again. */
+  const inlineShown = !why && open
   useEffect(() => {
-    if (!running) stage.current?.fit({ max: 1, jump: true })
-  }, [width, running])
+    const id = window.requestAnimationFrame(() => stage.current?.fit({ max: 1, jump: true }))
+    return () => window.cancelAnimationFrame(id)
+  }, [width, narrow, inlineShown])
 
-  /* Step through the evidence, one citation at a time, from the dock; Escape lets go. */
-  const stepCite = (d: 1 | -1) => {
-    const list = model.cites
-    const at = pinned ? list.indexOf(pinned) : -1
-    const next = at < 0 ? (d > 0 ? 0 : list.length - 1) : at + d
-    setPinned(next < 0 || next >= list.length ? null : list[next])
-  }
+  /* Step through the parts (the dock's ‹ ›, or ← → on the canvas), one at a time, each on its step in the panel; Escape lets go. */
+  const cites = model.cites
+  const stepCite = useCallback(
+    (d: 1 | -1) => {
+      const at = pinned ? cites.indexOf(pinned) : -1
+      const n = at < 0 ? (d > 0 ? 0 : cites.length - 1) : at + d
+      const next = n < 0 || n >= cites.length ? null : cites[n]
+      setPinned(next)
+      if (next && !open) setOpen(true)
+    },
+    [cites, pinned, open, setOpen],
+  )
   useEffect(() => {
-    if (!pinned) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPinned(null)
+      const t = e.target as HTMLElement | null
+      if (t && (t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], .sit-panel') || e.altKey || e.ctrlKey || e.metaKey)) return
+      if (e.key === 'Escape') {
+        setPinned(null)
+        if (!whyRef.current) setInlineOpen(false)
+      } else if (landed && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+        if (t?.closest('[role="toolbar"]:not(.ad__controls), [role="menu"], [role="listbox"], [role="tablist"]')) return
+        e.preventDefault()
+        stepCite(e.key === 'ArrowRight' ? 1 : -1)
+      }
     }
     window.addEventListener('keydown', onKey)
-    const el = worldRef.current?.querySelector(`[data-ev="${pinned}"]`)
-    stage.current?.follow(el, { lazy: true, jump: reduced })
     return () => window.removeEventListener('keydown', onKey)
-  }, [pinned, reduced])
+  }, [landed, stepCite])
 
-  const cardProps = (c: CiteId) => ({ n: model.num[c], state: stateOf(c), lit: lit === c, animate, onHot: setHot })
-  const policyRow = hotWhy?.cite === 'policy' ? hotWhy.node : null
-  const ruleRow = hotWhy?.cite === 'rule' ? hotWhy.node : null
-  const viaGroupIds = new Set(via?.groups.map((g) => g.id) ?? [])
-  const routed = landed || stateOf('policy') === 'settled'
+  /* The text, said once as it lands (a run seen playing; the narrator keeps it to once). */
+  const spoken = spokenOf(model)
+  const spokenRef = useRef(spoken)
+  useLayoutEffect(() => {
+    spokenRef.current = spoken
+  })
+  useEffect(() => {
+    if (landed && spokenRef.current) void narrator.say(spokenRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once a landing; `say` keeps each line to once a run
+  }, [landed, runKey])
+
+  /* The dock: its citations light ours; an answer lights what it is about; this view's three presses open the panel. */
+  const onCite = useCallback((t: Target | null) => setDockHot(citeOfTarget(t)), [])
+  const onAnswer = useCallback((a: Answer | null) => setAnswerOn(a), [])
+  const onAction = useCallback(
+    (a: Action): boolean => {
+      if (a.kind === 'see') {
+        setSeeAt((n) => n + 1)
+        setPinned('outcome')
+        setOpen(true)
+        return true
+      }
+      if (a.kind === 'checks') {
+        setPinned(cites.includes('check') ? 'check' : 'rule')
+        setOpen(true)
+        return true
+      }
+      if (a.kind === 'how') {
+        setOpen(true)
+        return true
+      }
+      return false
+    },
+    [cites, setOpen],
+  )
+  const { onOpenPolicy, onOpenRule, onAdd, onReviewBreakIn, breakIn } = props
+  const outcomeDecided = plan.outcome.status === 'decided' || plan.outcome.status === 'depends'
+  /* What would change it: the previews, run here only once the panel is open (never the page's sign-in). */
+  const whatIfs = useWhatIfs(form, rows, plan, open, props.policies)
+  const changes = useMemo(() => whatIfs.list.filter((w) => w.changed).slice(0, 3), [whatIfs.list])
+  const also = useMemo(() => alsoCoversOf(plan, ev), [plan, ev])
+  const factWords = useMemo(() => facts.filter((f) => !f.unset).map((f) => f.text), [facts])
+  const pinNo = pinned ? cites.indexOf(pinned) + 1 : 0
+
+  const panel = open ? (
+    <HowPanel
+      ev={ev}
+      steps={steps}
+      first={first}
+      appName={appName}
+      appId={app?.id ?? null}
+      who={groupName ? `Anyone in ${groupName}` : personName}
+      asGroup={!!groupName}
+      facts={factWords}
+      tone={model.tone}
+      lit={lit}
+      pinned={pinned}
+      onHot={onHot}
+      onPin={(c) => setPinned((p) => (p === c ? null : c))}
+      onClose={() => setOpen(false)}
+      id={panelId}
+      screens={outcomeDecided ? screens : []}
+      seeAt={seeAt}
+      reduced={reduced}
+      also={also}
+      whatIfs={changes}
+      expected={props.expected}
+      weaker={props.weaker}
+      breakIn={breakIn && onReviewBreakIn ? { counts: breakIn.summary.counts, onReview: () => onReviewBreakIn(why ? 'why' : 'outcome') } : null}
+      onOpenPolicy={onOpenPolicy}
+      onOpenRule={onOpenRule}
+      onAdd={onAdd}
+      onAsGroup={props.onAsGroup}
+      onRunWith={props.onRunWith}
+      inline={!why}
+    />
+  ) : null
 
   return (
     <RunStage
@@ -273,178 +321,85 @@ export default function BriefLayout(props: RunLayoutProps) {
       reduced={reduced}
       className={`rl-brief-stage is-${theme}`}
       label="Sign-in run, as a brief"
-      dock={
+      externalDock
+      onZoom={setZoom}
+      pad={{ top: 64, bottom: ASSISTANT_DOCK_PAD, left: 32, right: 32 }}
+      overlay={
         <>
-          <BriefStageToggle theme={theme} onChange={setTheme} />
-          <span className="bb__float__sep" />
-          <Tip text="Previous evidence" placement="top">
-            <button type="button" className="bb__act" aria-label="Previous evidence" disabled={!landed} onClick={() => stepCite(-1)}>
-              <ChevronLeft size={15} strokeWidth={2} aria-hidden />
-            </button>
-          </Tip>
-          <span className="rl-brief__stepno" aria-live="polite">
-            {pinned ? `${model.num[pinned] ?? ''} of ${model.cites.length}` : `${model.cites.length} cited`}
-          </span>
-          <Tip text="Next evidence" placement="top">
-            <button type="button" className="bb__act" aria-label="Next evidence" disabled={!landed} onClick={() => stepCite(1)}>
-              <ChevronRight size={15} strokeWidth={2} aria-hidden />
-            </button>
-          </Tip>
+          <SignInRow run={props} look={theme} lit={rowLitOf(lit, plan, model.decisive)} previewing={answerOn?.previewing ?? null} />
+          <AssistantDock
+            run={props}
+            stage={stage}
+            zoom={zoom}
+            narrator={narrator}
+            theme={theme}
+            how
+            onAnswer={onAnswer}
+            onCite={onCite}
+            onAction={onAction}
+            renderAnswer={(a, ctx) => <AnswerText answer={a} animate={ctx.animate} onCite={ctx.onCite} numbers={false} />}
+            controls={
+              <>
+                <DockButton label="Previous part" disabled={!landed} onClick={() => stepCite(-1)}>
+                  <ChevronLeft size={15} strokeWidth={2} aria-hidden />
+                </DockButton>
+                <span className="rl-brief__stepno" aria-live="polite">
+                  {pinNo > 0 ? `${pinNo} of ${cites.length}` : `${cites.length} parts`}
+                </span>
+                <DockButton label="Next part" disabled={!landed} onClick={() => stepCite(1)}>
+                  <ChevronRight size={15} strokeWidth={2} aria-hidden />
+                </DockButton>
+                <DockSep />
+              </>
+            }
+            trailing={<BriefStageToggle theme={theme} onChange={setTheme} />}
+          />
         </>
       }
     >
-      <div ref={worldRef} className="rl-brief" data-stage={theme} style={{ width }}>
-        <Thread root={worldRef} lit={lit} on={landed} animate={!reduced} sig={`${width}:${preview?.key ?? ''}:${ask ?? ''}:${see}:${selRule}:${selCheck}`} />
-        <button type="button" className={`rl-brief__ask${preview ? ' is-whatif' : ''}`} data-card data-node="sign-in" onClick={onPressPerson} title="Change the sign-in">
-          <span className={`rl-brief__askent ${asGroup ? 'is-group' : 'is-person'}`}>
-            {asGroup ? <Users size={13} strokeWidth={2.2} aria-hidden /> : person && <Face kind="user" name={person.name} size="sm" decorative />}
-            <strong>{personName}</strong>
-          </span>
-          <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
-          {app ? (
-            <span className="rl-brief__askent is-app">
-              <AppLogo appId={app.id} name={app.name} size={16} />
-              <strong>{app.name}</strong>
-            </span>
-          ) : (
-            <strong>Choose an application</strong>
+      <div ref={worldRef} className={`rl-brief${narrow ? ' is-narrow' : ''}`} data-stage={theme} style={{ width }}>
+        <div className="rl-brief__answer" aria-live="off">
+          <Text
+            text={text}
+            brief={model}
+            s={s}
+            landed={landed}
+            animate={animate}
+            reduced={reduced}
+            jumped={jumped}
+            runKey={runKey}
+            working={working}
+            lit={lit}
+            pinned={pinned}
+            tone={model.tone}
+            durOf={durOf}
+            onHot={onHot}
+            onPin={onPress}
+            onOpen={onOpenStep}
+            narrator={narrator}
+            narrow={narrow}
+          />
+          {model.after.length > 0 && (
+            <Sentence className="is-after" parts={model.after} num={model.num} s={s} landed={landed} animate={animate} working={null} lit={lit} pinned={pinned} tone={model.tone} durOf={durOf} onHot={onHot} onPin={onPress} numbers={false} />
           )}
-          {facts.map((v) => (
-            <span key={v.token} className={`rl-brief__askfact is-condition${v.unset ? ' is-unset' : ''}${changedFacts.has(v.token) ? ' is-changed' : ''}`}>
-              <ValueMark v={v} size={13} />
-              {v.unset ? `${v.label}: not stated` : v.text}
-            </span>
-          ))}
-          <Pencil className="rl-brief__askedit" size={13} strokeWidth={2.2} aria-hidden />
+        </div>
+        <TextAnnounce text={spoken} landed={landed} />
+
+        {/* The one press on the canvas: the evidence, in the panel. Held in its place from the start, shown once the answer is out. */}
+        <button
+          ref={howBtn}
+          type="button"
+          className={`rl-brief__how${open ? ' is-on' : ''}${landed ? '' : ' is-waiting'}`}
+          aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
+          disabled={!landed}
+          onClick={() => setOpen(!open)}
+        >
+          <PanelRight size={14} strokeWidth={2} aria-hidden />
+          How it was decided
         </button>
 
-        {preview && (
-          <div className="rl-brief__whatif" data-card role="status">
-            <span className="rl-brief__whatiftag">What if</span>
-            <span>{preview.label} · not this sign-in</span>
-            <button type="button" className="rl-brief__back" onClick={() => setPreview(null)}>
-              <Undo2 size={13} strokeWidth={2.2} aria-hidden />
-              Back to the run
-            </button>
-          </div>
-        )}
-        <div className="rl-brief__answer" aria-live="off" key={preview?.key ?? 'run'}>
-          <Sentence parts={model.parts} num={model.num} s={s} landed={landed} animate={animate} working={working} lit={lit} pinned={pinned} tone={model.tone} durOf={durOf} onHot={setHot} onPin={onPin} sweep={preview !== null} />
-          {model.after.length > 0 && (
-            <Sentence className="is-after" parts={model.after} num={model.num} s={s} landed={landed} animate={animate} working={null} lit={lit} pinned={pinned} tone={model.tone} durOf={durOf} onHot={setHot} onPin={onPin} />
-          )}
-        </div>
-
-        <div className="rl-brief__evidence">
-          <WhoCard {...cardProps('who')} name={personName} groups={memberGroups} asGroup={asGroup} via={via} also={alsoByGroup} globalDefault={plan.decider?.isGlobalDefault === true && plan.policies.length > 1} appName={appName} first={first} routed={routed} />
-          {model.cites.includes('policy') && (
-            <PolicyCard {...cardProps('policy')} plan={plan} s={s} landed={landed} first={first} also={alsoById} sel={selPolicy} onSel={setSelPolicy} litRow={policyRow} />
-          )}
-          {model.cites.includes('rule') && (
-            <RuleCard
-              {...cardProps('rule')}
-              plan={plan}
-              s={s}
-              landed={landed}
-              open={landed || (plan.at.expand >= 0 && s >= plan.at.expand)}
-              sel={selRule}
-              onSel={(i) => {
-                setSelRule(i)
-                setSelCheck(null)
-              }}
-              litRow={ruleRow}
-              tone={model.tone}
-            />
-          )}
-          {model.cites.includes('check') && checkRule !== null && (
-            <CheckCard
-              {...cardProps('check')}
-              plan={plan}
-              s={s}
-              rule={checkRule}
-              check={checkIx}
-              decisive={isDecisive}
-              onCheck={setSelCheck}
-              onBack={() => {
-                setSelRule(null)
-                setSelCheck(null)
-              }}
-              onAdd={props.onAdd}
-            />
-          )}
-          <OutcomeCard
-            {...cardProps('outcome')}
-            plan={plan}
-            landed={landed}
-            tone={model.tone}
-            screens={screens}
-            appId={form.appId}
-            columns={preview ? [] : props.columns}
-            changed={preview ? null : props.changed}
-            expected={preview ? null : props.expected}
-            weaker={preview ? null : props.weaker}
-            runKey={runKey}
-            see={see}
-            onSee={() => setSee((v) => !v)}
-          />
-        </div>
-
-        <motion.div
-          className="rl-brief__after"
-          style={{ visibility: landed ? 'visible' : 'hidden' }}
-          initial={false}
-          animate={{ opacity: landed ? 1 : 0 }}
-          transition={{ duration: animate && landed ? 0.32 : 0, delay: animate && landed ? 0.3 : 0 }}
-        >
-          {whyNots.length > 0 && (
-            <ul className="rl-brief__whys" aria-label="Why not">
-              {whyNots.map((w) => (
-                <li key={w.key} className={`rl-brief__why is-${w.tone}`}>
-                  <button
-                    type="button"
-                    className="rl-brief__whybtn"
-                    data-card
-                    aria-expanded={w.fix ? openWhy === w.key : undefined}
-                    onMouseEnter={() => setHotWhy(w)}
-                    onMouseLeave={() => setHotWhy(null)}
-                    onFocus={() => setHotWhy(w)}
-                    onBlur={() => setHotWhy(null)}
-                    onClick={() => setOpenWhy((o) => (o === w.key ? null : w.key))}
-                  >
-                    <span className="rl-brief__whyask">{w.ask}</span>
-                    <span className="rl-brief__whyans">
-                      {w.answer}
-                      <sup className="rl-brief__mk">{model.num[w.cite]}</sup>
-                    </span>
-                  </button>
-                  {openWhy === w.key && w.fix && <p className="rl-brief__whyfix">{w.fix}</p>}
-                </li>
-              ))}
-            </ul>
-          )}
-          {!preview && !plan.empty && (
-            <FollowUps
-              plan={plan}
-              first={first}
-              appName={appName}
-              open={ask}
-              onOpen={setAsk}
-              whatIfs={whatIfs}
-              onPreview={(w) => {
-                setPreview(w)
-                setAsk(null)
-              }}
-              canChange={canChange}
-              onOpenRule={props.onOpenRule}
-              onOpenPolicy={props.onOpenPolicy}
-              onAsGroup={props.onAsGroup}
-              viaGroups={viaGroupIds}
-              holes={props.breakIn?.summary.holes ?? 0}
-              onBreakIn={props.onReviewBreakIn ? () => props.onReviewBreakIn!('outcome') : undefined}
-              animate={!reduced}
-            />
-          )}
-        </motion.div>
+        {why ? why.slot && panel && createPortal(panel, why.slot) : panel}
       </div>
     </RunStage>
   )

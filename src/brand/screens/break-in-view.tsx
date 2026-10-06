@@ -653,7 +653,7 @@ function AfterFix({ preview }: { preview: FixPreview }) {
    with no reason says "Enter a reason" under the field, where the answer
    goes (owner, 26 Sep 2026: a blocked step says why inside the form, and the
    buttons are only buttons). */
-function AcceptForm({ onAccept, onCancel }: { onAccept: (reason: string) => void; onCancel: () => void }) {
+export function AcceptForm({ onAccept, onCancel }: { onAccept: (reason: string) => void; onCancel: () => void }) {
   const [reason, setReason] = useState('')
   const [tried, setTried] = useState(false)
   const inputId = useId()

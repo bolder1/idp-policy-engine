@@ -5,6 +5,7 @@ import { Tip } from '../../../kit'
 import { BANNER_H } from './circuit-geometry'
 import type { Tone } from './circuit-model'
 import type { StageTheme } from './circuit-theme'
+import { STAGE_FROM_TOP } from '../canvas-shelf'
 
 /* -----------------------------------------------------------------------------
    Over the board (CircuitLayout.tsx): once landed, the hint that a fact can
@@ -82,6 +83,8 @@ export function StageDock({ theme, onTheme, landed, onPulse }: { theme: StageThe
 
 /** The dock's light / dark button: pressed while the stage is dark. */
 function StageThemeToggle({ theme, onChange }: { theme: StageTheme; onChange: (t: StageTheme) => void }) {
+  /* The stage is the Mode button's at the top (canvas-shelf.ts `STAGE_FROM_TOP`, 4 Oct 2026). */
+  if (STAGE_FROM_TOP) return null
   const dark = theme === 'dark'
   return (
     <Tip text={dark ? 'Light stage' : 'Dark stage'} placement="top">

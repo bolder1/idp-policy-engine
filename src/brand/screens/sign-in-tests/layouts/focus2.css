@@ -1,0 +1,231 @@
+/* -----------------------------------------------------------------------------
+   FOCUS v2 (Focus2Layout.tsx): what v2 adds to the Focus stage.
+
+   This file is small on purpose. The root carries `rl-focus-root` as well as
+   `rl-f2`, so the whole `--fc-*` palette — both stages, the pinned console
+   blue, the tones, the veil colour, the depth ladder by `data-depth` — comes
+   from focus.css, which is imported read-only and never edited. Restating any
+   of it here would be two sources for one colour and a breach of the
+   tokens-only rule; the ladder in particular (0 / 0.22 / 0.5 / 0.7 veil and
+   0 / 0.6 / 1.6 / 3 px blur) is the same table focus2-geometry.ts returns in
+   each place, which is why the places' `veil` and `blur` are not written
+   inline: an inline value on the card would beat the rule that clears both
+   when a receded card is hovered.
+
+   So what is here is only the four things v2 does that v1 did not: the
+   rack-focus wrapper the card's face sits in, the lines sharpening as they
+   are proven, the hairline from a check's value to what the rule needs, and
+   the room under the open card where the walkthrough player stands.
+
+   Colour is meaning, as everywhere in Focus: blue only on what the engine is
+   working on now, green / red / amber only on results. No orange.
+   -------------------------------------------------------------------------- */
+
+.rl-f2 {
+  /* The repo's ease-out, as focus-shared.ts `EASE_OUT`. */
+  --f2-ease: cubic-bezier(0.2, 0, 0, 1);
+  /* The focus pull: the same 420 ms the card's own wrapper animates over, so a card leaving the centre softens to its
+     resting blur over exactly as long as the one arriving takes to sharpen, and the two read as one move. Retuned down
+     from 680 ms with the rack itself — see the note on the constants in focus2-cards.tsx. */
+  --f2-rack-ms: 0.42s;
+  /* A line coming into focus: the text version's effect, a touch bigger (7 px rather than 6). Kept close to the
+     sentence's own, because that is the effect he pointed at and liked. */
+  --f2-sharpen-ms: 0.3s;
+  --f2-sharpen-blur: 7px;
+  /* Between one line and the next. Tightened with the rack: six lines at 80 ms ran past the card's own arrival. */
+  --f2-stagger: 55ms;
+  /* A hairline drawn, and a tone crossing over. */
+  --f2-hair-ms: 0.2s;
+  --f2-tone-ms: 0.24s;
+}
+
+/* The canvas's top fade (journey.css `.tj-canvas::after`) is for a row standing over the canvas, so what scrolls up
+   reads as going under it. Focus has no such row: the sign-in is the chain's first node (owner, 5 Oct 2026), and the
+   stage's top pad went from 64 to 16 with it (focus2-faq.ts `FOCUS2_TOP_PAD`) — so the fade lay over the brief's first
+   line and the questions panel's head, and ghosted them (5 Oct 2026). Off on both stages; focus.css's own rule for the
+   dark one is keyed on `.tj-canvas.is-focus`, which TryJourney's `is-${layout}` never writes here. */
+.sit__stage .tj-canvas.is-focus2::after,
+.tj-canvas.is-focus2::after {
+  content: none;
+}
+
+/* v1's band is a carousel you can drag; v2's path is pressed, not dragged. */
+.rl-f2 .rl-focus__band { cursor: default; }
+
+/* The edge pills' own layer (Focus2Layout.tsx): the world's whole box, so a pill's `top` reads as it did, moved by the
+   brief's headline and leaving with the band. It takes no pointer; the pills do. The pills carry focus.css's own CSS
+   transform, which is why they are not the motion element themselves. */
+.rl-f2__edges { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
+.rl-f2__edges > .rl-focus__edge { pointer-events: auto; }
+.rl-f2 .rl-focus__band:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 2px; }
+/* The dock's own z-index went with the dock (owner, 4 Oct 2026): v2 draws the answers panel and the voice strip
+   instead, and those carry their own in focus2-ask.css. */
+
+/* --- The card's face: stacked, so no frame is ever without one ---------------------------- */
+
+/* The far face stays under the full one and the full one fades in over it, both in one grid cell. v1 crossfaded them
+   through AnimatePresence, which let the outgoing face leave before the incoming one had arrived: there were frames
+   with no card at the centre at all (the spec's own evidence, three of them in one run). Stacked, there is always an
+   opaque card there, and the only cost is the open card's far face being kept — memoised, and covered a moment later. */
+.rl-f2__faces { display: grid; }
+.rl-f2__faces > * { grid-area: 1 / 1; align-self: start; min-width: 0; }
+
+.rl-f2__reveal { position: relative; }
+
+/* --- The lines, sharpening as they are proven --------------------------------------------- */
+
+@keyframes f2-sharpen {
+  from {
+    filter: blur(var(--f2-sharpen-blur));
+  }
+  to {
+    filter: blur(0px);
+  }
+}
+
+/* Only inside the open card's full face: a receded far face is read at a distance and has its own depth blur, and
+   animating `filter` on every card at once is the thing the owner's performance note rules out.
+
+   `backwards` and not `both` is deliberate. It fills the delay — a line waiting its turn is already soft — but leaves
+   nothing behind when the animation ends, so a settled card holds no filter and no compositing layer for it. */
+.rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > * {
+  animation: f2-sharpen var(--f2-sharpen-ms) var(--f2-ease) backwards;
+}
+.rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *:nth-child(2) { animation-delay: calc(1 * var(--f2-stagger)); }
+.rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *:nth-child(3) { animation-delay: calc(2 * var(--f2-stagger)); }
+.rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *:nth-child(4) { animation-delay: calc(3 * var(--f2-stagger)); }
+.rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *:nth-child(5) { animation-delay: calc(4 * var(--f2-stagger)); }
+.rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *:nth-child(6) { animation-delay: calc(5 * var(--f2-stagger)); }
+.rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *:nth-child(n + 7) { animation-delay: calc(6 * var(--f2-stagger)); }
+
+/* --- A check, read across: the hairline from the value to what the rule needs -------------- */
+
+@keyframes f2-hair {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* The value and the requirement are two lines, never run together into one claim (focus-parts.tsx `CheckBody`), and
+   until now there was nothing to say they were the same reading. A 24 px rule is drawn from under the value across to
+   "needs …" as the row is read: blue while the engine is reading it, and a hairline once it has been read — the mark
+   beside it is what carries the result's colour. */
+.rl-f2 .rl-f2__face.is-full .rl-focus__cneed::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--fc-line-2);
+  transform-origin: left center;
+  animation: f2-hair var(--f2-hair-ms) var(--f2-ease) backwards;
+  transition: background-color var(--f2-tone-ms) ease;
+}
+.rl-f2 .rl-f2__face.is-full .rl-focus__check.is-working .rl-focus__cneed::before { background: var(--fc-work); }
+.rl-f2 .rl-f2__face.is-full .rl-focus__check.is-unread .rl-focus__cneed::before { background: var(--fc-line); }
+
+/* --- A card leaving the centre ------------------------------------------------------------- */
+
+/* Its blur eases out to its depth's resting value over the same 680 ms the card arriving takes, so focus passes from
+   one to the other as one move. The hover clear keeps focus.css's own 200 ms: a pointer reaching a receded card is an
+   answer to the admin, not part of the story's pace. */
+.rl-f2 .rl-focus__slot.is-receding .rl-focus__turn { transition-duration: var(--f2-rack-ms); }
+
+/* The verdict landing (focus2-draw-model.ts DIM_MS): the cards that have receded dim slightly for 600 ms, then settle.
+   Opacity on the turn, which Motion does not drive; in on 250 ms, out on 350 ms; never for instant runs, which never
+   get the class. */
+.rl-f2__world .rl-focus__slot:not(.is-focus) .rl-focus__turn { transition: filter 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.35s cubic-bezier(0.2, 0, 0, 1); }
+.rl-f2__world.is-landing .rl-focus__slot:not(.is-focus) .rl-focus__turn { opacity: 0.72; transition-duration: 0.2s, 0.25s; }
+@media (prefers-reduced-motion: reduce) {
+  .rl-f2__world.is-landing .rl-focus__slot:not(.is-focus) .rl-focus__turn { opacity: 1; }
+}
+
+/* --- The bar's room, under the open card ---------------------------------------------------- */
+
+/* The bar (focus2-trail.tsx) belongs to the card, not to a toolbar (owner, 4 Oct 2026: "inside the canvas"), so it
+   stands in the strip under the path — where v1's subtitle was — and not over a card or the dock. */
+.rl-f2__player {
+  position: absolute;
+  z-index: 8;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* --- The landed answer, Focus v2's additions ------------------------------------------------ */
+
+/* Two quiet questions under the verdict line: text, not buttons that shout. */
+.rl-f2__qs { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: -4px 0 0; }
+.rl-f2__q {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  color: var(--fc-text-2);
+  text-decoration: underline;
+  text-decoration-color: var(--fc-line-3);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rl-f2__q:hover { color: var(--fc-text); text-decoration-color: currentColor; }
+.rl-f2__q:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 2px; border-radius: 2px; }
+
+/* A person in more than one group, said as a finding: an icon, one sentence, the one press. */
+.rl-f2__gfind {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  background: var(--fc-sunken);
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  color: var(--fc-text-2);
+}
+.rl-f2__gfind > svg { flex: none; align-self: flex-start; margin-top: 2px; }
+.rl-f2__gtext { flex: 1 1 200px; min-width: 0; }
+.rl-f2__gfind.is-conflict { border-color: var(--fc-warn-line); background: var(--fc-warn-bg); color: var(--fc-warn-fg); }
+.rl-f2__gfind.is-conflict .rl-f2__q { color: var(--fc-warn-fg); }
+
+/* What they see is a small picture here, not a column: it does not hold the card open to 300px. */
+.rl-f2 .rl-focus__see.rl-f2__seerow { min-height: 0; }
+
+/* A far face set two lines deep (`is-compact`: a small room, and every card on the overview's route) lays its result
+   line out inline, and focus.css makes the line's spans inline for it — which drops the application logo's own box, so
+   the sign-in's logo was drawn at its picture's full size (5 Oct 2026, seen on the route). Its box back, on the line. */
+.rl-f2 .rl-focus__card.is-far.is-compact .rl-focus__fartext > .applogo {
+  display: inline-block;
+  margin-right: var(--space-3);
+  vertical-align: middle;
+}
+
+/* --- Nothing blurred ---------------------------------------------------------------------- */
+
+/* After a Skip, a press, or a run drawn settled: everything sharp and in place at once, with no reveal left running.
+   The depth veil and blur stay — they are hierarchy, and with nothing moving they are the only thing that says which
+   card is open. */
+.rl-f2.is-sharp .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *,
+.rl-f2.is-sharp .rl-f2__face.is-full .rl-focus__cneed::before {
+  animation-name: none;
+}
+.rl-f2.is-sharp .rl-f2__face.is-full .rl-focus__cneed::before { transform: scaleX(1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-f2 .rl-f2__face.is-full :is(.rl-focus__facts, .rl-focus__plist, .rl-focus__checks, .rl-focus__outin) > *,
+  .rl-f2 .rl-f2__face.is-full .rl-focus__cneed::before {
+    animation-name: none;
+  }
+  .rl-f2 .rl-f2__face.is-full .rl-focus__cneed::before { transform: scaleX(1); transition: none; }
+}

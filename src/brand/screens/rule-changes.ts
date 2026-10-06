@@ -65,6 +65,8 @@ function aspects(before: Rule, after: Rule, movedTo: number | null, resolve?: Na
   if (after.decision === '2fa' && secondFactorKey(before) !== secondFactorKey(after)) out.push(`Second factor: ${secondFactorSaid(after)}`)
   if (before.enabled !== after.enabled) out.push(after.enabled ? 'Switched on' : 'Switched off')
   if ((before.denyMessage ?? '') !== (after.denyMessage ?? '')) out.push('Deny message')
+  if ((before.denyAction ?? '') !== (after.denyAction ?? '')) out.push('Deny next step')
+  if ((before.denyContact ?? '') !== (after.denyContact ?? '')) out.push('Deny contact')
   return out
 }
 

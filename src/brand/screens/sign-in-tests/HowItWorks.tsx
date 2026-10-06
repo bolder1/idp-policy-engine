@@ -1,4 +1,6 @@
 import { useId } from 'react'
+import { RecentBlocked } from './BlockedDrawer'
+import type { BlockedRow } from './blocked'
 import { LayoutTemplate, Layers, ListChecks, LogIn, MonitorSmartphone, type LucideIcon } from 'lucide-react'
 
 import { Button } from '../../kit'
@@ -49,6 +51,8 @@ const GETS: readonly { icon: LucideIcon; text: string }[] = [
 export function HowItWorks({
   onCheck,
   onSaved,
+  onBlocked,
+  onPickBlocked,
   open = null,
   primary = true,
   doorWhileOpen = true,
@@ -59,6 +63,10 @@ export function HowItWorks({
   onCheck: () => void
   /** Saved sign-ins: the panel, on the saved ones. Absent — nothing saved, or not in this phase — the button is left out. */
   onSaved?: () => void
+  /** Recently blocked, View all: the panel at the right, with the week's refused sign-ins (BlockedDrawer.tsx). Absent with `onPickBlocked`, no block. */
+  onBlocked?: () => void
+  /** A refused sign-in in the block, pressed: the form is filled with it. */
+  onPickBlocked?: (r: BlockedRow) => void
   /** Which the panel beside the canvas holds, if it is open: its button is pressed. */
   open?: 'form' | 'saved' | null
   /** Check access is the page's orange while the panel is shut. Off inside a policy, where the builder's bar keeps its own. */
@@ -90,6 +98,8 @@ export function HowItWorks({
           )}
         </div>
       )}
+
+      {onBlocked && onPickBlocked && <RecentBlocked onPick={onPickBlocked} onAll={onBlocked} />}
 
       <ul className="hiw__gets" aria-label="What the check shows">
         {GETS.map(({ icon: Icon, text }) => (

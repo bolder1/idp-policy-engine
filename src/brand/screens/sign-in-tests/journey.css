@@ -168,7 +168,7 @@
   display: block;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: min(560px, calc(100cqi - 220px));
+  max-width: min(560px, calc(100cqi - 220px), calc(100cqi - var(--space-9) - var(--tj-others, 0px)));
   height: 20px;
   overflow: hidden;
 }
@@ -177,7 +177,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  max-width: min(560px, calc(100cqi - 220px));
+  max-width: min(560px, calc(100cqi - 220px), calc(100cqi - var(--space-9) - var(--tj-others, 0px)));
   overflow: hidden;
   line-height: 20px;
   text-align: left;
@@ -214,6 +214,50 @@
   line-height: 16px;
   color: var(--text-secondary);
 }
+/* Several identities (5 Oct 2026): a chip each at the pill's left, before the words — the sign-in row's chips
+   (IdentityChips.tsx, sign-in-row.css) in the console's tokens: the person and the group in the accent, each answer in
+   its feedback tone, the pressed one as the pencil is pressed here. A chip is a pill inside the pill, its face
+   concentric with the pill's round end; a hairline parts them from the words, as it parts the pencil. With them the
+   words' widest is the pill's room less everything else in it (`--tj-others`, measured by EngineLine), so the pill
+   never runs past its own edge. Light console only. */
+.tj-engine__pill.has-ids { padding-left: var(--space-1); }
+.tj-engine__ids {
+  --sir-bg: var(--surface-raised);
+  --sir-muted: var(--text-tertiary);
+  --sir-blue: var(--accent-strong);
+  --sir-blue-soft: var(--accent-soft);
+  --sir-face-bg: var(--accent-soft);
+  --sir-ok: var(--fb-positive-fg);
+  --sir-bad: var(--fb-negative-fg);
+  --sir-amber: var(--fb-notice-fg);
+  padding-right: var(--space-2);
+  border-right: var(--bw-thin) solid var(--border-subtle);
+}
+.tj-engine__ids .sir__id {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 30px;
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.tj-engine__ids .sir__id:not(.is-on):hover { background: var(--int-ghost-bg-hover); }
+.tj-engine__ids .sir__id.is-on { border-color: var(--accent-soft-border); }
+/* The faces alone: each answer on its face's corner, clear of the initials, on the pill's own ground. */
+.tj-engine__ids.is-faces .sir__id { position: relative; padding-right: var(--space-4) !important; }
+.tj-engine__ids.is-faces .sir__idmark { position: absolute; right: 0; bottom: var(--space-1); padding: var(--space-1); border-radius: var(--radius-full); background: var(--sir-bg); }
+.tj-engine__ids.is-faces .sir__id.is-on .sir__idmark { background: var(--sir-blue-soft); }
+/* The run's hairline stays under the words: it starts past the chips (`--tj-chips`, where they end). */
+.tj-engine__pill.has-ids .tj-engine__track { left: calc(var(--tj-chips, 0px) + var(--space-7)); }
 .tj-canvas.is-editing .tj-engine { opacity: 0.4; }
 /* The hairline under the words: how far through its plan the run is. The
    bar is motion's (its scaleX), the track motion's too (it fades as the run
@@ -1287,7 +1331,8 @@ button.tj-why__grow:focus-visible { outline: var(--bw-thick) solid var(--accent)
   .tj-r__rail,
   .tj-pol,
   .tj-r__card,
-  .tj-crow { transition: none; }
+  .tj-crow,
+  .tj-engine__ids .sir__id { transition: none; }
 }
 
 /* --- The four stops (RunNodes.tsx; owner, 1 Oct 2026: "give me a better
@@ -1477,3 +1522,13 @@ button.tj-hero__strip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(-
 .tj-hero .tsee__steps .tplay__chiptext { z-index: 1; }
 .tj-hero .tsee__steps .tplay__chiptext { max-width: none; }
 .tj-hero .tsee__steps .tplay__replay { flex: none; align-self: flex-start; }
+
+/* What changed, in the why (WhyCard.tsx): the policy that refused, edited lately. */
+.tj-why__changes { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.tj-why__changes li { display: flex; flex-direction: column; gap: var(--space-1); }
+.tj-why__changehead { font-size: var(--fs-sm); color: var(--text-primary); }
+.tj-why__changelines { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* Why a sign-in was refused, under Decided by: admin and help desk only (deny-reason.ts). */
+.tj-hero__reason { margin: 0; font-size: var(--fs-sm); line-height: 20px; color: var(--text-secondary); }
+.tj-hero__reason span { color: var(--text-tertiary); margin-left: var(--space-1); }

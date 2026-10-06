@@ -130,6 +130,31 @@ export function verdictLine(plan: EngineRun, screens: readonly SignInScreens[]):
   return 'No policy decides.'
 }
 
+/** The answer's beat says WHY, not the verdict again (the card already says Deny): "No rule above fits Devon, so the
+    last rule denies.", "Rule 2 denies Devon.", "Rule 2 lets Devon in with 2FA.", "The Global Default lets Kavya in.",
+    "It depends on the network." */
+export function reasonLine(plan: EngineRun, screens: readonly SignInScreens[], names: Pick<VoiceNames, 'first'>): string {
+  const o = plan.outcome
+  if (!(o.status === 'decided' && o.decision)) return verdictLine(plan, screens)
+  const first = names.first || 'them'
+  const landing = plan.landing !== null ? plan.rules[plan.landing] : undefined
+  const f = factorOf(screens)
+  const lets = o.decision === 'deny' ? '' : o.decision === '2fa' ? ` in with ${f || 'a second factor'}` : ' in on one factor'
+  if (plan.decider?.isGlobalDefault && (!landing || landing.index === null)) return o.decision === 'deny' ? `The Global Default denies ${first}.` : `The Global Default lets ${first} in.`
+  if (!landing) return verdictLine(plan, screens)
+  if (landing.index === null) return o.decision === 'deny' ? `No rule above fits ${first}, so the last rule denies.` : `No rule above fits ${first}, so the last rule lets ${first === 'them' ? 'them' : first}${lets}.`
+  const who = `Rule ${landing.index + 1}`
+  return o.decision === 'deny' ? `${who} denies ${first}.` : `${who} lets ${first}${lets}.`
+}
+
+/** "None of AWS for engineering teams's 3 rules match" → "None of the 3 rules in AWS for engineering teams match":
+    a policy's name never takes 's (the assistant's lines, said and shown in Focus). */
+export function fixPossessive(t: string): string {
+  return t
+    .replace(/None of (.+?)'s (\d+) rules match/g, 'None of the $2 rules in $1 match')
+    .replace(/None of (.+?)'s rule matches/g, 'The one rule in $1 does not match')
+}
+
 /** Every moment's line, in order, with the step it is due at. Never throws. */
 export function beatsOf(plan: EngineRun, moments: readonly Moment[], names: VoiceNames, screens: readonly SignInScreens[]): Beat[] {
   const out: Beat[] = []
@@ -165,7 +190,7 @@ export function beatsOf(plan: EngineRun, moments: readonly Moment[], names: Voic
         const { line, short } = ruleLine(r, names)
         if (line) out.push({ key: m.key, at: settleStep(plan, r), line, short, from: m.at, ...(r.state === 'match' ? { dropAt: 1, carry: true } : r.state === 'possible' ? { dropAt: 1 } : r.state === 'unknown' ? { dropAt: 2 } : {}) })
       } else {
-        const v = verdictLine(plan, screens)
+        const v = reasonLine(plan, screens, names)
         /* Said as the answer lands (focus-model.ts `landedAt`), not as the engine starts deciding. */
         out.push({ key: m.key, at: plan.at.outcome >= 0 ? Math.min(last, plan.at.outcome) : last, line: v, short: v, from: m.at })
       }

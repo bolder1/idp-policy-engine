@@ -54,10 +54,10 @@ describe('the zone page head', () => {
     expect(head).not.toMatch(/<p>/)
   })
 
-  it('carries the Note style switch with its four versions, in the preview slot', () => {
+  it('carries the Note style switch with its five versions, in the preview slot', () => {
     expect(head).toContain('class="bpage__preview"')
-    expect(text(head)).toContain('Note style Classic Sticky note Clipboard Pointer')
-    expect(head.match(/aria-pressed="(true|false)"/g)).toHaveLength(4)
+    expect(text(head)).toContain('Note style Classic Blue Sticky note Clipboard Pointer')
+    expect(head.match(/aria-pressed="(true|false)"/g)).toHaveLength(5)
   })
 })
 
@@ -121,10 +121,26 @@ const NEW = ['Japan', 'California', 'Toronto', 'Within 50 km of Berlin']
 const note = (half: 'net' | 'place', style: NoteStyle, rollOut = false) =>
   html(<ZoneNote half={half} style={style} rollOut={rollOut} />)
 
+describe('the Blue note (owner, 5 Oct 2026)', () => {
+  it('is Classic’s card in the info blue: the kind on the left, the example in monospace on a chip, the facts under a rule on Locations', () => {
+    const net = note('net', 'blue')
+    expect(net).toContain('class="bz7n-blue"')
+    expect(net).toContain('What you can add')
+    expect(net).toContain('<dt>IPv4 or IPv6 address</dt><dd><code>10.0.0.1</code></dd>')
+    expect(net).not.toContain('bz7n-blue__facts')
+    const place = note('place', 'blue')
+    expect(place).toContain('<dt>Country</dt><dd><code>Japan</code></dd>')
+    expect(place).toContain('bz7n-blue__facts')
+    /* Static: nothing animates and nothing is pressed. */
+    expect(net).not.toMatch(/<button|style="/)
+    expect(parseNoteStyle('blue')).toBe('blue')
+  })
+})
+
 describe('the Note style switch', () => {
-  it('offers Classic, the sticky note, the clipboard and the pointer, in that order, Classic first', () => {
-    expect(NOTE_STYLES.map((s) => s.label)).toEqual(['Classic', 'Sticky note', 'Clipboard', 'Pointer'])
-    expect(NOTE_STYLES.map((s) => s.value)).toEqual(['classic', ...PAPER])
+  it('offers Classic, Blue, the sticky note, the clipboard and the pointer, in that order, Classic first', () => {
+    expect(NOTE_STYLES.map((s) => s.label)).toEqual(['Classic', 'Blue', 'Sticky note', 'Clipboard', 'Pointer'])
+    expect(NOTE_STYLES.map((s) => s.value)).toEqual(['classic', 'blue', ...PAPER])
   })
 
   it('keeps a stored sticky note, and puts the withdrawn versions, and anything else, on Classic', () => {
@@ -136,9 +152,9 @@ describe('the Note style switch', () => {
       expect(parseNoteStyle(gone)).toBe('classic')
   })
 
-  it('draws one pressed segment among four, and it is Classic', () => {
+  it('draws one pressed segment among five, and it is Classic', () => {
     const out = html(<NoteStyleSwitch />)
-    expect(out.match(/aria-pressed="(true|false)"/g)).toHaveLength(4)
+    expect(out.match(/aria-pressed="(true|false)"/g)).toHaveLength(5)
     expect(out.match(/aria-pressed="true"/g)).toHaveLength(1)
     expect(out).toMatch(/aria-pressed="true"[^>]*>Classic</)
     expect(out).toContain('aria-label="Note style"')

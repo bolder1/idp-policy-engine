@@ -12,15 +12,16 @@ import type { CiteId, Part, Seg, Tone } from './brief-model'
    it (its `at` step), the stream paced by that step's length. A blank the
    engine is working on now is the console blue; the rest wait grey.
 
-   A cited phrase carries its card's number. Hovered or focused it lights its
-   card; pressed it pins it (pressed again, lets go).
+   A cited phrase (its part's number beside it, unless `numbers` is off) is
+   a press: hovered or focused it lights its evidence; pressed it pins it
+   (pressed again, lets go).
 
-   The things the admin picked are named in their colours — who blue, the
-   application orange, the conditions violet — each with its mark before it
-   (brief-glyph.tsx). The mark rides with its thing's first word: written
-   with it, blurred and sharpened with it, never left alone at a line's end.
-   A blank holds the marks and the tints' room too, unseen, so nothing moves
-   when it is written.
+   The things the admin picked are named in ink, each with its mark before it
+   (brief-glyph.tsx) — the mark carries the colour: the face and a group's
+   people blue, the application its logo, a condition violet (owner, 3 Oct
+   2026). The mark rides with its thing's first word: written with it,
+   blurred and sharpened with it, never left alone at a line's end. A blank
+   holds the marks' room too, unseen, so nothing moves when it is written.
    -------------------------------------------------------------------------- */
 
 export interface SentenceProps {
@@ -41,6 +42,8 @@ export interface SentenceProps {
   className?: string
   /** Everything written at once (a what-if briefed): one sweep through the sentence, word after word. */
   sweep?: boolean
+  /** Draw each cited phrase's number (default). Off: the phrase alone, lit and pinned as before. */
+  numbers?: boolean
 }
 
 const EASE = [0.2, 0, 0, 1] as const
@@ -63,8 +66,8 @@ function wordsOf(seg: Seg, word: (w: string, i: number, lead: boolean) => ReactN
   })
 }
 
-/* One run, still: plain words, or a picked thing in its tint — written
-   whole, or, in a blank, held unseen at its width. */
+/* One run, still: plain words, or a picked thing — written whole, or, in a
+   blank, held unseen at its width. */
 function Run({ seg, children }: { seg: Seg; children: ReactNode }) {
   if (!seg.entity) return <>{children}</>
   return <span className={`rl-brief__ent is-${seg.entity}`}>{children}</span>
@@ -101,7 +104,6 @@ function Stream({ part, animate, dur, base = 0, small }: { part: Part; animate: 
   return (
     <>
       {segsOf(part).map((seg, j) => {
-        /* A tint arrives with its first word: faded in as that word is written. */
         const first = base + w * per
         const runWords = wordsOf(seg, (b, i, lead) => (
           <motion.span key={i} className={`rl-brief__w${lead ? ' rl-brief__lead' : ''}`} {...on(base + w++ * per)}>
@@ -120,7 +122,7 @@ function Stream({ part, animate, dur, base = 0, small }: { part: Part; animate: 
   )
 }
 
-export function Sentence({ parts, num, s, landed, animate, working, lit, pinned, tone, durOf, onHot, onPin, className = '', sweep = false }: SentenceProps) {
+export function Sentence({ parts, num, s, landed, animate, working, lit, pinned, tone, durOf, onHot, onPin, className = '', sweep = false, numbers = true }: SentenceProps) {
   let words = 0
   const small = className.includes('is-after')
   /* The first blank of the cite the engine is on: the one blue blank. */
@@ -133,7 +135,7 @@ export function Sentence({ parts, num, s, landed, animate, working, lit, pinned,
           return (
             <span key={p.key} className={`rl-brief__blank${p.cite ? ' is-cite' : ''}${p.key === workKey ? ' is-working' : ''}`} aria-hidden>
               <Still part={p} small={small} />
-              {p.cite && num[p.cite] !== undefined && <sup className="rl-brief__mk is-hidden">{num[p.cite]}</sup>}
+              {numbers && p.cite && num[p.cite] !== undefined && <sup className="rl-brief__mk is-hidden">{num[p.cite]}</sup>}
             </span>
           )
         }
@@ -163,7 +165,7 @@ export function Sentence({ parts, num, s, landed, animate, working, lit, pinned,
             data-card
             data-cite={c}
             aria-pressed={pinned === c}
-            aria-label={`${p.text}, evidence ${n}`}
+            aria-label={numbers ? `${p.text}, evidence ${n}` : `${p.text}: show the evidence`}
             className={`rl-brief__cite is-${c}${lit === c ? ' is-lit' : ''}${p.answer ? ' is-answer' : ''}${p.notice ? ' is-notice' : ''}`}
             onMouseEnter={() => onHot(c)}
             onMouseLeave={() => onHot(null)}
@@ -173,6 +175,7 @@ export function Sentence({ parts, num, s, landed, animate, working, lit, pinned,
             onKeyDown={onKey}
           >
             {body}
+            {numbers && (
             <motion.sup
               className="rl-brief__mk"
               initial={animate ? { opacity: 0 } : false}
@@ -181,6 +184,7 @@ export function Sentence({ parts, num, s, landed, animate, working, lit, pinned,
             >
               {n}
             </motion.sup>
+            )}
           </span>
         )
       })}

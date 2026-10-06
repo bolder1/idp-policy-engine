@@ -172,8 +172,16 @@ describe('the widgets', () => {
     expect(home).toContain('<span class="tpw__domain is-app">hrms.app</span>')
     expect(home).toContain('lucide-lock')
     expect(text(endOf(film('deny/verbatim'), 1))).toBe(
-      'mo.xecurify.com Sign in to HRMS Access denied HRMS opens only from a corporate office. Contact IT if you need access from elsewhere. Back to sign in',
+      'mo.xecurify.com Sign in to HRMS Access denied HRMS opens only from a corporate office. Contact IT if you need access from elsewhere. Contact: IT help desk Back to sign in',
     )
+    /* A rule's own next step and contact: its words win over the tenant's. The reason is for admins and never on this page. */
+    const refused = film('deny/verbatim')
+    const last = refused.beats.length - 1
+    const page = refused.beats[last].scene.page
+    if (page?.kind !== 'denied') throw new Error('expected the deny page')
+    const withExtra = { ...refused, beats: refused.beats.map((b, i) => (i === last ? { ...b, scene: { ...b.scene, page: { ...page, action: 'Connect from the office.', contact: 'Payroll team' } } } : b)) }
+    expect(text(endOf(withExtra, 1))).toContain('Connect from the office. Contact: Payroll team Back to sign in')
+    expect(text(endOf(withExtra, 1))).not.toContain('Ref:')
     expect(text(endOf(film('2fa/password/unavailable'), 1))).toContain('Duo Push is not available Contact your administrator. Back to sign in')
     expect(text(endOf(film('2fa/password/unavailable'), 2))).toContain('Duo Push is not available Contact your administrator. Back to sign in')
   })

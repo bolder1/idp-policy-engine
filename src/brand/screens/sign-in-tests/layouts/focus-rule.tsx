@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { useContext } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { ArrowUpRight, TriangleAlert } from 'lucide-react'
 
 import { DECISION_WORDS } from '../../../decision-words'
 import { checkPhase, rulePhase, type EngineRule, type EngineRun } from '../engine-run'
@@ -12,10 +12,38 @@ import { EASE_OUT, LitCtx, viaOf } from './focus-shared'
 /* A rule of the policy that applies, read as its own moment (FocusLayout.tsx):
    its checks arrive one by one, each mark landing as the engine finds it; the
    first that fails ends the rule (the ones after it never read, said so);
-   the rule that matches says what it then does. The last row — "Nothing else
-   matched" — is locked: it always matches when nothing above it did. */
+   the rule that matches says what it then does — the Then word in the
+   decision's colour, and a rule that matches to deny wears the deny tone all
+   through, its ✓ in a red ring, never green, the message it refuses with
+   under Then. The last row — "Nothing else matched" — is locked: it always
+   matches when nothing above it did. "Open rule ↗" opens it in the editor. */
 
-export function RuleMoment({ plan, r, s, landed, animate, focused, first }: { plan: EngineRun; r: EngineRule; s: number; landed: boolean; animate: boolean; focused: boolean; first: string }) {
+export function RuleMoment({
+  plan,
+  r,
+  s,
+  landed,
+  animate,
+  focused,
+  first,
+  denyMessage = '',
+  pulse = false,
+  onOpen,
+}: {
+  plan: EngineRun
+  r: EngineRule
+  s: number
+  landed: boolean
+  animate: boolean
+  focused: boolean
+  first: string
+  /** The message a Deny refuses with (the screens'), shown under Then on a rule that matches to deny. */
+  denyMessage?: string
+  /** The verdict is being reached from this rule: its Then row says so, once. */
+  pulse?: boolean
+  /** Open this rule in the policy editor (absent: no decider). */
+  onOpen?: () => void
+}) {
   const n = r.index === null ? null : r.index + 1
   const count = plan.rules.filter((x) => x.index !== null).length
   const result = traceResult(r, s)
@@ -29,12 +57,13 @@ export function RuleMoment({ plan, r, s, landed, animate, focused, first }: { pl
   const failed = result === 'missed' || result === 'folded'
   const unknown = result === 'unknown' || result === 'possible'
   const working = !landed && (result === 'reading' || result === 'waiting')
-  const tone = matched ? (r.decision === 'deny' ? 'negative' : 'positive') : failed ? 'fail' : unknown ? 'notice' : r.state === 'off' ? 'off' : working ? 'working' : ''
+  const deny = r.decision === 'deny'
+  const tone = matched ? (deny ? 'negative' : 'positive') : failed ? 'fail' : unknown ? 'notice' : r.state === 'off' ? 'off' : working ? 'working' : ''
   const mark =
     working && !rowWorking ? (
       <Spinner />
     ) : matched ? (
-      <Mark status="pass" big label="Matches" pop={animate && focused} />
+      <Mark status="pass" big deny={deny} label={deny ? 'Applies' : 'Matches'} pop={animate && focused} />
     ) : failed ? (
       <Mark status="fail" big label="No match" pop={animate && focused} />
     ) : unknown ? (
@@ -61,13 +90,19 @@ export function RuleMoment({ plan, r, s, landed, animate, focused, first }: { pl
           </h3>
         </span>
         {mark}
+        {onOpen && focused && (
+          <button type="button" className="rl-focus__openrule" onClick={onOpen}>
+            Open rule
+            <ArrowUpRight size={13} strokeWidth={2.2} aria-hidden />
+          </button>
+        )}
       </header>
       <p className="rl-focus__sub">{n === null ? 'Matches when no rule above it did' : plan.decider ? `In ${plan.decider.name}` : ''}</p>
       {(read.length > 0 || unread.length > 0) && (
         <ul className="rl-focus__checks">
           {read.map(({ c, k, phase: ph }) => {
             const w = ph === 'working'
-            const body = <CheckBody word={c.word} fact={c.missing ? 'Not stated' : c.value} by={viaOf(c, w, r.via)} need={c.requirement} status={c.status} working={w} label={c.line || undefined} pop={animate && focused} />
+            const body = (chev: boolean) => <CheckBody word={c.word} fact={c.missing ? 'Not stated' : c.value} by={viaOf(c, w, r.via)} need={c.requirement} status={c.status} working={w} label={c.line || undefined} pop={animate && focused} chevron={chev} />
             return (
               <motion.li
                 key={c.key || k}
@@ -78,10 +113,10 @@ export function RuleMoment({ plan, r, s, landed, animate, focused, first }: { pl
                 transition={{ duration: 0.22, ease: EASE_OUT }}
               >
                 {w ? (
-                  <span className="rl-focus__crow">{body}</span>
+                  <span className="rl-focus__crow">{body(false)}</span>
                 ) : (
-                  <Poke id={`${r.node}:${c.key || k}`} className="rl-focus__crow" label={`${c.word}: how it was read`} note={<CheckNote c={c} />}>
-                    {body}
+                  <Poke id={`${r.node}:${c.key || k}`} className="rl-focus__crow has-chev" label={`${c.word}: how it was read`} note={<CheckNote c={c} />}>
+                    {body(true)}
                   </Poke>
                 )}
               </motion.li>
@@ -97,16 +132,23 @@ export function RuleMoment({ plan, r, s, landed, animate, focused, first }: { pl
         </ul>
       )}
       {(settled || matched) && (
-        <motion.p
-          className={`rl-focus__then${matched ? ` is-${r.decision === 'deny' ? 'negative' : 'positive'}` : unknown ? ' is-notice' : ' is-quiet'}`}
+        <motion.div
+          className={`rl-focus__then${matched ? ` is-${deny ? 'negative' : 'positive'}` : unknown ? ' is-notice' : ' is-quiet'}${pulse ? ' is-pulse' : ''}`}
           initial={animate && focused ? { opacity: 0 } : false}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.24, ease: EASE_OUT }}
         >
-          <span className="rl-focus__cword">Then</span>
-          <span className="rl-focus__thenword">{r.index === null && r.state === 'possible' ? `If not · ${then}` : then}</span>
-          {!matched && <span className="rl-focus__thenquiet">{r.state === 'off' ? 'switched off · passed over' : unknown ? "can't tell · read on" : 'not used'}</span>}
-        </motion.p>
+          <p className="rl-focus__thenrow">
+            <span className="rl-focus__cword">Then</span>
+            <span className="rl-focus__thenword">{r.index === null && r.state === 'possible' ? `If not · ${then}` : then}</span>
+            {!matched && <span className="rl-focus__thenquiet">{r.state === 'off' ? 'switched off · passed over' : unknown ? "can't tell · read on" : 'not used'}</span>}
+          </p>
+          {matched && deny && denyMessage && (
+            <p className="rl-focus__deny rl-focus__thendeny" title={denyMessage}>
+              “{denyMessage}”
+            </p>
+          )}
+        </motion.div>
       )}
       {clashes.map((c) => (
         <div key={c.ruleId} className={`rl-focus__clash${c.kind === 'conflict' ? ' is-conflict' : ''}`}>

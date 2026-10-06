@@ -36,3 +36,24 @@ export const SAVED_SIGN_INS: boolean = false
 
 /** Break-in attempts on Access checks: the Why section, the strip, the attempts panel. On, with `features.breakInTest`. */
 export const BREAK_IN_ATTEMPTS: boolean = true
+
+/** Denial reasons (docs/specs/DENIAL-REASONS.md): the cause of a refusal, said in plain words under the message. */
+export const DENIAL_REASONS: boolean = true
+
+/** Accept as expected on a break-in attempt (a reason, who and when; Restore undoes it). The builder's acceptance is read either way. */
+export const ACCEPT_ATTEMPTS: boolean = true
+
+/** Temporary access from a refusal: the Why's Let in for a while, a first rule that ends by itself (temp-access.ts). */
+export const TEMP_ACCESS: boolean = true
+
+/** The Identity field takes several users and groups at once, one run each (IdentityField.tsx). Off: one person or one group, as it was (IdentityFieldSingle.tsx). Owner, 5 Oct 2026. */
+export const MULTI_IDENTITY: boolean = false
+
+/** The inspector: a name on the run (a policy, a rule) opens in the right-hand panel, read-only, with Edit in builder as the one way out (InspectPanel.tsx). */
+export const INSPECTOR: boolean = true
+
+/** Read as text, a tab beside the policy inspector's details. Off (owner, 6 Oct 2026, later: "Read as text is not used — only the details view, no tabs"); the details never depended on it. */
+export const READ_AS_TEXT_TAB: boolean = false
+
+/** Details in the canvas bar (the policy that decided, in the inspector). Off (owner, 6 Oct 2026: "remove this button, no need"): the names inside the cards are the way in. */
+export const DETAILS_IN_BAR: boolean = false

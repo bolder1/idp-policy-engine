@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { useContext, useMemo } from 'react'
-import { ArrowRight, Layers, TriangleAlert } from 'lucide-react'
+import { ArrowRight, Layers, TriangleAlert, Users } from 'lucide-react'
 
 import { DECISION_WORDS } from '../../../decision-words'
 import { Face } from '../../../faces'
@@ -32,7 +32,9 @@ export function SignInMoment({ props, landed }: { props: RunLayoutProps; landed:
   const { users, groups, apps, zones } = useBrand()
   const person = users.find((u) => u.id === form.personId) ?? null
   const app = apps.find((a) => a.id === form.appId) ?? null
-  const groupLine = asGroup ? `A member of ${asGroup}` : person ? groupNamesOf(person, groups).join(', ') : ''
+  /* A group run is checked as one of its members (sign-in-card.ts `personPick`): the card names the group, as the row
+     does, and says whose sign-in stands for it. */
+  const groupLine = asGroup ? (person ? `Checked as ${person.name}, a member` : '') : person ? groupNamesOf(person, groups).join(', ') : ''
   const ctx: SentenceContext = { people: users, apps, zones, rows }
   const facts = sentenceTokens(rows)
     .filter((t) => t !== 'person' && t !== 'app')
@@ -42,10 +44,16 @@ export function SignInMoment({ props, landed }: { props: RunLayoutProps; landed:
   return (
     <div className={`rl-focus__card is-sign${lit ? ' is-lit' : ''}`} data-card data-node="sign-in">
       <header className="rl-focus__head">
-        <span className="rl-focus__tile is-face">{person ? <Face kind="user" name={person.name} size="md" decorative /> : null}</span>
+        {asGroup ? (
+          <span className="rl-focus__tile is-group">
+            <Users size={20} strokeWidth={2} aria-hidden />
+          </span>
+        ) : (
+          <span className="rl-focus__tile is-face">{person ? <Face kind="user" name={person.name} size="md" decorative /> : null}</span>
+        )}
         <span className="rl-focus__heading">
           <span className="rl-focus__kicker">Sign-in</span>
-          <h3 className="rl-focus__title">{person?.name ?? (asGroup ? `Anyone in ${asGroup}` : 'Choose a person')}</h3>
+          <h3 className="rl-focus__title">{asGroup ? `Anyone in ${asGroup}` : (person?.name ?? 'Choose a person')}</h3>
         </span>
       </header>
       {groupLine && <p className="rl-focus__sub">{groupLine}</p>}
@@ -97,7 +105,7 @@ export function PoliciesMoment({ plan, s, first, landed, animate, focused }: { p
   const decider = deciderIndex >= 0 ? plan.policies[deciderIndex] : undefined
   const sub = decider && s >= decider.settleAt ? (decider.isGlobalDefault ? 'None above covers them: the Global Default applies' : `The first that covers ${first} applies`) : `Read in order · the first that covers ${first} applies`
   return (
-    <div className={`rl-focus__card is-policies${working ? ' is-working' : state === 'pass' && landed ? ' is-settled' : ''}`} data-card data-node="which">
+    <div className={`rl-focus__card is-policies${working ? ' is-working' : state === 'pass' ? ' is-positive is-settled' : ''}`} data-card data-node="which">
       <header className="rl-focus__head">
         <span className={`rl-focus__tile${working ? ' is-working' : state === 'pass' ? ' is-positive' : ''}`}>
           <Layers size={18} strokeWidth={2} aria-hidden />

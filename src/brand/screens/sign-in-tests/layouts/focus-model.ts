@@ -8,8 +8,8 @@ import type { EnginePolicy, EngineRule, EngineRun } from '../engine-run'
      sign-in · policies · rule 1 · rule 2 … · outcome
 
    A moment is reached at a step of the plan; the one in focus at step `s` is
-   the last reached. The outcome is always there at the end, waiting, as the
-   place the run is going. Rules come in only as the engine reaches them —
+   the last reached. Every card, the outcome too, comes in only as the engine
+   reaches it (owner, 3 Oct 2026: progressive, never waiting ahead). Rules come in only as the engine reaches them —
    the engine does not know how far it will read, so neither does the ribbon.
    Pure: everything here is drawn from the plan and `s`.
    -------------------------------------------------------------------------- */
@@ -155,6 +155,52 @@ export function tallestOf(plan: EngineRun, moments: readonly Moment[], facts: nu
     }
   }
   return h
+}
+
+/** What makes a moment's card look different at step `s`: a card re-renders only when this changes
+    (FocusLayout.tsx memoises each card on it, so a step of the clock touches only the card it changes). */
+export function stateKeyOf(m: Moment, plan: EngineRun, s: number, landed: boolean): string {
+  if (m.kind === 'sign') return landed ? 'landed' : 'playing'
+  if (m.kind === 'policies') {
+    const di = plan.policies.findIndex((p) => p.decides)
+    return `${policiesState(plan, s)}|${landed ? 1 : 0}|${plan.policies.map((p, i) => policyRow(p, s, di, i, false, landed)).join(',')}|${plan.policies.some((p) => p.scanAt !== null && s >= p.scanAt && s < p.settleAt) ? s : ''}`
+  }
+  if (m.kind === 'rule') {
+    const r = plan.rules[m.rule ?? -1]
+    if (!r) return ''
+    const read = r.checks
+      .slice(0, r.checked)
+      .map((_, k) => {
+        const at = r.checkAt[k]
+        if (at === undefined || s < at) return 'h'
+        return s < (r.markAt[k] ?? at + 1) ? 'w' : 's'
+      })
+      .join('')
+    const deciding = plan.steps.findIndex((st) => st.kind === 'deciding')
+    return `${traceResult(r, s)}|${read}|${landed ? 1 : 0}|${deciding >= 0 && s >= deciding ? 1 : 0}|${plan.steps[s]?.kind === 'deciding' ? 1 : 0}`
+  }
+  return `${landed ? 1 : 0}|${plan.steps[s]?.kind === 'deciding' ? 1 : 0}`
+}
+
+/** On a Deny that fell to the last rule: the rule read that came closest — the fewest failing checks, the earliest on a
+    tie — and what it missed on ("missed only on Device", "missed on 2 checks"). Null for any other answer. */
+export function closestMiss(plan: Pick<EngineRun, 'rules' | 'landing' | 'outcome'>): { rule: EngineRule; says: string; line: string } | null {
+  const o = plan.outcome
+  if (!(o.status === 'decided' && o.decision === 'deny')) return null
+  const landing = plan.landing !== null ? plan.rules[plan.landing] : undefined
+  if (!landing || landing.index !== null) return null
+  let best: { rule: EngineRule; fails: number } | null = null
+  for (const r of plan.rules) {
+    if (r.index === null || !r.visited || r.state !== 'no-match') continue
+    const fails = Math.max(1, r.checks.filter((c) => c.status === 'fail').length)
+    if (!best || fails < best.fails) best = { rule: r, fails }
+  }
+  if (!best) return null
+  const r = best.rule
+  const only = r.checks.filter((c) => c.status === 'fail')
+  const word = only.length === 1 ? only[0].word : r.failing !== null && best.fails === 1 ? (r.checks[r.failing]?.word ?? '') : ''
+  const says = best.fails === 1 && word ? `Closest: Rule ${(r.index ?? 0) + 1}, missed only on ${word}` : `Closest: Rule ${(r.index ?? 0) + 1}, missed on ${best.fails} checks`
+  return { rule: r, says, line: foldLine(r).text }
 }
 
 /* The moment an assistant's target (assistant/intents.ts `Target`) is about:

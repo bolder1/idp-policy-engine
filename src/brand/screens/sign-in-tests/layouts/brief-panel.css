@@ -1,0 +1,358 @@
+/* -----------------------------------------------------------------------------
+   HOW IT WAS DECIDED, in the page's right-hand panel (brief-panel.tsx,
+   brief-panel-path.tsx). The panel's frame, head and scrolling body are
+   WhyCard's (`.tj-why*`, journey.css + sign-in-tests.css `.sit-whypanel`).
+   Console tokens only — the panel's own, which panel-stage.css redeclares
+   dark beside a dark stage — so it reads right in both. Colour is meaning:
+   ✓ green, ✕ red, ? amber, – grey; blue only for what is lit now and for
+   what runs; never orange. De-boxed: hairlines between sections, one tinted
+   callout when something answers otherwise. Type: the verdict 20 px, section
+   labels 12 px, body 13–14 px.
+   -------------------------------------------------------------------------- */
+
+.bfp {
+  /* What they see (brief-see.tsx) reads the stage's names: here they are the panel's. */
+  --bf-text: var(--text-primary);
+  --bf-text-2: var(--text-secondary);
+  --bf-text-3: var(--text-tertiary);
+  --bf-card: var(--surface-raised);
+  --bf-sunken: var(--surface-sunken);
+  --bf-line: var(--border-subtle);
+  --bf-line-2: var(--border-default);
+  --bf-line-3: var(--border-strong);
+  --bf-ink: var(--text-primary);
+  --bf-bad: var(--fb-negative-fg);
+  --bf-shadow-up: var(--el-mid);
+  --bfp-live: var(--fb-info-dot);
+  --bfp-lit: color-mix(in srgb, var(--fb-info-dot) 9%, transparent);
+  --bfp-tone: var(--text-tertiary);
+  --bfp-k: 96px;
+  container: bfp / inline-size;
+}
+.bfp.is-pass { --bfp-tone: var(--fb-positive-fg); }
+.bfp.is-fail { --bfp-tone: var(--fb-negative-fg); }
+.bfp.is-unknown { --bfp-tone: var(--fb-notice-fg); }
+@container bfp (min-width: 480px) {
+  .bfp-body { --bfp-k: 112px; }
+}
+
+/* Every press in it: a visible ring. */
+.bfp :is(button, [tabindex]):focus-visible { outline: 2px solid var(--focus-ring, var(--bfp-live)); outline-offset: 2px; border-radius: 6px; }
+
+/* --- The head: the verdict ------------------------------------------------------------------ */
+
+/* The bar stays; the verdict under it scrolls with the rest, on the same soft tint of the answer's colour. */
+.bfp { --bfp-tint: color-mix(in srgb, var(--bfp-tone) 6%, var(--surface-raised)); }
+.tj-why__top.bfp-top { flex-direction: column; align-items: stretch; padding: 10px 12px 2px 24px; border-bottom: 0; background: var(--bfp-tint); }
+.bfp-top__bar { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.bfp-top__title.tj-why__title { font-size: 13px; line-height: 20px; font-weight: 600; color: var(--text-secondary); }
+.bfp-copy { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; }
+.bfp-copy:hover { background: var(--state-hover-bg, var(--surface-sunken)); color: var(--text-primary); }
+.bfp-copy > svg { color: var(--text-tertiary); }
+
+.bfp-verdict { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; align-items: start; margin: 0 -24px; padding: 10px 24px 20px; border-bottom: 1px solid var(--border-subtle); background: var(--bfp-tint); }
+.bfp-verdict__mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--bfp-tone) 30%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bfp-tone) 13%, var(--surface-raised));
+  color: var(--bfp-tone);
+}
+.bfp-verdict__main { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.bfp-verdict__words { margin: 0; font-size: 20px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; color: var(--bfp-tone); overflow-wrap: anywhere; }
+.bfp.is-none .bfp-verdict__words { color: var(--text-primary); }
+.bfp-verdict__who { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font-size: 13px; line-height: 20px; color: var(--text-body, var(--text-primary)); }
+.bfp-ent { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+.bfp-ent__group { color: var(--fb-info-dot); }
+/* The face, its initials at the panel's floor size. */
+.bfp-ent .bx-face { width: 24px; height: 24px; font-size: 12px; letter-spacing: -0.02em; }
+.bfp-verdict__to { flex: none; color: var(--text-tertiary); }
+.bfp-factors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 0; }
+.bfp-factors__item { display: inline-flex; align-items: center; gap: 6px; }
+.bfp-factors__then { color: var(--text-tertiary); }
+.bfp-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-raised); font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; }
+.bfp-verdict__msg { margin: 2px 0 0; padding-left: 10px; border-left: 2px solid color-mix(in srgb, var(--fb-negative-fg) 45%, transparent); font-size: 13px; line-height: 19px; color: var(--text-primary); }
+.bfp-verdict__could { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; }
+.bfp-could { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px solid var(--border-default); border-radius: 999px; font-size: 12px; font-weight: 600; }
+.bfp-could.is-pass { color: var(--fb-positive-fg); }
+.bfp-could.is-fail { color: var(--fb-negative-fg); }
+.bfp-could__src { font-weight: 400; color: var(--text-tertiary); white-space: pre; }
+.bfp-verdict__add { margin-top: 4px; }
+
+/* --- The body, its sections, the labels --------------------------------------------------- */
+
+.tj-why__body.bfp-body { gap: 0; padding: 0 24px 24px; }
+.bfp-sec { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 18px 0; }
+.bfp-sec + .bfp-sec { border-top: 1px solid var(--border-subtle); }
+.bfp-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-secondary); }
+.bfp-label__aside { font-weight: 400; color: var(--text-tertiary); }
+.bfp-note { margin: 0; font-size: 12px; line-height: 16px; color: var(--text-tertiary); }
+.bfp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Buttons: a plain outline (Open rule 2, Run with …), never orange; a text link (Open policy ↗). */
+.bfp-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.bfp-btn:hover { border-color: var(--border-strong); background: var(--state-hover-bg, var(--surface-sunken)); }
+.bfp-btn > svg { flex: none; color: var(--text-tertiary); }
+/* What runs: its play mark blue, the engine's colour. */
+.bfp-btn.is-run > svg { color: var(--fb-info-dot); }
+.bfp-btn.is-quiet { min-height: 26px; border-style: dashed; background: none; }
+.bfp-link { display: inline-flex; align-items: center; gap: 3px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; cursor: pointer; }
+.bfp-link:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+.bfp-link > svg { color: var(--text-tertiary); }
+
+/* --- Decided by (and Expected) ------------------------------------------------------------- */
+
+.bfp-decided { gap: 12px; }
+.bfp-kv { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; row-gap: 8px; }
+.bfp-kv__k { grid-column: 1 / -1; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-secondary); }
+.bfp-kv__v { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13px; line-height: 20px; color: var(--text-primary); }
+.bfp-decided__policy { display: inline-flex; align-items: flex-start; gap: 6px; font-weight: 600; overflow-wrap: anywhere; }
+.bfp-decided__policy > svg { flex: none; margin-top: 3px; color: var(--text-tertiary); }
+.bfp-decided__rule { padding-left: 20px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.bfp-expect { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-weight: 600; }
+.bfp-expect.is-pass { color: var(--fb-positive-fg); }
+.bfp-expect.is-fail { color: var(--fb-negative-fg); }
+.bfp-expect__got { font-weight: 400; color: var(--text-secondary); }
+
+/* --- The path: the engine's order on a rail ------------------------------------------------ */
+
+.bfp-path { display: flex; flex-direction: column; margin: 2px 0 0; padding: 0; list-style: none; }
+.bfp-node { position: relative; padding: 0 0 14px 36px; scroll-margin: 12px; }
+.bfp-node.is-last { padding-bottom: 0; }
+/* The rail: from under a node's mark to the next; dashed into what can't be told or wasn't asked. */
+.bfp-node:not(.is-last)::after {
+  content: '';
+  position: absolute;
+  top: 27px;
+  bottom: 3px;
+  left: 11px;
+  border-left: 2px solid var(--border-subtle);
+}
+.bfp-node:has(+ .bfp-node.is-unknown)::after,
+.bfp-node:has(+ .bfp-node.is-none)::after { border-left-style: dashed; border-left-color: var(--border-default); }
+.bfp-node__dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--bfp-m) 34%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bfp-m) 12%, var(--surface-raised));
+  color: var(--bfp-m);
+  --bfp-m: var(--text-tertiary);
+}
+.bfp-node.is-pass .bfp-node__dot { --bfp-m: var(--fb-positive-fg); }
+.bfp-node.is-fail .bfp-node__dot { --bfp-m: var(--fb-negative-fg); }
+.bfp-node.is-unknown .bfp-node__dot { --bfp-m: var(--fb-notice-fg); }
+.bfp-node.is-none .bfp-node__dot { border-style: dashed; background: var(--surface-raised); }
+.bfp-node__dot > .bfp-mk.bfp-mk { color: inherit; }
+.bfp-node__dot > span { display: grid; place-items: center; line-height: 0; }
+/* The node that decides, and the outcome: a filled mark. */
+.bfp-node.is-deciding .bfp-node__dot,
+.bfp-node.is-outcome .bfp-node__dot { border-color: transparent; background: var(--bfp-m); color: var(--surface-raised); }
+
+.bfp-node__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin: -2px -8px 0; padding: 2px 8px 4px; border-radius: 8px; transition: background-color 150ms ease; }
+.bfp-node.is-lit .bfp-node__main { background: var(--bfp-lit); box-shadow: inset 2px 0 0 var(--bfp-live); }
+.bfp-node__head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.bfp-node__title { flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-primary); text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.bfp-node__title:hover { text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+.bfp-node.is-deciding .bfp-node__title,
+.bfp-node.is-outcome .bfp-node__title { font-weight: 600; }
+.bfp-node.is-none .bfp-node__title { color: var(--text-secondary); }
+.bfp-node__fold { display: grid; flex: none; place-items: center; width: 24px; height: 20px; margin: 0 -4px 0 0; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--text-tertiary); cursor: pointer; }
+.bfp-node__fold:hover { background: var(--state-hover-bg, var(--surface-sunken)); color: var(--text-primary); }
+.bfp-node__fold > svg { transition: transform 180ms ease; }
+.bfp-node__fold.is-open > svg { transform: rotate(180deg); }
+.bfp-node__sub { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 0; font-size: 13px; line-height: 19px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.bfp-node__more { overflow: hidden; }
+
+/* A rule's checks: the check, this sign-in, what the rule needs, the mark. */
+.bfp-checks { width: 100%; margin: 8px 0 2px; border: 1px solid var(--border-subtle); border-radius: 8px; border-spacing: 0; background: var(--surface-sunken); font-size: 12px; line-height: 17px; color: var(--text-body, var(--text-primary)); }
+.bfp-checks :is(th, td) { padding: 7px 8px; border-top: 1px solid var(--border-subtle); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.bfp-checks thead th { padding-top: 6px; padding-bottom: 6px; border-top: 0; font-weight: 500; color: var(--text-tertiary); white-space: nowrap; }
+.bfp-checks tbody th { font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+.bfp-checks__word { display: inline-flex; align-items: center; gap: 6px; }
+.bfp-checks__word > svg { flex: none; color: var(--text-tertiary); }
+.bfp-checks__value { color: var(--text-primary); }
+.bfp-checks__needs { color: var(--text-secondary); }
+.bfp-checks__mark { width: 16px; padding-left: 0; }
+.bfp-checks tr.is-decides .bfp-checks__value { font-weight: 600; }
+.bfp-checks tr.is-none :is(.bfp-checks__value, .bfp-checks__needs) { color: var(--text-tertiary); }
+.bfp-add { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--fb-notice-fg); white-space: nowrap; cursor: pointer; }
+.bfp-add:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* Narrow: each check a little block — the check and its mark, then this sign-in, then what it needs. */
+@container bfp (max-width: 440px) {
+  .bfp-checks thead { display: none; }
+  .bfp-checks,
+  .bfp-checks tbody { display: block; }
+  .bfp-checks tr { display: grid; grid-template-columns: minmax(0, 1fr) 16px; column-gap: 8px; padding: 7px 10px; border-top: 1px solid var(--border-subtle); }
+  .bfp-checks tbody tr:first-child { border-top: 0; }
+  .bfp-checks :is(th, td) { padding: 0; border: 0; }
+  .bfp-checks tbody th { grid-column: 1; grid-row: 1; }
+  .bfp-checks__mark { grid-column: 2; grid-row: 1; }
+  .bfp-checks__value { grid-column: 1 / -1; padding-top: 2px; }
+  .bfp-checks__needs { grid-column: 1 / -1; }
+  .bfp-checks__needs::before { content: 'Needs '; color: var(--text-tertiary); }
+}
+
+.bfp-mk { display: inline-grid; flex: none; place-items: center; line-height: 0; }
+.bfp-mk.is-pass { color: var(--fb-positive-fg); }
+.bfp-mk.is-fail { color: var(--fb-negative-fg); }
+.bfp-mk.is-unknown { color: var(--fb-notice-fg); }
+.bfp-mk.is-none { color: var(--text-tertiary); }
+
+/* --- Also covers: the one callout ---------------------------------------------------------- */
+
+.bfp-also { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface-sunken); }
+.bfp-also.is-conflict { border-color: color-mix(in srgb, var(--fb-notice-fg) 32%, transparent); background: color-mix(in srgb, var(--fb-notice-fg) 7%, var(--surface-raised)); }
+.bfp-also__head { display: flex; align-items: center; gap: 8px; }
+.bfp-also__icon { flex: none; color: var(--text-tertiary); }
+.bfp-also.is-conflict .bfp-also__icon { color: var(--fb-notice-fg); }
+.bfp-also__title { margin: 0; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--text-primary); }
+.bfp-also__pol { display: flex; flex-direction: column; gap: 2px; padding-left: 23px; }
+.bfp-also__name { display: inline-flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--text-primary); }
+.bfp-also__name > svg { flex: none; margin-top: 3px; color: var(--text-tertiary); }
+.bfp-also__line { margin: 0; font-size: 13px; line-height: 19px; color: var(--text-secondary); }
+.bfp-also__would { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 0; font-size: 12px; line-height: 18px; color: var(--text-tertiary); }
+.bfp-also__would > span { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.bfp-also__would > svg { color: var(--text-tertiary); }
+.bfp-groups { display: flex; flex-direction: column; margin: 0 0 0 23px; padding: 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.bfp-groups__row { display: grid; grid-template-columns: var(--bfp-k) minmax(0, 1fr); grid-template-areas: 'label ans' '. run'; align-items: start; column-gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+.bfp-groups__row:last-child { border-bottom: 0; padding-bottom: 0; }
+.bfp-groups__label { grid-area: label; font-size: 12px; line-height: 19px; font-weight: 500; color: var(--text-secondary); overflow-wrap: anywhere; }
+.bfp-groups__row.is-current .bfp-groups__label { color: var(--text-primary); font-weight: 600; }
+.bfp-groups__ans { grid-area: ans; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bfp-groups__run { justify-self: start; margin-top: 6px; }
+.bfp-groups__words { font-size: 13px; line-height: 19px; font-weight: 600; }
+.bfp-groups__words.is-pass { color: var(--fb-positive-fg); }
+.bfp-groups__words.is-fail { color: var(--fb-negative-fg); }
+.bfp-groups__words.is-unknown { color: var(--fb-notice-fg); }
+.bfp-groups__src { font-size: 12px; line-height: 17px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.bfp-groups__run { grid-area: run; }
+@container bfp (max-width: 420px) {
+  .bfp-groups__row { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'label' 'ans' 'run'; row-gap: 1px; }
+  .bfp-groups__label { line-height: 16px; }
+}
+.bfp-also__fix { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 0 0 23px; border-top: 1px solid color-mix(in srgb, var(--fb-notice-fg) 20%, transparent); }
+.bfp-also__fix > p { margin: 0; font-size: 13px; line-height: 19px; color: var(--text-body, var(--text-primary)); }
+.bfp-also__fixk { margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.bfp-also__caution { font-size: 12px !important; color: var(--fb-negative-fg) !important; }
+
+/* --- What would change it ------------------------------------------------------------------ */
+
+.bfp-ifs { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.bfp-ifs__row { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'change' 'to' 'run'; align-items: start; padding: 10px 0 12px; border-bottom: 1px solid var(--border-subtle); }
+.bfp-ifs__row:first-child { padding-top: 2px; }
+.bfp-ifs__change { grid-area: change; font-size: 13px; line-height: 19px; font-weight: 500; color: var(--text-primary); overflow-wrap: anywhere; }
+.bfp-ifs__to { grid-area: to; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; font-size: 13px; line-height: 19px; }
+.bfp-ifs__to > svg { flex: none; color: var(--text-tertiary); }
+.bfp-ifs__words { font-weight: 600; }
+.bfp-ifs__words.is-pass { color: var(--fb-positive-fg); }
+.bfp-ifs__words.is-fail { color: var(--fb-negative-fg); }
+.bfp-ifs__words.is-unknown { color: var(--fb-notice-fg); }
+.bfp-ifs__words.is-none { color: var(--text-secondary); }
+.bfp-ifs__src { font-size: 12px; color: var(--text-tertiary); overflow-wrap: anywhere; }
+.bfp-ifs__run { grid-area: run; justify-self: start; max-width: 100%; margin-top: 8px; }
+/* Wide: the change and what it gives on one line, the press under them. */
+@container bfp (min-width: 480px) {
+  .bfp-ifs__row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'change to' 'run run'; column-gap: 8px; align-items: baseline; }
+}
+
+/* --- What they see -------------------------------------------------------------------------- */
+
+.bfp-see { display: flex; flex-direction: column; gap: 8px; }
+.bfp-see__tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.bfp-see__tabs > button { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 6px; border: 1px solid var(--border-subtle); border-radius: 999px; background: none; font: inherit; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; }
+.bfp-see__tabs.is-answers > button { padding-left: 10px; }
+.bfp-see__tabs > button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.bfp-see__tabs > button[aria-pressed='true'] { border-color: var(--fb-info-dot); background: color-mix(in srgb, var(--fb-info-dot) 10%, transparent); color: var(--text-primary); }
+.bfp-see__n { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--surface-sunken); font-size: 12px; line-height: 1; font-weight: 600; color: var(--text-secondary); }
+.bfp-see__tabs > button[aria-pressed='true'] .bfp-see__n { background: var(--fb-info-dot); color: var(--surface-raised); }
+.bfp .bfp-see__frame.rl-brief__seeframe { position: relative; right: auto; bottom: auto; width: 100%; height: 196px; box-shadow: none; }
+.bfp .bfp-see__frame .rl-brief__seebar { height: 18px; padding: 0 8px; }
+.bfp .bfp-see__frame .rl-brief__seebar > i { width: 6px; height: 6px; }
+.bfp .bfp-see__frame .rl-brief__seepage { gap: 10px; padding: 12px 24px; }
+
+/* --- Break-in attempts ---------------------------------------------------------------------- */
+
+.bfp-bi__row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bfp-bi__row:hover { border-color: var(--border-default); background: var(--state-hover-bg, var(--surface-sunken)); }
+.bfp-bi__icon { color: var(--text-tertiary); }
+.bfp-bi__row.is-holes .bfp-bi__icon { color: var(--fb-notice-fg); }
+.bfp-bi__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bfp-bi__title { font-size: 13px; line-height: 19px; font-weight: 600; color: var(--text-primary); }
+.bfp-bi__counts { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; line-height: 17px; }
+.bfp-bi__counts > .is-held { color: var(--text-secondary); }
+.bfp-bi__counts > .is-hole { font-weight: 600; color: var(--fb-notice-fg); }
+.bfp-bi__counts > .is-none { font-weight: 500; color: var(--fb-positive-fg); }
+.bfp-bi__go { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+.bfp-bi__row:hover .bfp-bi__go { color: var(--text-primary); }
+/* Narrow: the counts keep the room; the press says itself by its chevron (its name stays for assistive tech). */
+@container bfp (max-width: 420px) {
+  .bfp-bi__gow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bfp-node__main,
+  .bfp-node__fold > svg { transition: none; }
+}
+
+/* --- No page panel to open (the builder's Check access): a card under the button ---------- */
+
+.bfp.is-inline { width: 100%; max-width: 560px; margin-top: 16px; text-align: left; }
+.bfp.is-inline .tj-why__top.bfp-top { border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+.rl-brief[data-stage='dark'] .bfp.is-inline {
+  --surface-raised: #1a212a;
+  --surface-sunken: #0d1218;
+  --border-subtle: #262e38;
+  --border-default: #45505d;
+  --border-strong: #7e8b9a;
+  --text-primary: #f8fafb;
+  --text-body: #d2dae3;
+  --text-secondary: #aeb9c6;
+  --text-tertiary: #97a3b0;
+  --state-hover-bg: #232d39;
+  --fb-positive-fg: #4cc47c;
+  --fb-negative-fg: #ff7f9e;
+  --fb-notice-fg: #f5c452;
+  --fb-info-dot: #4d94ff;
+  --focus-ring: #93a0ae;
+}

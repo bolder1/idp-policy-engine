@@ -15,6 +15,7 @@ import {
   type User,
   type Zone,
   type ZoneScope,
+  ruleExpired,
 } from '../data'
 import {
   DEFAULT_MATCH,
@@ -1632,7 +1633,7 @@ export function tracePolicy(policy: Policy, facts: SignInFacts, env: SimEnv): Po
   for (let i = 0; i < traced.length; i++) {
     const t = traced[i]
     if (hitIndex !== null) steps.push({ ...t, kind: 'unreached' })
-    else if (!policy.rules[i].enabled) steps.push({ ...t, kind: 'off' })
+    else if (!policy.rules[i].enabled || ruleExpired(policy.rules[i], facts.when?.date)) steps.push({ ...t, kind: 'off' })
     else if (t.match === 'yes') {
       hitIndex = i
       steps.push({ ...t, kind: 'hit' })
@@ -1650,7 +1651,7 @@ export function tracePolicy(policy: Policy, facts: SignInFacts, env: SimEnv): Po
   let stopped = false
   for (let i = 0; i < policy.rules.length && !stopped; i++) {
     const rule = policy.rules[i]
-    if (!rule.enabled) continue
+    if (!rule.enabled || ruleExpired(rule, facts.when?.date)) continue
     const m = traced[i].match
     if (m === 'yes') {
       possible.push({ decision: rule.decision, ruleIndex: i, ruleName: rule.name, assumes })

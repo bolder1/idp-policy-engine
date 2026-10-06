@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 
+import { COPILOT_NAME } from './jarvis-mode/copilot-name'
 import { CANVAS_OPTIONS } from './phase'
 
 /* -----------------------------------------------------------------------------
@@ -156,11 +157,15 @@ import { CANVAS_OPTIONS } from './phase'
    switches are; read on arrival, never trusted past its list.
    -------------------------------------------------------------------------- */
 
-export type RunLayoutId = 'column' | 'line' | 'tree' | 'gates' | 'marble' | 'chat' | 'deck' | 'depth' | 'jarvis' | 'jarvis2' | 'mission' | 'synapse' | 'pulse' | 'focus' | 'brief' | 'circuit' | 'stream' | 'bento' | 'directions' | 'explainer' | 'pass'
+export type RunLayoutId = 'column' | 'classic2' | 'line' | 'tree' | 'gates' | 'marble' | 'chat' | 'deck' | 'depth' | 'jarvis' | 'jarvis2' | 'mission' | 'synapse' | 'pulse' | 'focus' | 'focus2' | 'brief' | 'circuit' | 'stream' | 'bento' | 'directions' | 'explainer' | 'pass'
 
 /** The switch's choices, in its order, each in its group (the dropdown's headings). */
 export const RUN_LAYOUTS: readonly { value: RunLayoutId; label: string; group: string }[] = [
   { value: 'column', label: 'Classic', group: 'Original' },
+  /* Classic v2 (owner, 5 Oct 2026: "double down on the classic mode … the same experience we have in creating policy
+     … 4 basic cards"): the sign-in, the policies, the rules, the outcome, on the policy builder's own cards
+     (layouts/ClassicV2Layout.tsx). Classic stays as it is beside it. */
+  { value: 'classic2', label: 'Classic v2', group: 'Original' },
   { value: 'line', label: 'Line', group: 'Spread out' },
   { value: 'tree', label: 'Tree', group: 'Spread out' },
   { value: 'gates', label: 'Gates', group: 'Playful' },
@@ -168,12 +173,14 @@ export const RUN_LAYOUTS: readonly { value: RunLayoutId; label: string; group: s
   { value: 'chat', label: 'Chat', group: 'Playful' },
   { value: 'deck', label: 'Deck', group: 'Playful' },
   { value: 'depth', label: 'Depth', group: 'Playful' },
-  { value: 'jarvis', label: 'Jarvis', group: 'Cinematic' },
-  { value: 'jarvis2', label: 'Jarvis v2', group: 'Cinematic' },
+  /* The copilot's name, not the code name (owner, 3 Oct 2026: it ships as Aruna — jarvis-mode/copilot-name.ts). */
+  { value: 'jarvis', label: COPILOT_NAME, group: 'Cinematic' },
+  { value: 'jarvis2', label: `${COPILOT_NAME} v2`, group: 'Cinematic' },
   { value: 'mission', label: 'Mission', group: 'Cinematic' },
   { value: 'synapse', label: 'Synapse', group: 'Cinematic' },
   { value: 'pulse', label: 'Pulse', group: 'Newest' },
-  { value: 'focus', label: 'Focus', group: 'Newest' },
+  { value: 'focus', label: 'Focus v1', group: 'Newest' },
+  { value: 'focus2', label: 'Focus', group: 'Newest' },
   { value: 'brief', label: 'Brief', group: 'Newest' },
   { value: 'circuit', label: 'Circuit', group: 'Newest' },
   { value: 'stream', label: 'Stream', group: 'Newest' },
@@ -188,29 +195,61 @@ export const JARVIS: RunLayoutId = 'jarvis'
 /* Jarvis v2, the Reactor (2 Oct 2026): the owner kept the first Jarvis — "the older version is more simple and better, so
    revert that and keep the current version as v2". Both are Jarvis: one bar button, the transition, the dark stage; the
    version switch beside the button while Jarvis is on picks which, and is remembered. */
+/* v2, the Reactor, is an ARCHIVED canvas (owner, 3 Oct 2026: "move v2 inside the archive — not needed in the main
+   view, no need for v1 / v2 … no need to work on that"): on the Canvas dropdown's Archive shelf, not a dedicated
+   view; the bar's button enters Aruna (v1) only. */
 export const JARVIS2: RunLayoutId = 'jarvis2'
-export const JARVIS_VERSIONS: readonly RunLayoutId[] = [JARVIS, JARVIS2]
-export const isJarvis = (l: RunLayoutId) => JARVIS_VERSIONS.includes(l)
-export const JARVIS_VERSION_KEY = 'idp.jarvis-version'
+export const isJarvis = (l: RunLayoutId) => l === JARVIS
 
 /* The dedicated views (owner, 2 Oct 2026: "Brief and Focus can be two
    dedicated views — exclude those, those are very good"; and Jarvis, "one
    personal favourite"): each its own button on the bar, on neither shelf. */
-export const DEDICATED: readonly RunLayoutId[] = ['focus', 'brief', 'jarvis', 'jarvis2']
+/* Focus is the main view and Brief is archived (owner, 4 Oct 2026: "Brief — just move it to archive, and Focus will be
+   our main view; it should have that Brief part as well … we can remove the Blend mode"). */
+/* Focus v2 IS Focus now, and v1 is archived (owner, 4 Oct 2026, pointing at the bar's v1 | v2: "Move the v1 to
+   archive"). v2 is the story that goes deeper — the policy, inside it its rules, the deciding rule's Then, the
+   outcome; v1, the carousel of separate cards, sits on the Archive shelf as "Focus v1". No version switch. */
+export const DEDICATED: readonly RunLayoutId[] = ['focus2', 'jarvis']
+/** The main view: Focus (the layout id stays 'focus2' — v1 keeps 'focus', so a stored pick still means what it did). */
+export const MAIN_VIEW: RunLayoutId = 'focus2'
 
 /** The owner's favourites, in his order (2 Oct 2026), the dedicated views apart — Pass and Explainer moved to the archive the same day ("remove Pass and Explainer from the favourites"). Everything else on the switch is the archive. */
 export const DEFAULT_FAVOURITES: readonly RunLayoutId[] = ['tree', 'depth', 'directions']
 
 /** The layouts that draw on a stage with a dark option — the Configure panel follows their stage. */
-export const STAGED_LAYOUTS: readonly RunLayoutId[] = ['jarvis', 'jarvis2', 'mission', 'synapse', 'pulse', 'focus', 'brief', 'circuit', 'stream', 'bento', 'directions', 'explainer', 'pass']
+export const STAGED_LAYOUTS: readonly RunLayoutId[] = ['jarvis', 'jarvis2', 'mission', 'synapse', 'pulse', 'focus', 'focus2', 'brief', 'circuit', 'stream', 'bento', 'directions', 'explainer', 'pass']
 
 /** The layouts that are only ever dark (owner: "Jarvis only available in dark mode … a special experience"). */
-export const DARK_ONLY: readonly RunLayoutId[] = ['jarvis', 'jarvis2']
+/* Jarvis itself has a light stage again (owner, 3 Oct 2026: "add the light mode in Jarvis as well, based on our brand");
+   only Jarvis v2, the unfinished Reactor, stays dark. */
+export const DARK_ONLY: readonly RunLayoutId[] = ['jarvis2']
 
 /** The layouts that show an edit pencil of their own on the sign-in (owner, 2 Oct 2026: "only add the pencil
     button wherever they don't have the option"): the run line's pencil is left out of them. Measured, on screen
     once a run has landed, at 1440×900 and 1280×800 — Focus's own sits on a card that recedes, so it keeps the line's. */
 export const OWN_EDIT: readonly RunLayoutId[] = ['column', 'brief', 'directions', 'explainer']
+
+/** The views that draw their own top — the sign-in row, its pencil and a basic Replay — so the run line is left out
+    of them (owner, 3 Oct 2026: "all 3 should have the same things … I don't like that constant change with the whole
+    top replay thing — just a replay button").
+
+    ARUNA STAYS IN IT, and the reason is worth writing down because taking her out of it was tried first and was wrong.
+    Her circle had swallowed the sign-in on 4 Oct 2026 — the person at the core, the application at the ring's gate, the
+    conditions orbiting as chips, the pencil and Replay on the core — and the owner reversed that: "revert the circle,
+    and give me the old top bar as we have in Focus". The circle is the engine's again, so the facts have to come back.
+
+    But this list is not the switch for that. Leaving it hands a view the HOST's `EngineLine` — the clock sentence,
+    "Checked 1 policy · 2 rules · 3 checks" — which is a reading of the run, not the sign-in. The bar he means is
+    `SignInRow`, the one Focus and Brief draw THEMSELVES inside their own overlay, which is exactly what being in this
+    list allows. So Aruna is in it and draws the row too (JarvisLayout.tsx). The component was built for her: it takes
+    `look="jarvis"` and sign-in-row.css carries her ember palette for it.
+
+    TREE JOINED IT on 5 Oct 2026 (owner, on the run line over the tree: "remove the current top bar and add this one
+    that we have in Focus mode") — TreeLayout.tsx draws the same row in its stage's overlay.
+
+    CLASSIC V2 draws its own top too (5 Oct 2026): its first card IS the sign-in — the form, read as the builder reads
+    a rule — with the pencil and Replay on its head (layouts/ClassicV2Layout.tsx). */
+export const OWN_TOP: readonly RunLayoutId[] = ['focus', 'focus2', 'brief', 'jarvis', 'tree', 'classic2']
 
 export type CanvasShelf = 'favourites' | 'archive'
 
@@ -221,12 +260,35 @@ export function shelfOf(id: RunLayoutId, favourites: readonly RunLayoutId[]): Ca
 }
 
 /** The layouts on a shelf, in the switch's order. */
+/* Focus is the main view (owner, 4 Oct 2026): first on either shelf, so the Canvas dropdown always leads back to it now
+   the bar has no Focus button. */
 export function layoutsOn(shelf: CanvasShelf, favourites: readonly RunLayoutId[]): (typeof RUN_LAYOUTS)[number][] {
-  return RUN_LAYOUTS.filter((l) => !DEDICATED.includes(l.value) && (shelf === 'favourites' ? favourites.includes(l.value) : !favourites.includes(l.value)))
+  const main = RUN_LAYOUTS.filter((l) => l.value === MAIN_VIEW)
+  return [...main, ...RUN_LAYOUTS.filter((l) => !DEDICATED.includes(l.value) && (shelf === 'favourites' ? favourites.includes(l.value) : !favourites.includes(l.value)))]
 }
 
-/** What the switch shows before anything is chosen. */
-export const FIRST_LAYOUT: RunLayoutId = 'tree'
+/** What the page shows before anything is chosen: Focus, the main view (owner, 4 Oct 2026). */
+export const FIRST_LAYOUT: RunLayoutId = MAIN_VIEW
+
+/* ONE VIEW ON THE PAGE (owner, 5 Oct 2026, for the build he presents: "the user comes here, adds his form, then we
+   showcase one view — hide the rest: the archive, favourites and the canvas type; we focus on one type where we
+   showcase all"). Off, the page head carries neither the Show (Favourites / Archive) nor the Canvas picker, and the
+   page draws Focus whatever `idp.check-canvas` holds — the key is read for nothing and never written, so the stored
+   pick comes back as it was when this is turned on. true brings both pickers back. */
+export const CANVAS_PICKER: boolean = false
+
+/* Aruna's way in on this page (owner, the same day: one view, nothing else to choose): off, the floating "Ask Aruna"
+   on the canvas is not drawn, and with the Canvas picker off there is no other way in — her layout is on no shelf, and
+   a stored 'jarvis' draws Focus (`shownLayout`). true brings the button, her entrance and her way out back. */
+export const ARUNA_ENTRY: boolean = false
+
+/** What the page draws for a stored pick: the pick itself while the pickers are on; with them off, Focus — or Aruna,
+    when her own button is on and took the page there. Off with the switch (phase.ts), always the column. */
+export function shownLayout(stored: RunLayoutId): RunLayoutId {
+  if (!CANVAS_OPTIONS) return 'column'
+  if (CANVAS_PICKER) return stored
+  return ARUNA_ENTRY && isJarvis(stored) ? stored : MAIN_VIEW
+}
 
 export const RUN_LAYOUT_KEY = 'idp.check-canvas'
 
@@ -244,7 +306,8 @@ export function readRunLayout(): RunLayoutId {
   }
 }
 
-/** The layout, and the way to change it — remembered as it changes. Off with the switch, always the column. */
+/** The layout, and the way to change it — remembered as it changes. Off with the switch, always the column; with the
+    pickers off, Focus (`shownLayout`). */
 export function useRunLayout(): [RunLayoutId, (next: RunLayoutId) => void] {
   const [layout, setLayout] = useState<RunLayoutId>(readRunLayout)
   const set = useCallback((next: RunLayoutId) => {
@@ -255,5 +318,5 @@ export function useRunLayout(): [RunLayoutId, (next: RunLayoutId) => void] {
       /* Storage refused: the choice holds for this visit. */
     }
   }, [])
-  return [CANVAS_OPTIONS ? layout : 'column', set]
+  return [shownLayout(layout), set]
 }

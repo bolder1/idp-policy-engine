@@ -34,22 +34,22 @@ import type { RowsRead } from '../testing/rows-read'
 import type { FormField, FormIssue, SignInForm } from '../testing/sign-in-form'
 import { GLOBAL_SCOPE, TOKEN_LABEL, appChoices, tokenDomId, tokenIssue, tokenName, tokenValue, type SentenceScope, type TokenId } from '../testing/sign-in-sentence'
 import { SaveSignInPopover, SentenceTokenPanel } from '../testing/SignInSentence'
-import { PANEL_ID, PANEL_SLIDE, factTokens } from './sign-in-card'
+import { PANEL_ID, PANEL_SLIDE, factTokens, personPick, type IdentityValue } from './sign-in-card'
 import { IdentityField } from './IdentityField'
+import { IdentityFieldSingle } from './IdentityFieldSingle'
 import { ValueMark } from './SignInCard'
 /* The condition row's frame, worn by the fact rows: the board may not have
    loaded it yet. */
 import '../condition-popover.css'
-import { SAVED_SIGN_INS } from './phase'
+import { MULTI_IDENTITY, SAVED_SIGN_INS } from './phase'
 
 /* -----------------------------------------------------------------------------
    The sign-in, as the policy builder's right-hand panel (TESTING-V4 §14.2).
 
      ┌ Check access ─────────────────────── >< ┐
      │ 👥 Identity                              │
-     │ │ Identity type  [User ▾]                │
-     │ │ User           [👤 User  MI Maya Iyer ✎]│
-     │ │ Member of [Engineering] [Finance]      │
+     │ │ [MI Maya Iyer ×] [FI Finance ×]      ▾ │
+     │ │                                        │
      │ ▭ Application                            │
      │ │ [GitHub Enterprise ▾]                  │
      │ ⌖ Sign-in conditions                     │
@@ -59,9 +59,9 @@ import { SAVED_SIGN_INS } from './phase'
      │                                  [▶ Run] │
      └──────────────────────────────────────────┘
 
-   Entra's What If, in order (owner, 1 Oct 2026): Identity — the identity
-   type, User or Group, and then the one chosen, from the policy builder's
-   own list of users and groups (IdentityField.tsx) — then Application, then
+   Entra's What If, in order (owner, 1 Oct 2026): Identity — users and
+   groups in one field, several at once (owner, 5 Oct 2026; IdentityField.tsx),
+   each pick a run of its own when Run is pressed — then Application, then
    Sign-in conditions (it was "Where and on what"). Saved sign-ins, and with
    them Use a saved sign-in and Save sign-in, are a later phase (phase.ts).
 
@@ -119,10 +119,9 @@ export interface TryPanelProps {
   /** What reads each fact (sign-in-card.ts `tokenTips`). */
   tips: Partial<Record<TokenId, string>>
   reduced: boolean
-  /** A group was chosen in the Person picker (§13.3): its id. */
-  asGroup: string | null
-  /** A pick in the Person picker: a person's id, or `group:<id>`. */
-  onPerson: (value: string) => void
+  /** The Identity field's picks, in the order chosen: a person's id, or `group:<id>` (5 Oct 2026). */
+  identities: readonly IdentityValue[]
+  onIdentities: (next: readonly IdentityValue[]) => void
   onPatch: (p: Partial<SignInForm>, field: FormField) => void
   onRun: () => void
   /** The form has changes the run on the canvas has not checked: said beside Run. */
@@ -163,7 +162,7 @@ const FACT: Partial<Record<TokenId, { label: string; icon: LucideIcon }>> = {
 }
 
 export function TryPanel(props: TryPanelProps) {
-  const { title, form, rows, issues, boundaries, tips, reduced, asGroup, onPerson, onPatch, onRun, saved, onUseSaved, savedOpen, onSavedOpen } = props
+  const { title, form, rows, issues, boundaries, tips, reduced, identities, onIdentities, onPatch, onRun, saved, onUseSaved, savedOpen, onSavedOpen } = props
   const { ran, saveOpen, onSaveOpen, wide, onToggleWidth, onClose, scope = GLOBAL_SCOPE, unrun = false } = props
   /* On its way out (AnimatePresence): inert, so it keeps no focus and takes no press. */
   const present = useIsPresent()
@@ -180,6 +179,8 @@ export function TryPanel(props: TryPanelProps) {
   /* No saved sign-in to offer (a policy's applications have none): no row that opens an empty list. */
   const anySaved = saved.some((s) => !s.generated)
   const personIssue = tokenIssue('person', issues)
+  /* The one pick, as the single field reads it: a person, or the member a group stands for and the group. */
+  const held = identities[0] ? personPick(identities[0], users) : { personId: null, asGroup: null }
   const appIssue = tokenIssue('app', issues)
   const facts = factTokens(form, rows)
 
@@ -254,16 +255,28 @@ export function TryPanel(props: TryPanelProps) {
         )}
 
         <PanelSection id="identity" title="Identity" icon={Users}>
-          <IdentityField
-            users={users}
-            groups={groups}
-            personId={form.personId}
-            asGroup={asGroup}
-            audience={audience}
-            domId={tokenDomId(PANEL_ID, 'person')}
-            error={personIssue && <RowError text={personIssue} />}
-            onPick={onPerson}
-          />
+          {MULTI_IDENTITY ? (
+            <IdentityField
+              users={users}
+              groups={groups}
+              values={identities}
+              audience={audience}
+              domId={tokenDomId(PANEL_ID, 'person')}
+              error={personIssue && <RowError text={personIssue} />}
+              onChange={onIdentities}
+            />
+          ) : (
+            <IdentityFieldSingle
+              users={users}
+              groups={groups}
+              personId={held.personId}
+              asGroup={held.asGroup}
+              audience={audience}
+              domId={tokenDomId(PANEL_ID, 'person')}
+              error={personIssue && <RowError text={personIssue} />}
+              onPick={(value) => onIdentities([value])}
+            />
+          )}
         </PanelSection>
 
         <PanelSection id="app" title="Application" icon={AppWindow}>

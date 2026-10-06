@@ -1,89 +1,148 @@
 /* -----------------------------------------------------------------------------
-   The run as JARVIS (JarvisLayout.tsx): the access assistant's HUD. Only ever
-   dark (owner, 2 Oct 2026: "Jarvis only available in dark mode … a special
-   experience"): the luminous cyan of the HUD on deep navy, with a faint grid,
-   a vignette and depth. Every colour below is a variable; the rules use only
-   those.
+   The run as ARUNA (JarvisLayout.tsx; code name JARVIS): the access copilot's
+   HUD, on two stages (`data-stage` on the root, the page's one stage setting).
+   Aruna is the orange-red light of dawn (owner, 3 Oct 2026: "just orange as a
+   base, any orange that feels futuristic and cool"), so the whole HUD is one
+   ember family derived from the brand orange #eb5424:
+   · DARK: ember on warm near-black — a hotter, luminous signal orange
+     (#ff6b2c), a faint ember grid, a vignette, soft blooms behind the core and
+     the lock;
+   · LIGHT: the brand itself on warm paper — crisp orange linework, warm ink,
+     warm shadows, no neon (the light overrides are at the end of this file).
+   Every colour below is a variable; the rules use only those.
 
-   Two families, each with a job:
-   · the HUD's CHROME (ring tracks, ticks, frames, connectors, the core) in a
-     cool azure / cyan, calm and low while settled (it is structure), bright
-     only on what the engine works on now (--jv-work);
-   · the MEANING inks, vivid and clean: emerald covers / matches / ✓ / an
-     allow; rose a failed check ✕ / a deny; amber only a conflict or can't
-     tell; slate not reached. Each has an ink (text, AA on its tint) and a
-     vivid stroke (-hi) for arcs, wires and glows.
-   Depth: soft radial glows behind the core, the lock and the verdict; tails
-   on what moves. Text surfaces stay flat. Brand orange never. 12px floor.
+   Three jobs, three hues (orange never means allow or fail):
+   · ORANGE is the engine and Aruna herself: ring tracks, ticks, frames and
+     connectors at rest in low-alpha orange linework (structure); full strength
+     only on what the engine works on now (--jv-work) and on the presence;
+   · GREEN covers / matches / ✓ / an allow; CRIMSON (hue 344, the product's
+     deny) a failed check ✕ / a deny; LEMON (hue 51–53) only a conflict or
+     can't tell, always with ⚠ and a dashed edge too; warm grey not reached.
+     Each has an ink (text, AA on its tint) and a vivid stroke (-hi).
+   Depth: ONLY THE VERDICT glows strongly (its halo, bloom and breathing edge;
+   the lock-on and scan that assemble it). Everything else — the core, the
+   band's lock, the sweep, the rows, the route — carries a faint, short glow
+   at most; tails on what moves. Text surfaces stay flat. 12px floor.
 
    Nothing motion moves carries a CSS transform or transition: colour
    transitions sit on parents (the moved children take currentColor).
    -------------------------------------------------------------------------- */
 
-/* The one stage: the luminous cyan of the HUD on deep navy. */
+/* The DARK stage: ember on warm near-black. */
 .rl-jarvis-root {
-  --jv-ground: #050c18;
-  /* The ground's grid: hairlines every 32px, a brighter node at each crossing (jarvis-chrome.css draws the same on the page). */
-  --jv-ground-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%2370d6ff' stroke-opacity='0.075' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1' fill='%2370d6ff' fill-opacity='0.22'/%3E%3C/svg%3E");
-  --jv-bg: #0a1729;
-  --jv-text: #e9f4ff;
-  --jv-text-2: #a9c0da;
-  --jv-text-3: #8ca5c2;
-  --jv-line: rgba(130, 200, 255, 0.17);
-  --jv-line-soft: rgba(130, 200, 255, 0.09);
-  --jv-line-strong: rgba(150, 210, 255, 0.3);
-  --jv-hud: #3cc8f5;
-  --jv-hud-line: rgba(60, 200, 245, 0.34);
-  --jv-hud-faint: rgba(60, 200, 245, 0.17);
-  --jv-hud-ghost: rgba(60, 200, 245, 0.1);
-  --jv-edge: rgba(60, 200, 245, 0.3);
-  --jv-glass: rgba(11, 29, 52, 0.8);
-  --jv-glass-2: rgba(13, 34, 60, 0.94);
-  --jv-work: #5fd3ff;
-  --jv-work-ink: #86dfff;
-  --jv-work-soft: rgba(60, 200, 245, 0.14);
-  --jv-halo: rgba(90, 215, 255, 0.75);
-  --jv-glow-core: rgba(60, 200, 245, 0.22);
+  --jv-ground: #0b0807;
+  /* The ground's grid: ember hairlines every 32px, a brighter node at each crossing (jarvis-chrome.css draws the same on the page). */
+  --jv-ground-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%23ff8a50' stroke-opacity='0.07' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1' fill='%23ff8a50' fill-opacity='0.2'/%3E%3C/svg%3E");
+  --jv-bg: #15100d;
+  --jv-text: #f6eee9;
+  --jv-text-2: #c9b6ab;
+  --jv-text-3: #a8948a;
+  --jv-line: rgba(255, 170, 130, 0.15);
+  --jv-line-soft: rgba(255, 170, 130, 0.08);
+  --jv-line-strong: rgba(255, 180, 140, 0.28);
+  --jv-hud: #e8622c;
+  --jv-hud-line: rgba(232, 98, 44, 0.34);
+  --jv-hud-faint: rgba(232, 98, 44, 0.17);
+  --jv-hud-ghost: rgba(232, 98, 44, 0.09);
+  --jv-edge: rgba(255, 122, 61, 0.28);
+  --jv-glass: rgba(24, 16, 12, 0.82);
+  --jv-glass-2: rgba(30, 20, 15, 0.94);
+  --jv-work: #ff6b2c;
+  --jv-work-ink: #ffa574;
+  --jv-work-soft: rgba(255, 107, 44, 0.14);
+  --jv-halo: rgba(255, 122, 61, 0.7);
+  --jv-glow-core: rgba(255, 107, 44, 0.12);
   --jv-ok: #3ddba0;
   --jv-ok-hi: #34e3a4;
   --jv-ok-soft: rgba(52, 227, 164, 0.14);
   --jv-ok-faint: rgba(52, 227, 164, 0.06);
-  --jv-bad: #ff8197;
-  --jv-bad-hi: #ff6482;
-  --jv-bad-soft: rgba(255, 100, 130, 0.15);
-  --jv-bad-faint: rgba(255, 100, 130, 0.06);
-  --jv-warn: #fcc645;
-  --jv-warn-hi: #ffc93d;
-  --jv-warn-soft: rgba(252, 198, 69, 0.14);
-  --jv-warn-faint: rgba(252, 198, 69, 0.06);
-  --jv-off: #7d93ad;
-  --jv-hover: rgba(130, 200, 255, 0.1);
-  --jv-hover-soft: rgba(130, 200, 255, 0.05);
-  --jv-ring-fill: rgba(60, 200, 245, 0.04);
-  --jv-seg-ghost: rgba(60, 200, 245, 0.24);
-  --jv-seg-passed: rgba(170, 200, 230, 0.34);
-  --jv-seg-quiet: rgba(170, 200, 230, 0.18);
-  --jv-seg-lit: rgba(220, 235, 255, 0.6);
-  --jv-face-bg: rgba(60, 200, 245, 0.08);
-  --jv-row: rgba(130, 200, 255, 0.03);
-  --jv-panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(140, 220, 255, 0.07);
-  --jv-verdict-shadow: 0 14px 44px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(140, 220, 255, 0.08);
-  --jv-float-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
-  --jv-pop-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
-  --jv-answer-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
-  --jv-see-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
-  --jv-peek-bg: #0e2038;
-  --jv-answer-bg: rgba(12, 30, 52, 0.96);
-  --jv-chip-bg: rgba(12, 30, 52, 0.88);
-  --jv-chip-hover: rgba(22, 48, 78, 0.95);
-  --jv-cond-bg: rgba(12, 30, 52, 0.82);
-  --jv-ask-bg: rgba(10, 26, 46, 0.94);
-  --jv-ask-ring: rgba(60, 200, 245, 0.12);
-  --jv-caption-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+  --jv-bad: #ff7a9c;
+  --jv-bad-hi: #ff5a87;
+  --jv-bad-soft: rgba(255, 90, 135, 0.15);
+  --jv-bad-faint: rgba(255, 90, 135, 0.06);
+  --jv-warn: #f9e57f;
+  --jv-warn-hi: #ffe02e;
+  --jv-warn-soft: rgba(255, 224, 46, 0.13);
+  --jv-warn-faint: rgba(255, 224, 46, 0.05);
+  --jv-off: #9a877d;
+  --jv-hover: rgba(255, 170, 130, 0.09);
+  --jv-hover-soft: rgba(255, 170, 130, 0.045);
+  --jv-ring-fill: rgba(255, 107, 44, 0.035);
+  --jv-seg-ghost: rgba(232, 98, 44, 0.24);
+  --jv-seg-passed: rgba(230, 200, 185, 0.32);
+  --jv-seg-quiet: rgba(230, 200, 185, 0.3);
+  --jv-seg-lit: rgba(255, 240, 230, 0.6);
+  --jv-leader: #e6c8b9;
+  --jv-row: rgba(255, 170, 130, 0.03);
+  --jv-panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 170, 130, 0.07);
+  --jv-verdict-shadow: 0 14px 44px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 170, 130, 0.08);
+  --jv-pop-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  --jv-see-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  --jv-peek-bg: #1d1511;
   --jv-inset-border: transparent;
-  --jv-glow-k: 1.4;
+  --jv-glow-k: 1;
   --jv-quiet-op: 0.92;
   --jv-pnum-op: 0.9;
+}
+
+/* The LIGHT stage (owner, 3 Oct 2026): the brand orange on warm paper — white surfaces, warm hairlines, de-boxed
+   rows; the HUD's structure in crisp orange linework at low alpha, the brand at full strength ONLY on what the
+   engine works on now, warm ink, and the product's meaning inks. Fixed hexes, never var(--accent) (slate in the
+   current look). Glows on paper are a thin ring and a short warm shadow, never neon (the overrides at the end). */
+.rl-jarvis-root[data-stage='light'] {
+  --jv-ground: #faf7f4;
+  --jv-ground-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%238a4a2c' stroke-opacity='0.06' stroke-width='1'/%3E%3Ccircle cx='0.5' cy='0.5' r='1' fill='%23c9a593' fill-opacity='0.45'/%3E%3C/svg%3E");
+  --jv-bg: #ffffff;
+  --jv-text: #241b17;
+  --jv-text-2: #574842;
+  --jv-text-3: #6d5f58;
+  --jv-line: #efe6e0;
+  --jv-line-soft: #f6f0ec;
+  --jv-line-strong: #ddcdc3;
+  --jv-hud: #c4613a;
+  --jv-hud-line: rgba(196, 97, 58, 0.32);
+  --jv-hud-faint: rgba(196, 97, 58, 0.17);
+  --jv-hud-ghost: rgba(196, 97, 58, 0.09);
+  --jv-edge: rgba(60, 30, 15, 0.08);
+  --jv-glass: rgba(255, 255, 255, 0.9);
+  --jv-glass-2: #ffffff;
+  --jv-work: #eb5424;
+  --jv-work-ink: #b23d17;
+  --jv-work-soft: #fdeee9;
+  --jv-halo: rgba(235, 84, 36, 0.32);
+  --jv-glow-core: rgba(235, 84, 36, 0.1);
+  --jv-ok: #146c43;
+  --jv-ok-hi: #198754;
+  --jv-ok-soft: #e8f5ee;
+  --jv-ok-faint: rgba(25, 135, 84, 0.05);
+  --jv-bad: #a5142b;
+  --jv-bad-hi: #d01243;
+  --jv-bad-soft: #fcecf1;
+  --jv-bad-faint: rgba(208, 18, 67, 0.05);
+  --jv-warn: #5f5200;
+  --jv-warn-hi: #8a7a00;
+  --jv-warn-soft: #fbf5d2;
+  --jv-warn-faint: rgba(138, 122, 0, 0.06);
+  --jv-off: #776962;
+  --jv-hover: #f6efea;
+  --jv-hover-soft: #fbf8f6;
+  --jv-ring-fill: rgba(235, 84, 36, 0.03);
+  --jv-seg-ghost: rgba(196, 97, 58, 0.16);
+  --jv-seg-passed: rgba(87, 72, 66, 0.3);
+  --jv-seg-quiet: rgba(87, 72, 66, 0.28);
+  --jv-seg-lit: rgba(36, 27, 23, 0.55);
+  --jv-leader: #574842;
+  --jv-row: transparent;
+  --jv-panel-shadow: 0 1px 2px rgba(60, 30, 15, 0.05), 0 8px 24px rgba(60, 30, 15, 0.08);
+  --jv-verdict-shadow: 0 2px 4px rgba(60, 30, 15, 0.05), 0 12px 32px rgba(60, 30, 15, 0.1);
+  --jv-pop-shadow: 0 8px 24px rgba(60, 30, 15, 0.12);
+  --jv-see-shadow: 0 8px 24px rgba(60, 30, 15, 0.12);
+  --jv-peek-bg: #ffffff;
+  --jv-inset-border: #eaded6;
+  --jv-glow-k: 0.35;
+  --jv-quiet-op: 1;
+  --jv-pnum-op: 1;
+  color-scheme: light;
 }
 
 .rl-jarvis-root {
@@ -95,7 +154,7 @@
   font-family: inherit;
 }
 
-/* The stage: deep navy and a faint luminous grid that follows the pan and zoom, under a soft vignette. */
+/* The stage: warm black (or paper) and a faint ember grid that follows the pan and zoom, under a soft vignette. */
 .rl-jarvis__stage {
   position: absolute;
   inset: 0;
@@ -109,12 +168,12 @@
 .rl-jarvis__vignette {
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 180px 40px rgba(1, 5, 12, 0.72);
+  box-shadow: inset 0 0 180px 40px rgba(3, 2, 1, 0.75);
   pointer-events: none;
 }
 
 /* --- The way in and out (jarvis-mode/) -------------------------------------------------------
-   Booting: the HUD fades up under the overlay as it dissolves; standing down, it fades into the navy as the
+   Booting: the HUD fades up under the overlay as it dissolves; standing down, it fades into the ground as the
    rings close in. Opacity alone (one composited layer — no transform, so RunStage measures its world true,
    and no clip, so nothing re-rasterises the HUD per frame). */
 .rl-jarvis-root.is-booting { will-change: opacity; animation: rl-jarvis-boot 520ms cubic-bezier(0.3, 0, 0.3, 1) var(--jv-boot-delay, 0ms) both; }
@@ -122,41 +181,27 @@
 @keyframes rl-jarvis-boot { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rl-jarvis-down { from { opacity: 1; } to { opacity: 0; } }
 
-/* --- Depth: the far rings ---------------------------------------------------------------------- */
-
-.rl-jarvis__far { position: absolute; left: 0; top: 0; z-index: 0; overflow: visible; pointer-events: none; }
-.rl-jarvis__fartrack { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1; stroke-dasharray: 3 6; }
-.rl-jarvis__fartrack.is-inner { stroke: var(--jv-hud-ghost); stroke-dasharray: none; }
-.rl-jarvis__farline { fill: none; stroke: var(--jv-hud-ghost); stroke-width: 1; }
-.rl-jarvis__farticks line { stroke: var(--jv-hud-faint); stroke-width: 1; }
-.rl-jarvis__farticks line.is-major { stroke: var(--jv-hud-line); stroke-width: 1.4; }
-/* While the engine works the readout drifts; landed, it holds where it is. */
-.rl-jarvis__farticks { animation: rl-jarvis-drift 5.2s ease-in-out infinite alternate; animation-play-state: paused; }
-.rl-jarvis__far.is-idle .rl-jarvis__farticks { animation-play-state: running; }
-@keyframes rl-jarvis-drift { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
-
 /* The host's engine pill and the ground's dock, in the HUD's glass. */
-.tj-canvas.is-jarvis .tj-engine__pill {
-  border-color: rgba(60, 200, 245, 0.28);
-  background: rgba(10, 26, 46, 0.9);
-  color: #e9f4ff;
+.sit[data-stage='dark'] .tj-canvas.is-jarvis .tj-engine__pill {
+  border-color: rgba(255, 122, 61, 0.28);
+  background: rgba(22, 14, 10, 0.9);
+  color: #f6eee9;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
 }
-.tj-canvas.is-jarvis .tj-engine.is-done .tj-engine__text,
-.tj-canvas.is-jarvis .tj-engine.is-running .tj-engine__text { color: #dfe7ef; }
-.tj-canvas.is-jarvis .tj-engine__done { color: #aebdcb; }
-.tj-canvas.is-jarvis .tj-engine__pill button { color: #dfe7ef; }
-.tj-canvas.is-jarvis .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.sit[data-stage='dark'] .tj-canvas.is-jarvis .tj-engine.is-done .tj-engine__text,
+.sit[data-stage='dark'] .tj-canvas.is-jarvis .tj-engine.is-running .tj-engine__text { color: #f6eee9; }
+.sit[data-stage='dark'] .tj-canvas.is-jarvis .tj-engine__done { color: #c9b6ab; }
+.sit[data-stage='dark'] .tj-canvas.is-jarvis .tj-engine__pill button { color: #f6eee9; }
+.sit[data-stage='dark'] .tj-canvas.is-jarvis .tj-engine__pill button:hover { background: rgba(255, 170, 130, 0.09); color: #ffffff; }
 
 .rl-jarvis-root .rl-jarvis .bb__dockbar {
   border-color: var(--jv-line);
-  background: rgba(10, 26, 46, 0.9);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  background: var(--jv-glass-2);
+  box-shadow: var(--jv-pop-shadow);
 }
 .rl-jarvis-root .rl-jarvis .bb__act { color: var(--jv-text-2); }
 .rl-jarvis-root .rl-jarvis .bb__act:hover { background: var(--jv-hover); color: var(--jv-text); }
 .rl-jarvis-root .rl-jarvis .bb__float__sep { background: var(--jv-line); }
-.rl-jarvis .rl-jarvis__voicebtn.is-on { color: var(--jv-text); }
 
 .rl-jarvis__sr {
   position: absolute;
@@ -183,165 +228,44 @@
 .rl-jarvis__busy svg { animation: rl-jarvis-spin 0.9s linear infinite; }
 @keyframes rl-jarvis-spin { to { transform: rotate(360deg); } }
 
-/* --- Row 1: who ----------------------------------------------------------------------------- */
-
-.rl-jarvis__id { position: absolute; z-index: 3; display: flex; align-items: center; gap: 14px; pointer-events: none; }
-.rl-jarvis__id > * { pointer-events: auto; }
-.rl-jarvis__face {
-  position: relative;
-  display: grid;
-  flex: none;
-  place-items: center;
-  box-sizing: border-box;
-  margin: 0 0 0 5px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--jv-face-bg);
-  color: var(--jv-text);
-  font: inherit;
-  cursor: pointer;
-  /* The ring's colour (its arc takes currentColor through --jv-face-ring). */
-  --jv-face-ring: var(--jv-hud);
-  transition: box-shadow 0.25s ease;
-}
-.rl-jarvis__facering { position: absolute; left: -5px; top: -5px; overflow: visible; rotate: -90deg; pointer-events: none; }
-.rl-jarvis__facetrack { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1; }
-.rl-jarvis__facearc { fill: none; stroke: var(--jv-face-ring); stroke-width: 2; stroke-linecap: round; transition: stroke 0.25s ease; }
-.rl-jarvis__face:hover { box-shadow: 0 0 0 4px var(--jv-hud-ghost); }
-.rl-jarvis__face:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 7px; }
-.rl-jarvis__face.is-working { --jv-face-ring: var(--jv-work); box-shadow: 0 0 0 5px var(--jv-work-soft), 0 0 22px var(--jv-halo); }
-.rl-jarvis__face.is-flash.is-pass { --jv-face-ring: var(--jv-ok-hi); box-shadow: 0 0 0 5px var(--jv-ok-soft), 0 0 20px color-mix(in srgb, var(--jv-ok-hi) 45%, transparent); }
-.rl-jarvis__face.is-flash.is-fail { --jv-face-ring: var(--jv-bad-hi); box-shadow: 0 0 0 5px var(--jv-bad-soft), 0 0 20px color-mix(in srgb, var(--jv-bad-hi) 45%, transparent); }
-.rl-jarvis__face.is-flash.is-unknown { --jv-face-ring: var(--jv-warn-hi); box-shadow: 0 0 0 5px var(--jv-warn-soft); }
-.rl-jarvis__face.is-lit { box-shadow: 0 0 0 4px var(--jv-hud-faint); }
-.rl-jarvis__initials { font-size: 16px; font-weight: 600; letter-spacing: 0.04em; color: var(--jv-text); }
-
-.rl-jarvis__idtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.rl-jarvis__status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 18px;
-  margin: 0;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-.rl-jarvis__status.is-working { color: var(--jv-work-ink); }
-.rl-jarvis__status.is-done { color: var(--jv-text-3); }
-.rl-jarvis__statusdone { color: var(--jv-hud); }
-.rl-jarvis__idline { display: flex; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
-.rl-jarvis__name { max-width: 300px; overflow: hidden; font-size: 19px; font-weight: 600; line-height: 26px; letter-spacing: -0.01em; color: var(--jv-text); text-overflow: ellipsis; }
-.rl-jarvis__gchips { display: inline-flex; gap: 6px; }
-.rl-jarvis__gchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--jv-edge);
-  border-radius: 11px;
-  background: var(--jv-hover-soft);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--jv-text-2);
-}
-.rl-jarvis__gchip.is-via { border-color: color-mix(in srgb, var(--jv-ok-hi) 45%, transparent); background: var(--jv-ok-soft); color: var(--jv-ok); }
-.rl-jarvis__id.is-working .rl-jarvis__gchip { border-color: color-mix(in srgb, var(--jv-work) 50%, transparent); color: var(--jv-work-ink); }
-.rl-jarvis__tested { font-size: 12px; color: var(--jv-text-3); }
-.rl-jarvis__target { display: inline-flex; align-items: center; gap: 7px; margin-left: 4px; font-size: 14px; font-weight: 600; color: var(--jv-text); }
-.rl-jarvis__to { font-weight: 400; color: var(--jv-text-3); }
-
-/* --- Row 2: the conditions ------------------------------------------------------------------ */
-
-.rl-jarvis__strip { position: absolute; z-index: 3; display: flex; align-items: center; gap: 8px; box-sizing: border-box; padding-bottom: 4px; pointer-events: none; }
-.rl-jarvis__condwrap { display: inline-flex; flex: none; pointer-events: auto; }
-.rl-jarvis__stripline { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
-.rl-jarvis__stripline path { fill: none; stroke: var(--jv-hud-line); stroke-width: 1; }
-.rl-jarvis__stripline path.is-end { stroke: var(--jv-hud); stroke-width: 1.5; }
-.rl-jarvis__striplabel { flex: none; margin-right: 4px; font-size: 12px; font-weight: 500; letter-spacing: 0.02em; color: var(--jv-text-3); }
-.rl-jarvis__nocond { font-size: 12px; color: var(--jv-text-3); }
-.rl-jarvis__cond {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  box-sizing: border-box;
-  height: 28px;
-  padding: 0 10px;
-  overflow: hidden;
-  border: 1px solid var(--jv-edge);
-  border-radius: 8px;
-  background: var(--jv-cond-bg);
-  color: var(--jv-text);
-  font: inherit;
-  cursor: pointer;
-  /* The chip's meaning colour: its icon, its edge and its glow take it. */
-  --jv-cond: var(--jv-hud);
-  transition: border-color 0.22s ease, background-color 0.22s ease, box-shadow 0.22s ease;
-}
-.rl-jarvis__condin { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-.rl-jarvis__condicon { flex: none; color: var(--jv-cond); transition: color 0.22s ease; }
-.rl-jarvis__condlabel { font-size: 12px; color: var(--jv-text-3); }
-.rl-jarvis__condvalue { font-size: 13px; font-weight: 500; color: var(--jv-text); }
-.rl-jarvis__condadd { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; padding: 0 6px; height: 18px; border-radius: 9px; background: var(--jv-warn-soft); font-size: 12px; font-weight: 600; color: var(--jv-warn); }
-/* The scan underline as a chip boots: it runs along the chip's foot (motion scales it, nothing else does). */
-.rl-jarvis__condscan { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--jv-hud); transform-origin: left center; pointer-events: none; }
-.rl-jarvis__cond:hover,
-.rl-jarvis__cond.is-lit { border-color: var(--jv-hud-line); background: var(--jv-hover); }
-.rl-jarvis__cond:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
-.rl-jarvis__cond.is-unset .rl-jarvis__condvalue { font-weight: 600; color: var(--jv-warn); }
-.rl-jarvis__cond.is-unset { --jv-cond: var(--jv-warn-hi); border-color: color-mix(in srgb, var(--jv-warn-hi) 40%, transparent); }
-/* Read now: blue; the mark landed: its meaning, for that step. */
-.rl-jarvis__cond.is-working { --jv-cond: var(--jv-work); border-color: var(--jv-work); background: var(--jv-work-soft); box-shadow: 0 0 0 3px var(--jv-work-soft), 0 0 18px var(--jv-halo); }
-.rl-jarvis__cond.is-working .rl-jarvis__condlabel { color: var(--jv-work-ink); }
-.rl-jarvis__cond.is-flash.is-pass { --jv-cond: var(--jv-ok-hi); border-color: var(--jv-ok-hi); background: var(--jv-ok-soft); box-shadow: 0 0 16px color-mix(in srgb, var(--jv-ok-hi) 40%, transparent); }
-.rl-jarvis__cond.is-flash.is-fail { --jv-cond: var(--jv-bad-hi); border-color: var(--jv-bad-hi); background: var(--jv-bad-soft); box-shadow: 0 0 16px color-mix(in srgb, var(--jv-bad-hi) 40%, transparent); }
-.rl-jarvis__cond.is-flash.is-unknown { --jv-cond: var(--jv-warn-hi); border-color: var(--jv-warn-hi); background: var(--jv-warn-soft); }
-
 /* --- The ring ------------------------------------------------------------------------------ */
 
-.rl-jarvis__ring { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .rl-jarvis__guide { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1; }
-.rl-jarvis__ticks { fill: none; stroke: var(--jv-hud-line); stroke-width: 4; }
-.rl-jarvis__major { stroke: var(--jv-hud); stroke-width: 1.5; stroke-linecap: round; opacity: 0.7; }
-.rl-jarvis__ringa { fill: var(--jv-ring-fill); stroke: var(--jv-hud-line); stroke-width: 1.2; }
-.rl-jarvis__ringb { fill: none; stroke: var(--jv-hud-faint); stroke-width: 1.2; }
-.rl-jarvis__ringc { fill: none; stroke: var(--jv-hud-ghost); stroke-width: 1; }
-.rl-jarvis-root.is-running .rl-jarvis__ringb { stroke: color-mix(in srgb, var(--jv-work) 55%, transparent); }
-/* The core's halo: azure while the engine works, the answer's tone once landed. */
-.rl-jarvis__glowstop.is-in { stop-color: var(--jv-hud); stop-opacity: 0.2; }
+/* The core's halo: ember while the engine works, the answer's tone once landed. */
+.rl-jarvis__glowstop.is-in { stop-color: var(--jv-hud); stop-opacity: 0.08; }
 .rl-jarvis__glowstop.is-out { stop-color: var(--jv-hud); stop-opacity: 0; }
 .rl-jarvis-root.is-tone-positive .rl-jarvis__glowstop { stop-color: var(--jv-ok-hi); }
 .rl-jarvis-root.is-tone-negative .rl-jarvis__glowstop { stop-color: var(--jv-bad-hi); }
 .rl-jarvis-root.is-tone-notice .rl-jarvis__glowstop { stop-color: var(--jv-warn-hi); }
 .rl-jarvis__corehalo.is-breathing { animation: rl-jarvis-breathe 4s ease-in-out infinite; }
 @keyframes rl-jarvis-breathe { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
-.rl-jarvis__coredisc { fill: var(--jv-bg); stroke: var(--jv-hud); stroke-width: 1.4; filter: drop-shadow(0 0 6px var(--jv-glow-core)); }
+.rl-jarvis__coredisc { fill: var(--jv-bg); stroke: var(--jv-hud); stroke-width: 1.4; filter: drop-shadow(0 0 3px var(--jv-glow-core)); }
+.rl-jarvis__coredisc.is-alive { transform-box: fill-box; transform-origin: center; }
+.rl-jarvis-root[data-jv-presence='idle'] .rl-jarvis__coredisc.is-alive { animation: jv1-core-breathe 4s ease-in-out infinite; }
+@keyframes jv1-core-breathe { 0%, 100% { opacity: 0.86; scale: 1; } 50% { opacity: 1; scale: 1.025; } }
+.rl-jarvis__corepulse { fill: none; stroke: var(--jv-work); stroke-width: 1.4; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.rl-jarvis-root[data-jv-presence='speaking'] .rl-jarvis__corepulse { animation: jv1-core-pulse 1.2s ease-out infinite; }
+@keyframes jv1-core-pulse { 0% { opacity: 0.5; scale: 1; } 100% { opacity: 0; scale: 1.28; } }
+.rl-jarvis__coreflash { fill: none; stroke: var(--jv-text-2); stroke-width: 2; }
+.rl-jarvis-root.is-tone-positive .rl-jarvis__coreflash { stroke: var(--jv-ok-hi); }
+.rl-jarvis-root.is-tone-negative .rl-jarvis__coreflash { stroke: var(--jv-bad-hi); }
+.rl-jarvis-root.is-tone-notice .rl-jarvis__coreflash { stroke: var(--jv-warn-hi); }
 .rl-jarvis__corespin { animation: rl-jarvis-spin 1.6s linear infinite; transform-box: view-box; }
 .rl-jarvis__corearc { fill: none; stroke: var(--jv-work); stroke-width: 2; stroke-linecap: round; }
 .rl-jarvis__corearc.is-b { stroke-opacity: 0.45; }
 .rl-jarvis__coredot { fill: var(--jv-hud); }
-.rl-jarvis-root.is-running .rl-jarvis__coredot { fill: var(--jv-work); filter: drop-shadow(0 0 4px var(--jv-halo)); }
+.rl-jarvis-root.is-running .rl-jarvis__coredot { fill: var(--jv-work); }
 /* Landed: the core and the reactor ring round it take the answer's tone. */
-.rl-jarvis-root.is-landed .rl-jarvis__ringa { stroke-width: 1.6; }
-.rl-jarvis-root.is-tone-positive .rl-jarvis__ringa,
 .rl-jarvis-root.is-tone-positive .rl-jarvis__coredisc { stroke: var(--jv-ok-hi); }
-.rl-jarvis-root.is-tone-negative .rl-jarvis__ringa,
 .rl-jarvis-root.is-tone-negative .rl-jarvis__coredisc { stroke: var(--jv-bad-hi); }
-.rl-jarvis-root.is-tone-notice .rl-jarvis__ringa,
 .rl-jarvis-root.is-tone-notice .rl-jarvis__coredisc { stroke: var(--jv-warn-hi); }
 .rl-jarvis-root.is-tone-positive .rl-jarvis__coredot { fill: var(--jv-ok-hi); }
 .rl-jarvis-root.is-tone-negative .rl-jarvis__coredot { fill: var(--jv-bad-hi); }
 .rl-jarvis-root.is-tone-notice .rl-jarvis__coredot { fill: var(--jv-warn-hi); }
-.rl-jarvis-root.is-tone-positive .rl-jarvis__ringa { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--jv-ok-hi) 55%, transparent)); }
-.rl-jarvis-root.is-tone-negative .rl-jarvis__ringa { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--jv-bad-hi) 55%, transparent)); }
 
 .rl-jarvis__sweep { fill: var(--jv-work); }
-.rl-jarvis__sweepedge { stroke: var(--jv-work); stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--jv-halo)); }
-.rl-jarvis__sweephead { fill: var(--jv-work); filter: drop-shadow(0 0 5px var(--jv-halo)); }
+.rl-jarvis__sweepedge { stroke: var(--jv-work); stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(0 0 2px var(--jv-glow-core)); }
+.rl-jarvis__sweephead { fill: var(--jv-work); filter: drop-shadow(0 0 2px var(--jv-glow-core)); }
 .rl-jarvis__ping { fill: none; stroke: var(--jv-hud); stroke-width: 1.5; }
 .rl-jarvis__landping { fill: none; stroke: var(--jv-text-2); stroke-width: 1.8; }
 .rl-jarvis-root.is-tone-positive .rl-jarvis__landping { stroke: var(--jv-ok-hi); }
@@ -355,16 +279,20 @@
 .rl-jarvis__segarc { fill: none; stroke: currentColor; stroke-width: 9; stroke-linecap: butt; }
 .rl-jarvis__segpulse { fill: none; stroke: currentColor; stroke-linecap: butt; pointer-events: none; }
 .rl-jarvis__segbracket { fill: none; stroke: currentColor; stroke-width: 1.4; }
-.rl-jarvis__lockstop.is-in { stop-color: currentColor; stop-opacity: 0.32; }
+.rl-jarvis__lockstop.is-in { stop-color: currentColor; stop-opacity: 0.14; }
 .rl-jarvis__lockstop.is-out { stop-color: currentColor; stop-opacity: 0; }
-.rl-jarvis__seg .rl-jarvis__leader { stroke: currentColor; opacity: 0.6; }
+.rl-jarvis__seg .rl-jarvis__leader { stroke: currentColor; stroke-width: 1.25; opacity: 0.85; }
+/* The quiet states' own colours are too dim to carry a line: theirs is the leader ink. */
+.rl-jarvis__seg:is(.is-ghost, .is-passed, .is-quiet) .rl-jarvis__leader { stroke: var(--jv-leader); opacity: 0.5; }
+.rl-jarvis__seg.is-passed .rl-jarvis__leader { opacity: 0.6; }
+.rl-jarvis__seg.is-lit .rl-jarvis__leader { opacity: 1; }
 .rl-jarvis__seg.is-ghost { color: var(--jv-seg-ghost); }
 .rl-jarvis__seg.is-scan,
 .rl-jarvis__seg.is-found { color: var(--jv-work); }
 .rl-jarvis__seg.is-scan .rl-jarvis__segarc,
-.rl-jarvis__seg.is-found .rl-jarvis__segarc { filter: drop-shadow(0 0 7px var(--jv-halo)); }
+.rl-jarvis__seg.is-found .rl-jarvis__segarc { filter: drop-shadow(0 0 3px var(--jv-glow-core)); }
 .rl-jarvis__seg.is-locked { color: var(--jv-ok-hi); }
-.rl-jarvis__seg.is-locked .rl-jarvis__segarc { stroke-width: 12; filter: drop-shadow(0 0 7px color-mix(in srgb, currentColor 65%, transparent)); }
+.rl-jarvis__seg.is-locked .rl-jarvis__segarc { stroke-width: 12; filter: drop-shadow(0 0 3px color-mix(in srgb, currentColor calc(30% * var(--jv-glow-k)), transparent)); }
 .rl-jarvis__seg.is-locked .rl-jarvis__leader { opacity: 0.95; }
 .rl-jarvis__seg.is-locked.is-negative { color: var(--jv-bad-hi); }
 .rl-jarvis__seg.is-locked.is-notice { color: var(--jv-warn-hi); }
@@ -373,12 +301,10 @@
 .rl-jarvis__seg.is-quiet { color: var(--jv-seg-quiet); }
 .rl-jarvis__seg.is-also { color: var(--jv-warn-hi); }
 .rl-jarvis__seg.is-also .rl-jarvis__segarc { stroke-opacity: 0.8; }
-.rl-jarvis__seg.is-lit .rl-jarvis__segarc { filter: drop-shadow(0 0 7px currentColor); stroke-opacity: 1; }
+.rl-jarvis__seg.is-lit .rl-jarvis__segarc { filter: drop-shadow(0 0 3px color-mix(in srgb, currentColor 35%, transparent)); stroke-opacity: 1; }
 .rl-jarvis__seg.is-lit.is-passed,
 .rl-jarvis__seg.is-lit.is-quiet { color: var(--jv-seg-lit); }
 
-.rl-jarvis__ringhit { position: absolute; border-radius: 50%; cursor: grab; touch-action: none; }
-.rl-jarvis__ringhit:active { cursor: grabbing; }
 
 /* The policies' labels. */
 .rl-jarvis__plabel { position: absolute; z-index: 2; color: var(--jv-text-3); transition: color 0.3s ease; }
@@ -425,11 +351,13 @@
   line-height: 18px;
   color: var(--jv-text-2);
 }
-.rl-jarvis__pstate { display: block; min-height: 17px; padding-left: 25px; font-size: 12px; line-height: 17px; overflow: hidden; white-space: nowrap; }
-/* One line, always: the label's height is measured once, so the words never wrap under the eye. */
+.rl-jarvis__pstate { display: block; min-height: 17px; padding-left: 25px; font-size: 12px; line-height: 17px; overflow: hidden; }
+/* The state under a name wraps to two lines and is cut only after the second, never mid-line with an ellipsis. The
+   label's height is measured once per plan with the words it will end on (JarvisLayout.tsx `stateRoom`), so it
+   never changes as the run plays. */
 .rl-jarvis__pstate .rl-jarvis__decode { display: block; overflow: hidden; }
-.rl-jarvis__pstate .rl-jarvis__decode-ghost { display: block; overflow: hidden; white-space: nowrap; }
-.rl-jarvis__pstate .rl-jarvis__decode-live { white-space: nowrap; text-overflow: ellipsis; }
+.rl-jarvis__pstate .rl-jarvis__decode-ghost,
+.rl-jarvis__pstate .rl-jarvis__decode-live { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
 .rl-jarvis__plabel.is-ghost .rl-jarvis__ptext { color: var(--jv-text-3); font-weight: 500; }
 .rl-jarvis__plabel.is-quiet .rl-jarvis__ptext,
 .rl-jarvis__plabel.is-passed .rl-jarvis__ptext { color: var(--jv-text-3); font-weight: 500; }
@@ -543,7 +471,7 @@
 .rl-jarvis__rule.is-off .rl-jarvis__rulename { color: var(--jv-text-3); font-weight: 500; }
 .rl-jarvis__rule.is-quiet { opacity: var(--jv-quiet-op); }
 .rl-jarvis__rule.is-quiet .rl-jarvis__num { opacity: 1; }
-.rl-jarvis__rule.is-working { border-color: color-mix(in srgb, var(--jv-work) 60%, transparent); background: var(--jv-work-soft); color: var(--jv-work-ink); box-shadow: 0 0 18px color-mix(in srgb, var(--jv-work) 22%, transparent); }
+.rl-jarvis__rule.is-working { border-color: color-mix(in srgb, var(--jv-work) 60%, transparent); background: var(--jv-work-soft); color: var(--jv-work-ink); box-shadow: 0 0 8px color-mix(in srgb, var(--jv-work) 10%, transparent); }
 .rl-jarvis__rule.is-working .rl-jarvis__rulename { color: var(--jv-text); }
 .rl-jarvis__rule.is-missed { border-color: color-mix(in srgb, var(--jv-bad) 32%, transparent); background: var(--jv-bad-faint); color: var(--jv-bad); }
 .rl-jarvis__rule.is-missed .rl-jarvis__rulename { color: var(--jv-text-2); }
@@ -551,14 +479,14 @@
 .rl-jarvis__rule.is-possible { border-color: color-mix(in srgb, var(--jv-warn) 36%, transparent); background: var(--jv-warn-faint); color: var(--jv-warn); }
 .rl-jarvis__rule.is-unknown .rl-jarvis__rulename,
 .rl-jarvis__rule.is-possible .rl-jarvis__rulename { color: var(--jv-text); }
-.rl-jarvis__rule.is-matched { overflow: visible; border-color: color-mix(in srgb, currentColor 55%, transparent); background: color-mix(in srgb, currentColor 9%, transparent); box-shadow: 0 0 22px color-mix(in srgb, currentColor 18%, transparent); }
+.rl-jarvis__rule.is-matched { overflow: visible; border-color: color-mix(in srgb, currentColor 55%, transparent); background: color-mix(in srgb, currentColor 9%, transparent); box-shadow: 0 0 8px color-mix(in srgb, currentColor calc(10% * var(--jv-glow-k)), transparent); }
 .rl-jarvis__rule.is-matched .rl-jarvis__rulename { color: var(--jv-text); }
 .rl-jarvis__rule.is-matched.is-positive { color: var(--jv-ok); }
 .rl-jarvis__rule.is-matched.is-negative { color: var(--jv-bad); }
 .rl-jarvis__rule.is-matched.is-notice { color: var(--jv-warn); }
 .rl-jarvis__rule.is-matched.is-neutral { color: var(--jv-text-2); }
 .rl-jarvis__rule.is-possible { overflow: visible; }
-.rl-jarvis__rule.is-lit { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 60%, transparent), 0 0 24px color-mix(in srgb, currentColor 30%, transparent); }
+.rl-jarvis__rule.is-lit { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 60%, transparent), 0 0 8px color-mix(in srgb, currentColor 12%, transparent); }
 .rl-jarvis__rule.is-lit.is-quiet,
 .rl-jarvis__rule.is-lit.is-waiting { opacity: 1; color: var(--jv-text-2); }
 
@@ -568,7 +496,7 @@
   right: 0;
   height: 2px;
   background: var(--jv-work);
-  box-shadow: 0 0 10px var(--jv-halo);
+  box-shadow: 0 0 4px var(--jv-glow-core);
   pointer-events: none;
 }
 
@@ -617,7 +545,7 @@
   inset: 0;
   border-radius: 10px;
   background: var(--jv-glass-2);
-  box-shadow: var(--jv-verdict-shadow), 0 0 34px color-mix(in srgb, currentColor 14%, transparent);
+  box-shadow: var(--jv-verdict-shadow), 0 0 34px color-mix(in srgb, currentColor calc(14% * var(--jv-glow-k)), transparent);
   backdrop-filter: blur(6px);
   pointer-events: none;
 }
@@ -674,23 +602,44 @@
 .rl-jarvis__bylink { width: 100%; justify-content: space-between; }
 .rl-jarvis__bylink svg { flex: none; margin-top: 3px; color: var(--jv-text-3); }
 .rl-jarvis__bylink:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; border-radius: 3px; }
+/* What the copilot noticed (jarvis1-notice.ts): one sentence in its tone and its one press — de-boxed, a hairline
+   above, a short rule beside it in the tone's stroke. */
 .rl-jarvis__finding {
-  padding: 7px 9px;
-  border: 1px solid color-mix(in srgb, var(--jv-warn) 40%, transparent);
-  border-radius: 7px;
-  background: var(--jv-warn-soft);
-  color: var(--jv-text);
+  --jv-ntone: var(--jv-warn);
+  --jv-nrule: var(--jv-warn-hi);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 0 0 10px;
+  border-top: 1px solid var(--jv-line);
+  box-shadow: inset 2px 0 0 var(--jv-nrule);
+  background-clip: padding-box;
+}
+.rl-jarvis__finding.is-negative { --jv-ntone: var(--jv-bad); --jv-nrule: var(--jv-bad-hi); }
+.rl-jarvis__finding.is-neutral { --jv-ntone: var(--jv-text-2); --jv-nrule: var(--jv-line-strong); }
+.rl-jarvis__ntext { margin: 0; font-size: 13px; line-height: 1.45; color: var(--jv-text); text-wrap: pretty; }
+.rl-jarvis__npress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--jv-line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--jv-work-ink);
   font: inherit;
   font-size: 12px;
-  line-height: 1.4;
-  text-align: left;
+  font-weight: 600;
   cursor: pointer;
 }
-.rl-jarvis__finding.is-info { border-color: var(--jv-line); background: var(--jv-hover-soft); color: var(--jv-text-2); }
-.rl-jarvis__finding:hover { border-color: var(--jv-line-strong); }
-.rl-jarvis__finding:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
+.rl-jarvis__npresses { display: flex; flex-wrap: wrap; gap: 6px; }
+.rl-jarvis__npress:disabled { opacity: 0.5; cursor: default; }
+.rl-jarvis__npress:not(:disabled):hover { border-color: var(--jv-work); background: var(--jv-work-soft); }
+.rl-jarvis__npress:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
 .rl-jarvis__vfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rl-jarvis__changed { font-size: 12px; color: var(--jv-text-2); }
 .rl-jarvis__seebtn {
   margin-left: auto;
   padding: 3px 8px;
@@ -731,13 +680,13 @@
 
 .rl-jarvis__wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 0; }
 .rl-jarvis__wire { color: var(--jv-hud); transition: color 0.4s ease; }
-.rl-jarvis__wireline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 0 3px color-mix(in srgb, currentColor 45%, transparent)); }
+.rl-jarvis__wireline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor calc(25% * var(--jv-glow-k)), transparent)); }
 /* The pulse: a tail in three steps of the wire's colour, brighter toward its head, and the head itself. */
 .rl-jarvis__wiretail { fill: none; stroke: currentColor; stroke-linecap: round; pointer-events: none; }
 .rl-jarvis__wiretail.is-t0 { stroke-width: 3; stroke-opacity: 0.18; }
 .rl-jarvis__wiretail.is-t1 { stroke-width: 3.5; stroke-opacity: 0.35; }
 .rl-jarvis__wiretail.is-t2 { stroke-width: 4; stroke-opacity: 0.7; }
-.rl-jarvis__wiredot { fill: var(--jv-bg); stroke: currentColor; stroke-width: 2; filter: drop-shadow(0 0 6px currentColor); }
+.rl-jarvis__wiredot { fill: var(--jv-bg); stroke: currentColor; stroke-width: 2; filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 35%, transparent)); }
 .rl-jarvis__wire.is-working { color: var(--jv-work); }
 .rl-jarvis__wire.is-covers,
 .rl-jarvis__wire.is-positive { color: var(--jv-ok-hi); }
@@ -754,7 +703,7 @@
   stroke-width: 3;
   stroke-linecap: round;
   opacity: 0;
-  filter: drop-shadow(0 0 4px currentColor);
+  filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 35%, transparent));
   animation: rl-jarvis-flow 1.25s linear infinite, rl-jarvis-flow-in 0.4s ease-out 0.7s forwards;
 }
 @keyframes rl-jarvis-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -0.4; } }
@@ -765,12 +714,12 @@
 .rl-jarvis__panelscan { position: absolute; inset: 0; overflow: hidden; border-radius: 10px; pointer-events: none; }
 .rl-jarvis__panelscanline { position: absolute; inset: 0; animation: rl-jarvis-panelscan 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; will-change: transform; }
 .rl-jarvis__panelscanline::before { content: ''; position: absolute; left: 0; right: 0; top: -40px; height: 40px; background: var(--jv-work); opacity: 0.045; }
-.rl-jarvis__panelscanline::after { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: var(--jv-work); opacity: 0.55; box-shadow: 0 0 8px var(--jv-halo); }
+.rl-jarvis__panelscanline::after { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: var(--jv-work); opacity: 0.55; box-shadow: 0 0 3px var(--jv-glow-core); }
 @keyframes rl-jarvis-panelscan { from { transform: translateY(0%); } to { transform: translateY(100%); } }
 
 /* The verdict locks on: four brackets close in from outside and let go. */
 .rl-jarvis__lockon { position: absolute; inset: -7px; pointer-events: none; opacity: 0; animation: rl-jarvis-lockon 1.25s cubic-bezier(0.2, 0.8, 0.25, 1) var(--jv-lock-at, 0ms) both; will-change: transform, opacity; }
-.rl-jarvis__lc { position: absolute; width: 16px; height: 16px; border: 0 solid currentColor; filter: drop-shadow(0 0 4px currentColor); }
+.rl-jarvis__lc { position: absolute; width: 16px; height: 16px; border: 0 solid currentColor; }
 .rl-jarvis__lc.is-tl { left: 0; top: 0; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 4px; }
 .rl-jarvis__lc.is-tr { right: 0; top: 0; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 4px; }
 .rl-jarvis__lc.is-bl { left: 0; bottom: 0; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 4px; }
@@ -807,176 +756,76 @@
   color: var(--jv-text);
 }
 .rl-jarvis__peekx { position: absolute; right: 6px; top: 6px; }
-.rl-jarvis__peeklines,
-.rl-jarvis__answerlines { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.rl-jarvis__peeklines li,
-.rl-jarvis__answerlines li { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--jv-text); }
+.rl-jarvis__peeklines { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rl-jarvis__peeklines li { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--jv-text); }
 .rl-jarvis__peeklines li.is-lead { font-weight: 600; }
 .rl-jarvis__peeklines li.is-quiet { font-size: 12px; color: var(--jv-text-2); }
-.rl-jarvis__peeklines li.is-positive,
-.rl-jarvis__answerlines li.is-positive { color: var(--jv-ok); }
-.rl-jarvis__peeklines li.is-negative,
-.rl-jarvis__answerlines li.is-negative { color: var(--jv-bad); }
-.rl-jarvis__peeklines li.is-notice,
-.rl-jarvis__answerlines li.is-notice { color: var(--jv-warn); }
-.rl-jarvis__peeklines li.is-neutral,
-.rl-jarvis__answerlines li.is-neutral { color: var(--jv-text-2); }
+.rl-jarvis__peeklines li.is-positive { color: var(--jv-ok); }
+.rl-jarvis__peeklines li.is-negative { color: var(--jv-bad); }
+.rl-jarvis__peeklines li.is-notice { color: var(--jv-warn); }
+.rl-jarvis__peeklines li.is-neutral { color: var(--jv-text-2); }
 .rl-jarvis__peektext { display: flex; flex-direction: column; min-width: 0; }
 .rl-jarvis__peeksub { font-size: 12px; font-weight: 400; color: var(--jv-text-3); }
 .rl-jarvis__peeklines .rl-jarvis__mark { margin-top: 2px; }
 
-/* --- The deck: answer, subtitle, suggestions, command bar ------------------------------------- */
+/* --- What an answer lights (jarvis1-lit.ts) ---------------------------------------------------- */
 
-.rl-jarvis__deck {
-  position: absolute;
-  left: 50%;
-  bottom: 66px;
-  z-index: 5;
+/* A check row an answer is about: a hairline in its meaning, the row's glass a touch brighter. */
+.rl-jarvis__check { position: relative; isolation: isolate; }
+.rl-jarvis__check.is-lit::before { content: ''; position: absolute; inset: 2px -6px 2px -30px; z-index: -1; border-radius: 6px; background: color-mix(in srgb, currentColor 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent); pointer-events: none; }
+.rl-jarvis__check.is-lit.is-pass { color: var(--jv-ok); }
+.rl-jarvis__check.is-lit.is-fail { color: var(--jv-bad); }
+.rl-jarvis__check.is-lit.is-unknown { color: var(--jv-warn); }
+
+/* The verdict's way to the application's break-in attempts (the page's attempts panel). */
+.rl-jarvis__breakin {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  /* Wide enough that a run's suggestions sit on one line, so the deck stays low. */
-  width: min(1060px, calc(100% - 32px));
-  translate: -50% 0;
-  pointer-events: none;
-}
-.rl-jarvis__deck > * { pointer-events: auto; }
-
-.rl-jarvis__answer {
-  box-sizing: border-box;
-  width: min(620px, 100%);
-  max-height: 248px;
-  overflow: auto;
-  padding: 12px 14px;
-  border: 1px solid var(--jv-line-strong);
-  border-radius: 10px;
-  background: var(--jv-answer-bg);
-  box-shadow: var(--jv-answer-shadow);
-  color: var(--jv-text-2);
-}
-.rl-jarvis__answer.is-positive { border-color: color-mix(in srgb, var(--jv-ok) 45%, transparent); }
-.rl-jarvis__answer.is-negative { border-color: color-mix(in srgb, var(--jv-bad) 45%, transparent); }
-.rl-jarvis__answer.is-notice { border-color: color-mix(in srgb, var(--jv-warn) 45%, transparent); }
-.rl-jarvis__answerhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.rl-jarvis__answertitle { font-size: 14px; font-weight: 600; color: var(--jv-text); }
-
-.rl-jarvis__caption {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  max-width: 100%;
-  min-height: 20px;
-  margin: 0;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--jv-text);
-  text-align: center;
-  text-shadow: var(--jv-caption-shadow);
-}
-.rl-jarvis__caption[hidden] { display: none; }
-.rl-jarvis__captionmark { display: inline-grid; flex: none; place-items: center; color: var(--jv-text-3); }
-
-.rl-jarvis__chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.rl-jarvis__chip {
-  height: 28px;
-  padding: 0 11px;
-  border: 1px solid var(--jv-line);
-  border-radius: 14px;
-  background: var(--jv-chip-bg);
-  color: var(--jv-text);
-  font: inherit;
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.rl-jarvis__chip:hover { border-color: var(--jv-line-strong); background: var(--jv-chip-hover); }
-.rl-jarvis__chip.is-on { border-color: var(--jv-text-2); }
-.rl-jarvis__chip:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
-
-.rl-jarvis__ask {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  box-sizing: border-box;
-  width: min(560px, 100%);
-  height: 42px;
-  padding: 0 6px 0 12px;
-  border: 1px solid var(--jv-line-strong);
-  border-radius: 21px;
-  background: var(--jv-ask-bg);
-  box-shadow: var(--jv-float-shadow);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.rl-jarvis__ask:focus-within { border-color: var(--jv-text-2); box-shadow: var(--jv-float-shadow), 0 0 0 3px var(--jv-ask-ring); }
-.rl-jarvis__ask.is-listening { border-color: var(--jv-work); box-shadow: 0 0 0 3px var(--jv-work-soft); }
-.rl-jarvis__askmark { display: inline-grid; flex: none; place-items: center; color: var(--jv-text-3); }
-.rl-jarvis__askmark.is-working { color: var(--jv-work); }
-.rl-jarvis__input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  padding: 0 4px;
-  border: none;
-  background: none;
-  color: var(--jv-text);
-  font: inherit;
-  font-size: 13px;
-  outline: none;
-}
-.rl-jarvis__input::placeholder { color: var(--jv-text-3); }
-/* The console's own field look (kit.css) stays off the command bar: it is the bar's. */
-.rl-jarvis__ask .rl-jarvis__input,
-.rl-jarvis__ask .rl-jarvis__input:hover,
-.rl-jarvis__ask .rl-jarvis__input:focus,
-.rl-jarvis__ask .rl-jarvis__input:focus-visible {
-  width: auto;
-  height: 100%;
-  padding: 0 4px;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--jv-text);
-  outline: none;
-}
-.rl-jarvis__mic,
-.rl-jarvis__send {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 30px;
+  width: 100%;
   height: 30px;
+  margin: 0;
   padding: 0;
-  border: none;
-  border-radius: 15px;
+  border: 0;
+  border-top: 1px solid var(--jv-line-soft);
   background: none;
+  font: inherit;
+  font-size: 13px;
   color: var(--jv-text-2);
+  text-align: left;
   cursor: pointer;
 }
-.rl-jarvis__mic:hover,
-.rl-jarvis__send:hover:not(:disabled) { background: var(--jv-hover); color: var(--jv-text); }
-.rl-jarvis__mic.is-on { background: var(--jv-work-soft); color: var(--jv-work); }
-.rl-jarvis__send:disabled,
-.rl-jarvis__mic:disabled { opacity: 0.4; cursor: default; }
-.rl-jarvis__mic:focus-visible,
-.rl-jarvis__send:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 1px; }
+.rl-jarvis__breakin span { flex: 1; }
+.rl-jarvis__breakin svg { flex: none; color: var(--jv-text-3); }
+.rl-jarvis__breakin.is-holes svg:first-child { color: var(--jv-warn-hi); }
+.rl-jarvis__breakin:hover { color: var(--jv-text); }
+.rl-jarvis__breakin:hover span { text-decoration: underline; text-underline-offset: 2px; }
+.rl-jarvis__breakin:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; border-radius: 3px; }
+
+/* --- An answer in the dock (jarvis1-answer.tsx): the HUD's answer card -------------------------- */
+
+.jv1-ans { position: relative; display: flex; flex-direction: column; gap: 6px; padding-left: 12px; color: var(--ad-text-2); }
+/* The card's bracket: a hairline down its left in the answer's meaning. */
+.jv1-ans::before { content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 2px; border-radius: 1px; background: currentColor; opacity: 0.8; }
+.jv1-ans.is-positive { color: var(--ad-ok); }
+.jv1-ans.is-negative { color: var(--ad-bad); }
+.jv1-ans.is-notice { color: var(--ad-warn); }
+.jv1-ans.is-neutral { color: var(--ad-line-2); }
+.jv1-ans__kicker { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.01em; color: inherit; }
+.jv1-ans.is-neutral .jv1-ans__kicker { color: var(--ad-text-3); }
+.jv1-ans__sentence { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ad-text); text-wrap: pretty; }
+.jv1-ans.is-unknown .jv1-ans__sentence { color: var(--ad-text-2); }
+.jv1-ans__more { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.5; color: var(--ad-text-2); }
 
 @media (prefers-reduced-motion: reduce) {
   .rl-jarvis__seg,
   .rl-jarvis__plabel,
   .rl-jarvis__rule,
-  .rl-jarvis__face,
-  .rl-jarvis__facearc,
-  .rl-jarvis__cond,
-  .rl-jarvis__condicon,
   .rl-jarvis__wire,
   .rl-jarvis__pbtn { transition: none; }
   .rl-jarvis__busy svg,
   .rl-jarvis-root.is-booting,
   .rl-jarvis-root[data-jv-mode='down'],
-  .rl-jarvis__farticks,
   .rl-jarvis__wireflow,
   .rl-jarvis__panelscanline,
   .rl-jarvis__lockon,
@@ -987,5 +836,288 @@
 }
 
 /* The host's fade under the engine pill, in the stage's colour. */
-.sit__stage .tj-canvas.is-jarvis::after,
-.tj-canvas.is-jarvis::after { background: linear-gradient(to bottom, #081424 40%, rgba(8, 20, 36, 0)); }
+.sit[data-stage='dark'] .sit__stage .tj-canvas.is-jarvis::after,
+.sit[data-stage='dark'] .tj-canvas.is-jarvis::after { background: linear-gradient(to bottom, #0b0807 40%, rgba(11, 8, 7, 0)); }
+
+
+
+
+/* --- The LIGHT stage: glows become soft tinted shadows ---------------------------------------------
+   On white a glow in the meaning INK (dark green, dark red) reads as a smudge: here every glow is a thin
+   ring and a short shadow tinted with the -hi stroke, at low alpha; the room has no vignette. */
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__vignette { display: none; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__coredisc { filter: drop-shadow(0 1px 3px rgba(60, 30, 15, 0.12)); }
+.rl-jarvis-root[data-stage='light'].is-running .rl-jarvis__coredot,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__sweepedge,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__sweephead { filter: none; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__sweep { opacity: 0.6; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__glowstop.is-in { stop-opacity: 0.05; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__seg.is-scan .rl-jarvis__segarc,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__seg.is-found .rl-jarvis__segarc,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__seg.is-locked .rl-jarvis__segarc,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__seg.is-lit .rl-jarvis__segarc { filter: drop-shadow(0 1px 2px color-mix(in srgb, currentColor 30%, transparent)); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__pbtn { background: transparent; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__plabel.is-locked .rl-jarvis__pbtn { background: #ffffff; box-shadow: 0 1px 2px rgba(60, 30, 15, 0.05); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__panel,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__vglass { backdrop-filter: none; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__rule.is-working { box-shadow: 0 0 0 3px rgba(235, 84, 36, 0.08); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__rule.is-matched { background: var(--jv-ok-soft); box-shadow: 0 1px 2px rgba(60, 30, 15, 0.05), 0 4px 12px color-mix(in srgb, currentColor 10%, transparent); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__rule.is-matched.is-negative { background: var(--jv-bad-soft); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__rule.is-matched.is-notice { background: var(--jv-warn-soft); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__rule.is-matched.is-neutral { background: var(--jv-hover-soft); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__rule.is-lit { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 45%, transparent), 0 4px 14px color-mix(in srgb, currentColor 12%, transparent); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__scanline { box-shadow: 0 0 6px rgba(235, 84, 36, 0.3); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__vglass { box-shadow: var(--jv-verdict-shadow); }
+/* Light: the verdict's scan is a soft tinted wake behind a thin line, not a flat slab. */
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__vscanline::before { background: linear-gradient(to bottom, transparent, currentColor); opacity: 0.07; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__vscanline::after { height: 1px; box-shadow: 0 0 6px color-mix(in srgb, currentColor 35%, transparent); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__verdict.is-lit { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 45%, transparent), 0 6px 18px color-mix(in srgb, currentColor 12%, transparent); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__halo { box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 70%, transparent), 0 0 0 4px color-mix(in srgb, currentColor 10%, transparent); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__vglow { display: none; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__vbreath { box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent), 0 0 0 4px color-mix(in srgb, currentColor 8%, transparent); }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__wireline { filter: none; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__wiredot,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__wireflow,
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__lc { filter: none; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__panelscanline::after { box-shadow: none; }
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__check.is-lit::before { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent); }
+
+/* --- The companion's presence (jarvis1-presence.tsx) ------------------------------------------------
+   The core is the copilot: rings close in while it listens, breathe out while it speaks, one arc turns
+   while it reads a question — all the engine's orange (active). The nameplate under the ring says the
+   state in a word. CSS animates only these elements (motion never touches them). */
+.jv1-pr { position: absolute; z-index: 1; overflow: visible; pointer-events: none; }
+.jv1-pr circle { fill: none; stroke: var(--jv-work); transform-box: fill-box; transform-origin: center; opacity: 0; }
+.jv1-pr__wave { stroke-width: 1.6; }
+.jv1-pr__ear { stroke-width: 1.4; }
+.jv1-pr__think { stroke-width: 2; stroke-linecap: round; stroke-dasharray: 22 78; }
+.jv1-pr[data-state='speaking'] .jv1-pr__wave,
+.jv1-pr[data-state='greeting'] .jv1-pr__wave { animation: jv1-pr-out 1.6s cubic-bezier(0.2, 0.6, 0.35, 1) calc(var(--k) * 0.53s) infinite; }
+.jv1-pr[data-state='listening'] .jv1-pr__ear { animation: jv1-pr-in 1.2s cubic-bezier(0.4, 0, 0.6, 1) calc(var(--k) * 0.6s) infinite; }
+.jv1-pr[data-state='thinking'] .jv1-pr__think { opacity: 0.9; animation: jv1-pr-turn 1s linear infinite; }
+/* Acting: one pulse out as it does what it was told, then still. */
+.jv1-pr[data-state='acting'] .jv1-pr__wave:first-child { animation: jv1-pr-out 400ms cubic-bezier(0.2, 0.6, 0.35, 1) 1 both; }
+@keyframes jv1-pr-out {
+  0% { transform: scale(1); opacity: 0.75; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+@keyframes jv1-pr-in {
+  0% { transform: scale(1); opacity: 0; }
+  35% { opacity: 0.7; }
+  100% { transform: scale(0.46); opacity: 0; }
+}
+@keyframes jv1-pr-turn { to { transform: rotate(360deg); } }
+/* Listening, acting, reading, speaking or greeting, the core lights in the engine's orange (the answer's tone comes back
+   when it is quiet: landed idle is the only time the core takes the verdict's colour). */
+.rl-jarvis-root:is([data-jv-presence='listening'], [data-jv-presence='acting'], [data-jv-presence='thinking'], [data-jv-presence='speaking'], [data-jv-presence='greeting']) .rl-jarvis__coredot { fill: var(--jv-work); }
+.rl-jarvis-root:is([data-jv-presence='listening'], [data-jv-presence='acting'], [data-jv-presence='thinking'], [data-jv-presence='speaking'], [data-jv-presence='greeting']) .rl-jarvis__coredisc { stroke: var(--jv-work); }
+/* …and so does the halo round it once landed: one colour for one state (never a green rim round an orange dot
+   while it speaks). The tone comes back a moment after it falls quiet, so the short gap between two beats never
+   flashes it; it goes at once when the copilot wakes. */
+.rl-jarvis-root.is-landed:not([data-jv-presence='idle']) .rl-jarvis__glowstop { stop-color: var(--jv-work); }
+.rl-jarvis__coredisc { transition: stroke 0.3s ease; }
+.rl-jarvis__coredot { transition: fill 0.3s ease; }
+.rl-jarvis__glowstop { transition: stop-color 0.3s ease; }
+.rl-jarvis-root.is-landed[data-jv-presence='idle'] .rl-jarvis__coredisc { transition: stroke 0.6s ease 0.7s; }
+.rl-jarvis-root.is-landed[data-jv-presence='idle'] .rl-jarvis__coredot { transition: fill 0.6s ease 0.7s; }
+.rl-jarvis-root.is-landed[data-jv-presence='idle'] .rl-jarvis__glowstop { transition: stop-color 0.6s ease 0.7s; }
+@media (prefers-reduced-motion: reduce) {
+  .rl-jarvis-root :is(.rl-jarvis__coredisc, .rl-jarvis__coredot, .rl-jarvis__glowstop) { transition: none !important; }
+}
+/* Light: the presence at rest is a white disc with a brand-orange rim and dot, no glow. */
+.rl-jarvis-root[data-stage='light']:not(.is-landed) .rl-jarvis__coredisc { stroke: var(--jv-work); stroke-width: 1.5; }
+.rl-jarvis-root[data-stage='light']:not(.is-landed) .rl-jarvis__coredot { fill: var(--jv-work); }
+/* Idle, nothing said: the core breathes — before a run small and quick, landed slow in the answer's tone. */
+.rl-jarvis-root[data-jv-presence='idle']:not(.is-landed) .rl-jarvis__corehalo { animation: rl-jarvis-breathe 5s ease-in-out infinite; }
+.rl-jarvis-root.is-landed .rl-jarvis__corehalo.is-breathing { animation-duration: 6s; }
+
+.jv1-np { position: absolute; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; pointer-events: none; transition: opacity 160ms ease; }
+/* No room between the ring and the dock (1280×800 with the panel open, or the chat up): it steps aside. */
+.jv1-np[data-hidden] { opacity: 0; visibility: hidden; }
+.jv1-np__head { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; min-height: 20px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--jv-ground); box-shadow: 0 0 0 4px var(--jv-ground); }
+.jv1-np[data-state='idle'] .jv1-np__head { padding-right: 10px; }
+.jv1-np__name { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--jv-text); }
+.jv1-np__state { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px 1px 6px; border-radius: 999px; background: var(--jv-work-soft); font-size: 12px; font-weight: 500; line-height: 18px; color: var(--jv-work-ink); white-space: nowrap; }
+/* The signal beside the word: three bars that move with the voice, a dot that pulses while it listens. */
+.jv1-np__sig { display: inline-flex; align-items: center; gap: 2px; height: 10px; }
+.jv1-np__sig i { display: block; width: 2px; height: 4px; border-radius: 1px; background: currentColor; }
+.jv1-np[data-state='speaking'] .jv1-np__sig i { animation: jv1-np-bar 0.9s ease-in-out infinite; }
+.jv1-np[data-state='speaking'] .jv1-np__sig i:nth-child(2) { animation-delay: -0.3s; }
+.jv1-np[data-state='speaking'] .jv1-np__sig i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes jv1-np-bar { 0%, 100% { height: 3px; } 50% { height: 10px; } }
+.jv1-np:is([data-state='listening'], [data-state='thinking'], [data-state='working'], [data-state='acting']) .jv1-np__sig i:not(:first-child) { display: none; }
+.jv1-np:is([data-state='listening'], [data-state='thinking'], [data-state='working'], [data-state='acting']) .jv1-np__sig i:first-child { width: 6px; height: 6px; border-radius: 50%; }
+.jv1-np[data-state='listening'] .jv1-np__sig i:first-child { animation: jv1-np-dot 1.2s ease-in-out infinite; }
+.jv1-np[data-state='working'] .jv1-np__sig i:first-child { background: var(--jv-work); }
+@keyframes jv1-np-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.jv1-np__line { max-width: 100%; margin: 0; font-size: 13px; line-height: 1.45; color: var(--jv-text-2); text-wrap: balance; }
+
+@media (prefers-reduced-motion: reduce) {
+  .jv1-pr circle,
+  .rl-jarvis-root .rl-jarvis__corehalo,
+  .rl-jarvis__coredisc.is-alive,
+  .rl-jarvis__corepulse { animation: none !important; }
+  .jv1-pr[data-state='speaking'] .jv1-pr__wave { opacity: 0.3; transform: scale(1.35); }
+  .jv1-pr[data-state='listening'] .jv1-pr__ear { opacity: 0.35; transform: scale(0.8); }
+  .jv1-np__sig i { animation: none !important; }
+  .jv1-np[data-state='speaking'] .jv1-np__sig i { height: 7px; }
+}
+/* The verdict's notice: one quiet word over it, in its tone. */
+.rl-jarvis__noticed { display: flex; align-items: center; gap: 5px; margin-bottom: 2px; font-size: 12px; font-weight: 600; color: var(--jv-ntone); }
+.rl-jarvis__noticed svg { flex: none; color: var(--jv-nrule); }
+/* Light: the lock's halo on the ring is a breath, not a blur. */
+.rl-jarvis-root[data-stage='light'] .rl-jarvis__lockstop.is-in { stop-opacity: 0.06; }
+/* The presence at its smallest (the ask field's lead): the reactor mark, in the engine's orange. */
+.jv1-mark { flex: none; overflow: visible; }
+.jv1-mark circle { fill: none; stroke: var(--ad-glow-a); stroke-width: 1.6; transform-box: fill-box; transform-origin: center; }
+.jv1-mark .jv1-mark__outer { stroke-dasharray: 10 4.9; }
+.jv1-mark .jv1-mark__core { fill: var(--ad-glow-a); stroke: none; }
+.jv1-mark[data-state='working'] .jv1-mark__outer,
+.jv1-mark[data-state='thinking'] .jv1-mark__outer { animation: jv1-pr-turn 2.4s linear infinite; }
+.jv1-mark[data-state='thinking'] .jv1-mark__outer { animation-duration: 0.9s; }
+.jv1-mark[data-state='listening'] .jv1-mark__inner { animation: jv1-mark-ear 1.2s ease-in-out infinite; }
+.jv1-mark[data-state='speaking'] .jv1-mark__core { animation: jv1-mark-say 0.7s ease-in-out infinite; }
+@keyframes jv1-mark-ear { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.7); } }
+@keyframes jv1-mark-say { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.45); } }
+@media (prefers-reduced-motion: reduce) {
+  .jv1-mark circle { animation: none !important; }
+}
+.jv1-np__line { padding: 2px 6px; border-radius: 6px; background: var(--jv-ground); }
+
+/* --- The companion's thread (jarvis1-ask.tsx, in the dock's `.ad` frame) ------------------------------------------ */
+.rl-jarvis-root .ad__threadhead { display: flex; align-items: center; justify-content: space-between; margin: 0 4px; padding: 2px 4px 6px; border-bottom: 1px solid var(--ad-line); font-size: 12px; font-weight: 600; color: var(--ad-text-3); }
+.rl-jarvis-root .ad__clear { padding: 2px 6px; border: none; border-radius: 5px; background: none; color: var(--ad-on); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.rl-jarvis-root .ad__clear:hover { background: var(--ad-hover); }
+.rl-jarvis-root .ad__clear:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+.rl-jarvis-root .ad__divider { display: flex; align-items: center; gap: 8px; margin: 2px 0 0; padding: 0 8px; font-size: 12px; color: var(--ad-text-3); white-space: nowrap; }
+.rl-jarvis-root .ad__divider::before,
+.rl-jarvis-root .ad__divider::after { content: ''; flex: 1 1 12px; height: 1px; background: var(--ad-line); }
+.rl-jarvis-root .ad__divider span { overflow: hidden; text-overflow: ellipsis; }
+.rl-jarvis-root .ad__receipt { color: var(--ad-text-2); }
+/* An answer about an earlier run: readable, inert. */
+.rl-jarvis-root .ad__item.is-past .jv1-ans { opacity: 0.78; }
+.rl-jarvis-root .ad__item.is-past .ad-cite,
+.rl-jarvis-root .ad__item.is-past [data-cite] { pointer-events: none; }
+/* Under the session's head, lines scrolled up fade out instead of being cut through the middle. */
+.rl-jarvis-root .ad__threadhead + .ad__thread { padding-top: 12px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px); mask-image: linear-gradient(to bottom, transparent 0, #000 12px); }
+
+/* --- Can't tell, by its shape too (3 Oct 2026) ------------------------------------------------------
+   Lemon sits clear of the orange chrome, and a conflict or a can't-tell also draws a DASHED edge (with the
+   ⚠ on its marks), so it never reads as the engine at work. Borders only: what motion draws (the ring's
+   arcs, the verdict's frame lines) keeps its own dashes. */
+.rl-jarvis__rule.is-unknown,
+.rl-jarvis__rule.is-possible,
+.rl-jarvis__rule.is-matched.is-notice { border-style: dashed; }
+.rl-jarvis__plabel.is-locked.is-notice .rl-jarvis__pbtn,
+.rl-jarvis__plabel.is-also .rl-jarvis__pbtn { border-style: dashed; }
+.rl-jarvis__plabel.is-also .rl-jarvis__pbtn { border-color: color-mix(in srgb, currentColor 45%, transparent); }
+.rl-jarvis__expect { border-style: dashed; }
+.rl-jarvis__verdict.is-notice .rl-jarvis__vglass { outline: 1px dashed color-mix(in srgb, var(--jv-warn-hi) 70%, transparent); outline-offset: -1px; }
+.rl-jarvis__finding:not(.is-negative, .is-neutral) { box-shadow: none; border-left: 2px dashed var(--jv-nrule); }
+
+
+/* --- THE CIRCLE (jarvis1-hub.tsx) -------------------------------------------------------------------
+   The engine's circle: the core at its centre (its own rules are up with the ring, "The core's halo"), her
+   presence round it, the policies on the band's right half. Its linework is layered SVG at its own depths
+   inside one tilted parent; the policies' leaders are FLAT over it.
+
+   For one day — 4 Oct 2026 — the circle was the sign-in as well, and this section held its furniture: an
+   orb with the person's face and an edit pencil, chips for the conditions, a gate for the application, a
+   Replay pill, the route between them and their own gradient and shadow tokens. The owner reversed it
+   ("revert the circle, and give me the old top bar as we have in Focus"), so all of it is gone — the run
+   line above the canvas is where the sign-in is stated, as it is for every other view. */
+.rl-jarvis-root.is-landed.is-unrun .rl-jarvis__glowstop { stop-color: var(--jv-line-strong); }
+
+/* The 3D disc. */
+.rl-jarvis__hub3d { position: absolute; z-index: 0; perspective: 1000px; perspective-origin: 50% 50%; pointer-events: none; }
+.rl-jarvis__disc { position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 50% 50%; }
+.rl-jarvis__layer { position: absolute; inset: 0; pointer-events: none; }
+.rl-jarvis__layer > svg { position: absolute; left: 0; top: 0; overflow: visible; }
+/* The band's track runs under the policies only (one arc, first segment's start to the last one's end): nothing
+   on the rest of the ring pretends to be a scale. */
+.rl-jarvis__ptrack { fill: none; stroke: var(--jv-seg-ghost); stroke-width: 2; opacity: 0.5; }
+/* One index tick per policy, in its segment's colour; the leader carries on from its outer end. */
+.rl-jarvis__ptick { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.rl-jarvis__seghit { fill: none; stroke: transparent; stroke-width: 30; pointer-events: stroke; cursor: pointer; }
+.rl-jarvis__segarc { stroke-width: 10; }
+.rl-jarvis__segarc.is-dashed { stroke-dasharray: 7 3; }
+/* A state each: still to ask a thin ghost, asked and does not cover a solid mid line, never reached thin and dotted. */
+.rl-jarvis__seg.is-ghost .rl-jarvis__segarc { stroke-width: 4; }
+.rl-jarvis__seg.is-passed .rl-jarvis__segarc { stroke-width: 6; }
+.rl-jarvis__seg.is-quiet .rl-jarvis__segarc { stroke-width: 4; }
+.rl-jarvis__segarc.is-quiet-dash { stroke-dasharray: 2 5; }
+.rl-jarvis__reticlearc path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.rl-jarvis__segmark { fill: none; stroke: var(--jv-work); stroke-width: 2; stroke-linecap: round; }
+.rl-jarvis__hub3d.is-flat .rl-jarvis__seg.is-held .rl-jarvis__segarc { stroke-width: 15; }
+
+/* Aruna's presence: two rings round the core. */
+.rl-jarvis__presrings { color: var(--jv-hud); }
+.rl-jarvis__presrings circle { fill: none; stroke: currentColor; stroke-width: 1; opacity: 0.55; }
+.rl-jarvis__presrings circle.is-b { opacity: 0.25; }
+.rl-jarvis-root.is-running .rl-jarvis__presrings { color: var(--jv-work); }
+.rl-jarvis-root.is-running .rl-jarvis__presrings circle.is-b { stroke-dasharray: 30 8; }
+.rl-jarvis-root.is-landed.is-tone-positive .rl-jarvis__presrings { color: var(--jv-ok-hi); }
+.rl-jarvis-root.is-landed.is-tone-negative .rl-jarvis__presrings { color: var(--jv-bad-hi); }
+.rl-jarvis-root.is-landed.is-tone-notice .rl-jarvis__presrings { color: var(--jv-warn-hi); }
+.rl-jarvis-root:not([data-jv-presence='idle']) .rl-jarvis__presrings { color: var(--jv-work); }
+.rl-jarvis-root.is-unrun .rl-jarvis__presrings,
+.rl-jarvis-root.is-landed.is-unrun[data-jv-presence] .rl-jarvis__presrings { color: var(--jv-line-strong); }
+
+/* Not run: the engine on screen is the run before the edits — quiet until Run. */
+.rl-jarvis-root.is-unrun :is(.rl-jarvis__layer.is-sunk, .rl-jarvis__layer.is-segs, .rl-jarvis__layer.is-lift, .rl-jarvis__leaders, .rl-jarvis__plabel) { opacity: 0.45; }
+
+/* The flat layer: the policies' leaders, at their projected places, never scaled. The sign-in's own buttons
+   stood here too (hubflat) until the owner took the sign-in back out of the circle on 4 Oct 2026. */
+.rl-jarvis__leaders { position: absolute; left: 0; top: 0; z-index: 1; overflow: visible; pointer-events: none; }
+
+/* The policies' list: one tab stop, arrows go round in engine order (the labels are its options). */
+.rl-jarvis__plist { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+/* The list itself is a point: its focus shows on the active option (is-focus), in orange. */
+.rl-jarvis-root .rl-jarvis__plist:focus,
+.rl-jarvis-root .rl-jarvis__plist:focus-visible { outline: none; box-shadow: none; }
+/* While the run plays, the lock is the engine at work: orange; landed, it takes the answer's tone. */
+.rl-jarvis-root.is-running .rl-jarvis__seg.is-locked { color: var(--jv-work); }
+.rl-jarvis-root.is-running .rl-jarvis__plabel.is-locked { color: var(--jv-work-ink); }
+.rl-jarvis__plabel { cursor: pointer; }
+.rl-jarvis__plabel.is-hover .rl-jarvis__pbtn { border-color: var(--jv-line-strong); background: var(--jv-hover-soft); }
+.rl-jarvis__plabel.is-focus .rl-jarvis__pbtn { outline: 2px solid var(--jv-work); outline-offset: 2px; }
+.rl-jarvis__plabel.is-inview .rl-jarvis__pbtn { border-color: var(--jv-work); }
+.rl-jarvis__pinview { flex: none; color: var(--jv-work-ink); }
+.rl-jarvis__pwarn { flex: none; }
+/* A ⚠ or "In view ·" sits before the words, on the first line of them. */
+.rl-jarvis__plist .rl-jarvis__pstate { display: flex; align-items: flex-start; gap: 4px; }
+.rl-jarvis__plist .rl-jarvis__pstate .rl-jarvis__pwarn { margin-top: 2.5px; }
+.rl-jarvis__plist .rl-jarvis__pstate .rl-jarvis__decode { flex: 1 1 auto; min-width: 0; }
+
+/* The tooltip under a policy's label: what it did in this run, and what a press does. */
+.rl-jarvis__ptip {
+  position: absolute;
+  z-index: 20;
+  box-sizing: border-box;
+  width: 188px;
+  padding: 9px 11px;
+  border: 1px solid var(--jv-line-strong);
+  border-radius: 8px;
+  background: var(--jv-peek-bg);
+  box-shadow: var(--jv-pop-shadow);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--jv-text-2);
+  pointer-events: none;
+}
+.rl-jarvis__ptip b { display: block; margin-bottom: 3px; font-weight: 600; color: var(--jv-text); }
+.rl-jarvis__ptip .is-positive { color: var(--jv-ok); }
+.rl-jarvis__ptip .is-negative { color: var(--jv-bad); }
+.rl-jarvis__ptip .is-notice { color: var(--jv-warn); }
+.rl-jarvis__ptip .is-work { color: var(--jv-work-ink); }
+.rl-jarvis__ptiphint { display: block; margin-top: 6px; font-size: 12px; color: var(--jv-text-3); }
+
+/* The rules panel: the policy in view, and its way to the builder. */
+.rl-jarvis__panelhead { position: relative; }
+.rl-jarvis__openpol { position: absolute; right: 2px; top: 10px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 0; border-radius: 5px; background: none; color: var(--jv-work-ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.rl-jarvis__openpol:hover { background: var(--jv-hover); }
+.rl-jarvis__openpol:focus-visible { outline: 2px solid var(--jv-work); outline-offset: 2px; }
+.rl-jarvis__panel.has-open .rl-jarvis__paneltitle { padding-right: 100px; }
+.rl-jarvis__inviewnote { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 0 4px; font-size: 12px; line-height: 18px; color: var(--jv-text-2); }
+.rl-jarvis__inviewnote.is-notice { color: var(--jv-warn); }
+.rl-jarvis__wires.is-dim { opacity: 0.3; }

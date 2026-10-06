@@ -5,8 +5,8 @@
 
    The page puts the stage on `.sit` (`data-stage`, SignInTests.tsx) — dark only
    for a layout that has a dark stage and is showing it — and on the app root
-   (`data-check-stage`), because the panel's pickers, popovers and its Who
-   dialog open there, outside the page. Under it the console's own dark tokens
+   (`data-check-stage`), because the panel's pickers, popovers and
+   lists open there, outside the page. Under it the console's own dark tokens
    are redeclared for the panels on the right (`.bb__insp`: Check access, Why,
    Break-in attempts) and for the layers THEY opened alone, so every control in
    them — fields, pickers, buttons, chips, the foot — turns dark by the tokens
@@ -17,8 +17,9 @@
    root and carries nothing of where it came from, so it is matched while a
    control in a dark-stage panel is expanded (`aria-expanded`, set by Picker,
    the condition rows and the row menus) — a picker opened from the page's bar
-   at the same stage stays light. The Who dialog has no expanded trigger; it is
-   matched by its own list (`.sit-ident__list`, IdentityField.tsx).
+   at the same stage stays light. The Identity field's list is one of these:
+   it wears the Picker's `.bx-picker__pop`, and its search is expanded while
+   it is open (identity-combo.tsx).
 
    Two layers of values. First the console's dark theme (tokens.css,
    console-theme.css `:root[data-theme='dark']`), for the console's own look.
@@ -33,8 +34,7 @@
    Edit sign-in on the run's line, pressed while the panel is open. */
 .sit[data-stage='dark'] .bb__insp,
 .sit[data-stage='dark'] .tj-engine__edit,
-.brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop),
-.brand-root[data-check-stage='dark'] .bx-modal:has(.sit-ident__list) {
+.brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop) {
   --surface-page: #131922;
   --surface-raised: #1a212a;
   --surface-sunken: #0d1218;
@@ -156,8 +156,7 @@
 /* The rebrand's light tokens, one for one, in dark (rebrand.css `:root`). */
 [data-brand='rebrand'] .sit[data-stage='dark'] .bb__insp,
 [data-brand='rebrand'] .sit[data-stage='dark'] .tj-engine__edit,
-[data-brand='rebrand'] .brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop),
-[data-brand='rebrand'] .brand-root[data-check-stage='dark'] .bx-modal:has(.sit-ident__list) {
+[data-brand='rebrand'] .brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop) {
   /* #fff / #f8f9fa / #f1f3f5 → the panel, a step down, a step up. */
   --surface-page: #161c24;
   --surface-raised: #1d242d;
@@ -264,17 +263,16 @@
   padding: 1px;
 }
 
-/* A row in the Who dialog lifts on hover, as a row on a dark ground does;
-   in light it dips to the sunken grey, which on dark reads as a hole. */
-.brand-root[data-check-stage='dark'] .bx-modal:has(.sit-ident__list) .bb__whoitem:hover {
+/* The Identity field's row under the cursor lifts, as a row on a dark ground
+   does; in light it dips to the sunken grey, which on dark reads as a hole. */
+.brand-root[data-check-stage='dark']:has(.sit[data-stage='dark'] .sit-ident [aria-expanded='true']) .sit-ident__pop .bx-picker__opt.is-cursor {
   background: var(--state-hover-bg);
 }
 
 /* Jarvis's panel wears its own navy glass (jarvis-mode/jarvis-chrome.css); the
-   lists, popovers and Who dialog it opens take the same navy, solid, so a
+   lists and popovers it opens take the same navy, solid, so a
    list never opens grey out of a navy panel. */
-.brand-root[data-check-stage='dark']:has(.sit.is-jarvis[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop),
-.brand-root[data-check-stage='dark']:has(.sit.is-jarvis[data-stage='dark']) .bx-modal:has(.sit-ident__list) {
+.brand-root[data-check-stage='dark']:has(.sit.is-jarvis[data-stage='dark'] .bb__insp [aria-expanded='true']) :is(.bx-picker__pop, .bx-apop, .bx-menu__pop, .cp__pop) {
   --surface-raised: #0a1729;
   --surface-overlay: #0a1729;
   --surface-sunken: #07111f;

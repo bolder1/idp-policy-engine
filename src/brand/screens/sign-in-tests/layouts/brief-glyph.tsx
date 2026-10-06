@@ -9,7 +9,7 @@ import type { Glyph } from './brief-model'
    The mark before a named thing in the brief's sentence (brief-sentence.tsx):
    the person's face, the application's logo, a fact's own mark (the one the
    Configure panel and the row on top draw), a group's people, the policy's
-   layers, the rule's list, the outcome's mark (the Outcome card's own). Sized
+   layers, the rule's list, the outcome's mark. Sized
    to the text it sits in; hidden from assistive tech, which reads the words.
    -------------------------------------------------------------------------- */
 

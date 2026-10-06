@@ -19,6 +19,7 @@ import { Spinner } from '../PolicyStack'
 import { ValueMark } from '../SignInCard'
 import { groupNamesOf } from '../sign-in-card'
 import { RunStage, type StageView } from './RunStage'
+import { SignInRow } from './shared/SignInRow'
 import type { RunLayoutProps } from './types'
 import './tree.css'
 
@@ -983,7 +984,9 @@ export default function TreeLayout(props: RunLayoutProps) {
   const pathLen = animate ? { pathLength: 0 } : false
 
   return (
-    <RunStage ref={stage} reduced={reduced} pad={PAD} className={`rl-tree${landed ? ` is-landed is-${tone}` : ''}${compact ? ' is-tight' : ''}`} label="Sign-in run, as a tree">
+    /* The top is Focus's sign-in row, not the host's run line (owner, 5 Oct 2026; run-layout.ts OWN_TOP): drawn in the
+       stage's overlay, over RunStage's default 64 px of top pad. */
+    <RunStage ref={stage} reduced={reduced} pad={PAD} className={`rl-tree${landed ? ` is-landed is-${tone}` : ''}${compact ? ' is-tight' : ''}`} label="Sign-in run, as a tree" overlay={<SignInRow run={props} look="light" />}>
       <div
         ref={mapRef}
         className="rl-tree__map"

@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react'
    See zone-notes.tsx for why there are four versions (owner, 1 and 2 Oct 2026).
    -------------------------------------------------------------------------- */
 
-export type NoteStyle = 'classic' | 'sticky' | 'clip' | 'pointer'
+export type NoteStyle = 'classic' | 'blue' | 'sticky' | 'clip' | 'pointer'
 
 /* Classic first and the default: it is the note the page had before any of
    this, so a viewer who never touches the switch sees the page as it was.
@@ -15,6 +15,7 @@ export type NoteStyle = 'classic' | 'sticky' | 'clip' | 'pointer'
    for a day (owner, 2 Oct 2026: "Remove Note pile, Index card"). */
 export const NOTE_STYLES: { value: NoteStyle; label: string }[] = [
   { value: 'classic', label: 'Classic' },
+  { value: 'blue', label: 'Blue' },
   { value: 'sticky', label: 'Sticky note' },
   { value: 'clip', label: 'Clipboard' },
   { value: 'pointer', label: 'Pointer' },

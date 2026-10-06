@@ -60,7 +60,7 @@ import { NPS_SERVERS, setupCardFor, setupReady } from '../setup-guide'
 import { AppSetupCard, NpsSetupCard } from './setup-card'
 import { useLeaveGuard } from '../leave-guard'
 import { compactClass, usePageWidth } from '../page-width'
-import { ToggleStyleSwitch, WidthSwitch } from './page-bar'
+import { WidthSwitch } from './page-bar'
 import { SHOWCASE } from '../showcase'
 import { chainStatus, chainsSaid, takesCaChain } from './ca-chain'
 import { CaChainDrawer } from './ca-chain-drawer'
@@ -536,12 +536,6 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           {/* The gear/chevron comparison switch stood here. The gear won on
               23 Sep 2026 and is on every row that opens, so there is nothing
               left to compare. */}
-          {/* Toggle style is a PENDING DECISION (owner, 1 Oct 2026), so it is
-              shown in the showcase build too; it goes once a style is picked
-              (toggle-style.ts). The width switch hides itself there. Admin
-              only: a person's Two-step verification page has no switches, and
-              this is preview furniture on the end user's site. */}
-          {!isUser && <ToggleStyleSwitch />}
           {!SHOWCASE && <WidthSwitch />}
         </div>
       </header>

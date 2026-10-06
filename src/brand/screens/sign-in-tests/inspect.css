@@ -1,0 +1,131 @@
+/* The inspector panel (InspectPanel.tsx, PeekViews.tsx). Tokens only; nothing here moves.
+
+   Sections are the builder inspector's own (board.css `.bb__insp .bb__sec`): they carry their own padding and the
+   inset hairline between them, so the body adds none of its own. What is not a section — the way back and the
+   verdict — stands in `.insp__lead`, padded to the sections' edge. */
+.sit-panel .insp__body { display: flex; flex-direction: column; padding: 0 0 var(--space-8); }
+
+/* --- The head: the kind's mark, what it is, its name ------------------------------------------------------------- */
+.insp__bar { align-items: center; }
+.insp__titles { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.insp__kicker { font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 1.2; color: var(--text-tertiary); }
+.insp__title { margin: 0; overflow: hidden; font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 1.3; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; }
+.insp__title:focus { outline: none; }
+.insp__title:focus-visible { box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); border-radius: var(--radius-sm); }
+.insp__bar .bb__act.is-on { background: var(--surface-sunken); color: var(--text-primary); }
+
+/* A kind's mark: a tile the size of the card's index tile, the kind's icon inside. */
+.insp__mark { flex: none; display: inline-grid; place-items: center; width: var(--space-9); height: var(--space-9); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.insp__mark b { font-weight: var(--fw-semibold); }
+.insp__mark.is-small { width: var(--space-7); height: var(--space-7); border-radius: var(--radius-sm); font-size: var(--fs-xs); }
+.insp__mark.is-app { background: var(--surface-raised); }
+.insp__mark.is-face { width: auto; height: auto; border: 0; background: none; }
+
+/* --- What stands above the sections ------------------------------------------------------------------------------ */
+.insp__crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-5) 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.insp__crumbstep { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.insp__crumb { padding: 0; border: 0; background: none; font: inherit; color: var(--text-secondary); cursor: pointer; }
+.insp__crumb:hover { color: var(--text-link); text-decoration: underline; }
+.insp__crumb:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); border-radius: var(--radius-sm); }
+.insp__crumb.is-here { color: var(--text-primary); font-weight: var(--fw-medium); cursor: default; text-decoration: none; }
+.insp__lead { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-5) 0; }
+.insp__tabs { margin: 0; }
+.insp__text { padding: var(--space-5); }
+
+/* The verdict: how this thing met the sign-in on the canvas, in the outcome's own feedback ramp. */
+.insp__verdict { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-5); border: var(--bw-thin) solid var(--fb-neutral-border); border-radius: var(--radius-lg); background: var(--fb-neutral-bg); }
+.insp__verdictmark { flex: none; display: inline-grid; place-items: center; width: var(--space-8); height: var(--space-8); border-radius: var(--radius-full); background: var(--surface-raised); color: var(--fb-neutral-fg); }
+.insp__verdicttext { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.insp__verdicttext b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.insp__verdict.is-positive { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); }
+.insp__verdict.is-positive .insp__verdictmark { color: var(--fb-positive-fg); }
+.insp__verdict.is-notice { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.insp__verdict.is-notice .insp__verdictmark { color: var(--fb-notice-fg); }
+.insp__verdict.is-negative { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.insp__verdict.is-negative .insp__verdictmark { color: var(--fb-negative-fg); }
+
+/* --- Sections ---------------------------------------------------------------------------------------------------- */
+.insp__sec .bb__sec__body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.insp__secmeta { flex: none; margin-left: auto; max-width: 50%; overflow: hidden; font-size: var(--fs-xs); color: var(--text-tertiary); text-overflow: ellipsis; white-space: nowrap; }
+.insp__gone { margin: 0; padding: var(--space-5); font-size: var(--fs-sm); color: var(--text-tertiary); }
+.insp__sec .insp__gone { padding: 0; }
+.insp__note { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* Facts: a label with its mark beside the answer. */
+.insp__facts { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; }
+.insp__fact { display: grid; grid-template-columns: minmax(96px, 34%) minmax(0, 1fr); align-items: center; column-gap: var(--space-4); min-height: var(--space-7); font-size: var(--fs-sm); }
+.insp__fact dt { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-tertiary); }
+.insp__fact dt svg { flex: none; }
+.insp__fact dd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; min-width: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.insp__applink { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-pill); background: var(--surface-raised); font: inherit; color: var(--text-link); cursor: pointer; }
+.insp__applink .insp__mark.is-small { width: var(--space-6); height: var(--space-6); border: 0; }
+.insp__applink:hover { background: var(--surface-sunken); }
+.insp__applink:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+
+/* Rows you can press: a rule of the policy, a thing a rule uses, a policy a thing is in, the sign-in, a pin. */
+.insp__rows { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.insp__row,
+.insp__rule { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: var(--space-10); padding: var(--space-3); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-raised); font: inherit; font-size: var(--fs-sm); text-align: left; color: var(--text-primary); cursor: pointer; }
+.insp__row:hover,
+.insp__rule:hover { border-color: var(--border-default); background: var(--surface-sunken); }
+.insp__row:hover .insp__chev,
+.insp__rule:hover .insp__chev { color: var(--text-primary); }
+.insp__row:focus-visible,
+.insp__rule:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+.insp__rowname { flex: 1 1 auto; min-width: 0; overflow: hidden; font-weight: var(--fw-medium); text-overflow: ellipsis; white-space: nowrap; }
+.insp__rowmeta { flex: none; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.insp__chev { flex: none; color: var(--text-tertiary); }
+
+/* A rule of the policy: its number, its name over how it fared, its decision. The one that decided stands out. */
+.insp__n { flex: none; display: inline-grid; place-items: center; width: var(--space-7); height: var(--space-7); border-radius: var(--radius-sm); background: var(--surface-sunken); font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.insp__rmain { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.insp__rname { overflow: hidden; font-weight: var(--fw-medium); text-overflow: ellipsis; white-space: nowrap; }
+.insp__fate { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-xs); color: var(--text-tertiary); }
+.insp__fate.is-decided { color: var(--fb-positive-fg); font-weight: var(--fw-medium); }
+.insp__fate.is-not-matched { color: var(--fb-negative-fg); }
+.insp__fate.is-cant-tell { color: var(--fb-notice-fg); }
+.insp__rule.is-decided { border-color: var(--text-secondary); box-shadow: inset var(--bw-thick) 0 0 var(--text-secondary); }
+.insp__rule.is-decided .insp__n { background: var(--text-primary); color: var(--surface-raised); }
+.insp__rule.is-not-reached .insp__rname { color: var(--text-secondary); }
+
+/* What this sign-in showed, row by row: a tinted mark, the row's word, the finding. */
+.insp__evidence { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.insp__evidence li { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); font-size: var(--fs-sm); }
+.insp__evmark { flex: none; display: inline-grid; place-items: center; width: var(--space-6); height: var(--space-6); border-radius: var(--radius-full); }
+.insp__evidence li.is-pass .insp__evmark { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.insp__evidence li.is-fail .insp__evmark { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.insp__evidence li.is-unknown .insp__evmark { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.insp__evtext { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.insp__evtext b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.insp__evtext span { color: var(--text-secondary); overflow-wrap: anywhere; }
+
+/* What the person is told: the message as they see it, then how they get help. */
+.insp__quote { margin: 0; padding: var(--space-4) var(--space-5); border-left: var(--bw-thick) solid var(--border-strong); border-radius: 0 var(--radius-md) var(--radius-md) 0; background: var(--surface-sunken); font-size: var(--fs-sm); color: var(--text-primary); }
+
+/* A draft's changes, sentence by sentence. */
+.insp__diff { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); }
+.insp__diff li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: var(--space-3); }
+.insp__diffword { padding: 0 var(--space-2); border-radius: var(--radius-sm); font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+.insp__diff li.is-added .insp__diffword { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.insp__diff li.is-removed .insp__diffword { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.insp__diff li.is-removed .insp__difftext { color: var(--text-secondary); text-decoration: line-through; }
+
+/* Related: the sign-in's person and application, and what is pinned (with Compare where it is the same kind). */
+.insp__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.insp__grouplabel { font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+.insp__pinrow { display: flex; align-items: center; gap: var(--space-2); }
+.insp__pinrow > .insp__row { flex: 1 1 auto; min-width: 0; }
+.insp__cmpbtn { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--space-10); padding: 0 var(--space-4); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-raised); font: inherit; font-size: var(--fs-sm); color: var(--text-primary); cursor: pointer; }
+.insp__cmpbtn:hover { background: var(--surface-sunken); }
+.insp__cmpbtn:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+
+/* Compare: two of a kind side by side, the rows that differ raised. */
+.insp__compare { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: var(--fs-sm); }
+.insp__compare th,
+.insp__compare td { padding: var(--space-3); text-align: left; vertical-align: top; overflow-wrap: anywhere; border-bottom: var(--bw-thin) solid var(--border-subtle); font-weight: var(--fw-regular); }
+.insp__compare thead th { font-weight: var(--fw-semibold); color: var(--text-primary); border-bottom-color: var(--border-default); }
+.insp__compare tbody th { width: 26%; color: var(--text-tertiary); }
+.insp__compare tr.is-differs td { background: var(--fb-notice-bg); color: var(--text-primary); font-weight: var(--fw-medium); }
+
+/* The foot: the one way out, where the form panel keeps Run. */
+.insp__foot { justify-content: flex-end; }

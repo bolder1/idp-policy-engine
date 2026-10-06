@@ -1,0 +1,151 @@
+/* -----------------------------------------------------------------------------
+   THE CANVAS'S BAR (focus2-canvasbar.tsx): one line at the foot of the canvas,
+   the stage's own surface, hairline and shadow — the `--fc-*` palette from
+   focus.css, so it is right on both stages — and type, space and radius from
+   tokens.css. Its place (the room the questions panel leaves, the foot's inset)
+   is inline geometry off Focus2Layout, as the panel's is.
+
+   Two kinds of selection, both never orange (5 Oct 2026):
+     the pair      Vertical | Horizontal, one always on — the console's own view
+                   switch (coverage.css `.bviewswitch`): a sunken track, the
+                   pressed side raised, ink on the stage's surface, greyscale.
+     the toggles   Brief and Questions — the stage's blue on its soft blue, as the
+                   sign-in row's toggles were.
+   Voice on, when the voice is handed, is ink, not blue: it is not the engine at work.
+   -------------------------------------------------------------------------- */
+
+/* The bar's lane across the room: it lets the pointer through to the canvas everywhere the bar is not. */
+.f2cb-dock {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.f2cb {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  height: var(--space-10);
+  max-width: 100%;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  border: var(--bw-thin) solid var(--fc-line);
+  border-radius: var(--radius-xl);
+  background: var(--fc-surface);
+  box-shadow: var(--fc-shadow);
+  color: var(--fc-text-2);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.f2cb__btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--space-9);
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-lg);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.f2cb__btn:hover { background: var(--fc-sunken); color: var(--fc-text); }
+.f2cb__btn:focus-visible { outline: var(--bw-thick) solid var(--fc-work-line); outline-offset: calc(-1 * var(--bw-thin)); }
+.f2cb__btn.is-on,
+.f2cb__btn.is-on:hover { background: var(--fc-work-soft); color: var(--fc-work); }
+.f2cb.is-narrow .f2cb__btn { padding: 0 var(--space-3); }
+
+.f2cb__div {
+  flex: none;
+  width: var(--bw-thin);
+  height: var(--space-6);
+  margin: 0 var(--space-1);
+  background: var(--fc-line);
+}
+
+/* Expand all / Collapse all: both words in one cell, the one not said unseen, so the button is always the longer's width. */
+.f2cb__words { display: inline-grid; }
+.f2cb__words > * { grid-area: 1 / 1; }
+.f2cb__ghost { visibility: hidden; }
+/* Expand all with no card on the canvas yet: there is nothing for it to fold or open. */
+.f2cb__fold[aria-disabled='true'],
+.f2cb__fold[aria-disabled='true']:hover { background: none; color: var(--fc-text-3); opacity: var(--disabled-opacity); cursor: default; }
+
+/* Back: its own divider rides with it, so the bar closes up behind it as it folds away. */
+.f2cb__backwrap {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+/* The pair: a sunken track, the pressed side raised on it. Its sides sit one track-inset inside the bar's 40. */
+.f2cb__pair {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: var(--bw-thin) solid var(--fc-line);
+  border-radius: var(--radius-lg);
+  background: var(--fc-sunken);
+}
+.f2cb__side {
+  height: calc(var(--space-9) - var(--space-2));
+  border-radius: var(--radius-md);
+  color: var(--fc-text-3);
+}
+.f2cb__side:hover { background: var(--fc-inset); color: var(--fc-text); }
+.f2cb__side.is-on,
+.f2cb__side.is-on:hover {
+  background: var(--fc-surface);
+  color: var(--fc-text);
+  box-shadow: var(--fc-shadow);
+}
+
+/* The voice, when handed: what is being said, while it is said. */
+.f2cb__said {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  overflow: hidden;
+  color: var(--fc-text-3);
+}
+.f2cb__wave { margin-right: var(--space-3); }
+.f2cb__line {
+  overflow: hidden;
+  font-size: var(--fs-md);
+  color: var(--fc-text-2);
+  text-overflow: ellipsis;
+}
+.f2cb__stop { width: var(--space-9); justify-content: center; padding: 0; color: var(--fc-text-3); }
+.f2cb__voice { width: var(--space-9); justify-content: center; padding: 0; color: var(--fc-text-3); }
+.f2cb__voice.is-on,
+.f2cb__voice.is-on:hover { background: none; color: var(--fc-text); }
+.f2cb__voice.is-on:hover { background: var(--fc-sunken); }
+
+@media (prefers-reduced-motion: reduce) {
+  .f2cb__btn { transition: none; }
+}
+
+/* Break-in attempts: the bar's prominent press — a filled, dark button (the stage's inverse), and where some attempts got
+   through the warning's tone. Never orange (the run's one orange is Run). */
+.f2cb__break { background: var(--fc-text); color: var(--surface-raised); }
+.f2cb__break:hover { background: var(--fc-text); color: var(--surface-raised); opacity: 0.88; }
+.f2cb__break.is-holes { background: var(--fc-bad-fg); }
+.f2cb__break.is-holes:hover { background: var(--fc-bad-fg); }

@@ -1,3 +1,4 @@
+import { COPILOT_NAME } from './jarvis-mode/copilot-name'
 import type { RunLayoutId } from './run-layout'
 
 /* -----------------------------------------------------------------------------
@@ -25,6 +26,12 @@ export const REASONING: Partial<Record<RunLayoutId, LayoutReasoning>> = {
     idea: 'The original run: one vertical column of cards — the sign-in, the policies, the deciding policy, the outcome.',
     good: ['Familiar: the builder’s own card language', 'Every stop shows its full detail', 'Works in a narrow canvas'],
     bad: ['Uses under half the width', 'Who, which policy and the outcome never fit on one screen', 'A conflicting rule is never on the canvas, only a pulsing chip'],
+  },
+  classic2: {
+    idea: 'Four of the policy builder’s own cards, top to bottom — the sign-in, the policies, the rules, the outcome — on its canvas.',
+    good: ['Reads exactly like the builder: the same cards, rows, chips and rule cards', 'Only the basics: who, which policy, which rule, what they get', 'The rule cards are the ones the admin edits'],
+    bad: ['No conflicts, What they see or why on the canvas', 'A policy of many rules runs below the fold at 1280 wide', 'One column: half the width stays empty'],
+    early: true,
   },
   line: {
     idea: 'Stage columns left to right; the chosen card of each column sits on one horizontal line.',
@@ -67,9 +74,15 @@ export const REASONING: Partial<Record<RunLayoutId, LayoutReasoning>> = {
     bad: ['A dense HUD', 'Voice can surprise in an open office (mute in the dock)', 'More to read than the calmer layouts'],
   },
   jarvis2: {
-    idea: 'Jarvis v2, the Reactor: concentric rings are the run — the policies, the rules, the checks — around a verdict core, with wedge panels for who, the decision, the policies and the rule trace.',
+    idea: `${COPILOT_NAME} v2, the Reactor: concentric rings are the run — the policies, the rules, the checks — around a verdict core, with wedge panels for who, the decision, the policies and the rule trace.`,
     good: ['The most HUD-like: the path the engine took reads as lit rings', 'Deny floods the reactor red and names the failing check', 'Every readout is a fact of the run'],
-    bad: ['Busier than the first Jarvis — the owner kept that one', 'Names appear twice (on the rings and in the wedges)', 'Still being finished: stopped part-way through its build'],
+    bad: [`Busier than the first ${COPILOT_NAME} — the owner kept that one`, 'Names appear twice (on the rings and in the wedges)', 'Still being finished: stopped part-way through its build'],
+    early: true,
+  },
+  focus2: {
+    idea: 'Focus v2, the run as a story that goes deeper: the sign-in, the policies, then inside the policy that covers its rules, then the deciding rule’s Then, then the outcome.',
+    good: ['Each card leads into the next, so the order of the engine reads as one story', 'The policy is shown once, with its rules inside it'],
+    bad: ['Still being built'],
     early: true,
   },
   mission: {

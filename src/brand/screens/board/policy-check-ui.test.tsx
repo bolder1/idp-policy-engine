@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import policyCheckSrc from './PolicyCheck.tsx?raw'
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
@@ -6,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Policy } from '../../data'
 import { showcaseTenant } from '../../fixtures'
 import { BrandProvider } from '../../store'
-import { emptyDraft, initialTryPage, personPickerOptions, type TryPage } from '../sign-in-tests/sign-in-card'
+import { emptyDraft, identitiesOfKind, identityOptions, identityRows, initialTryPage, personPickerOptions, picksOf, type TryPage } from '../sign-in-tests/sign-in-card'
 import { TryJourney } from '../sign-in-tests/TryJourney'
 import { TryPanel, type TryPanelProps } from '../sign-in-tests/TryPanel'
 import { envOf } from '../tenant-resolver'
@@ -185,12 +186,22 @@ describe('the panel is the page’s form, scoped to the policy', () => {
     expect(checkSrc).toMatch(/\{panel === 'form' && \(\s+<TryPanel\s+key="form"/)
     expect(checkSrc).toContain('scope={scope}')
     expect(checkSrc).toContain('const scope = useMemo(() => boardScope(draft), [draft])')
-    /* Run shuts it, then the run begins on the whole canvas. */
-    expect(checkSrc).toMatch(/const runNow = \(\) => \{[\s\S]*?toCanvas\(\(\) => begin\(f, 'full', \{ prev \}\)\)/)
+    /* Run shuts it, then the run begins on the whole canvas: once per pick, the canvas telling the first (5 Oct 2026). */
+    expect(checkSrc).toMatch(
+      /const runNow = \(\) => \{[\s\S]*?const \{ form: first, ran: covered, prev \} = runOfPicks\(f, page\.identities, users, before\)\s+toCanvas\(\(\) => begin\(first, 'full', \{ prev, ran: covered \}\)\)/,
+    )
     /* Only Run runs (2 Oct): a change waits; "Run as" runs at once. */
     expect(checkSrc).toContain("if (!now || page.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return")
     expect(checkSrc).toContain('onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}')
     expect(checkSrc).toContain('onEdit={editSignIn}')
+    /* The same Identity field, the page's helpers (sign-in-card.ts): the picks, a chip's switch, Not run for new picks. */
+    expect(checkSrc).toContain('identities={page.identities}')
+    expect(checkSrc).toContain('onIdentities={pickIdentities}')
+    expect(checkSrc).toMatch(/const showPick = \(key: IdentityValue\) => \{\s+const to = switchPick\(page, ran, key, users\)\s+if \(to\) begin\(to\.form, 'full', \{ ran: to\.ran \}\)/)
+    expect(checkSrc).toContain('onPickIdentity={showPick}')
+    expect(checkSrc).toContain('const unrun = unrunOf(page, ran, rows)')
+    expect(checkSrc).toContain('const asGroup = asGroupOf(page, ran, users)')
+    expect(checkSrc).not.toContain('setAsGroup')
     expect(checkSrc).toContain('title={loaded?.name ?? ACCESS_CHECK}')
   })
 
@@ -207,6 +218,16 @@ describe('the panel is the page’s form, scoped to the policy', () => {
     expect(heads).toEqual([IN_POLICY, NOT_IN_POLICY, 'Groups'])
     /* The page's own: everybody under one heading. */
     expect([...new Set(personPickerOptions(t.directory.people, t.groups).map((o) => o.group))]).toEqual(['People', 'Groups'])
+    /* The Identity field: Users — In this policy, then Not in this policy, under it — then Groups. */
+    const field = identityOptions(t.directory.people, t.groups, hrms.audience)
+    expect([...new Set(field.map((o) => `${o.heading}${o.sub ? ` › ${o.sub}` : ''}`))]).toEqual([`Users › ${IN_POLICY}`, `Users › ${NOT_IN_POLICY}`, 'Groups'])
+    /* Shown one kind at a time under the switch (5 Oct 2026): Users keeps the policy's two sub-headings and holds no group; Groups has neither. */
+    const users = identityRows(identitiesOfKind(field, 'user'), [], false)
+    const groups = identityRows(identitiesOfKind(field, 'group'), [], false)
+    expect([...new Set(users.map((o) => o.sub))]).toEqual([IN_POLICY, NOT_IN_POLICY])
+    expect(users.every((o) => o.kind === 'user')).toBe(true)
+    expect(groups.length).toBeGreaterThan(0)
+    expect(groups.every((o) => o.kind === 'group' && o.sub === undefined)).toBe(true)
   })
 
   it('leaves out Use a saved sign-in — where the policy has none, and everywhere in this phase', () => {
@@ -219,8 +240,8 @@ describe('the panel is the page’s form, scoped to the policy', () => {
       boundaries: boundariesOf(kavya, rows, {}, t.policies, env, t.zones),
       tips: {},
       reduced: false,
-      asGroup: null,
-      onPerson: noop,
+      identities: picksOf(kavya),
+      onIdentities: noop,
       onPatch: noop,
       onRun: noop,
       saved: [],
@@ -289,7 +310,7 @@ describe('Past sign-ins, a button of its own on the bar', () => {
     expect(checkSrc).toMatch(/\{panel === 'past' && \(\s+<ViewPanel key="past" view="past"/)
     expect(checkSrc).toContain('<DockPast draft={draft} apps={mine} version={version} onLoad={(f) => tryWhole(f, null)} />')
     const whole = checkSrc.slice(checkSrc.indexOf('const tryWhole = '), checkSrc.indexOf('const trySaved = '))
-    expect(whole).toContain('setPage((pg) => ({ ...pg, draft: f, touched: [] }))')
+    expect(whole).toContain('setPage((pg) => ({ ...pg, draft: f, touched: [], identities: picksOf(f) }))')
     expect(whole).toContain('openForm(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))')
     expect(whole).not.toContain('begin(')
   })
@@ -374,5 +395,16 @@ describe('the sign-in it starts from', () => {
   it('starts the panel on the policy’s first application, none for the Global Default', () => {
     expect(firstCheckApp(hrms, t.apps)).toBe('hrms')
     expect(firstCheckApp(policy('global-default'), t.apps)).toBeNull()
+  })
+})
+
+describe('the builder’s Check access — the troubleshooting (DENIAL-REASONS), against the draft', () => {
+  it('runs a what-if on the draft, and a grant edits the draft with Undo — only for the policy that refused, never the stored one', () => {
+    expect(policyCheckSrc).toContain("onTryForm={(f) => begin(f, 'full', { draft: f, touched: [], identities: picksOf(f) })}")
+    expect(policyCheckSrc).toContain('onGrant={grantAccess}')
+    expect(policyCheckSrc).toContain('grantFor={saved.id}')
+    expect(policyCheckSrc).toContain('onApplyFix(grantTempAccess(draft, person, { until, reason, by: account.name }), `${person.name} can sign in until ${dateSaid(until)}`)')
+    /* Not a save: the draft goes through the same door as a break-in fix, which is an ordinary edit on the undo stack. */
+    expect(policyCheckSrc).not.toContain('savePolicy(grantTempAccess')
   })
 })

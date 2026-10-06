@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
 
 import { Tip } from '../../../kit'
+import { STAGE_FROM_TOP } from '../canvas-shelf'
 
 /* -----------------------------------------------------------------------------
    Bento's stage, light or dark — the cinematic layouts' one setting
@@ -56,6 +57,8 @@ export function useStageTheme(): [StageTheme, (t: StageTheme) => void] {
 export function StageThemeToggle() {
   const [theme, set] = useStageTheme()
   const dark = theme === 'dark'
+  /* The stage is the Mode button's at the top (canvas-shelf.ts `STAGE_FROM_TOP`, 4 Oct 2026). */
+  if (STAGE_FROM_TOP) return null
   return (
     <Tip text={dark ? 'Light stage' : 'Dark stage'} placement="top">
       <button type="button" className="bb__act" aria-label="Dark stage" aria-pressed={dark} onClick={() => set(dark ? 'light' : 'dark')}>

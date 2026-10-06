@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react'
+import { dateSaid, grantTempAccess } from '../sign-in-tests/temp-access'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { ChevronsLeftRight, ChevronsRightLeft, History, ShieldAlert, Users, X, type LucideIcon } from 'lucide-react'
 
@@ -11,15 +12,24 @@ import { ACCESS_CHECK } from '../sign-in-tests/names'
 import {
   GROUP_PREFIX,
   PANEL_ID,
+  asGroupOf,
   cardIssues,
   forRun,
   initialTryPage,
   issueToken,
   nowIn,
   personPick,
+  picksOf,
+  ranPicks,
+  runNowOf,
+  runOfPicks,
+  switchPick,
   tokenTips,
   tryingPage,
+  unrunOf,
   withDefaults,
+  withIdentities,
+  type IdentityValue,
   type TryPage,
 } from '../sign-in-tests/sign-in-card'
 import { TryJourney } from '../sign-in-tests/TryJourney'
@@ -88,6 +98,11 @@ import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
                   rule; another policy's builder, in Check access, as on the
                   page
 
+   Several picks in the Identity field run one sign-in each, the canvas
+   telling one at a time, as on the page (owner, 5 Oct 2026; the helpers are
+   sign-in-card.ts's, shared): the picks and what the last Run covered are
+   the panel's page state (`TryPage.identities`, `TryPage.ran`), kept with it.
+
    The builder (BoardBuilder.tsx) holds which panel is open and its width —
    its region's right-hand track follows them — and the board under the
    canvas, hidden, exactly as it was: closing Check access gives back the
@@ -99,11 +114,10 @@ import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
 /** Which panel Check access has open beside the canvas: the sign-in, the saved sign-ins (the empty canvas's Saved sign-ins), or a view. */
 export type CheckPanel = 'form' | 'saved' | 'why' | CheckView
 
-/** What Check access keeps while it is shut, for the life of the builder. */
+/** What Check access keeps while it is shut, for the life of the builder: the page holds the picks and what ran. */
 export interface CheckKept {
   page: TryPage
   runId: number
-  asGroup: string | null
   loaded: Loaded | null
   zoom: number
 }
@@ -152,7 +166,7 @@ export interface PolicyCheckProps {
 }
 
 export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth, kept, onBack, onApplyFix, focusBar }: PolicyCheckProps) {
-  const { go, policies, zones, fingerprints, savedSignIns, users, apps } = useBrand()
+  const { go, policies, zones, fingerprints, savedSignIns, users, apps, account } = useBrand()
   const lib = useMemo(() => ({ zones, fingerprints }), [zones, fingerprints])
   const session = useTestingSession()
   const env = useSimEnv()
@@ -167,14 +181,13 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     const time = nowIn()
     const base = initialTryPage(1, today, time)
     const stored = session.boardForms[saved.id]
-    if (stored) return { page: { ...tryingPage(base, onPolicyApps(stored, draft, apps)), played: 0 }, runId: 1, asGroup: null, loaded: null, zoom: 1 }
+    if (stored) return { page: { ...tryingPage(base, onPolicyApps(stored, draft, apps)), played: 0 }, runId: 1, loaded: null, zoom: 1 }
     const blank = { ...base.draft, appId: firstCheckApp(draft, apps) }
-    return { page: { ...base, draft: withDefaults(blank, rowsRead(policies, draft, blank.appId, lib), [], today, time) }, runId: 1, asGroup: null, loaded: null, zoom: 1 }
+    return { page: { ...base, draft: withDefaults(blank, rowsRead(policies, draft, blank.appId, lib), [], today, time) }, runId: 1, loaded: null, zoom: 1 }
   })
   const [page, setPage] = useState<TryPage>(start.page)
   const onPage = useCallback((next: (p: TryPage) => TryPage) => setPage(next), [])
   const [runId, setRunId] = useState(start.runId)
-  const [asGroup, setAsGroup] = useState<string | null>(start.asGroup)
   const [loaded, setLoaded] = useState<Loaded | null>(start.loaded)
   const [zoom, setZoom] = useState(start.zoom)
   const [submitted, setSubmitted] = useState(false)
@@ -184,7 +197,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   const [whySlot, setWhySlot] = useState<HTMLDivElement | null>(null)
   const [focusRun, setFocusRun] = useState(0)
   useEffect(() => {
-    kept.current = { page, runId, asGroup, loaded, zoom }
+    kept.current = { page, runId, loaded, zoom }
   })
   /* The Break-in test's own state, while another view takes the panel (hidden with it). */
   const breakInKept = useRef<BreakInKept | null>(null)
@@ -203,6 +216,8 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   }, [stored, ran, saved.id, loadBoard])
   const replay = useCallback(() => setRunId((n) => n + 1), [])
   const run = useMemo(() => ({ form: ran, runId, replay }), [ran, runId, replay])
+  /* A group the canvas's run stands for: its member runs, the node says the group. */
+  const asGroup = asGroupOf(page, ran, users)
   const pair = useMemo(() => ({ saved, draft }), [saved, draft])
 
   const form = page.draft
@@ -324,17 +339,18 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
 
   // --- Runs ---
 
-  /* Every run is the policy's sign-in, stored, and a run counted here. */
+  /* Every run is the policy's sign-in, stored, and a run counted here; one of
+     a single sign-in covers no picks of its own (`ran` gone). */
   const begin = (f: SignInForm, pace: TryPage['pace'], next: Partial<TryPage> = {}) => {
-    setPage((p) => ({ ...p, mode: 'journey', intro: 'none', pace, replay: false, prev: null, askSaveFor: null, ...next }))
+    setPage((p) => ({ ...p, mode: 'journey', intro: 'none', pace, replay: false, prev: null, askSaveFor: null, ran: undefined, ...next }))
     setSubmitted(false)
     setSaveOpen(false)
     loadBoard(saved.id, f)
     setRunId((n) => n + 1)
   }
-  /* Run: the panel's sign-in as it stands — after a run, with what the
-     change did said on the answer. A saved sign-in loaded and left as it
-     was runs as it was saved. */
+  /* Run: the panel's sign-in as it stands, once per pick, the canvas telling
+     the first — after a run, with what the change did said on the answer. A
+     saved sign-in loaded and left as it was runs as it was saved. */
   const runNow = () => {
     if (found.length > 0) {
       setSubmitted(true)
@@ -342,8 +358,9 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
       return
     }
     const f = loaded && same(form, loaded.form) ? loaded.form : forRun(form, rows)
-    const prev = page.mode === 'journey' && !same(f, ran) ? ran : null
-    toCanvas(() => begin(f, 'full', { prev }))
+    const before = page.mode === 'journey' ? { form: ran, list: ranPicks(page, ran) } : null
+    const { form: first, ran: covered, prev } = runOfPicks(f, page.identities, users, before)
+    toCanvas(() => begin(first, 'full', { prev, ran: covered }))
   }
   /* Ctrl+Enter (⌘ on a Mac) presses Run from anywhere in Check access, before
      the builder reads it as Save: taken on the way down, and stopped. */
@@ -365,36 +382,45 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   /* A field changed: the application brings the facts its rules read. It
      changes the panel's sign-in and nothing else — Run runs it (owner,
      2 Oct 2026: "unless I click the run button, don't run"); `now` is a
-     press that says it runs, the canvas's "Run as Engineering only". */
-  const patch = (p: Partial<SignInForm>, field: FormField, now = false) => {
+     press that says it runs, the canvas's "Run as Engineering only" — every
+     pick again, the canvas staying on the pick it tells. `picks` are the
+     Identity field's, when the change is to them. */
+  const patch = (p: Partial<SignInForm>, field: FormField, now = false, picks?: readonly IdentityValue[]) => {
     const touched = page.touched.includes(field) ? page.touched : [...page.touched, field]
     let next = { ...page.draft, ...p }
     const nextRows = field === 'app' ? rowsRead(policies, draft, next.appId, lib) : rows
     if (field === 'app') next = withDefaults(next, nextRows, touched, todayIn(), nowIn())
-    setPage((pg) => ({ ...pg, draft: next, touched }))
+    const identities = picks ?? ('personId' in p ? picksOf(next) : page.identities)
+    setPage((pg) => ({ ...pg, draft: next, touched, identities }))
     setLoaded(null)
     if (!now || page.mode !== 'journey' || cardIssues(next, nextRows, zones).length > 0) return
-    const f = forRun(next, nextRows)
-    if (same(f, ran)) return
-    begin(f, 'edit', { prev: ran })
+    const { form: f, ran: covered } = runNowOf(forRun(next, nextRows), identities, page, ran, users)
+    if (same(f, ran) && covered.list.join() === ranPicks(page, ran).join()) return
+    begin(f, 'edit', { prev: ran, ran: covered })
   }
-  const pickPerson = (value: string, now = false) => {
-    const pick = personPick(value, users)
-    setAsGroup(pick.asGroup)
-    patch({ personId: pick.personId }, 'person', now)
+  /* "Run as Finance only": the picks become that group alone, and its member runs at once. */
+  const pickPerson = (value: string, now = false) => patch({ personId: personPick(value, users).personId }, 'person', now, [value])
+  /* The Identity field's picks: the panel's, and nothing runs (only Run runs). */
+  const pickIdentities = (next: readonly IdentityValue[]) => {
+    setPage((pg) => withIdentities(pg, next, users))
+    setLoaded(null)
+  }
+  /* A pick's chip on the canvas's top bar: that pick's run of the same Run, never a new Run of the panel's picks. */
+  const showPick = (key: IdentityValue) => {
+    const to = switchPick(page, ran, key, users)
+    if (to) begin(to.form, 'full', { ran: to.ran })
   }
   /* A whole sign-in from elsewhere — a saved one, a past one — fills the
      panel, which opens on it, and waits for Run, which takes the focus. */
   const tryWhole = (f: SignInForm, from: Loaded | null) => {
-    setAsGroup(null)
     setLoaded(from)
-    setPage((pg) => ({ ...pg, draft: f, touched: [] }))
+    setPage((pg) => ({ ...pg, draft: f, touched: [], identities: picksOf(f) }))
     setSubmitted(false)
     setSavedOpen(false)
     openForm(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))
   }
-  /* The panel's sign-in has changes the run on the canvas has not checked, in the facts its rules read. */
-  const unrun = page.mode === 'journey' && !same(forRun(form, rows), forRun(ran, rows))
+  /* The panel's sign-in has changes the run on the canvas has not checked, in the facts its rules read or the picks. */
+  const unrun = unrunOf(page, ran, rows)
   /* Edit sign-in, on the run's line: the panel, on its Person row; pressed again, shut. */
   const editSignIn = () => (panel === 'form' ? closePanel(true) : openForm(() => focusRow('person')))
   const trySaved = (sv: SavedSignIn) => {
@@ -426,6 +452,11 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     [saved.id, loadBoard, go],
   )
 
+  /* Let in for a while, from a refusal's Why: the draft gets a first rule for that person that ends by itself — an ordinary edit
+     to the draft, on the undo stack and said in a toast with Undo, not saved (sign-in-tests/temp-access.ts). Only the policy
+     that refused is offered it (`grantFor`), so it is always this draft. */
+  const grantAccess = (_policyId: string, person: { id: string; name: string }, until: string, reason: string) =>
+    onApplyFix(grantTempAccess(draft, person, { until, reason, by: account.name }), `${person.name} can sign in until ${dateSaid(until)}`)
   const version = useMemo(() => boardVersion(saved, draft), [saved, draft])
   const mine = useMemo(() => policyApps(draft, apps), [draft, apps])
   const closeView = () => closePanel(true)
@@ -441,7 +472,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
           asGroup={asGroup}
           zoom={zoom}
           onZoom={setZoom}
-          onNode={() => openForm(() => focusRow('person'))}
+          onNode={() => openForm(() => focusRow('person', true))}
           onAdd={(f) => openForm(() => focusRow(tokenOfField(f), true))}
           onAskSave={() => openForm(() => setSaveOpen(true))}
           onSaved={SAVED_SIGN_INS && mySaved.some((s) => !s.generated) ? () => onPanel('saved') : undefined}
@@ -449,6 +480,10 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
           panel={panel === 'form' || panel === 'saved' ? panel : null}
           why={why}
           onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}
+          onTryForm={(f) => begin(f, 'full', { draft: f, touched: [], identities: picksOf(f) })}
+          onGrant={grantAccess}
+          grantFor={saved.id}
+          onPickIdentity={showPick}
           loaded={loaded}
           policy={pair}
           run={run}
@@ -470,8 +505,8 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
             boundaries={bounds}
             tips={tips}
             reduced={reduced}
-            asGroup={asGroup}
-            onPerson={pickPerson}
+            identities={page.identities}
+            onIdentities={pickIdentities}
             onPatch={patch}
             onRun={runNow}
             unrun={unrun}

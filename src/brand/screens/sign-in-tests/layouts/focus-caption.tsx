@@ -1,5 +1,8 @@
 import { motion } from 'motion/react'
+import { useMemo } from 'react'
 import { Square } from 'lucide-react'
+
+import { fixPossessive } from './focus-voice'
 
 import { PartsLine } from './assistant/AnswerText'
 import type { Answer, Target } from './assistant/intents'
@@ -16,7 +19,9 @@ import type { Answer, Target } from './assistant/intents'
 
 const NO_NUMS = new Map<Target, number>()
 
-export function FocusCaption({ answer, animate, onCite, lit, speaking = false, onStop }: { answer: Answer; animate: boolean; onCite: (t: Target | null) => void; lit: Target | null; speaking?: boolean; onStop?: () => void }) {
+export function FocusCaption({ answer: raw, animate, onCite, lit, speaking = false, onStop }: { answer: Answer; animate: boolean; onCite: (t: Target | null) => void; lit: Target | null; speaking?: boolean; onStop?: () => void }) {
+  /* A policy's name never takes 's: "None of the 3 rules in AWS for engineering teams match". */
+  const answer = useMemo(() => ({ ...raw, sentence: raw.sentence.map((p) => (p.text.includes("'s ") ? { ...p, text: fixPossessive(p.text) } : p)) }), [raw])
   const words = answer.sentence.reduce((n, p) => n + p.text.split(/\s+/).filter(Boolean).length, 0)
   return (
     <div className={`ad-ans rl-focus__caption is-${answer.tone}${answer.known ? '' : ' is-unknown'}`}>

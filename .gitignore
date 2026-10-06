@@ -70,3 +70,6 @@ docs/memory/
 docs/research/
 docs/artifacts/
 tools/rigs/walkthroughs/
+
+# Local workflow scripts (they can carry internal briefs; both remotes are public).
+.wf-*.js

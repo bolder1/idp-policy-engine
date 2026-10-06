@@ -1,8 +1,8 @@
 /* -----------------------------------------------------------------------------
-   The run as FOCUS (FocusLayout.tsx): a spatial carousel of large cards over
-   a ribbon of the whole run. LIGHT is the console's own look — white raised
+   The run as FOCUS (FocusLayout.tsx): a spatial carousel of large cards across
+   the canvas's whole width. LIGHT is the console's own look — white raised
    cards, hairlines, sunken fills, the canvas's dotted ground showing through;
-   DARK is the dimmed stage, behind the dock's toggle (stage-theme.tsx).
+   DARK is the dimmed stage, behind the dock's toggle (focus-theme.tsx).
    Every colour is a variable on the root, set per stage; the rules use only
    those.
 
@@ -26,9 +26,13 @@
   --fc-text-2: var(--text-secondary);
   --fc-text-3: var(--text-tertiary);
   --fc-text-4: var(--text-muted);
-  --fc-work: var(--accent);
-  --fc-work-soft: var(--accent-soft);
-  --fc-work-line: var(--accent-soft-border);
+  /* The engine at work: the console blue, pinned (as Brief's --bf-work) — never --accent, which is slate. */
+  --fc-work: #0d6efd;
+  --fc-work-soft: rgba(13, 110, 253, 0.1);
+  --fc-work-line: rgba(13, 110, 253, 0.42);
+  /* The fade by distance: a veil in the stage's own ground over an opaque card (never see-through), and a blur. */
+  --fc-veil-c: var(--bb-stage);
+  --fc-halo-k: 24%;
   --fc-ok: var(--fb-positive-dot);
   --fc-ok-fg: var(--fb-positive-fg);
   --fc-ok-bg: var(--fb-positive-bg);
@@ -43,6 +47,9 @@
   --fc-warn-line: var(--fb-notice-border);
   --fc-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px rgba(16, 24, 40, 0.05);
   --fc-shadow-focus: 0 2px 4px rgba(16, 24, 40, 0.05), 0 12px 32px rgba(16, 24, 40, 0.1);
+  /* Depth: the far edge of a turned card falls into shade; a turned card sits on a longer, softer shadow. */
+  --fc-depth-shade: rgba(16, 24, 40, 0.07);
+  --fc-shadow-turned: 0 2px 6px rgba(16, 24, 40, 0.06), 0 18px 36px -12px rgba(16, 24, 40, 0.18);
   --fc-skel: var(--surface-inset);
   --fc-pick-hover: rgba(16, 24, 40, 0.025);
   --fc-link: var(--text-link);
@@ -52,7 +59,9 @@
 }
 .rl-focus-root[data-stage='dark'] {
   --fc-backdrop: #121d26;
-  --fc-surface: rgba(28, 42, 56, 0.96);
+  --fc-surface: #1c2a38;
+  --fc-veil-c: var(--fc-backdrop);
+  --fc-halo-k: 30%;
   --fc-sunken: rgba(255, 255, 255, 0.045);
   --fc-inset: rgba(255, 255, 255, 0.08);
   --fc-line: rgba(255, 255, 255, 0.1);
@@ -62,9 +71,9 @@
   --fc-text-2: #c4d0db;
   --fc-text-3: #98a9b8;
   --fc-text-4: #7d8fa0;
-  --fc-work: #6ea8ff;
-  --fc-work-soft: rgba(110, 168, 255, 0.14);
-  --fc-work-line: rgba(110, 168, 255, 0.45);
+  --fc-work: #4d94ff;
+  --fc-work-soft: rgba(77, 148, 255, 0.2);
+  --fc-work-line: rgba(77, 148, 255, 0.55);
   --fc-ok: #4fd18b;
   --fc-ok-fg: #8be3b2;
   --fc-ok-bg: rgba(79, 209, 139, 0.12);
@@ -79,6 +88,8 @@
   --fc-warn-line: rgba(242, 193, 78, 0.42);
   --fc-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
   --fc-shadow-focus: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --fc-depth-shade: rgba(0, 0, 0, 0.32);
+  --fc-shadow-turned: 0 4px 12px rgba(0, 0, 0, 0.3), 0 22px 40px -14px rgba(0, 0, 0, 0.55);
   --fc-skel: rgba(255, 255, 255, 0.08);
   --fc-pick-hover: rgba(255, 255, 255, 0.03);
   --fc-link: #8fbcff;
@@ -97,30 +108,24 @@
   background-position: var(--bb-x, 0) var(--bb-y, 0);
 }
 
-/* The host's engine pill and the dock, on the dark stage. */
-.tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark']) .tj-engine__pill {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(28, 42, 56, 0.94);
-  color: #eef3f8;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-}
-.tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark']) :is(.tj-engine__text, .tj-engine__done, .tj-engine__pill button) { color: #dfe7ef; }
-.tj-canvas.is-focus:has(.rl-focus-root[data-stage='dark']) .tj-engine__pill button:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
-.rl-focus-root[data-stage='dark'] .bb__dockbar { border-color: var(--fc-line-2); background: rgba(28, 42, 56, 0.94); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
-.rl-focus-root[data-stage='dark'] .bb__act { color: var(--fc-text-2); }
-.rl-focus-root[data-stage='dark'] .bb__act:hover { background: rgba(255, 255, 255, 0.08); color: var(--fc-text); }
-.rl-focus-root[data-stage='dark'] .bb__act:disabled { color: var(--fc-text-4); }
-.rl-focus-root[data-stage='dark'] .bb__float__sep { background: var(--fc-line-2); }
-.rl-focus .bb__act.is-on,
-.rl-focus .bb__act[aria-pressed='true'] { color: var(--fc-work); background: var(--fc-work-soft); }
-
-/* --- The world: the band of cards, the ribbon under it --------------------------------- */
+/* --- The world: the band of cards ---------------------------------------------------------- */
 
 .rl-focus__world { position: relative; isolation: isolate; font-size: var(--fs-md); line-height: 1.35; color: var(--fc-text); }
-.rl-focus__band { position: relative; overflow: visible; touch-action: pan-y; cursor: grab; user-select: none; }
+.rl-focus__band {
+  position: relative;
+  overflow: visible;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  border-radius: 12px;
+  /* Cards leaving reach slide on under a soft edge, never a hard-clipped sliver; the answer's peek shows through. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+}
 .rl-focus__band.is-dragging { cursor: grabbing; }
 .rl-focus__slot { position: absolute; left: 0; top: 0; }
 .rl-focus__slot.is-hidden { pointer-events: none; }
+.rl-focus__turn { position: relative; }
 .rl-focus__content { position: relative; }
 .rl-focus__content[inert] { user-select: none; }
 
@@ -137,7 +142,8 @@
   cursor: pointer;
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
-.rl-focus__pick:hover { background: var(--fc-pick-hover); box-shadow: 0 0 0 1px var(--fc-line-3); }
+.rl-focus__pick:hover { background: transparent; }
+.rl-focus__band .rl-focus__pick { cursor: pointer; }
 .rl-focus__pick:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--fc-work); }
 
 /* --- A card ------------------------------------------------------------------------------ */
@@ -159,15 +165,68 @@
   transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
 }
 .rl-focus__slot.is-focus .rl-focus__card { box-shadow: var(--fc-shadow-focus); border-color: var(--fc-line-2); }
-/* The engine at work on it: the console blue, a crisp ring and a soft halo. */
-.rl-focus__slot.is-focus .rl-focus__card.is-working { border-color: var(--fc-work); box-shadow: 0 0 0 3px var(--fc-work-soft), var(--fc-shadow-focus); }
+.rl-focus__slot.is-focus .rl-focus__card::after { opacity: 0; }
+/* Depth (owner, 3 Oct 2026: "bend the cards a little more to add some depth … give it a good visual experience"):
+   a turned card sits on a longer shadow, and its far edge — the one turned away from the front — falls into shade,
+   as light across a window in space. The shade fades as a card turns to the front. */
+.rl-focus__slot.is-left .rl-focus__card,
+.rl-focus__slot.is-right .rl-focus__card { box-shadow: var(--fc-shadow-turned); }
+.rl-focus__card::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.rl-focus__slot.is-left .rl-focus__card::after { opacity: 1; background: linear-gradient(90deg, transparent 35%, var(--fc-depth-shade)); }
+.rl-focus__slot.is-right .rl-focus__card::after { opacity: 1; background: linear-gradient(270deg, transparent 35%, var(--fc-depth-shade)); }
+@media (prefers-reduced-motion: reduce) {
+  .rl-focus__card::after { transition: none; }
+}
 .rl-focus__card.is-positive { border-color: var(--fc-ok-line); }
 .rl-focus__card.is-negative,
 .rl-focus__card.is-fail { border-color: var(--fc-bad-line); }
 .rl-focus__card.is-notice { border-color: var(--fc-warn-line); }
-.rl-focus__slot.is-focus .rl-focus__card.is-positive { border-color: var(--fc-ok); box-shadow: 0 0 0 3px var(--fc-ok-bg), var(--fc-shadow-focus); }
-.rl-focus__slot.is-focus .rl-focus__card.is-negative { border-color: var(--fc-bad); box-shadow: 0 0 0 3px var(--fc-bad-bg), var(--fc-shadow-focus); }
-.rl-focus__slot.is-focus .rl-focus__card.is-notice { border-color: var(--fc-warn); box-shadow: 0 0 0 3px var(--fc-warn-bg), var(--fc-shadow-focus); }
+
+/* THE CARD IN FOCUS (owner, 4 Oct 2026: "the main card highlighted in the centre"): lifted on a long soft shadow in its
+   state's tone — blue while the engine reads it, green on a pass or an allow, red on a fail or a deny, amber on can't
+   tell, Depends or a conflict; neutral for the sign-in — and ringed 1 px in that tone's line. The tone crosses over. */
+.rl-focus__slot.is-focus .rl-focus__card { --fc-tone: transparent; transition: border-color 0.24s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.24s cubic-bezier(0.2, 0, 0, 1), background-color 0.24s ease; }
+.rl-focus__slot.is-focus .rl-focus__card.is-working { --fc-tone: var(--fc-work); border-color: var(--fc-work-line); }
+.rl-focus__slot.is-focus .rl-focus__card.is-positive { --fc-tone: var(--fc-ok); border-color: var(--fc-ok-line); }
+.rl-focus__slot.is-focus .rl-focus__card.is-negative,
+.rl-focus__slot.is-focus .rl-focus__card.is-fail { --fc-tone: var(--fc-bad); border-color: var(--fc-bad-line); }
+.rl-focus__slot.is-focus .rl-focus__card.is-notice { --fc-tone: var(--fc-warn); border-color: var(--fc-warn-line); }
+.rl-focus__slot.is-focus .rl-focus__card:is(.is-working, .is-positive, .is-negative, .is-fail, .is-notice) {
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 28px 64px -18px color-mix(in srgb, var(--fc-tone) var(--fc-halo-k), transparent);
+}
+
+/* THE OTHERS, faded by distance: a veil in the stage's ground over the opaque card, and a blur — on the turn, never the
+   motion slot (focus-geometry.ts `depthOf`). A receded card hovered or focused comes clear. */
+.rl-focus__turn { filter: blur(var(--fc-blur, 0px)); transition: filter 0.2s cubic-bezier(0.2, 0, 0, 1); }
+.rl-focus__turn::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: 3;
+  border-radius: 12px;
+  background: var(--fc-veil-c);
+  opacity: var(--fc-veil, 0);
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+.rl-focus__slot[data-depth='1'] { --fc-veil: 0.22; --fc-blur: 0.6px; }
+.rl-focus__slot[data-depth='2'] { --fc-veil: 0.5; --fc-blur: 1.6px; }
+.rl-focus__slot[data-depth='3'] { --fc-veil: 0.7; --fc-blur: 3px; }
+.rl-focus__slot.is-hover,
+.rl-focus__slot:has(> .rl-focus__turn > .rl-focus__pick:focus-visible),
+.rl-focus__world.is-overview .rl-focus__slot { --fc-veil: 0; --fc-blur: 0px; }
+@media (prefers-reduced-motion: reduce) {
+  .rl-focus__turn,
+  .rl-focus__turn::after { transition: none; }
+}
 .rl-focus__card.is-ghost { min-height: 260px; border-style: dashed; border-color: var(--fc-line-2); background: var(--fc-sunken); box-shadow: none; }
 .rl-focus__slot.is-focus .rl-focus__card.is-ghost.is-working { border-style: solid; }
 .rl-focus__ghostline { display: block; height: 10px; margin: 18px 0 0 52px; background: var(--fc-skel); }
@@ -204,6 +263,8 @@
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 .rl-focus__tile.is-face { background: transparent; }
+.rl-focus__tile.is-group { color: var(--fc-text-2); }
+.rl-focus__whogroup { flex: none; color: var(--fc-text-2); }
 .rl-focus__tile.is-working { background: var(--fc-work-soft); color: var(--fc-work); }
 .rl-focus__tile.is-positive { background: var(--fc-ok-bg); color: var(--fc-ok-fg); }
 .rl-focus__tile.is-negative,
@@ -260,7 +321,7 @@
 
 /* --- The sign-in -------------------------------------------------------------------------- */
 
-.rl-focus__to { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-sunken); font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--fc-text); }
+.rl-focus__to { display: flex; align-items: center; gap: 8px; margin: 12px 0 0 52px; padding: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--fc-text); }
 .rl-focus__toarrow { flex: none; color: var(--fc-text-3); }
 .rl-focus__facts { display: flex; flex-direction: column; gap: 0; margin: 10px 0 0; }
 .rl-focus__fact { display: grid; grid-template-columns: 64px 1fr; align-items: start; gap: 8px; padding: 8px 2px; border-top: 1px solid var(--fc-line); }
@@ -375,16 +436,16 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 .rl-focus__check.is-unread .rl-focus__crow { opacity: 0.6; }
 .rl-focus__check.is-unread .rl-focus__cval { font-weight: var(--fw-regular); color: var(--fc-text-3); }
 
-.rl-focus__then { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-sunken); font-size: var(--fs-md); }
+.rl-focus__then { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-sunken); font-size: var(--fs-md); }
+.rl-focus__thenrow { display: flex; align-items: baseline; gap: 10px; margin: 0; }
+.rl-focus__thendeny { margin: 8px 0 0 64px; }
 .rl-focus__then .rl-focus__cword { flex: none; width: 54px; }
 .rl-focus__thenword { font-weight: var(--fw-semibold); color: var(--fc-text); }
 .rl-focus__thenquiet { font-size: var(--fs-sm); color: var(--fc-text-3); }
 .rl-focus__then.is-quiet .rl-focus__thenword { font-weight: var(--fw-medium); color: var(--fc-text-3); }
-.rl-focus__then.is-positive { background: var(--fc-ok-bg); }
 .rl-focus__then.is-positive .rl-focus__thenword { color: var(--fc-ok-fg); }
-.rl-focus__then.is-negative { background: var(--fc-bad-bg); }
 .rl-focus__then.is-negative .rl-focus__thenword { color: var(--fc-bad-fg); }
-.rl-focus__then.is-notice { background: var(--fc-warn-bg); }
+.rl-focus__then.is-notice .rl-focus__thenword { color: var(--fc-warn-fg); }
 .rl-focus__clash { margin-top: 8px; }
 .rl-focus__clashbtn {
   display: flex;
@@ -409,21 +470,19 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 .rl-focus__who { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; font-size: var(--fs-sm); color: var(--fc-text-2); }
 .rl-focus__whoname { min-width: 0; overflow: hidden; font-weight: var(--fw-medium); white-space: nowrap; text-overflow: ellipsis; }
 .rl-focus__verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.rl-focus__vtile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: var(--fc-inset); color: var(--fc-text-2); }
+.rl-focus__vtile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: var(--fc-inset); color: var(--fc-text-2); }
 .rl-focus__vtile.is-positive { background: var(--fc-ok-bg); color: var(--fc-ok-fg); }
 .rl-focus__vtile.is-negative { background: var(--fc-bad-bg); color: var(--fc-bad-fg); }
 .rl-focus__vtile.is-notice { background: var(--fc-warn-bg); color: var(--fc-warn-fg); }
-.rl-focus__vword { font-size: 24px; font-weight: var(--fw-semibold); line-height: 32px; letter-spacing: -0.01em; color: var(--fc-text); }
+.rl-focus__vword { font-size: 32px; font-weight: var(--fw-semibold); line-height: 40px; letter-spacing: -0.015em; color: var(--fc-text); }
 .rl-focus__card.is-positive .rl-focus__vword { color: var(--fc-ok-fg); }
 .rl-focus__card.is-negative .rl-focus__vword { color: var(--fc-bad-fg); }
 .rl-focus__card.is-notice .rl-focus__vword { color: var(--fc-warn-fg); }
 .rl-focus__expect { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid var(--fc-warn-line); border-radius: 6px; background: var(--fc-warn-bg); font-size: var(--fs-xs); color: var(--fc-warn-fg); }
-.rl-focus__label { display: block; margin-bottom: 4px; font-size: var(--fs-sm); color: var(--fc-text-3); }
+.rl-focus__label { display: block; margin-bottom: 2px; font-size: var(--fs-xs); line-height: 16px; color: var(--fc-text-3); }
 .rl-focus__by { min-width: 0; }
 .rl-focus__bylink {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  display: inline;
   max-width: 100%;
   margin: 0;
   padding: 0;
@@ -436,14 +495,18 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
   text-align: left;
   cursor: pointer;
 }
-.rl-focus__bylink span { overflow-wrap: anywhere; }
-.rl-focus__bylink:hover span { text-decoration: underline; text-underline-offset: 2px; }
+.rl-focus__bylink { line-height: 20px; overflow-wrap: anywhere; }
+.rl-focus__bylink:hover { text-decoration: underline; text-underline-offset: 2px; }
+.rl-focus__nowrap { white-space: nowrap; }
+.rl-focus__nowrap svg { display: inline-block; margin-left: 3px; vertical-align: -2px; }
 .rl-focus__byrule { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--fc-text-2); }
 .rl-focus__factors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .rl-focus__factors li { display: inline-flex; align-items: center; gap: 4px; }
 .rl-focus__factor { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--fc-line-2); border-radius: 6px; background: var(--fc-surface); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fc-text); }
 .rl-focus__factorarrow { color: var(--fc-text-4); }
-.rl-focus__deny { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-bad-bg); font-size: var(--fs-md); color: var(--fc-bad-fg); }
+.rl-focus__deny { margin: 0; padding: 2px 0 2px 12px; border-left: 2px solid var(--fc-bad-line); font-size: var(--fs-md); line-height: 20px; color: var(--fc-bad-fg); }
+.rl-focus__reason { margin: 0; font-size: var(--fs-sm); color: var(--fc-text-2); }
+.rl-focus__reason span { color: var(--fc-text-3); margin-left: 6px; }
 .rl-focus__ifs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .rl-focus__ifs li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; background: var(--fc-sunken); font-size: var(--fs-sm); }
 .rl-focus__if { color: var(--fc-text-3); }
@@ -465,94 +528,10 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 .rl-focus__quietlink { display: inline-flex; align-items: center; gap: 2px; margin: 0; padding: 0; border: 0; background: transparent; font: inherit; font-size: var(--fs-sm); color: var(--fc-text-3); cursor: pointer; }
 .rl-focus__quietlink:hover { color: var(--fc-text); }
 
-/* --- The ribbon -------------------------------------------------------------------------- */
-
-.rl-focus__ribbon {
-  position: absolute;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  height: 52px;
-  z-index: 30;
-}
-.rl-focus__chips { display: flex; align-items: center; min-width: 0; max-width: 100%; margin: 0; padding: 4px 6px; overflow-x: auto; list-style: none; scrollbar-width: none; }
-.rl-focus__chips::-webkit-scrollbar { display: none; }
-.rl-focus__chipwrap { display: flex; flex: none; align-items: center; }
-.rl-focus__link { display: block; width: 18px; height: 2px; border-radius: 1px; background: var(--fc-line-2); }
-.rl-focus__link.is-reached { background: var(--fc-work-line); }
-.rl-focus__link.is-positive { background: var(--fc-ok-line); }
-.rl-focus__link.is-negative { background: var(--fc-bad-line); }
-.rl-focus__link.is-notice { background: var(--fc-warn-line); }
-.rl-focus__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--fc-line);
-  border-radius: 8px;
-  background: var(--fc-surface);
-  box-shadow: var(--fc-shadow);
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--fc-text-2);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-}
-.rl-focus__chip:hover:not(:disabled) { border-color: var(--fc-line-3); color: var(--fc-text); }
-.rl-focus__chip:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 2px; }
-.rl-focus__chip > svg { flex: none; }
-.rl-focus__chip.is-ahead { border-style: dashed; background: transparent; box-shadow: none; color: var(--fc-text-4); cursor: default; }
-.rl-focus__chip.is-working { border-color: var(--fc-work-line); color: var(--fc-work); }
-.rl-focus__chip.is-pass .rl-focus__chipmark,
-.rl-focus__chip.is-positive > svg { color: var(--fc-ok); }
-.rl-focus__chip.is-fail .rl-focus__chipmark,
-.rl-focus__chip.is-negative > svg { color: var(--fc-bad); }
-.rl-focus__chip.is-unknown .rl-focus__chipmark,
-.rl-focus__chip.is-notice > svg { color: var(--fc-warn); }
-.rl-focus__chip.is-positive { border-color: var(--fc-ok-line); background: var(--fc-ok-bg); color: var(--fc-ok-fg); }
-.rl-focus__chip.is-negative { border-color: var(--fc-bad-line); background: var(--fc-bad-bg); color: var(--fc-bad-fg); }
-.rl-focus__chip.is-notice { border-color: var(--fc-warn-line); background: var(--fc-warn-bg); color: var(--fc-warn-fg); }
-.rl-focus__chip.is-off { color: var(--fc-text-4); }
-/* The one in focus: raised, a firm ring in its own colour. */
-.rl-focus__chip.is-focus { border-color: var(--fc-text-2); color: var(--fc-text); box-shadow: 0 0 0 1px var(--fc-text-2), var(--fc-shadow-focus); }
-.rl-focus__chip.is-focus.is-working { border-color: var(--fc-work); color: var(--fc-work); box-shadow: 0 0 0 1px var(--fc-work), 0 0 0 4px var(--fc-work-soft); }
-.rl-focus__chip.is-focus.is-positive { border-color: var(--fc-ok); box-shadow: 0 0 0 1px var(--fc-ok), var(--fc-shadow-focus); color: var(--fc-ok-fg); }
-.rl-focus__chip.is-focus.is-negative { border-color: var(--fc-bad); box-shadow: 0 0 0 1px var(--fc-bad), var(--fc-shadow-focus); color: var(--fc-bad-fg); }
-.rl-focus__chip.is-focus.is-notice { border-color: var(--fc-warn); box-shadow: 0 0 0 1px var(--fc-warn), var(--fc-shadow-focus); color: var(--fc-warn-fg); }
-.rl-focus__walk,
-.rl-focus__live {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--fc-line);
-  border-radius: 8px;
-  background: transparent;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--fc-text-2);
-  cursor: pointer;
-}
-.rl-focus__walk:hover,
-.rl-focus__live:hover { border-color: var(--fc-line-3); color: var(--fc-text); background: var(--fc-surface); }
-.rl-focus__walk.is-on { color: var(--fc-text); background: var(--fc-surface); border-color: var(--fc-line-3); }
-.rl-focus__live { color: var(--fc-work); border-color: var(--fc-work-line); }
-.rl-focus__walk:focus-visible,
-.rl-focus__live:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 2px; }
-
 .rl-focus__world.is-overview .rl-focus__pick:hover { box-shadow: 0 0 0 2px var(--fc-line-3); }
 
 @media (prefers-reduced-motion: reduce) {
   .rl-focus__card,
-  .rl-focus__chip,
   .rl-focus__pick { transition: none; }
 }
 .rl-focus__outgrid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 20px; align-items: start; }
@@ -575,12 +554,7 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 /* A policy that also covers the person: its name whole, the flag under it. */
 .rl-focus__prow.is-also .rl-focus__pbtn { flex-wrap: wrap; row-gap: 2px; }
 .rl-focus__prow.is-also .rl-focus__pstate { flex-basis: 100%; max-width: none; padding-left: 32px; }
-/* The ribbon follows the cards' bottom when a note opens or the answer lands. */
-.rl-focus__ribbon { transition: top 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease; }
-/* Overview: small cards, so their titles are set larger to stay legible. */
-.rl-focus__world.is-overview .rl-focus__slot:not(:last-child) .rl-focus__title { font-size: 24px; line-height: 30px; }
-.rl-focus__world.is-overview .rl-focus__slot:not(:last-child) .rl-focus__kicker { font-size: 17px; line-height: 22px; }
-@media (prefers-reduced-motion: reduce) { .rl-focus__ribbon { transition: none; } }
+
 
 /* --- The assistant pointing (LitCtx): what an answer is about draws lit -------------------
    In its own meaning colour — a ring and a soft wash on the row, landing once (opacity only:
@@ -623,11 +597,9 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 
 /* --- The subtitle under the card in focus -------------------------------------------------- */
 
-.rl-focus__subtitle { position: absolute; z-index: 25; display: flex; justify-content: center; pointer-events: none; transition: left 0.45s cubic-bezier(0.2, 0, 0, 1), width 0.45s cubic-bezier(0.2, 0, 0, 1); }
+.rl-focus__subtitle { position: relative; margin-top: 12px; text-align: center; pointer-events: none; }
 .rl-focus__subline {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
+  display: block;
   max-width: 100%;
   margin: 0;
   padding: 0 4px;
@@ -641,9 +613,8 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 .rl-focus__subline.is-positive { color: var(--fc-ok-fg); }
 .rl-focus__subline.is-negative { color: var(--fc-bad-fg); }
 .rl-focus__subline.is-notice { color: var(--fc-warn-fg); }
-.rl-focus__subwords { min-width: 0; }
 .rl-focus__subw { display: inline-block; }
-.rl-focus__wave { display: inline-flex; flex: none; align-items: center; gap: 2px; height: 14px; }
+.rl-focus__wave { display: inline-flex; flex: none; align-items: center; gap: 2px; height: 14px; margin-right: 8px; vertical-align: -2px; }
 .rl-focus__wave i { display: block; width: 2px; height: 100%; border-radius: 1px; background: currentColor; opacity: 0.7; transform-origin: 50% 50%; animation: rl-focus-wave 0.9s ease-in-out infinite; }
 .rl-focus__wave i:nth-child(2) { animation-delay: -0.3s; }
 .rl-focus__wave i:nth-child(3) { animation-delay: -0.6s; }
@@ -657,8 +628,10 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  vertical-align: -4px;
   padding: 0;
   border: 1px solid var(--fc-line-2);
   border-radius: 6px;
@@ -677,7 +650,6 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 .rl-focus__capstop { margin-left: 8px; vertical-align: -4px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .rl-focus__subtitle { transition: none; }
   .rl-focus__wave i { animation: none; transform: scaleY(0.6); }
   .rl-focus__check.is-lit .rl-focus__crow::after,
   .rl-focus__prow.is-lit .rl-focus__pbtn::after,
@@ -686,11 +658,213 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 
 /* The assistant dock floats over the world, its thread over the lower cards while it is open. */
 .rl-focus-root .ad.rl-focus__dock { z-index: 40; }
-/* Asking: the cards rise above the open thread (focus-geometry.ts liftPlaces) and the ribbon, under the thread, steps back — ‹ › in the dock still move the focus. */
-.rl-focus__world.is-asking .rl-focus__ribbon { opacity: 0; pointer-events: none; visibility: hidden; transition: top 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease, visibility 0s linear 0.2s; }
-@media (prefers-reduced-motion: reduce) {
-  .rl-focus__world.is-asking .rl-focus__ribbon { transition: none; }
+/* The row is one Tab stop (← → Home End move it, Space walks it): its ring shows only from the keyboard. */
+.rl-focus-root .rl-focus__band:focus { outline: none; }
+/* Drawn on the world, outside the band's soft edge mask, so all four sides show. */
+.rl-focus__world:has(> .rl-focus__band:focus-visible)::after { content: ''; position: absolute; inset: 0; z-index: 35; border-radius: 12px; box-shadow: inset 0 0 0 2px var(--fc-work); pointer-events: none; }
+
+/* --- Walk through (FocusLayout.tsx), in the dock's row 2: a text button among its icon buttons ---------
+   Blue only while it walks (the view at work); waiting (the run plays) it stays focusable, faded. */
+.ad .ad-btn.rl-focus__walk {
+  display: inline-flex;
+  width: auto;
+  gap: 6px;
+  padding: 0 9px 0 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ad-text-2);
+}
+.ad .ad-btn.rl-focus__walk:hover { color: var(--ad-text); }
+.ad .ad-btn.rl-focus__walk.is-on { color: var(--ad-on); background: var(--ad-on-soft); }
+.ad .ad-btn.rl-focus__walk[aria-disabled='true'] { opacity: 0.45; cursor: default; background: none; color: var(--ad-text-3); }
+
+/* The ask field keeps the dock's ground: the console's own input hover / focus-visible fill (.brand-root :where(input…))
+   outranks .ad__input and would paint it white on the dark stage; the dock's halo is the field's focus ring. */
+.rl-focus-root .ad .ad__input:hover,
+.rl-focus-root .ad .ad__input:focus-visible { background: transparent; box-shadow: none; }
+
+/* --- Polish (3 Oct 2026): faces, peeks, the landing beat ------------------------------------ */
+
+.rl-focus__faces { position: relative; }
+.rl-focus__face { position: relative; }
+
+/* A receded card's FAR FACE (focus-far.tsx): kicker, title, one result line — set large, so it reads at its depth
+   (×0.8: a 16 px title; ×0.68: 13.6 px). */
+.rl-focus__card.is-far { min-height: 150px; padding: 18px; justify-content: space-between; gap: 14px; }
+.rl-focus__card.is-far .rl-focus__head { gap: 12px; }
+.rl-focus__card.is-far .rl-focus__kicker { font-size: 16px; line-height: 20px; }
+.rl-focus__card.is-far .rl-focus__title { font-size: 20px; line-height: 26px; display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.rl-focus__card.is-far.is-compact .rl-focus__title { display: -webkit-box; -webkit-line-clamp: 2; white-space: normal; }
+.rl-focus__card.is-far .rl-focus__title.is-verdict { font-size: 24px; line-height: 30px; }
+.rl-focus__card.is-far.is-positive .rl-focus__title.is-verdict { color: var(--fc-ok-fg); }
+.rl-focus__card.is-far.is-negative .rl-focus__title.is-verdict { color: var(--fc-bad-fg); }
+.rl-focus__card.is-far.is-notice .rl-focus__title.is-verdict { color: var(--fc-warn-fg); }
+.rl-focus__tile.is-far { width: 36px; height: 36px; border-radius: 9px; }
+.rl-focus__tile.is-far.is-bare { background: transparent; }
+.rl-focus__farn { font-size: 17px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
+.rl-focus__vtile.is-far { width: 32px; height: 32px; border-radius: 9px; }
+.rl-focus__farline { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; font-size: 17px; line-height: 22px; color: var(--fc-text-2); border-radius: 6px; }
+.rl-focus__farmark { display: inline-flex; flex: none; align-items: center; color: var(--fc-text-3); }
+.rl-focus__farmark:empty { display: none; }
+.rl-focus__fartext { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-focus__fartext > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rl-focus__card.is-far.is-compact .rl-focus__fartext { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
+.rl-focus__card.is-far.is-compact .rl-focus__fartext > img,
+.rl-focus__card.is-far.is-compact .rl-focus__fartext > span { display: inline; vertical-align: middle; }
+.rl-focus__farline.is-ok .rl-focus__farmark { color: var(--fc-ok); }
+.rl-focus__farline.is-bad .rl-focus__farmark { color: var(--fc-bad); }
+.rl-focus__farline.is-warn .rl-focus__farmark { color: var(--fc-warn); }
+.rl-focus__farline.is-warn { color: var(--fc-warn-fg); }
+.rl-focus__farline.is-work { color: var(--fc-work); }
+.rl-focus__farline.is-quiet { color: var(--fc-text-3); }
+.rl-focus__farline.is-plain { color: var(--fc-text); font-weight: var(--fw-medium); }
+.rl-focus__farquiet { color: var(--fc-text-2); }
+.rl-focus__farverb { font-weight: var(--fw-semibold); }
+.rl-focus__farline.is-ok .rl-focus__farverb { color: var(--fc-ok-fg); }
+.rl-focus__farline.is-bad .rl-focus__farverb { color: var(--fc-bad-fg); }
+.rl-focus__card.is-far.is-off { opacity: 0.85; }
+/* Overview: each card's number, 12 px as rendered, at its top-left; the card you came from ringed. */
+.rl-focus__farnum {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 1;
+  font-size: calc(12px / var(--ov-k, 1));
+  line-height: 1;
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--fc-text-3);
+}
+.rl-focus__world.is-overview .rl-focus__card.is-far { padding-top: 30px; }
+.rl-focus__world.is-overview .rl-focus__slot.is-from .rl-focus__card { box-shadow: 0 0 0 calc(2px / var(--ov-k, 1)) var(--fc-text-2), var(--fc-shadow-focus); }
+
+/* The deciding rule's result says it once, as the verdict is reached: a ring in its tone, in and out. */
+.rl-focus__farline.is-pulse,
+.rl-focus__then.is-pulse { position: relative; }
+.rl-focus__farline.is-pulse::after,
+.rl-focus__then.is-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 8px;
+  border: 2px solid var(--fc-text-2);
+  pointer-events: none;
+  opacity: 0;
+  animation: rl-focus-pulse 0.3s ease-in-out 1;
+}
+.rl-focus__farline.is-pulse.is-bad::after,
+.rl-focus__then.is-pulse.is-negative::after { border-color: var(--fc-bad); }
+.rl-focus__farline.is-pulse.is-ok::after,
+.rl-focus__then.is-pulse.is-positive::after { border-color: var(--fc-ok); }
+.rl-focus__farline.is-pulse.is-warn::after,
+.rl-focus__then.is-pulse.is-notice::after { border-color: var(--fc-warn); }
+@keyframes rl-focus-pulse {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
-/* The row takes the keyboard on a press (← →); a mouse press draws no ring. */
-.rl-focus__band:focus:not(:focus-visible) { outline: none; }
+/* A rule that matches to deny: its ✓ in a red ring, never green; its passing checks too. */
+.rl-focus__mark.is-big.is-pass.is-deny { color: var(--fc-bad); background: transparent; box-shadow: inset 0 0 0 2px var(--fc-bad-line); border-radius: 50%; }
+.rl-focus__card.is-rule.is-negative .rl-focus__check .rl-focus__mark.is-pass { color: var(--fc-bad); }
+/* Open rule: quiet, after the mark. */
+.rl-focus__openrule {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 0 4px;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  color: var(--fc-text-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rl-focus__openrule:hover { color: var(--fc-link); text-decoration: underline; text-underline-offset: 2px; }
+.rl-focus__openrule:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 1px; border-radius: 4px; }
+/* A check that opens its why: a faint chevron at its end, full on hover or focus. */
+.rl-focus__crow.has-chev { grid-template-columns: 64px 1fr auto 14px; }
+.rl-focus__chev { margin-top: 3px; color: var(--fc-text-3); opacity: 0.4; transition: opacity 0.15s ease; }
+.rl-focus__crow:hover .rl-focus__chev,
+.rl-focus__crow:focus-visible .rl-focus__chev,
+.rl-focus__crow.is-pressed .rl-focus__chev { opacity: 1; }
+
+/* The outcome: the wide card keeps one box from Deciding to the verdict; What they see keeps its place. */
+.rl-focus__card.is-outcome.is-wide { min-height: 360px; }
+.rl-focus__card.is-outcome.is-ghost.is-wide { background: var(--fc-surface); border-style: solid; }
+.rl-focus__tile.is-verdict { width: 44px; height: 44px; border-radius: 12px; }
+.rl-focus__see { min-height: 300px; }
+.rl-focus__seeghost { position: absolute; top: 0; right: 0; left: 20px; }
+.rl-focus__seeskel { display: flex; flex-direction: column; gap: 10px; }
+.rl-focus__seeskel .tj-skel.is-short { width: 40%; height: 12px; }
+.rl-focus__seeskel .tj-skel.is-line { width: 70%; height: 10px; }
+.rl-focus__seeskel-frame { display: block; height: 220px; border: 1px solid var(--fc-line); border-radius: 10px; background: var(--fc-sunken); }
+.rl-focus__by { display: flex; flex-direction: column; align-items: flex-start; }
+.rl-focus__byrule { margin-top: 2px; font-size: var(--fs-sm); line-height: 18px; color: var(--fc-text-2); }
+.rl-focus__closest { margin: 0; }
+.rl-focus__closebtn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--fc-text-2);
+  cursor: pointer;
+}
+.rl-focus__closebtn:hover { border-color: var(--fc-line-3); background: var(--fc-sunken); }
+.rl-focus__closebtn:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 1px; }
+.rl-focus__closemark { flex: none; margin-top: 3px; color: var(--fc-bad); }
+.rl-focus__closetext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rl-focus__closesays { font-size: var(--fs-md); line-height: 20px; font-weight: var(--fw-medium); color: var(--fc-text-2); }
+.rl-focus__closeline { font-size: var(--fs-xs); line-height: 16px; color: var(--fc-text-3); overflow-wrap: anywhere; }
+
+/* Edge hints: more moments that way, a step away — a quiet pill at the edge, centred on the receded row. */
+.rl-focus__edge {
+  position: absolute;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  margin: 0;
+  padding: 0 9px 0 6px;
+  border: 1px solid var(--fc-line);
+  border-radius: 12px;
+  background: var(--fc-surface);
+  box-shadow: var(--fc-shadow);
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: var(--fw-medium);
+  color: var(--fc-text-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.rl-focus__edge.is-left { left: 8px; }
+.rl-focus__edge.is-right { right: 8px; padding: 0 6px 0 9px; }
+.rl-focus__edge.is-right.is-by-peek { right: 72px; }
+.rl-focus__edge:hover { color: var(--fc-text); border-color: var(--fc-line-3); }
+.rl-focus__world.is-overview .rl-focus__edge { display: none; }
+
+/* Where you are, between the arrows: 4 / 7. */
+.rl-focus__pos { display: inline-flex; align-items: center; padding: 0 2px; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--fc-text-2); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-focus__farline.is-pulse::after,
+  .rl-focus__then.is-pulse::after { animation: none; }
+  .rl-focus__chev { transition: none; }
+}

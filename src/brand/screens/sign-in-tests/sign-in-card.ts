@@ -53,6 +53,16 @@ export interface TryPage {
   prev: SignInForm | null
   /** New sign-in: open Save sign-in once THIS run lands — the session's run id it will have — and no other. */
   askSaveFor: number | null
+  /** The Identity field's picks, in the order chosen (5 Oct 2026); `draft.personId` is the first one's person. */
+  identities: readonly IdentityValue[]
+  /** What the last Run covered, in pick order, and which pick the canvas tells. Absent: a run of one sign-in. */
+  ran?: TryRan
+}
+
+/** The picks one Run covered, and the one on the canvas (owner, 5 Oct 2026: "one run each, switch"). */
+export interface TryRan {
+  list: readonly IdentityValue[]
+  active: number
 }
 
 /** The time now where the tenant is, as a time input writes it: "09:30". */
@@ -95,6 +105,7 @@ export function initialTryPage(runId: number, today: string, time: string, form?
     touched: [],
     prev: null,
     askSaveFor: null,
+    identities: back && form ? picksOf(form) : [],
   }
 }
 
@@ -103,7 +114,7 @@ export function initialTryPage(runId: number, today: string, time: string, form?
    page pairs this with the testing session's `load`, which bumps the run the
    canvas then plays. */
 export function tryingPage(p: TryPage, form: SignInForm): TryPage {
-  return { ...p, mode: 'journey', intro: 'none', pace: 'full', replay: false, draft: form, touched: [], prev: null, askSaveFor: null }
+  return { ...p, mode: 'journey', intro: 'none', pace: 'full', replay: false, draft: form, touched: [], prev: null, askSaveFor: null, identities: picksOf(form), ran: undefined }
 }
 
 /* New sign-in (the Saved table's primary, locked off with the table): the panel
@@ -111,7 +122,7 @@ export function tryingPage(p: TryPage, form: SignInForm): TryPage {
    lands — naming it is what was asked for. The ask is for the NEXT run only
    (the session's `load` bumps `runId` by one). */
 export function newSignInPage(p: TryPage, runId: number, today: string, time: string): TryPage {
-  return { ...p, mode: 'form', played: runId, replay: false, draft: emptyDraft(today, time), touched: [], prev: null, askSaveFor: runId + 1 }
+  return { ...p, mode: 'form', played: runId, replay: false, draft: emptyDraft(today, time), touched: [], prev: null, askSaveFor: runId + 1, identities: [], ran: undefined }
 }
 
 /* A People row's Try: the People tab's own sentence — the one every cell on
@@ -228,11 +239,234 @@ export function personPickerOptions(users: readonly User[], groups: readonly Gro
   return [...people, ...withMembers.map((g) => ({ value: `${GROUP_PREFIX}${g.id}`, label: `Anyone in ${g.name}`, group: GROUPS_HEADING }))]
 }
 
-/** What a pick in the Person picker states: that person, or the member a group stands for, and the group. */
+// --- The Identity field: users and groups, several at once (owner, 5 Oct 2026) --------
+/* "I think we can combine both and it can be multiple select, so the user can
+   select more than one thing" — and Run, asked what it does with several:
+   one run each, the canvas telling one at a time, a chip per pick on its top
+   bar to switch. The sign-in stays ONE form (SignInForm is saved, compared
+   and resolved everywhere as one person); the picks are the page's, beside
+   it, and each Run makes one sign-in per pick from the same facts. */
+
+/** A pick in the Identity field, in the field's own values: a person's id, or `group:<id>`. */
+export type IdentityValue = string
+
+/** At most this many picks: the canvas's top bar holds a chip for each. */
+export const MAX_IDENTITIES = 5
+
+export const USERS_HEADING = 'Users'
+
+/** What a pick is: a person, or a group. */
+export type IdentityKind = 'user' | 'group'
+
+/** A pick, read: a person or a group, and its id. */
+export interface IdentityPick {
+  value: IdentityValue
+  kind: IdentityKind
+  id: string
+}
+
+export const identityOf = (value: IdentityValue): IdentityPick =>
+  value.startsWith(GROUP_PREFIX) ? { value, kind: 'group', id: value.slice(GROUP_PREFIX.length) } : { value, kind: 'user', id: value }
+
+/* The Identity field's options (IdentityField.tsx): Users, then Groups — the
+   list shows one kind at a time, under its switch (`identitiesOfKind`). A
+   person with every group they are in on the second line — or, with none,
+   their email — and inside a policy under its two headings, In this policy
+   first (`sub`); a group with its member count, only those with somebody in
+   them to test as. `kind` draws each row's own mark: a person's round face,
+   a group's square. `hay` is what a search reads. */
+export interface IdentityOption {
+  value: IdentityValue
+  kind: IdentityKind
+  name: string
+  meta: string
+  /** Users or Groups. */
+  heading: string
+  /** Inside a policy, a person's place under Users: In this policy, or Not in this policy. */
+  sub?: string
+  hay: string
+}
+
+/** "1 member", "1,204 members". */
+export const membersLine = (n: number): string => `${n.toLocaleString()} ${n === 1 ? 'member' : 'members'}`
+
+export function identityOptions(users: readonly User[], groups: readonly Group[], audience: Audience | null = null): IdentityOption[] {
+  const people = personPickerOptions(users, groups, audience)
+    .filter((o) => !o.value.startsWith(GROUP_PREFIX))
+    .map((o): IdentityOption => {
+      const email = users.find((u) => u.id === o.value)?.email ?? ''
+      return {
+        value: o.value,
+        kind: 'user',
+        name: o.label,
+        meta: o.meta || email,
+        heading: USERS_HEADING,
+        ...(audience && o.group ? { sub: o.group } : null),
+        /* Name and email only, not the groups on the second line (5 Oct 2026): under Users, "Finance" listed every
+           Finance member and never offered "Search groups" — a group is found under Groups. */
+        hay: `${o.label} ${email}`.toLowerCase(),
+      }
+    })
+  const teams = groups
+    .filter((g) => memberOf(users, g.id))
+    .map((g): IdentityOption => ({ value: `${GROUP_PREFIX}${g.id}`, kind: 'group', name: g.name, meta: membersLine(g.memberCount), heading: GROUPS_HEADING, hay: g.name.toLowerCase() }))
+  return [...people, ...teams]
+}
+
+/* Users or Groups first, then the list of that kind alone (owner, 5 Oct
+   2026: "I want the user to first select a user or group, and based on that
+   selection display the list in a single dropdown"): the switch over the
+   list says which, so the list has no Users or Groups heading of its own.
+   The picks are both kinds' — a switch keeps them. */
+export const identitiesOfKind = (options: readonly IdentityOption[], kind: IdentityKind): IdentityOption[] => options.filter((o) => o.kind === kind)
+
+/** The kind the list opens on: the last pick's; nothing picked, Users. */
+export const openingKind = (picks: readonly IdentityValue[]): IdentityKind => (picks.length > 0 ? identityOf(picks[picks.length - 1]).kind : 'user')
+
+/** The switch's other side. */
+export const otherKind = (kind: IdentityKind): IdentityKind => (kind === 'user' ? 'group' : 'user')
+
+/** The Identity field's Clear all: nobody chosen. */
+export const NO_ONE = ''
+
+/** The list's Clear all, on top while anything is picked: no pick of its own. */
+export const CLEAR_ALL: IdentityOption = { value: NO_ONE, kind: 'user', name: 'Clear all', meta: '', heading: '', hay: '' }
+
+/* A search's matches, best first as Jira lists them: a name that starts with
+   what is typed, then a name with a word that does, then a match only in the
+   second line or the email — each heading's rows kept under it, Users before
+   Groups, In this policy before Not in this policy (identity-combo.tsx reads
+   one kind at a time). */
+export function rankedIdentities(options: readonly IdentityOption[], needle: string): IdentityOption[] {
+  const place = (o: IdentityOption) => `${o.heading}\n${o.sub ?? ''}`
+  const heads = [...new Set(options.map(place))]
+  return options
+    .filter((o) => o.hay.includes(needle))
+    .map((o) => ({ o, h: heads.indexOf(place(o)), r: rankOf(o, needle) }))
+    .sort((a, b) => a.h - b.h || a.r - b.r)
+    .map((x) => x.o)
+}
+const rankOf = (o: IdentityOption, needle: string) => {
+  const name = o.name.toLowerCase()
+  return name.startsWith(needle) ? 0 : name.split(/\s+/).some((w) => w.startsWith(needle)) ? 1 : 2
+}
+
+/* Where the cursor lands as a search is typed — what Enter takes: the best
+   name match, wherever its heading puts it (inside a policy, a name under
+   Not in this policy that starts with what is typed, before a person under
+   In this policy who matches only by a group or an email). */
+export function bestIdentity(rows: readonly IdentityOption[], needle: string): IdentityOption | undefined {
+  let best: IdentityOption | undefined
+  let at = 3
+  for (const o of rows) {
+    const r = rankOf(o, needle)
+    if (r < at) [best, at] = [o, r]
+  }
+  return best
+}
+
+/* The list with nothing typed: Clear all while anything is picked — of
+   either kind — then each heading with the picks the list opened with at its
+   top, in the order chosen and ticked, and everyone else under them — inside
+   a policy, under In this policy and Not in this policy. */
+export function identityRows(options: readonly IdentityOption[], pinned: readonly IdentityValue[], anyPicked: boolean): IdentityOption[] {
+  const heads = [...new Set(options.map((o) => o.heading))]
+  const out: IdentityOption[] = anyPicked ? [CLEAR_ALL] : []
+  for (const h of heads) {
+    const mine = options.filter((o) => o.heading === h)
+    for (const v of pinned) {
+      const o = mine.find((x) => x.value === v)
+      if (o) out.push({ ...o, sub: undefined })
+    }
+    out.push(...mine.filter((o) => !pinned.includes(o.value)))
+  }
+  return out
+}
+
+/** What a pick in the Person picker states: that person, or the member a group stands for, and the group; NO_ONE, nobody. */
 export function personPick(value: string, users: readonly User[]): { personId: string | null; asGroup: string | null } {
+  if (value === NO_ONE) return { personId: null, asGroup: null }
   if (!value.startsWith(GROUP_PREFIX)) return { personId: value, asGroup: null }
   const groupId = value.slice(GROUP_PREFIX.length)
   return { personId: memberOf(users, groupId)?.id ?? null, asGroup: groupId }
+}
+
+/** The picks a whole sign-in brings into the panel — a saved one, a break-in attempt, a revisit: its one person. */
+export const picksOf = (form: Pick<SignInForm, 'personId'>): IdentityValue[] => (form.personId ? [form.personId] : [])
+
+const sameList = (a: readonly IdentityValue[], b: readonly IdentityValue[]) => a.length === b.length && a.every((v, i) => v === b[i])
+
+/* The panel's picks changed. The draft's person is the first pick's — the
+   member a group stands for — so the panel's one form keeps what Run checks
+   (`cardIssues`), what it runs (`forRun`) and what the rules read. */
+export function withIdentities(p: TryPage, next: readonly IdentityValue[], users: readonly User[]): TryPage {
+  return { ...p, identities: next, draft: { ...p.draft, personId: personPick(next[0] ?? NO_ONE, users).personId } }
+}
+
+/** The picks the run on the canvas covered: the last Run's, else its one person. */
+export function ranPicks(p: TryPage, ranForm: Pick<SignInForm, 'personId'>): readonly IdentityValue[] {
+  return p.ran?.list ?? picksOf(ranForm)
+}
+
+/* The pick the canvas tells — while the run on it is still that pick's (a
+   tenant reset, or a road in from elsewhere, can load another sign-in under
+   it) — else null. */
+export function activePick(p: TryPage, ranForm: Pick<SignInForm, 'personId'>, users: readonly User[]): IdentityPick | null {
+  const v = p.ran?.list[p.ran.active]
+  if (v === undefined || personPick(v, users).personId !== ranForm.personId) return null
+  return identityOf(v)
+}
+
+/** The group the canvas's run stands for — "A member of Finance" — or null. */
+export function asGroupOf(p: TryPage, ranForm: Pick<SignInForm, 'personId'>, users: readonly User[]): string | null {
+  const at = activePick(p, ranForm, users)
+  return at?.kind === 'group' ? at.id : null
+}
+
+/* Run (owner, 5 Oct 2026: "one run each, switch"): one sign-in per pick, the
+   same facts with each pick's person, and the canvas telling the first. `prev`
+   is what "Changed by …" compares with: that first pick's run on the canvas
+   — the facts as they were, its own person — when it was among the last
+   Run's picks, else the run on the canvas as today; so a Run never says it
+   was changed by moving to another pick. */
+export function runOfPicks(
+  base: SignInForm,
+  picks: readonly IdentityValue[],
+  users: readonly User[],
+  before: { form: SignInForm; list: readonly IdentityValue[] } | null,
+): { form: SignInForm; ran: TryRan; prev: SignInForm | null } {
+  const form = { ...base, personId: personPick(picks[0] ?? NO_ONE, users).personId ?? base.personId }
+  const was = before && (before.list.includes(picks[0]) ? { ...before.form, personId: form.personId } : before.form)
+  return { form, ran: { list: picks, active: 0 }, prev: was && JSON.stringify(was) !== JSON.stringify(form) ? was : null }
+}
+
+/* A press that runs at once — "Run with Home broadband", "Run as Finance
+   only": every pick of the panel's again, the canvas staying on the pick it
+   tells while that pick is still among them. */
+export function runNowOf(base: SignInForm, picks: readonly IdentityValue[], p: TryPage, ranForm: SignInForm, users: readonly User[]): { form: SignInForm; ran: TryRan } {
+  const on = activePick(p, ranForm, users)?.value
+  const i = Math.max(0, on === undefined ? 0 : picks.indexOf(on))
+  return { form: { ...base, personId: personPick(picks[i] ?? NO_ONE, users).personId ?? base.personId }, ran: { list: picks, active: i } }
+}
+
+/* A pick's chip pressed on the canvas's top bar: that pick's run of the SAME
+   Run — the facts it ran with, its person — never a new Run of the panel's
+   picks. Null for the pick already told, or one the Run did not cover. */
+export function switchPick(p: TryPage, ranForm: SignInForm, key: IdentityValue, users: readonly User[]): { form: SignInForm; ran: TryRan } | null {
+  const ran = p.ran
+  const i = ran ? ran.list.indexOf(key) : -1
+  if (!ran || i < 0 || i === ran.active) return null
+  return { form: { ...ranForm, personId: personPick(key, users).personId }, ran: { list: ran.list, active: i } }
+}
+
+/* Changes the run on the canvas has not checked (owner, 2 Oct 2026: only Run
+   runs), in the facts the application's rules read — a device on an
+   application no rule asks about changes no answer — the person aside, since
+   each pick runs as its own; or in the picks themselves (5 Oct 2026). */
+export function unrunOf(p: TryPage, ranForm: SignInForm, rows: RowsRead): boolean {
+  if (p.mode !== 'journey') return false
+  const facts = (f: SignInForm) => JSON.stringify(forRun({ ...f, personId: null }, rows))
+  return facts(p.draft) !== facts(ranForm) || !sameList(p.identities, ranPicks(p, ranForm))
 }
 
 /* What each fact row's TipDot says reads it (engine-run.ts `readersOf`):

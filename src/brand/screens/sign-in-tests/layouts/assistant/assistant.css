@@ -1,11 +1,11 @@
 /* -----------------------------------------------------------------------------
    The assistant dock (AssistantDock.tsx): one floating panel at the bottom
-   centre of the stage — the chips over it, the thread growing up out of it,
-   the ask row with its travelling glow, the controls row.
+   centre of the stage — the chat growing up out of it (suggestions inside
+   it, never floating), the ask row with its travelling glow, the controls row.
 
    Every colour is a variable a layout may set on `.ad` (or an ancestor):
    light by default, in the console's look; the dark stage under
-   [data-stage='dark']. Colour is meaning: the glow is the assistant's
+   [data-stage='dark'], Jarvis's HUD under [data-stage='jarvis']. Colour is meaning: the glow is the assistant's
    (the console blue into a soft cyan), brighter only while the engine or the
    assistant works; green / red / amber only on cited answers that mean them.
    Nothing motion animates carries a CSS transform or transition.
@@ -45,7 +45,7 @@
   z-index: 5;
   left: 0;
   right: 0;
-  bottom: 14px;
+  bottom: 16px;
   margin-inline: auto;
   width: min(640px, calc(100% - 32px));
   display: flex;
@@ -81,42 +81,62 @@
   --ad-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
   --ad-chip: rgba(26, 40, 53, 0.92);
 }
+/* Aruna (code name Jarvis), DARK: the HUD's warm glass and ember hairlines; the glow runs ember to flare (one
+   family, no second hue); the meaning inks are the HUD's (green, crimson, lemon). */
+.ad[data-stage='jarvis'] {
+  --ad-surface: rgba(20, 13, 10, 0.86);
+  --ad-field: rgba(10, 7, 5, 0.74);
+  --ad-sunken: rgba(255, 140, 90, 0.06);
+  --ad-line: rgba(255, 140, 90, 0.22);
+  --ad-line-2: rgba(255, 140, 90, 0.4);
+  --ad-text: #f6eee9;
+  --ad-text-2: #d6c5bb;
+  --ad-text-3: #a8948a;
+  --ad-hover: rgba(255, 140, 90, 0.1);
+  --ad-glow-a: #ff6b2c;
+  --ad-glow-b: #ffa066;
+  --ad-on: #ffa574;
+  --ad-on-soft: rgba(255, 107, 44, 0.16);
+  --ad-halo: rgba(255, 107, 44, 0.35);
+  --ad-ok: #3ddba0;
+  --ad-ok-bg: rgba(52, 227, 164, 0.12);
+  --ad-bad: #ff7a9c;
+  --ad-bad-bg: rgba(255, 90, 135, 0.14);
+  --ad-warn: #f9e57f;
+  --ad-warn-bg: rgba(255, 224, 46, 0.12);
+  --ad-shadow: 0 0 0 1px rgba(255, 107, 44, 0.06), 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+.ad[data-stage='jarvis'] .ad__panel { backdrop-filter: blur(10px); }
+.ad[data-stage='jarvis'] .ad__field { box-shadow: 0 0 14px rgba(255, 107, 44, 0.12), inset 0 0 0 1px rgba(255, 140, 90, 0.1); }
+.ad[data-stage='jarvis'] .ad__ask.is-focused .ad__field { box-shadow: 0 0 0 1px #ff6b2c, 0 0 0 4px rgba(255, 107, 44, 0.28), 0 0 22px rgba(255, 107, 44, 0.22); }
+/* Aruna, LIGHT: the console's light dock on warm paper, the brand orange as fixed values (the light look reads
+   --accent, slate in the current look); the ask field's focus is a crisp ring, never neon. */
+.ad[data-stage='jarvis-light'] {
+  --ad-surface: rgba(255, 255, 255, 0.92);
+  --ad-field: #ffffff;
+  --ad-sunken: #fbf8f6;
+  --ad-line: #efe6e0;
+  --ad-line-2: #e3d6ce;
+  --ad-text: #241b17;
+  --ad-text-2: #574842;
+  --ad-text-3: #6d5f58;
+  --ad-hover: #f6efea;
+  --ad-glow-a: #eb5424;
+  --ad-glow-b: #f3a389;
+  --ad-on: #b23d17;
+  --ad-on-soft: #fdeee9;
+  --ad-halo: rgba(235, 84, 36, 0.2);
+  --ad-ok: #146c43;
+  --ad-ok-bg: #e8f5ee;
+  --ad-bad: #a5142b;
+  --ad-bad-bg: #fcecf1;
+  --ad-warn: #5f5200;
+  --ad-warn-bg: #fbf5d2;
+  --ad-shadow: 0 1px 2px rgba(60, 30, 15, 0.05), 0 10px 28px rgba(60, 30, 15, 0.1);
+}
+.ad[data-stage='jarvis-light'] .ad__panel { backdrop-filter: blur(8px); }
+.ad[data-stage='jarvis-light'] .ad__ask.is-focused .ad__field { box-shadow: 0 0 0 1px #eb5424, 0 0 0 4px rgba(235, 84, 36, 0.14), 0 4px 14px rgba(235, 84, 36, 0.08); }
 .ad > * { pointer-events: auto; }
-
-/* --- The chips ------------------------------------------------------------- */
-
-.ad__chips {
-  align-self: center;
-  width: max-content;
-  max-width: calc(var(--ad-roomw, 1200px) - 32px);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  pointer-events: none;
-}
-/* Inside the open thread: what to ask next, under the newest answer. */
-.ad__chips.is-next { align-self: stretch; width: auto; max-width: none; justify-content: flex-start; padding-top: 2px; }
-.ad__chips.is-next .ad__chip { height: 26px; font-size: 12px; box-shadow: none; backdrop-filter: none; background: var(--ad-surface); }
-.ad__chip {
-  pointer-events: auto;
-  height: 28px;
-  padding: 0 11px;
-  border: 1px solid var(--ad-line);
-  border-radius: 999px;
-  background: var(--ad-chip);
-  backdrop-filter: blur(6px);
-  color: var(--ad-text-2);
-  font: inherit;
-  font-size: 12.5px;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-.ad__chip:hover { border-color: var(--ad-line-2); background: var(--ad-surface); color: var(--ad-text); }
-.ad__chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
 
 /* --- The panel ------------------------------------------------------------- */
 
@@ -133,29 +153,14 @@
 
 /* The thread: grows up out of the panel; scrolls inside its 40% of the canvas. */
 .ad__threadwrap { overflow: hidden; }
-.ad__threadhead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 2px 6px 6px;
-}
-.ad__threadtitle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ad-text-3);
-}
-.ad__threadtitle svg { color: var(--ad-glow-a); }
 .ad__thread {
-  max-height: max(160px, calc(var(--ad-room, 800px) * 0.4 - 96px));
+  max-height: max(160px, calc(var(--ad-room, 800px) * 0.4 - 104px));
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 6px 8px;
+  padding: 4px 4px 8px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   scrollbar-width: thin;
 }
 .ad__item { display: flex; flex-direction: column; gap: 6px; }
@@ -183,26 +188,60 @@
 .ad__thinking span:nth-child(3) { animation-delay: 300ms; }
 @keyframes ad-think { 50% { opacity: 1; } }
 
-.ad__itemfoot { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.ad__itemfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ad__spacer { flex: 1; }
+/* An answer's presses: the first an outline in the active blue (never orange), the rest quiet. */
 .ad__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 28px;
-  padding: 0 11px;
-  border: 1px solid var(--ad-line-2);
+  padding: 0 10px;
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--ad-surface);
-  color: var(--ad-on);
+  background: none;
+  color: var(--ad-text-2);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.ad__action:hover { background: var(--ad-on-soft); border-color: var(--ad-on); }
+.ad__action:hover { background: var(--ad-hover); color: var(--ad-text); }
+.ad__action.is-primary { border-color: var(--ad-on); color: var(--ad-on); font-weight: 600; }
+.ad__action.is-primary:hover { background: var(--ad-on-soft); }
 .ad__action:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
-.ad__hint { font-size: 12px; color: var(--ad-text-3); }
-.ad__votes { display: inline-flex; align-items: center; gap: 2px; }
-.ad__voteslabel { font-size: 12px; color: var(--ad-text-3); margin-right: 4px; }
+/* The suggestions, inside the chat: full-width rows, the icon says what a press does. */
+.ad__sugs { display: flex; flex-direction: column; gap: 1px; }
+.ad__sugs.is-next { padding-top: 2px; border-top: 1px solid var(--ad-line); margin-top: -2px; }
+.ad__sughead { margin: 0 0 4px; padding: 0 8px; font-size: 12px; font-weight: 600; color: var(--ad-text-3); }
+.ad__sug {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--ad-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ad__sug > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad__sug svg { flex: none; color: var(--ad-text-3); }
+.ad__sug.is-run svg,
+.ad__sug.is-open svg,
+.ad__sug.is-add svg { color: var(--ad-on); }
+.ad__sug.is-breakIn svg { color: var(--ad-warn); }
+.ad__sug:hover { background: var(--ad-hover); }
+.ad__sug:focus-visible { outline: none; background: var(--ad-hover); box-shadow: 0 0 0 2px var(--ad-halo); }
+/* What a press did, one quiet line in the thread. */
+.ad__did { margin: 0; padding: 0 8px; font-size: 12px; color: var(--ad-text-3); }
 
 /* --- Row 1: ask, with the glow travelling along its border ----------------- */
 

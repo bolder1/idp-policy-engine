@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { BookOpenText, GalleryHorizontal, type LucideIcon } from 'lucide-react'
 
 import { Picker } from '../../picker'
 import { DEDICATED, RUN_LAYOUTS, layoutsOn, shelfOf, type CanvasShelf, type RunLayoutId } from './run-layout'
@@ -15,10 +14,10 @@ import './canvas-bar.css'
      Canvas  the layouts on that shelf
 
    Moving to a shelf that does not hold the layout on screen shows that
-   shelf's first. The dedicated views — Focus, Brief and Jarvis — are on
-   neither shelf: each has its own button beside the switch
-   (`DedicatedViews`, and Jarvis's JarvisMode.tsx); while one is on, the
-   Canvas dropdown says so in its placeholder. */
+   shelf's first. Focus, the main view, leads both shelves (4 Oct 2026; v1
+   is on the Archive shelf as "Focus v1"). Aruna (Jarvis) is on
+   neither shelf: its way in stands on the canvas (JarvisMode.tsx), and while
+   it is on the Canvas dropdown says so in its placeholder. */
 export function CanvasSwitch({ value, onChange, favourites }: { value: RunLayoutId; onChange: (next: RunLayoutId) => void; favourites: readonly RunLayoutId[] }) {
   const [shelf, setShelf] = useState<CanvasShelf>(() => shelfOf(value, favourites) ?? 'favourites')
   const shown = layoutsOn(shelf, favourites)
@@ -52,27 +51,6 @@ export function CanvasSwitch({ value, onChange, favourites }: { value: RunLayout
         onChange={(v) => onChange(v as RunLayoutId)}
         searchable={false}
       />
-    </div>
-  )
-}
-
-const DEDICATED_BUTTONS: { id: RunLayoutId; label: string; icon: LucideIcon }[] = [
-  { id: 'focus', label: 'Focus', icon: GalleryHorizontal },
-  { id: 'brief', label: 'Brief', icon: BookOpenText },
-]
-
-/* Focus and Brief, each its own button (owner, 2 Oct 2026: "Brief and Focus
-   can be two dedicated views — those are very good"): pressed while it is the
-   layout on screen. Jarvis's button is JarvisMode.tsx's, with its entrance. */
-export function DedicatedViews({ value, onChange }: { value: RunLayoutId; onChange: (next: RunLayoutId) => void }) {
-  return (
-    <div className="sit-views" role="group" aria-label="Dedicated views">
-      {DEDICATED_BUTTONS.map(({ id, label, icon: Icon }) => (
-        <button key={id} type="button" className={`sit-views__btn${value === id ? ' is-on' : ''}`} aria-pressed={value === id} onClick={() => onChange(id)}>
-          <Icon size={14} strokeWidth={2} aria-hidden />
-          {label}
-        </button>
-      ))}
     </div>
   )
 }

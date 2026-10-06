@@ -19,11 +19,13 @@ import DepthLayout from './DepthLayout'
 import GatesLayout from './GatesLayout'
 import JarvisLayout from './JarvisLayout'
 import Jarvis2Layout from './Jarvis2Layout'
+import ClassicV2Layout from './ClassicV2Layout'
 import LineLayout from './LineLayout'
 import MarbleLayout from './MarbleLayout'
 import TreeLayout from './TreeLayout'
 import PulseLayout from './PulseLayout'
 import FocusLayout from './FocusLayout'
+import Focus2Layout from './Focus2Layout'
 import BriefLayout from './BriefLayout'
 import CircuitLayout from './CircuitLayout'
 import StreamLayout from './StreamLayout'
@@ -46,6 +48,7 @@ import type { RunLayoutProps } from './types'
    -------------------------------------------------------------------------- */
 
 const LAYOUTS: Record<Exclude<(typeof RUN_LAYOUTS)[number]['value'], 'column'>, ComponentType<RunLayoutProps>> = {
+  classic2: ClassicV2Layout,
   line: LineLayout,
   tree: TreeLayout,
   gates: GatesLayout,
@@ -59,6 +62,7 @@ const LAYOUTS: Record<Exclude<(typeof RUN_LAYOUTS)[number]['value'], 'column'>, 
   synapse: SynapseLayout,
   pulse: PulseLayout,
   focus: FocusLayout,
+  focus2: Focus2Layout,
   brief: BriefLayout,
   circuit: CircuitLayout,
   stream: StreamLayout,

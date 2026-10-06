@@ -8,6 +8,7 @@ import type { SignInScreens } from '../../testing/screens-of'
 import type { FormField, SignInForm } from '../../testing/sign-in-form'
 import type { AttemptsFrom } from '../attempts'
 import type { EngineRun } from '../engine-run'
+import type { InspectTarget } from '../inspect-model'
 
 /* -----------------------------------------------------------------------------
    What every layout of the run is handed (run-layout.ts): the run on screen
@@ -69,6 +70,10 @@ export interface RunLayoutProps {
   onAdd: (field: FormField) => void
   onOpenPolicy: (policyId: string) => void
   onOpenRule: (policyId: string, ruleId: string) => void
+  /** Any name on the run — a policy, a rule, a zone, a person — opened in the page's right-hand panel, read-only
+      (inspect-model.ts). `fresh` starts the panel's way back over at it (the canvas bar's Details). Absent, names
+      leave for the builder through the two above. */
+  onInspect?: (target: InspectTarget, fresh?: boolean) => void
   /** "As each group": the sign-in runs again as "Anyone in <group>" (the group's id). */
   onAsGroup?: (groupId: string) => void
   /** The why in the page's right-hand panel: open, its body, the way to open it. */
@@ -76,4 +81,38 @@ export interface RunLayoutProps {
   /** Break-in attempts on the application, once the run is done (the page's). */
   breakIn?: { summary: AppBreakInSummary; open: boolean } | null
   onReviewBreakIn?: (from: AttemptsFrom) => void
+
+  /* The dedicated views' own top (owner, 3 Oct 2026: Focus, Brief and Jarvis "should all have the same things" —
+     the sign-in row with the pencil and a basic Replay, no changing run line over them; run-layout.ts `OWN_TOP`): */
+  /** Replay: a new run of the same sign-in, as the run line's Replay. */
+  onReplay?: () => void
+  /** Land the run at once, as the run line's Skip does: the engine's own clock, not the view's. Focus v2 calls it for a run it is not going to tell. */
+  onLand?: () => void
+  /** A change that is a run of its own — a press that says it runs ("Run with Home broadband", "Run as Finance
+      only"): the form takes the change and the run begins at once (the page's `patch(…, now)`). Only Run runs:
+      never call it without such a press. */
+  onRunWith?: (patch: Partial<SignInForm>, field: FormField) => void
+  /** Save this sign-in as a test: the panel opens on Save sign-in. */
+  onSave?: () => void
+  /** The form has changes the run on screen has not checked ("Not run"); the form's panel is open. */
+  unrun?: boolean
+  editing?: boolean
+
+  /* Several identities in one Run (owner, 5 Oct 2026: "one run each, switch"): the canvas tells one at a time, and
+     the top bar holds a chip per identity to switch. Both absent when only one identity ran. */
+  /** Every identity the last Run covered, in pick order, and which one the canvas is telling (5 Oct 2026). Each
+      `plan` is that identity's own run, one stable object per pick per run — the active one's is the very plan on
+      screen (`plan` above, once it has been taken up). */
+  identities?: readonly RunIdentity[]
+  /** Switch the canvas to another identity of the same Run (loads its form; never a new Run of the picks). */
+  onPickIdentity?: (key: string) => void
+}
+
+/** One identity of a Run of several: its pick (`key`, a person's id or `group:<id>`), what it is, and its own plan. */
+export interface RunIdentity {
+  key: string
+  kind: 'user' | 'group'
+  name: string
+  active: boolean
+  plan: EngineRun
 }

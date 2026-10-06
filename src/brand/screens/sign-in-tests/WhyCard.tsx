@@ -8,9 +8,16 @@ import { TipDot } from '../../kit'
 import { REVIEW_ATTEMPTS, attemptsOnSaid, type AppBreakInSummary } from '../break-in-app'
 import { BREAK_IN_TIP } from '../break-in-model'
 import type { NameLookup } from '../predicate-prose'
-import type { FormField } from '../testing/sign-in-form'
+import type { FormField, SignInForm } from '../testing/sign-in-form'
 import { AttemptCells } from './BreakInPanel'
+import type { ChangeEntry } from '../../change-log'
+import { CopyText } from './CopyText'
+import { relativeTime } from './runs'
+import { GrantForm } from './GrantForm'
+import { whySummaryOf } from './why-summary'
 import type { EngineRun } from './engine-run'
+import type { GetIn } from './get-in'
+import { DENIAL_REASONS } from './phase'
 import type { GroupRowView, WhyAction, WhyIcon, WhyItem, WhyTone } from './journey'
 import { ConflictRuleCard } from './RunChain'
 
@@ -115,12 +122,21 @@ export interface WhyCardProps {
      and Review attempts, which opens them. Absent — the builder's Check
      access — the why says nothing of them. */
   breakIn?: { summary: AppBreakInSummary; onReview: () => void } | null
+  /* How to get in (get-in.ts): under a refusal, the what-ifs that would have let them in, each one a press that runs it. Absent, no section. */
+  getIn?: readonly GetIn[] | null
+  onGetIn?: (form: SignInForm) => void
+  /* Let in for a while (temp-access.ts): under a refusal, the sign-in's date and the press that grants it. Absent, no form. */
+  grant?: { today: string; onGrant: (until: string, reason: string) => void } | null
+  /* What changed (change-log.ts): the policy that refused was edited lately — who, when and what — which may be why. Absent or empty, no section. */
+  changes?: readonly ChangeEntry[]
 }
 
-export function WhyCard({ plan, items, groups, headline, policies, resolve, person, id, titleRef, interactive, onClose, onOpenRule, onOpenPolicy, onAdd, onAsGroup, breakIn = null }: WhyCardProps) {
+export function WhyCard({ plan, items, groups, headline, policies, resolve, person, id, titleRef, interactive, onClose, onOpenRule, onOpenPolicy, onAdd, onAsGroup, breakIn = null, getIn = null, onGetIn, grant = null, changes = [] }: WhyCardProps) {
   const titleId = useId()
   const groupsId = useId()
   const attemptsId = useId()
+  const getInId = useId()
+  const changesId = useId()
   /* The attempts' label, unless there is no finding: then the why's title says it, once. */
   const labelled = items.length > 0
   const HeadMark = HEAD_MARK[headline.tone]
@@ -142,6 +158,7 @@ export function WhyCard({ plan, items, groups, headline, policies, resolve, pers
           <span className="u-sr-only">Why: </span>
           {headline.text}
         </h3>
+        {interactive && DENIAL_REASONS && <CopyText text={whySummaryOf({ plan, items, person, getIn })} />}
         <button type="button" className="bb__act tj-why__close" aria-label="Close why" title="Close" tabIndex={tab} onClick={onClose}>
           <X size={14} strokeWidth={2.2} />
         </button>
@@ -272,6 +289,56 @@ export function WhyCard({ plan, items, groups, headline, policies, resolve, pers
               )
             })}
           </ul>
+        )}
+
+        {getIn && getIn.length > 0 && onGetIn && (
+          <section className="tj-why__sec" aria-labelledby={getInId}>
+            <p id={getInId} className="tj-why__label">
+              How to get in
+            </p>
+            <ul className="tj-why__groups">
+              {getIn.map((g) => (
+                <li key={g.key}>
+                  <button type="button" className="tj-why__grow" tabIndex={tab} title={`Run it ${g.label.charAt(0).toLowerCase()}${g.label.slice(1)}`} onClick={() => onGetIn(g.form)}>
+                    <span className="tj-why__glabel">{g.label}</span>
+                    <span className="tj-why__gresult">
+                      <DecisionBadge decision={g.decision} />
+                    </span>
+                    <span className="tj-why__gsource" title={g.source}>
+                      {g.source}
+                    </span>
+                    <span className="tj-why__gend" aria-hidden>
+                      <ChevronRight size={14} strokeWidth={2} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {changes.length > 0 && (
+          <section className="tj-why__sec" aria-labelledby={changesId}>
+            <p id={changesId} className="tj-why__label">
+              What changed
+            </p>
+            <ul className="tj-why__changes">
+              {changes.map((c) => (
+                <li key={c.id}>
+                  <span className="tj-why__changehead">
+                    {c.policyName} · {relativeTime(c.at, new Date())} · {c.by}
+                  </span>
+                  <span className="tj-why__changelines">{c.lines.join(' · ')}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {grant && interactive && (
+          <section className="tj-why__sec" aria-label="Let in for a while">
+            <GrantForm today={grant.today} person={person} onGrant={grant.onGrant} />
+          </section>
         )}
 
         {breakIn && (

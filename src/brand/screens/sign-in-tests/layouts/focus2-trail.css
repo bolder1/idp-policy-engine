@@ -1,0 +1,95 @@
+/* -----------------------------------------------------------------------------
+   The bar under the open card (focus2-trail.tsx): step buttons, the decision
+   trail, the voice. One surface in the stage's own tokens (--fc-*, which the
+   layout root carries in both stages), one height, centred in the slot the old
+   player stood in. Nothing here is a transform: the only motion is the steps'
+   opacity, which Motion drives.
+   -------------------------------------------------------------------------- */
+
+.rl-f2bar {
+  --f2bar-h: 44px;
+  container-type: inline-size;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(640px, 100%);
+  height: var(--f2bar-h);
+  margin: 0 auto;
+  padding: 0 var(--space-2);
+  border: var(--bw-thin) solid var(--fc-line);
+  border-radius: var(--radius-lg);
+  background: var(--fc-surface);
+  box-shadow: var(--fc-shadow);
+  font-size: var(--fs-sm);
+  line-height: 16px;
+  color: var(--fc-text-2);
+}
+
+.rl-f2bar__nav { display: flex; flex: none; align-items: center; gap: 2px; }
+.rl-f2bar__btn {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fc-text-2);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.rl-f2bar__btn:hover:not(:disabled) { background: var(--fc-inset); color: var(--fc-text); }
+.rl-f2bar__btn:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 1px; }
+.rl-f2bar__btn:disabled { color: var(--fc-text-4); cursor: default; }
+
+.rl-f2bar__trail { flex: 1 1 0; min-width: 0; overflow: hidden; }
+.rl-f2bar__trail ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.rl-f2bar__trail li { display: flex; flex: 0 1 auto; align-items: center; min-width: 0; }
+/* The person and the answer are the two ends of the story: they keep their words longest. */
+.rl-f2bar__trail li.is-end { flex-shrink: 0; max-width: 34%; }
+.rl-f2bar__trail li.is-gap { flex-shrink: 0; }
+.rl-f2bar__sep { flex: none; margin: 0 2px; color: var(--fc-text-4); }
+.rl-f2bar__gap { padding: 0 4px; color: var(--fc-text-3); }
+.rl-f2bar__cell { display: flex; min-width: 0; }
+
+.rl-f2bar__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  color: var(--fc-text-2);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.rl-f2bar__step:hover:not(:disabled) { background: var(--fc-sunken); color: var(--fc-text); }
+.rl-f2bar__step:focus-visible { outline: 2px solid var(--fc-work); outline-offset: 1px; }
+.rl-f2bar__step:disabled { cursor: default; }
+/* The step on screen: greyscale, calm. */
+.rl-f2bar__step.is-link:not(.is-on) { background: var(--fc-sunken); color: var(--fc-text); }
+.rl-f2bar__step.is-on { background: var(--fc-inset); color: var(--fc-text); font-weight: var(--fw-medium); }
+.rl-f2bar__word { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rl-f2bar__detail { min-width: 0; overflow: hidden; color: var(--fc-text-3); white-space: nowrap; text-overflow: ellipsis; }
+.rl-f2bar__mark { flex: none; }
+.rl-f2bar__mark.is-pass { color: var(--fc-ok); }
+.rl-f2bar__mark.is-fail { color: var(--fc-bad); }
+.rl-f2bar__mark.is-unknown { color: var(--fc-warn); }
+.rl-f2bar__mark.is-off { color: var(--fc-text-3); }
+.rl-f2bar__step.is-positive .rl-f2bar__word { color: var(--fc-ok-fg); }
+.rl-f2bar__step.is-negative .rl-f2bar__word { color: var(--fc-bad-fg); }
+.rl-f2bar__step.is-notice .rl-f2bar__word { color: var(--fc-warn-fg); }
+
+/* The detail is the first thing given up for room, then the marks stay and the words truncate. */
+@container (max-width: 600px) {
+  .rl-f2bar__detail { display: none; }
+}

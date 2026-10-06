@@ -572,6 +572,20 @@ export const DECISION_LABEL: Record<AccessDecision, string> = {
 export const DEFAULT_DENY_MESSAGE = 'You are not permitted to log in. Please contact your administrator.'
 /** The longest deny message the console accepts. */
 export const DENY_MESSAGE_MAX = 200
+/** The longest next step or contact a rule adds to its deny message (docs/specs/DENIAL-REASONS.md). */
+export const DENY_EXTRA_MAX = 120
+/** Who a refused user is told to ask when the rule names no one: the tenant's default contact (DENIAL-REASONS.md). One place until a tenant setting holds it. */
+export const TENANT_DENY_CONTACT = 'IT help desk'
+
+/** Temporary access on a rule: it holds up to and including `until` (YYYY-MM-DD). */
+export interface TempAccess {
+  until: string
+  reason: string
+  by: string
+}
+
+/** A rule whose temporary access has run out as of the sign-in's date. A sign-in with no date stated is never past it. */
+export const ruleExpired = (rule: Pick<Rule, 'tempAccess'>, date: string | undefined): boolean => !!rule.tempAccess && !!date && date > rule.tempAccess.until
 
 export interface Rule {
   id: string
@@ -635,6 +649,14 @@ export interface Rule {
      an empty string is never stored. Kept while the rule is an Allow, so
      switching back to Deny brings the message back. */
   denyMessage?: string
+  /* What the user can do next, and who to ask (DENIAL-REASONS.md): shown under the message on the deny page. ABSENT means
+     nothing is added; an empty string is never stored. */
+  denyAction?: string
+  denyContact?: string
+  /* Temporary access (docs/specs/DENIAL-NEXT.md, P0 item 3): a rule granted to one person until a date, with who gave it and
+     why. Once the sign-in's date is after `until` the rule is switched off by itself — nobody has to remember to remove it.
+     ABSENT on every ordinary rule. */
+  tempAccess?: TempAccess
   /** Rough population the rule matches — shown live while editing. */
   matchEstimate: number
 }

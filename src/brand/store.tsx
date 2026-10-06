@@ -28,6 +28,7 @@ import {
   type Zone,
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
+import { logChange, seedChangeLog, type ChangeEntry } from './change-log'
 import { asStored, changedBeyondStamp, lastSaved, openForEditing, withSavedDraft } from './policy-draft'
 import { isRevisit } from './revisit'
 import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
@@ -86,6 +87,8 @@ export type BrandScreen =
      sign-ins, people and runs for every policy at once. A policy's board keeps
      only its own; its test panel links here, carrying the tab. */
   | { name: 'sign-in-tests'; tab?: 'try' | 'saved' | 'people' | 'runs' }
+  /* The week's sign-ins across every application, and why any were refused (screens/SignInActivity.tsx), opened from Access checks. */
+  | { name: 'sign-in-activity' }
   /* The policy's own three facts — name, applications, audience — on one page.
 
      They used to be scattered across a top-bar input, a dialog and a card at
@@ -426,6 +429,8 @@ export interface BrandStore {
   updateSavedSignIn: (id: string, patch: Partial<Omit<SavedSignIn, 'id'>>) => void
   removeSavedSignIn: (id: string) => void
 
+  /** Who changed which policy, when and what — one entry per save that changed a policy (change-log.ts). The showcase tenant starts with a few seeded entries. */
+  changeLog: readonly ChangeEntry[]
   savePolicy: (p: Policy) => void
   /* Save as draft. On a policy still in draft the edits land in the policy
      itself; on a published one they are kept in `pendingDraft` and the live
@@ -524,6 +529,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
      read by every initialiser that follows. */
   const [seed] = useState<Tenant>(() => (SHOWCASE ? showcaseTenant() : tenantAt('medium')))
   const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)
+  const [changeLog, setChangeLog] = useState<ChangeEntry[]>(() => (SHOWCASE ? seedChangeLog(seed.policies, new Date()) : []))
   /* Zones are edited in place now that they carry two sections, so they need
      the same draft/commit treatment policies already had. */
   const [zones, setZones, zonesRef] = useCollection<Zone>(() => seed.zones)
@@ -714,6 +720,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           personaRef.current = id
           setPersonaId(id)
           setPolicies(t.policies)
+          setChangeLog([])
           setZones(t.zones)
           setScenarios(t.scenarios)
           setMethodSets(t.methodSets)
@@ -922,6 +929,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         }),
 
       breakInAccepted,
+      changeLog,
       /* Null removes the entry rather than storing the card's own
          expectation, as the overrides above do: "not accepted" is one state. */
       acceptBreakIn: (policyId, cardId, a) =>
@@ -945,23 +953,33 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       /* Stamped only when something changed. Saving an untouched policy used to
          record an edit nobody made. A policy saved with no applications is
          stored as a draft: unfinished means draft. */
-      savePolicy: (p) =>
+      savePolicy: (p) => {
+        const before = policiesRef.current.find((x) => x.id === p.id)
+        const after = settled(asStored(p))
+        if (before && changedBeyondStamp(before, after)) setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), groups, directory.people))
         setPolicies((all) =>
           all.map((x) => {
             if (x.id !== p.id) return x
             const next = settled(asStored(p))
             return changedBeyondStamp(x, next) ? { ...next, lastModified: 'Just now', modifiedBy: 'You' } : x
           }),
-        ),
+        )
+      },
 
-      setPolicyStatus: (id, status) =>
+      setPolicyStatus: (id, status) => {
+        const before = policiesRef.current.find((x) => x.id === id)
+        if (before && before.status !== status && !before.isSystem && !(before.appIds.length === 0 && status !== 'draft')) {
+          const after = settled(asStored({ ...before, status, lastModified: 'Just now', modifiedBy: 'You' }))
+          setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date()))
+        }
         setPolicies((all) =>
           all.map((x) => {
             if (x.id !== id || x.status === status || x.isSystem) return x
             if (x.appIds.length === 0 && status !== 'draft') return x
             return settled(asStored({ ...x, status, lastModified: 'Just now', modifiedBy: 'You' }))
           }),
-        ),
+        )
+      },
 
       saveDraft: (policyId, d) =>
         setPolicies((all) => all.map((x) => (x.id === policyId ? withSavedDraft(x, d) : x))),
@@ -1055,7 +1073,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       policies, scenarios, zones, fingerprints, riskProfiles, activeRiskProfileId, scale, hooks, apps, groups, directory, edition,
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
       registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast,
-      gauntletOverrides, breakInAccepted, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
+      gauntletOverrides, breakInAccepted, changeLog, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
       setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns,
       policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef,
     ],

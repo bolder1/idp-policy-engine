@@ -1,0 +1,125 @@
+/* -----------------------------------------------------------------------------
+   Aruna's chat (jarvis1-ask.tsx). It stands where the shared dock stood and keeps the dock's `.ad` root and its
+   `data-stage` palette (assistant.css: `--ad-*` for her dark and light looks), so the glass, the answer's citations
+   and the Leave pill's room all carry over. Only what the dock does not have is here: the bar's own controls (a
+   word on each, so no tooltip opens over another), and the questions as prompts at the foot of the thread.
+
+   Every colour is one of the dock's `--ad-*` variables. Nothing motion animates carries a CSS transform. The glow
+   on the bar is quieter than the dock's: only the verdict glows strongly (jarvis.css).
+   -------------------------------------------------------------------------- */
+
+/* The bar's travelling glow, kept as a thin line and a faint light — the verdict is the one thing that glows. */
+.jv1-ask .ad__ask::after { opacity: 0.08; filter: blur(7px); }
+.jv1-ask.is-busy .ad__ask::after { opacity: 0.16; }
+.jv1-ask[data-stage='jarvis'] .ad__field { box-shadow: inset 0 0 0 1px var(--ad-line); }
+
+.jv1-ask__bar { flex: none; }
+.jv1-ask__field { gap: 6px; }
+.jv1-ask__space { flex: 1 1 8px; min-width: 0; }
+
+/* A control on the bar: its word beside its icon. */
+.jv1-ask__btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ad-text-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.jv1-ask__btn:hover { background: var(--ad-hover); color: var(--ad-text); }
+.jv1-ask__btn:disabled { opacity: 0.45; cursor: default; background: none; color: var(--ad-text-3); }
+.jv1-ask__btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+.jv1-ask__btn.is-on { color: var(--ad-on); }
+
+/* Her name, while the chat is open (the bar has no question to offer then). */
+.jv1-ask__name { padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--ad-text); }
+/* The next question, or why there is none yet. */
+.jv1-ask__wait { margin: 0; padding: 0 4px; font-size: 13px; color: var(--ad-text-3); }
+.jv1-ask__next {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ad-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.jv1-ask__next > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jv1-ask__next svg { flex: none; color: var(--ad-on); }
+.jv1-ask__next:hover { background: var(--ad-hover); }
+.jv1-ask__next:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+
+/* The line she is saying: the wave, the words (two lines at most), Stop. */
+.jv1-ask__said { flex: 1 1 auto; min-width: 0; }
+.jv1-ask__line { cursor: default; }
+
+/* The thread and, under it, the questions. */
+.jv1-ask__log { display: flex; flex-direction: column; gap: 12px; }
+.jv1-ask__qs { display: flex; flex-direction: column; gap: 10px; }
+.jv1-ask__qs.is-next { padding-top: 10px; border-top: 1px solid var(--ad-line); }
+.jv1-ask__grp { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; }
+.jv1-ask__gtitle { margin: 0; padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--ad-text-3); }
+.jv1-ask__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.jv1-ask__q {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 4px 11px;
+  border: 1px solid var(--ad-line-2);
+  border-radius: 999px;
+  background: none;
+  color: var(--ad-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.jv1-ask__q svg { flex: none; color: var(--ad-text-3); }
+.jv1-ask__q:hover { background: var(--ad-hover); }
+.jv1-ask__q:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ad-halo); }
+/* Asked: kept, never removed — quieter, with a check where the question mark was. */
+.jv1-ask__q.is-asked { border-color: var(--ad-line); color: var(--ad-text-2); }
+.jv1-ask__q.is-asked svg { color: var(--ad-ok); }
+.jv1-ask__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .jv1-ask .ad__ask::before, .jv1-ask .ad__ask::after { animation: none; }
+}
+
+/* A1: her reasoning line. "Reading the run…" with a slow shimmer while she reads, then the quiet summary that stays
+   above the answer. The shimmer is a gradient's position (no transform); none of it under reduced motion. */
+.jv1-ask__body { display: flex; flex-direction: column; gap: 6px; }
+.jv1-ask__read { margin: 0; padding: 0 2px; font-size: 12px; line-height: 1.4; color: var(--ad-text-3); }
+.jv1-ask__read.is-reading {
+  background: linear-gradient(100deg, var(--ad-text-3) 35%, var(--ad-text) 50%, var(--ad-text-3) 65%) 100% 0 / 250% 100% no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: jv1-ask-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes jv1-ask-shimmer { to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .jv1-ask__read.is-reading { animation: none; background: none; -webkit-text-fill-color: currentColor; }
+}
+.jv1-ask.is-reduced .jv1-ask__read.is-reading { animation: none; background: none; -webkit-text-fill-color: currentColor; }

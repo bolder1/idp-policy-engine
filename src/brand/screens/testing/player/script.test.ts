@@ -172,6 +172,15 @@ describe('the ends that are not signed in', () => {
     expect(s.beats.at(-1)!.scene.page).toEqual({ kind: 'denied', message: 'HRMS opens only from a corporate office. Contact IT if you need access from elsewhere.' })
   })
 
+  it('adds the rule’s next step and contact under the message, and only when it sets them', () => {
+    const base = pick('deny/verbatim')
+    const step = base.steps[0]
+    if (step.kind !== 'deny') throw new Error('expected a deny step')
+    const withExtra = { ...base, steps: [{ ...step, action: 'Connect from the office.', contact: 'IT help desk' }] }
+    expect(film(withExtra).beats.at(-1)!.scene.page).toEqual({ kind: 'denied', message: step.message, action: 'Connect from the office.', contact: 'IT help desk' })
+    expect(film(base).beats.at(-1)!.scene.page).toEqual({ kind: 'denied', message: step.message })
+  })
+
   it('stops on the page that says the method is not available, and closes on a chip that says so', () => {
     const s = film(pick('2fa/password/unavailable'))
     expect(s.chips).toEqual(['Password', 'Duo Push', 'Not available'])

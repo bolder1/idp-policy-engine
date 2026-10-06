@@ -90,6 +90,7 @@ export function ZoneNote({
   onRolled?: () => void
 }) {
   const props = { half, rollOut, onRolled }
+  if (style === 'blue') return <BlueNote half={half} />
   if (style === 'sticky') return <StickyNote {...props} />
   if (style === 'clip') return <Clipboard {...props} />
   if (style === 'pointer') return <PointerNote {...props} />
@@ -306,3 +307,44 @@ function PointerNote({ half, rollOut, onRolled }: NoteProps) {
    withdrawn on 1 Oct 2026 (owner: "I only like the sticky note … remove the
    rest of them"). `NotePile` and `IndexCard` followed them on 2 Oct 2026
    (owner: "Remove Note pile, Index card"). */
+
+/* Blue (owner, 5 Oct 2026: "add another version with a blue-tinted background, a revamped classic style featuring better
+   text, and an improved experience so it can be distinguished — an example of static text"). Classic's card, tinted with
+   the info blue, its words set so they read at a glance: the head, then one row per kind — the kind in the UI face on
+   the left, the example in monospace on a white chip on the right — and, on Locations, the two facts as a short list
+   under a rule. Static: no motion, nothing to press. It reads the shared examples, as the paper versions do. */
+function BlueNote({ half }: { half: ZoneHalf }) {
+  const examples = examplesOf(half)
+  const facts = factsOf(half)
+  return (
+    <div className="bz7n-blue">
+      <h3 className="bz7n-blue__head">
+        <Info size={14} strokeWidth={2.2} aria-hidden />
+        What you can add
+      </h3>
+      <dl className="bz7n-blue__rows">
+        {examples.map((e) => (
+          <div key={e.text} className="bz7n-blue__row">
+            <dt>{kindOf(e.gloss)}</dt>
+            <dd>
+              <code>{e.text}</code>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {facts.length > 0 && (
+        <ul className="bz7n-blue__facts">
+          {facts.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** "an IPv4 or IPv6 address" → "IPv4 or IPv6 address": the kind without its article, for a row's label. */
+const kindOf = (gloss: string): string => {
+  const bare = gloss.replace(/^(an?|the)\s+/i, '')
+  return bare.charAt(0).toUpperCase() + bare.slice(1)
+}

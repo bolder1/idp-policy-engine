@@ -41,6 +41,7 @@ const BuilderPage = lazy(() => import('./screens/BuilderPage').then((m) => ({ de
 const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ default: m.BoardPage })))
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
 const Applications = lazy(() => import('./screens/Applications').then((m) => ({ default: m.Applications })))
+const SignInActivity = lazy(() => import('./screens/SignInActivity').then((m) => ({ default: m.SignInActivity })))
 const SignInTests = lazy(() => import('./screens/SignInTests').then((m) => ({ default: m.SignInTests })))
 
 /* Same specifiers as the lazy() calls above — Vite dedupes them to one chunk
@@ -59,6 +60,7 @@ const warm = () => {
   void import('./screens/PolicyDetails')
   void import('./screens/Applications')
   void import('./screens/SignInTests')
+  void import('./screens/SignInActivity')
 }
 
 function usePrefetchScreens() {
@@ -128,6 +130,8 @@ function ScreenBody() {
       return <DisplayTokensPage tab={screen.tab ?? 'assignments'} />
     case 'sign-in-tests':
       return <SignInTests tab={screen.tab} />
+    case 'sign-in-activity':
+      return <SignInActivity />
   }
 }
 

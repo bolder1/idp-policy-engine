@@ -3359,6 +3359,11 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__denyhelp { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-tertiary); }
 .bb__denyhelp b { font-weight: var(--fw-semibold); color: var(--text-secondary); }
 .bb__deny textarea { width: 100%; min-height: 76px; }
+.bb__deny input { width: 100%; }
+.bb__denysuggest { align-self: flex-start; padding: 0; border: 0; background: none; font: inherit; font-size: var(--fs-sm); color: var(--text-secondary); text-align: left; cursor: pointer; text-decoration: underline; }
+.bb__denysuggest:hover { color: var(--text-primary); }
+.bb__denysuggest:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bb__deny .bb__thenlabel { margin-top: var(--space-3); }
 .bb__denycount { font-size: var(--fs-xs); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
 /* Centred only: the in-card trail takes its track only while it is showing.

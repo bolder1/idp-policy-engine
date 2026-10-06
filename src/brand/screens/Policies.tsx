@@ -8,6 +8,7 @@ import {
   Grid3x3,
   LayoutTemplate,
   ListFilter,
+  ListChecks,
   LogIn,
   Pencil,
   Plus,
@@ -49,6 +50,7 @@ import { SHOWCASE } from '../showcase'
 import { screenOffered } from '../edition-screens'
 import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
 import { ACCESS_CHECK } from './sign-in-tests/names'
+import { DENIAL_REASONS } from './sign-in-tests/phase'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -427,6 +429,13 @@ export function Policies() {
                 tab, as a button"; 1 Oct: named for access, names.ts). Secondary,
                 before New policy, so the bar keeps one orange button; withheld
                 exactly as the route is. */}
+            {/* Sign-in activity beside it (owner, 5 Oct 2026: "move the sign-in activities in the main policy screen with the
+                check access button"): the week's sign-ins and why any were refused. */}
+            {DENIAL_REASONS && screenOffered({ name: 'sign-in-tests' }, store.features) && (
+              <Button variant="secondary" icon={ListChecks} onClick={() => store.go({ name: 'sign-in-activity' })}>
+                Sign-in activity
+              </Button>
+            )}
             {screenOffered({ name: 'sign-in-tests' }, store.features) && (
               <Button variant="secondary" icon={LogIn} onClick={() => store.go({ name: 'sign-in-tests' })}>
                 {ACCESS_CHECK}

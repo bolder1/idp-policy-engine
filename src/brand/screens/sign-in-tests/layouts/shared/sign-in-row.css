@@ -1,0 +1,183 @@
+/* -----------------------------------------------------------------------------
+   The sign-in row (SignInRow.tsx): one line at the top centre of the stage,
+   the same in Focus, Brief and Jarvis. De-boxed inside — no chip borders, no
+   fills — with three hairline dividers between its groups. Words are ink;
+   colour is on the icons only (person and group blue, the app its own logo,
+   the facts violet); blue rings mean the engine working, an amber dashed
+   ring a preview. Its looks are the STAGE's (data-look), not the console's.
+   -------------------------------------------------------------------------- */
+
+.sir {
+  --sir-bg: #ffffff;
+  --sir-line: #e5e7eb;
+  --sir-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --sir-ink: #212529;
+  --sir-muted: #5c646d;
+  --sir-hover: #f3f4f6;
+  --sir-blue: #0a58ca;
+  --sir-blue-soft: #e7f1ff;
+  --sir-violet: #5b3cc4;
+  --sir-ok: #14663a;
+  --sir-bad: #a5142b;
+  --sir-amber: #a86b00;
+  --sir-halo: rgba(13, 110, 253, 0.28);
+  --sir-face-bg: #e7f1ff;
+
+  position: absolute;
+  z-index: 6;
+  top: 16px;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 6px;
+  overflow: hidden;
+  border: 1px solid var(--sir-line);
+  border-radius: 10px;
+  background: var(--sir-bg);
+  box-shadow: var(--sir-shadow);
+  color: var(--sir-ink);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: auto;
+}
+.sir.is-inline { position: relative; top: auto; left: auto; right: auto; margin-inline: 0; }
+.sir[data-look='dark'] {
+  --sir-bg: #111827;
+  --sir-line: #2a3342;
+  --sir-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px rgba(0, 0, 0, 0.3);
+  --sir-ink: #e6edf5;
+  --sir-muted: #9aa8b8;
+  --sir-hover: rgba(255, 255, 255, 0.07);
+  --sir-blue: #7ab0ff;
+  --sir-blue-soft: rgba(110, 168, 255, 0.16);
+  --sir-violet: #b9a4ff;
+  --sir-ok: #8be3b2;
+  --sir-bad: #ffa3ae;
+  --sir-amber: #f6d58a;
+  --sir-halo: rgba(110, 168, 255, 0.4);
+  --sir-face-bg: rgba(110, 168, 255, 0.16);
+}
+/* Aruna (code name Jarvis), dark: warm glass, ember hairlines; the fact being read in the engine's orange, a
+   preview fact a dashed flare tint (never lemon: lemon means can't tell). Aruna's light stage restates the
+   light look's vars in jarvis.css. */
+.sir[data-look='jarvis'] {
+  --sir-bg: rgba(20, 13, 10, 0.8);
+  --sir-line: rgba(255, 140, 90, 0.28);
+  --sir-shadow: 0 0 18px rgba(255, 107, 44, 0.08);
+  --sir-ink: #f6eee9;
+  --sir-muted: #a8948a;
+  --sir-hover: rgba(255, 140, 90, 0.1);
+  --sir-blue: #ffa574;
+  --sir-blue-soft: rgba(255, 107, 44, 0.16);
+  --sir-violet: #d9b3a0;
+  --sir-ok: #3ddba0;
+  --sir-bad: #ff7a9c;
+  --sir-amber: #ffc09a;
+  --sir-halo: rgba(255, 107, 44, 0.4);
+  --sir-face-bg: rgba(255, 107, 44, 0.14);
+  backdrop-filter: blur(8px);
+}
+
+/* Every control: de-boxed, the console's focus ring. */
+.sir button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.sir button:hover { background: var(--sir-hover); }
+.sir button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--sir-halo); }
+
+/* Who → App: one button, the only part that may shrink (the app's name ellipses). */
+.sir__who { flex: 0 1 auto !important; min-width: 0; padding-left: 4px !important; }
+.sir__face { flex: none; display: grid; }
+.sir__face .bx-face { box-shadow: 0 0 0 1.5px var(--sir-blue); background: var(--sir-face-bg); color: var(--sir-blue); font-size: 12px; font-weight: 600; letter-spacing: -0.03em; }
+.sir__grp { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: var(--sir-blue); box-shadow: inset 0 0 0 1.5px var(--sir-blue); }
+.sir__name { flex: none; font-size: 14px; font-weight: 600; }
+.sir__arrow { flex: none; color: var(--sir-muted); }
+.sir__logo { flex: none; display: grid; }
+.sir__app { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+
+/* Several identities (5 Oct 2026): the Who part is a chip each, then → App. The chips keep their width (they fold by
+   name, in SignInRow's fit); → App is what shrinks, its name ellipsing last, and it clips rather than spill over the
+   facts. The chip the canvas tells is pressed as the pencil is — blue on blue-soft, so on Aruna's dark stage it is
+   her ember — and the rest are plain row buttons. */
+.sir__ids { flex: none; display: inline-flex; align-items: center; gap: 2px; }
+.sir__id { padding: 0 7px 0 4px !important; font-weight: 500; }
+/* Pressing the one on the canvas does nothing, so it does not answer the pointer as if it would. */
+.sir__id.is-on,
+.sir__id.is-on:hover { color: var(--sir-blue); background: var(--sir-blue-soft); cursor: default; }
+.sir__id.is-lit { border-color: var(--sir-blue); }
+/* Its answer, once the run on screen has landed: the row's own verdict colours, as Expected ✓ / ✕ are. */
+.sir__idmark { flex: none; }
+.sir__idmark.is-allow,
+.sir__idmark.is-2fa { color: var(--sir-ok); }
+.sir__idmark.is-deny { color: var(--sir-bad); }
+.sir__idmark.is-depends { color: var(--sir-amber); }
+.sir__idmark.is-none { color: var(--sir-muted); }
+.sir__to { flex: 0 1 auto !important; min-width: 0; overflow: hidden; padding-left: 2px !important; }
+/* The faces alone (the last fold): each answer sits on its face's corner, on the row's own ground. */
+.sir.is-faces .sir__id { position: relative; padding: 0 6px 0 3px !important; }
+.sir.is-faces .sir__idmark { position: absolute; right: 0; bottom: 1px; padding: 1px; border-radius: 50%; background: var(--sir-bg); }
+.sir.is-faces .sir__id.is-on .sir__idmark { background: var(--sir-blue-soft); }
+
+.sir__div { flex: none; width: 1px; height: 18px; background: var(--sir-line); }
+
+/* The facts: icon violet, words ink. */
+.sir__facts { flex: none; display: inline-flex; align-items: center; gap: 2px; }
+.sir__ficon { flex: none; color: var(--sir-violet); }
+/* The value's own mark (ValueMark): a lucide icon takes the violet; a platform logo (Windows, Apple…) keeps its own colours. */
+.sir__fmark { display: inline-flex; align-items: center; }
+.sir__val { color: var(--sir-ink); }
+.sir__fact.is-add { border: 1px dashed var(--sir-line); color: var(--sir-muted); height: 26px; padding: 0 8px 0 6px; margin: 0 2px; }
+.sir__fact.is-add .sir__val { color: var(--sir-muted); }
+.sir__fact.is-add:hover { border-color: var(--sir-violet); }
+.sir.is-compact .sir__fact { padding: 0 6px; }
+/* A check reading it (the engine working), a citation lighting it, a preview changing it. */
+.sir__fact.is-reading,
+.sir__fact.is-lit,
+.sir__who.is-lit { border-color: var(--sir-blue); }
+.sir__fact.is-preview { border: 1px dashed var(--sir-amber); }
+
+/* The one state tag: neutral ink, no fill. */
+.sir__state { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--sir-muted); }
+.sir__state.is-unrun { color: var(--sir-ink); font-weight: 500; }
+.sir__met { color: var(--sir-ok); }
+.sir__missed { color: var(--sir-bad); }
+
+/* The pencil: pressed while the panel is open (blue = active). */
+.sir__pencil { width: 30px; justify-content: center; padding: 0 !important; color: var(--sir-muted) !important; }
+.sir__pencil.is-on { color: var(--sir-blue) !important; background: var(--sir-blue-soft); }
+.sir__pencil:hover { color: var(--sir-ink) !important; }
+
+/* Replay: plain words that never change; quiet while the run plays. */
+.sir__replay { font-weight: 500; }
+.sir__replay[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+.sir__replay[aria-disabled='true']:hover { background: none; }
+
+/* Focus's voice, views and Questions are the canvas's own bar at its foot now (focus2-canvasbar.css, 5 Oct 2026). */
+
+@media (prefers-reduced-motion: reduce) {
+  .sir button { transition: none; }
+}

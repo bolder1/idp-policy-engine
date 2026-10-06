@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import type { Policy } from '../../../data'
 import { DECISION_WORDS } from '../../../decision-words'
 import { useBrand, useNameLookup } from '../../../store'
 import { useSimEnv } from '../../sim-env'
@@ -23,6 +24,8 @@ export interface Reroute {
   alt: AltRoute
   /** The what-if's own run; null for a group row (the run's own comparison). */
   plan: EngineRun | null
+  /** The sign-in with this one fact changed, for a what-if the page can run; null for a group row. */
+  form: SignInForm | null
 }
 
 const wordsOf = (plan: EngineRun): string => {
@@ -38,8 +41,11 @@ function sourceOf(plan: EngineRun, base: EngineRun): string {
   return rule
 }
 
-export function useReroutes(form: SignInForm, rows: RowsRead, base: EngineRun, on: boolean): Reroute[] {
-  const { policies, zones, fingerprints, users, apps } = useBrand()
+export function useReroutes(form: SignInForm, rows: RowsRead, base: EngineRun, on: boolean, policiesOverride?: readonly Policy[]): Reroute[] {
+  const brand = useBrand()
+  const { zones, fingerprints, users, apps } = brand
+  /* The policies the run was made against: the builder's draft stands in for its stored twin. */
+  const policies = policiesOverride ?? brand.policies
   const env = useSimEnv()
   const names = useNameLookup()
   return useMemo(() => {
@@ -72,6 +78,7 @@ export function useReroutes(form: SignInForm, rows: RowsRead, base: EngineRun, o
         const same = plan.decider?.id === base.decider?.id
         out.push({
           plan,
+          form: v.form,
           alt: {
             key: v.key,
             label: v.label,
@@ -98,6 +105,7 @@ export function useReroutes(form: SignInForm, rows: RowsRead, base: EngineRun, o
       const rule = r.ruleNumber !== null ? `rule ${r.ruleNumber}` : r.ruleName
       out.push({
         plan: null,
+        form: null,
         alt: {
           key: `group:${g.id}`,
           label: `As ${g.name} only`,

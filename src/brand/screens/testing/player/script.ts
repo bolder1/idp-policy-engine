@@ -144,7 +144,7 @@ export type Page =
   | { kind: 'continue'; title: string; ask: string; button: string; remember: Remember | null; done: boolean }
   | { kind: 'unavailable'; name: string }
   | { kind: 'signed-in' }
-  | { kind: 'denied'; message: string }
+  | { kind: 'denied'; message: string; action?: string; contact?: string }
 
 export type PhoneScreen =
   | { kind: 'sms'; from: string; text: string; code: string | null; link: string | null; approved: boolean }
@@ -663,7 +663,7 @@ export function scriptOf(screens: SignInScreens, ctx: ScriptContext): Script {
         f.next()
       }
       chips.push(stepLabel(step))
-      f.add('browser', { kind: 'end' }, MS.end, { page: { kind: 'denied', message: step.message }, device: null, toast: null, sheet: null, end: 'denied' })
+      f.add('browser', { kind: 'end' }, MS.end, { page: { kind: 'denied', message: step.message, action: step.action, contact: step.contact }, device: null, toast: null, sheet: null, end: 'denied' })
       end = 'denied'
       stopped = true
       continue

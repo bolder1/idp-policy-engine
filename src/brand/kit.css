@@ -579,8 +579,8 @@ html[data-theme='dark'] {
   position: relative; flex: none;
   width: 44px; height: 24px;
   border-radius: var(--radius-full);
-  background: var(--surface-inset);
-  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  border: 1px solid var(--text-placeholder);
   transition: background var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard);
 }
 .bx-toggle--sm { width: 32px; height: 18px; }
@@ -616,16 +616,12 @@ html[data-theme='dark'] {
   }
 }
 
-/* On is GREEN, not brand.
-
-   A switch says "this is running", which is a state, and the console already
-   has a colour for that state: the positive tint on every Active pill. Brand is
-   for the thing you press to commit, and a page of brand-orange switches spent
-   that meaning on rows nobody is about to act on — nine rules, nine orange
-   bars, none of them the primary action. */
-.bx-toggle.is-on { background: var(--fb-positive-fg); border-color: var(--fb-positive-fg); }
-.bx-toggle:not(:disabled):hover { border-color: var(--border-strong); }
-.bx-toggle.is-on:not(:disabled):hover { filter: brightness(0.93); }
+/* On is BLUE (owner, 5 Oct 2026; see the note after the knob rules). A switch
+   says "this is running", a state, and brand orange is for the thing you press
+   to commit. The current look has no blue token and keeps its green there. */
+.bx-toggle.is-on { background: var(--blue, var(--fb-positive-fg)); border-color: var(--blue, var(--fb-positive-fg)); }
+.bx-toggle:not(.is-on):not(:disabled):hover { background: var(--surface-raised); border-color: var(--text-secondary); }
+.bx-toggle.is-on:not(:disabled):hover { background: var(--blue-hover, var(--fb-positive-fg)); border-color: var(--blue-hover, var(--fb-positive-fg)); }
 .bx-toggle:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 
 .bx-toggle__knob {
@@ -634,7 +630,10 @@ html[data-theme='dark'] {
   border-radius: var(--radius-full);
   background: var(--surface-raised);
   box-shadow: var(--el-low);
+  transition: background-color var(--dur-normal) var(--ease-standard);
 }
+.bx-toggle:not(.is-on) .bx-toggle__knob { background: var(--text-tertiary); box-shadow: none; }
+.bx-toggle:not(.is-on):not(:disabled):hover .bx-toggle__knob { background: var(--text-secondary); }
 /* The small knob is 12px: 2px of track all round with the same 14px of travel.
    At 14px it sat flush against the right edge when on (1 Oct 2026). */
 .bx-toggle--sm .bx-toggle__knob { width: 12px; height: 12px; margin-top: -6px; }
@@ -645,103 +644,13 @@ html[data-theme='dark'] {
    switch reached by Tab turned into a rounded rectangle. */
 .brand-root .bx-toggle:focus-visible { border-radius: var(--radius-full); }
 
-/* --- Toggle style: a PENDING DECISION ----------------------------------------
-   Owner, 1 Oct 2026: "For the toggle I want some options. One is the blue one,
-   the green one, one grayscale, and you can find some more better options; we
-   will select and then choose one."
-
-   Six ways to draw the same switch, one block each, plus one off state the
-   four colours share, keyed on `data-toggle-style` on <html>. toggle-style.ts sets it before the first
-   paint and the "Toggle style" switch on Authentication methods changes it,
-   so every switch in the console changes together. Each block beats the
-   rebrand's switch rules on specificity, (0,3,1) over (0,3,0), wherever it
-   loads. Colours read tokens only; the contrast figures are the rebrand's
-   light page.
-
-   This all goes once the owner picks: the winner's lines become the switch's
-   own rules above, and toggle-style.ts and its switch are deleted. */
-
-/* 1. Blue: today's on colour. The live console's blue, as on 1Password,
-   Vercel, Notion and Cloudflare's newer pages. On is 4.5:1 against the page.
-   Off is the shared edge below. The current look has no blue token, and there
-   it keeps its own green, which is today's look there too. */
-html[data-toggle-style='blue'] .bx-toggle.is-on { background: var(--blue, var(--fb-positive-fg)); border-color: var(--blue, var(--fb-positive-fg)); }
-html[data-toggle-style='blue'] .bx-toggle.is-on:not(:disabled):hover { background: var(--blue-hover, var(--fb-positive-fg)); border-color: var(--blue-hover, var(--fb-positive-fg)); }
-
-/* 2. Green: on is running, in the colour the "Always on" and "1 of 3 enabled"
-   pills in the same column already use, and blue goes back to meaning
-   selected. Slack, Cloudflare's classic dashboard, Atlassian and Supabase.
-   6.5:1 against the page. Off is the shared edge below. */
-html[data-toggle-style='green'] .bx-toggle.is-on { background: var(--fb-positive-fg); border-color: var(--fb-positive-fg); }
-html[data-toggle-style='green'] .bx-toggle.is-on:not(:disabled):hover { background: color-mix(in srgb, var(--fb-positive-fg) 85%, var(--text-primary)); border-color: color-mix(in srgb, var(--fb-positive-fg) 85%, var(--text-primary)); filter: none; }
-
-/* 3. Grayscale: no hue at all, on shown by value, the console's 60/30/10 rule.
-   Base44 and Airbnb. 8.2:1 against the page. Off is the shared edge below.
-   Never `--accent`: that is blue in the rebrand. */
-html[data-toggle-style='grayscale'] .bx-toggle.is-on { background: var(--text-secondary); border-color: var(--text-secondary); }
-html[data-toggle-style='grayscale'] .bx-toggle.is-on:not(:disabled):hover { background: var(--text-primary); border-color: var(--text-primary); filter: none; }
-
-/* 4. Navy: the live console's dark slate, the rail's colour and its primary
-   button. A dark, quiet on, as in Plane, Customer.io and Wise. 12.2:1 against
-   the page. Off is the shared edge below. Reads the rail's tokens, so if it
-   wins it gets an alias of its own in rebrand.css. Never `--int-brand-bg`:
-   that is orange in the rebrand. */
-html[data-toggle-style='navy'] .bx-toggle.is-on { background: var(--shell-raised); border-color: var(--shell-raised); }
-html[data-toggle-style='navy'] .bx-toggle.is-on:not(:disabled):hover { background: var(--shell-bg); border-color: var(--shell-bg); filter: none; }
-
-/* Off, for the four colours above. Today's off was a 1.3:1 grey pill with a
-   white knob, also 1.3:1 against it, so off failed the 3:1 rule for controls
-   and their state, and "disabled" looked the same as off. Now the pill keeps
-   its fill and gains a 1px `--text-placeholder` edge, 4.7:1 against the page
-   (4.5:1 on Recovery's panel), and the knob is `--text-tertiary`, 4.7:1
-   against the track. The knob is the darker of the two so it still passes,
-   3.5:1, in a switched-off rule card on the board when that card is hovered
-   or selected (0.85 opacity). At rest such a card is 0.62, and there no
-   style reaches 3:1; that is the card's dimming, not the switch. Disabled
-   fades to 1.8:1, so it reads differently. It is the live console's own
-   Bootstrap switch, with darker greys. It is also what tells these four
-   apart from Outlined: a filled pill with a full-size knob, not an empty
-   ring with a small dot. The knob turns white as it crosses. */
-html:is([data-toggle-style='blue'], [data-toggle-style='green'], [data-toggle-style='grayscale'], [data-toggle-style='navy']) .bx-toggle:not(.is-on) { border-color: var(--text-placeholder); }
-html:is([data-toggle-style='blue'], [data-toggle-style='green'], [data-toggle-style='grayscale'], [data-toggle-style='navy']) .bx-toggle:not(.is-on):not(:disabled):hover { border-color: var(--text-secondary); }
-html:is([data-toggle-style='blue'], [data-toggle-style='green'], [data-toggle-style='grayscale'], [data-toggle-style='navy']) .bx-toggle__knob { transition: background-color var(--dur-normal) var(--ease-standard); }
-html:is([data-toggle-style='blue'], [data-toggle-style='green'], [data-toggle-style='grayscale'], [data-toggle-style='navy']) .bx-toggle:not(.is-on) .bx-toggle__knob { background: var(--text-tertiary); box-shadow: none; }
-html:is([data-toggle-style='blue'], [data-toggle-style='green'], [data-toggle-style='grayscale'], [data-toggle-style='navy']) .bx-toggle:not(.is-on):not(:disabled):hover .bx-toggle__knob { background: var(--text-secondary); }
-
-/* 5. Outlined: the heavier fix for off. An empty track with a 2px edge and a
-   small grey knob, 4.7:1 against the page; on is today's colour, and the knob
-   grows white as it crosses. Slack admin, GoFundMe, Dropbox and Material 3.
-   The shape works with any colour above. The 2px edge leaves 40x20 inside md:
-   a 12px knob with 4px all round off, 16px with 2px all round on; sm and lg
-   keep the same proportions. */
-html[data-toggle-style='outlined'] .bx-toggle { border-width: 2px; }
-html[data-toggle-style='outlined'] .bx-toggle:not(.is-on) { background: transparent; border-color: var(--text-placeholder); }
-html[data-toggle-style='outlined'] .bx-toggle:not(.is-on):not(:disabled):hover { background: var(--state-hover-bg); border-color: var(--text-secondary); }
-html[data-toggle-style='outlined'] .bx-toggle__knob { left: 4px; width: 12px; height: 12px; margin-top: -6px; transition: width var(--dur-normal) var(--ease-standard), height var(--dur-normal) var(--ease-standard), margin var(--dur-normal) var(--ease-standard), background var(--dur-normal) var(--ease-standard); }
-html[data-toggle-style='outlined'] .bx-toggle:not(.is-on) .bx-toggle__knob { background: var(--text-placeholder); box-shadow: none; }
-html[data-toggle-style='outlined'] .bx-toggle.is-on .bx-toggle__knob { width: 16px; height: 16px; margin-top: -8px; margin-left: -2px; }
-html[data-toggle-style='outlined'] .bx-toggle--sm .bx-toggle__knob { left: 3px; width: 8px; height: 8px; margin-top: -4px; }
-html[data-toggle-style='outlined'] .bx-toggle--sm.is-on .bx-toggle__knob { width: 10px; height: 10px; margin-top: -5px; margin-left: -1px; }
-html[data-toggle-style='outlined'] .bx-toggle--lg .bx-toggle__knob { left: 5px; width: 16px; height: 16px; margin-top: -8px; }
-html[data-toggle-style='outlined'] .bx-toggle--lg.is-on .bx-toggle__knob { width: 22px; height: 22px; margin-top: -11px; margin-left: -3px; }
-
-/* 6. Icons: a dark off track with a cross, green on with a tick, so the state
-   reads without colour. The identity consoles nearest ours do this: Okta,
-   Cloudflare's classic dashboard, Atlassian admin. Off 6.1:1 and on 6.5:1
-   against the page, the knob and marks the same against the track. The cost:
-   every off row becomes a dark pill. The mark is the track's ::before,
-   because ::after is the touch hit area, and the knob paints over it. */
-html[data-toggle-style='glyph'] .bx-toggle:not(.is-on) { background: var(--text-tertiary); border-color: var(--text-tertiary); }
-html[data-toggle-style='glyph'] .bx-toggle:not(.is-on):not(:disabled):hover { background: var(--text-secondary); border-color: var(--text-secondary); }
-html[data-toggle-style='glyph'] .bx-toggle.is-on { background: var(--fb-positive-fg); border-color: var(--fb-positive-fg); }
-html[data-toggle-style='glyph'] .bx-toggle.is-on:not(:disabled):hover { background: color-mix(in srgb, var(--fb-positive-fg) 85%, var(--text-primary)); border-color: color-mix(in srgb, var(--fb-positive-fg) 85%, var(--text-primary)); filter: none; }
-html[data-toggle-style='glyph'] .bx-toggle::before { content: ''; position: absolute; top: 50%; pointer-events: none; }
-html[data-toggle-style='glyph'] .bx-toggle:not(.is-on)::before { right: 7px; width: 8px; height: 8px; margin-top: -4px; background: linear-gradient(45deg, transparent calc(50% - 1px), var(--surface-raised) 0 calc(50% + 1px), transparent 0), linear-gradient(-45deg, transparent calc(50% - 1px), var(--surface-raised) 0 calc(50% + 1px), transparent 0); }
-html[data-toggle-style='glyph'] .bx-toggle.is-on::before { left: 8px; width: 5px; height: 9px; margin-top: -6px; border: solid var(--surface-raised); border-width: 0 2px 2px 0; transform: rotate(45deg); }
-html[data-toggle-style='glyph'] .bx-toggle--sm:not(.is-on)::before { right: 4px; scale: 0.75; }
-html[data-toggle-style='glyph'] .bx-toggle--sm.is-on::before { left: 5px; scale: 0.75; }
-html[data-toggle-style='glyph'] .bx-toggle--lg:not(.is-on)::before { right: 8px; scale: 1.25; }
-html[data-toggle-style='glyph'] .bx-toggle--lg.is-on::before { left: 9px; scale: 1.25; }
+/* The owner chose Blue on 5 Oct 2026, after comparing six styles. On is blue.
+   Off is white with a 1px `--text-placeholder` edge and a `--text-tertiary`
+   knob, so it feels active, not disabled; the knob turns white as it crosses.
+   Disabled off is the grey pill: `--border-default` fill and edge, white knob,
+   no shadow, not faded. Disabled on keeps the blue and fades. */
+.bx-toggle:disabled:not(.is-on) { background: var(--border-default); border-color: var(--border-default); opacity: 1; }
+.bx-toggle:disabled:not(.is-on) .bx-toggle__knob { background: var(--surface-raised); box-shadow: none; }
 
 /* --- Chip ----------------------------------------------------------------- */
 

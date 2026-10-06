@@ -6,7 +6,9 @@ import { tracePolicy, traceRule } from '../simulate'
 import { denyReasonOf } from '../sign-in-tests/deny-reason'
 import { engineRun, readersOf } from '../sign-in-tests/engine-run'
 import { askedFields, emptyDraft } from '../sign-in-tests/sign-in-card'
-import { grantTempAccess } from '../sign-in-tests/temp-access'
+import { GRANT_ENDED, grantTempAccess } from '../sign-in-tests/temp-access'
+import classic2Src from '../sign-in-tests/layouts/classic2-chain.tsx?raw'
+import inspectSrc from '../sign-in-tests/InspectPanel.tsx?raw'
 import { envOf, resolveSignIn } from '../tenant-resolver'
 import { rowsRead } from './rows-read'
 import { sentenceTokens, tokenValue } from './sign-in-sentence'
@@ -116,5 +118,28 @@ describe('a date with no time is still no time of day', () => {
   it('leaves a time window and a weekday undecided, asking for the time', () => {
     expect([window.status, window.missing]).toEqual(['unknown', ['time']])
     expect([day.status, day.missing]).toEqual(['unknown', ['time']])
+  })
+})
+
+describe('an ended grant says so (6 Oct 2026)', () => {
+  const ctx = (policies: readonly Policy[]) => ({ people: t.directory.people, apps: t.apps, zones: t.zones, rows: rowsRead(policies, null, 'aws', lib) })
+
+  it('the Time pill says the date beside the hour where a grant is in play, and only there', () => {
+    expect(rowsRead(granted, null, 'aws', lib).grant).toBe(true)
+    expect(rowsRead(t.policies, null, 'aws', lib).grant).toBeUndefined()
+    const after = leoOn('2026-10-14', '14:22')
+    expect(tokenValue('when', after, ctx(granted)).text).toBe('14:22 Wed · 14 Oct 2026')
+    expect(tokenValue('when', after, ctx(t.policies)).text).toBe('14:22 Wed')
+  })
+
+  it('the rules list and the details panel call it ended, not switched off', () => {
+    const { run } = judge(granted, leoOn('2026-10-14'))
+    const row = run.rules.find((r) => r.id === grant.rules[0].id)
+    expect(row?.state).toBe('off')
+    expect(grant.rules[0].tempAccess?.until).toBe(END)
+    expect(classic2Src).toContain("const ended = r.state === 'off' && !!rule?.tempAccess && rule.enabled !== false")
+    expect(classic2Src).toContain("possible: 'If not'")
+    expect(inspectSrc).toContain('title={GRANT_ENDED} line={`Ran until ${dateSaid(rule.tempAccess!.until)}`}')
+    expect(GRANT_ENDED).toBe('Temporary access ended')
   })
 })

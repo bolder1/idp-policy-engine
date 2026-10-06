@@ -66,6 +66,9 @@ export interface RowsRead {
   rows: ReadonlySet<RowId>
   /** Empty unless `rows` has 'device'. */
   device: ReadonlySet<DeviceRowId>
+  /** A rule on this application carries temporary access (temp-access.ts): the When row's date is what ends it, so it is
+      said beside the hour (sign-in-sentence.ts). Absent is none. */
+  grant?: boolean
 }
 
 /** The tenant objects the rows are read against: which zones draw a range, and what each profile checks. */
@@ -122,8 +125,12 @@ function deviceRowsOf(p: FingerprintProfile): DeviceRowId[] {
 export function rowsRead(policies: readonly Policy[], draft: Policy | null, appId: string | null, lib: RowsLibrary): RowsRead {
   const rows = new Set<RowId>()
   const device = new Set<DeviceRowId>()
+  let grant = false
   for (const r of rulesOn(policiesOn(policies, appId, draft))) {
-    if (r.tempAccess) rows.add('when')
+    if (r.tempAccess) {
+      rows.add('when')
+      grant = true
+    }
     for (const c of leaves(r.when)) {
       switch (c.typeId) {
         case 'zone':
@@ -160,7 +167,7 @@ export function rowsRead(policies: readonly Policy[], draft: Policy | null, appI
       }
     }
   }
-  return { rows, device: new Set(DEVICE_ROWS.filter((d) => device.has(d))) }
+  return { rows, device: new Set(DEVICE_ROWS.filter((d) => device.has(d))), ...(grant ? { grant } : {}) }
 }
 
 /* Policy testing's rows: all of them, and every device detail, but Distance
@@ -170,5 +177,5 @@ export function pageRows(read: RowsRead): RowsRead {
   const rows = new Set<RowId>(['place', 'when', 'device', 'risk'])
   if (read.rows.has('distance')) rows.add('distance')
   if (read.rows.has('time-track')) rows.add('time-track')
-  return { rows, device: new Set(DEVICE_ROWS) }
+  return { rows, device: new Set(DEVICE_ROWS), ...(read.grant ? { grant: true } : {}) }
 }

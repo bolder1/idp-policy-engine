@@ -34,7 +34,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { DEFAULT_DENY_MESSAGE, TENANT_DENY_CONTACT, audienceSummary, blankPolicy, type AccessDecision, type Policy } from '../../data'
+import { DEFAULT_DENY_MESSAGE, TENANT_DENY_CONTACT, audienceSummary, blankPolicy, type AccessDecision, type Policy, type Rule } from '../../data'
+import { GRANT_ENDED, dateSaid } from './temp-access'
 import { DecisionBadge } from '../../decision-badge'
 import { DECISION_WORDS } from '../../decision-words'
 import { Button, StatusPill, Tabs } from '../../kit'
@@ -338,6 +339,8 @@ type Shown = RuleFate | 'if-not'
 
 const FATE_MARK: Record<Shown, LucideIcon> = { decided: Check, 'not-matched': X, 'cant-tell': CircleHelp, off: Minus, 'not-reached': Minus, 'if-not': CornerDownRight }
 const FATE_SAID: Record<Shown, string> = { ...FATE_WORDS, 'if-not': 'If not' }
+/** A rule off in the run because its temporary access ran out, not because someone switched it off (6 Oct 2026). */
+const endedGrant = (rule: Pick<Rule, 'tempAccess' | 'enabled'> | undefined): boolean => !!rule?.tempAccess && rule.enabled !== false
 
 /** This policy decides the run, but the answer Depends: a rule in it could not be told. */
 const dependsIn = (plan: EngineRun, policyId: string): boolean => plan.decider?.id === policyId && (plan.outcome.status === 'depends' || !plan.rules.some((r) => r.state === 'match'))
@@ -515,7 +518,7 @@ function PolicyView({ target, plan, onPush }: { target: Extract<InspectTarget, {
                         {fate && FateIcon && (
                           <span className={`insp__fate is-${fate}`}>
                             <FateIcon size={12} strokeWidth={2.4} aria-hidden />
-                            {FATE_SAID[fate]}
+                            {fate === 'off' && endedGrant(policy.rules.find((x) => x.id === r.id)) ? GRANT_ENDED : FATE_SAID[fate]}
                           </span>
                         )}
                       </span>
@@ -593,7 +596,11 @@ function RuleView({ target, plan, onPush }: { target: Extract<InspectTarget, { k
           /* What is at stake, in the outcome card's words ("If rule 1 matches · Deny"); what it could not read is listed under This sign-in. */
           <Verdict tone="notice" icon={CircleHelp} title={FATE_WORDS['cant-tell']} line={`If it matches: ${DECISION_WORDS[rule.decision]}`} />
         ) : shown === 'off' ? (
-          <Verdict tone="neutral" icon={Minus} title="Switched off" />
+          endedGrant(rule) ? (
+            <Verdict tone="neutral" icon={Minus} title={GRANT_ENDED} line={`Ran until ${dateSaid(rule.tempAccess!.until)}`} />
+          ) : (
+            <Verdict tone="neutral" icon={Minus} title="Switched off" />
+          )
         ) : (
           <Verdict tone="neutral" icon={CircleDashed} title="Not checked for this sign-in" line={`${policy.name} did not decide it`} />
         )}

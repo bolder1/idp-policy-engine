@@ -232,7 +232,11 @@ export function tokenValue(token: TokenId, form: SignInForm, ctx: SentenceContex
          not read (simulate.ts, the day check). */
       if (!form.time) return form.date ? said([dateSaid(form.date), tz].filter(Boolean).join(' · '), { kind: 'icon', icon: 'clock' }) : unset({ kind: 'icon', icon: 'clock' })
       const day = form.date ? weekdayOf(form.date) : null
-      return said([[form.time, day].filter(Boolean).join(' '), tz].filter(Boolean).join(' · '), { kind: 'icon', icon: 'clock' })
+      /* Where a temporary access grant is in play, its end is a date, so the date is said beside the hour (6 Oct 2026):
+         "14:22 Tue" hid the very thing that ends the grant inside the popover. Elsewhere the hour and weekday are what a
+         rule reads, and the pill stays as it was. */
+      const date = ctx.rows?.grant && form.date ? dateSaid(form.date) : null
+      return said([[form.time, day].filter(Boolean).join(' '), date, tz].filter(Boolean).join(' · '), { kind: 'icon', icon: 'clock' })
     }
     case 'risk': {
       const risk = form.risk.trim()

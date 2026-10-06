@@ -266,9 +266,11 @@
 .rl-c2__reason { color: var(--text-secondary); }
 .rl-c2__reason span { color: var(--text-tertiary); margin-left: var(--space-1); }
 .rl-c2__arrow { flex: none; color: var(--text-tertiary); }
-/* The way to the why in the page's right-hand panel (Focus hands it; classic2-chain.tsx `ChainWhy`): the body's last
-   line, a quiet link in the link's own colour with its chevron — the policy names' look, never a button, never orange. */
-.rl-c2__whyrow { margin-top: var(--space-2); }
+/* The way to the why in the page's right-hand panel (Focus hands it; classic2-chain.tsx `ChainWhy`): under the
+   outcome's head, folded or not, in line with its title — a quiet link in the link's own colour with its chevron, the
+   policy names' look, never a button, never orange. The unseen tile holds the title's column without restating it. */
+.rl-c2__whyunder { display: flex; align-items: center; gap: var(--space-5); margin-top: calc(var(--space-3) * -1); }
+.rl-c2__whyspace { flex: none; height: 0; visibility: hidden; }
 .rl-c2__why {
   display: inline-flex;
   align-items: center;

@@ -63,6 +63,7 @@ import { IdentityChips, type ChipFold } from './shared/IdentityChips'
 import { identityChips, rowFacts, rowState, type IdentityChip } from './shared/sign-in-row'
 import type { RunLayoutProps } from './types'
 import { DENIAL_REASONS } from '../phase'
+import { GRANT_ENDED } from '../temp-access'
 import { PEEK_FALLBACK, targetLabel, type InspectTarget } from '../inspect-model'
 import { objectsOfRule, peekNames } from '../peek-model'
 import { DENY_REASON_WORD, denyReasonOf, denyRef } from '../deny-reason'
@@ -992,7 +993,10 @@ function PassedRuleCard({
    are a line — its number, its name, how it fared — and a press opens the builder's own rule body under it, with the
    ✓ and ✕ of the rows that were read (none on a rule never reached, which was not asked). A press again folds it.
    While the engine is still reading, only the rule it is on is drawn: the rest would give the answer away. */
-const RULE_WORDS: Record<string, string> = { match: 'Matches', 'no-match': 'Not matched', unknown: 'Can’t tell', possible: 'Can’t tell', off: 'Switched off', 'not-reached': 'Not reached' }
+/* `possible` is the rule the definite reading walks on to after one it cannot tell: "If not", the canvas's own word
+   (PolicyStack.tsx) and the details panel's. An ended temporary access grant is off in the run, but it was not switched
+   off — it ran out (6 Oct 2026), and says so. */
+const RULE_WORDS: Record<string, string> = { match: 'Matches', 'no-match': 'Not matched', unknown: 'Can’t tell', possible: 'If not', off: 'Switched off', 'not-reached': 'Not reached' }
 
 function RuleList({ plan, current, rules, fallback, s, settled, animate, resolve, onDetails }: { plan: RunLayoutProps['plan']; current: string; rules: readonly Rule[]; fallback: Rule | null; s: number; settled: boolean; animate: boolean; resolve: NameLookup; onDetails?: (ruleId: string) => void }) {
   /* What the admin opened or folded by hand; the rest follows the rule that is on. */
@@ -1011,7 +1015,8 @@ function RuleList({ plan, current, rules, fallback, s, settled, animate, resolve
         const terminal = r.index === null
         const rule = terminal ? (fallback ?? fallbackRule(r.decision)) : (rules.find((x) => x.id === r.id) ?? null)
         const open = manual.get(r.id) ?? r.id === current
-        const word = RULE_WORDS[r.state] ?? ''
+        const ended = r.state === 'off' && !!rule?.tempAccess && rule.enabled !== false
+        const word = ended ? GRANT_ENDED : (RULE_WORDS[r.state] ?? '')
         const why = r.state === 'no-match' && r.failing !== null ? (r.checks[r.failing]?.word ?? '') : ''
         const marks = rule && r.visited && !terminal ? ruleMarks(r, leaves(rule.when).map((k) => k.id), s) : null
         const bodyId = `${uid}-${r.id}`
@@ -1196,15 +1201,22 @@ function OutcomeCard({
               <span className="bb__ifkw is-blank">{metaWords(head.meta) || view.title}</span>
             </div>
           )}
-          {why && (
-            <div className="bb__ifrow rl-c2__whyrow">
-              <button type="button" className="rl-c2__why" aria-expanded={why.open} aria-controls={why.open ? why.id : undefined} onClick={why.onPress}>
-                {why.label}
-                <ChevronRight size={12} strokeWidth={2.2} aria-hidden />
-              </button>
-            </div>
-          )}
         </div>
+      }
+      /* The way to the why sits under the head, folded or not (owner, 6 Oct 2026: "move it to the folded card"):
+         Focus folds every card once a run lands, and a link only in the body was one press too deep and, at 1440 × 900,
+         under the canvas bar. In line with the title — an unseen copy of the tile holds its column — and a press on it
+         is the link's, never the card's fold. */
+      under={
+        why && (
+          <div className="rl-c2__under rl-c2__whyunder" onClick={(e) => e.stopPropagation()}>
+            <span className="bb__idx rl-c2__idx rl-c2__whyspace" aria-hidden />
+            <button type="button" className="rl-c2__why" aria-expanded={why.open} aria-controls={why.open ? why.id : undefined} onClick={why.onPress}>
+              {why.label}
+              <ChevronRight size={12} strokeWidth={2.2} aria-hidden />
+            </button>
+          </div>
+        )
       }
     />
   )

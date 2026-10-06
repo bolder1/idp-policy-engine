@@ -50,3 +50,6 @@ export function grantTempAccess(policy: Policy, person: { id: string; name: stri
 
 /** Every grant in a policy, for the list of what will expire. */
 export const tempGrantsOf = (policy: Pick<Policy, 'rules'>) => policy.rules.filter((r) => r.tempAccess)
+
+/** How a rule whose grant has run out reads in the run (it is off there, but nobody switched it off), and in the details panel. */
+export const GRANT_ENDED = 'Temporary access ended'

@@ -110,29 +110,31 @@ const ALLOW = propsOf('Maya Iyer', 'AWS Console')
 const DEPENDS = propsOf('Arun Patel', 'GitHub Enterprise', { patch: { device: { kind: 'none' } } as Partial<SignInForm> })
 const DEFAULTED = propsOf('Kavya Menon', 'HRMS')
 
-/** Every card folded but the outcome: the body the link ends. */
+/** Every card folded but the outcome. */
 const OUTCOME_OPEN: ChainFold = { open: { 'sign-in': false, policy: false, rule: false, outcome: true }, anyOpen: true, fold: noop, set: noop, foldAll: noop }
+/** Every card folded, as Focus leaves them once a run lands. */
+const ALL_FOLDED: ChainFold = { open: { 'sign-in': false, policy: false, rule: false, outcome: false }, anyOpen: false, fold: noop, set: noop, foldAll: noop }
 
 /* What Focus2Layout does with the two: the link on its chain's outcome, and the why — here beside the chain, there in the
    page's panel body. `done` is Focus's `whyDone`. */
-function Host({ run, done = true }: { run: RunLayoutProps; done?: boolean }) {
+function Host({ run, done = true, folded = false }: { run: RunLayoutProps; done?: boolean; folded?: boolean }) {
   const root = useRef<HTMLDivElement | null>(null)
   const fw = useFocusWhy(run, done, root)
   const data = useChainRun(run)
   return (
     <div ref={root}>
       <div className="rl-c2">
-        <Classic2Chain run={run} data={data} fold={OUTCOME_OPEN} animate={false} snap start={<span className="test-start" />} signInCard={false} why={fw.link} />
+        <Classic2Chain run={run} data={data} fold={folded ? ALL_FOLDED : OUTCOME_OPEN} animate={false} snap start={<span className="test-start" />} signInCard={false} why={fw.link} />
       </div>
       <aside className="test-panel">{fw.card}</aside>
     </div>
   )
 }
-const host = (run: RunLayoutProps, done = true) =>
+const host = (run: RunLayoutProps, done = true, folded = false) =>
   renderToStaticMarkup(
     <BrandProvider>
       <TestingSessionProvider>
-        <Host run={run} done={done} />
+        <Host run={run} done={done} folded={folded} />
       </TestingSessionProvider>
     </BrandProvider>,
   )
@@ -180,15 +182,21 @@ describe('the way in: one quiet link at the foot of the outcome card', () => {
     expect(panelOf(host({ ...DENY, ...pageWhy(true) }, false))).not.toContain('tj-why')
   })
 
-  it('is in the outcome card’s body, after who decided — never on a card’s head', () => {
-    const out = host({ ...DENY, ...pageWhy(false) })
-    const card = out.slice(out.indexOf('data-card="outcome"'))
-    const head = card.slice(0, card.indexOf('class="bb__tbody"'))
-    expect(head).not.toContain('rl-c2__why')
-    const body = card.slice(card.indexOf('class="bb__tbody"'))
-    expect(body.indexOf('rl-c2__why')).toBeGreaterThan(body.indexOf('decided by'))
-    /* Its own line at the keywords' edge, not a part of who decided. */
-    expect(body).toMatch(/<div class="bb__ifrow rl-c2__whyrow"><button type="button" class="rl-c2__why"/)
+  it('sits under the outcome’s head, folded or not — never in the head’s own buttons, never only in the body (owner, 6 Oct 2026)', () => {
+    for (const folded of [true, false]) {
+      const out = host({ ...DENY, ...pageWhy(false) }, true, folded)
+      const card = out.slice(out.indexOf('data-card="outcome"'))
+      const head = card.slice(0, card.indexOf('rl-c2__whyunder'))
+      expect(card, `folded ${folded}`).toContain('rl-c2__whyunder')
+      /* Not a head action: the head's own row ends before it. */
+      expect(head, `folded ${folded}`).not.toContain('rl-c2__why"')
+      /* In line with the title: an unseen tile holds the column. */
+      expect(card).toMatch(/class="rl-c2__under rl-c2__whyunder"><span class="bb__idx rl-c2__idx rl-c2__whyspace" aria-hidden="true"><\/span><button type="button" class="rl-c2__why"/)
+      if (!folded) {
+        const body = card.slice(card.indexOf('class="bb__tbody"'))
+        expect(body).not.toContain('rl-c2__why')
+      }
+    }
   })
 
   it('says what the why holds: a way in for a refusal that has one, the conflict for a conflict, else the plain why', () => {

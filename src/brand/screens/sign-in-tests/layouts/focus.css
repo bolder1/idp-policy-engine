@@ -444,6 +444,8 @@ button.rl-focus__crow:hover { background: var(--fc-sunken); }
 .rl-focus__factor { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--fc-line-2); border-radius: 6px; background: var(--fc-surface); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fc-text); }
 .rl-focus__factorarrow { color: var(--fc-text-4); }
 .rl-focus__deny { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--fc-bad-bg); font-size: var(--fs-md); color: var(--fc-bad-fg); }
+.rl-focus__reason { margin: 0; font-size: var(--fs-sm); color: var(--fc-text-2); }
+.rl-focus__reason span { color: var(--fc-text-3); margin-left: 6px; }
 .rl-focus__ifs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .rl-focus__ifs li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; background: var(--fc-sunken); font-size: var(--fs-sm); }
 .rl-focus__if { color: var(--fc-text-3); }

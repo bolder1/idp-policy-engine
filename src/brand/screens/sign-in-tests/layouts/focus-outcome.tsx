@@ -15,6 +15,8 @@ import { Spinner } from '../PolicyStack'
 import type { RunLayoutProps } from './types'
 import type { Tone } from './focus-model'
 import { EASE_OUT, LitCtx } from './focus-shared'
+import { DENIAL_REASONS } from '../phase'
+import { DENY_REASON_WORD, denyReasonOf, denyRef } from '../deny-reason'
 
 /* The last moment of Focus (FocusLayout.tsx): the answer, whole, and read at
    a glance — who signed in to what, the verdict in its colour, the policy
@@ -65,6 +67,7 @@ export function OutcomeMoment({ props, tone, animate, inert }: { props: RunLayou
   const deny = steps.find((st) => st.kind === 'deny')
   const factors = steps.filter((st) => st.kind !== 'deny')
   const count = findingsCount(plan)
+  const reason = denyReasonOf(plan)
   const hero = heroFinding(plan)
   const findings = (plan.conflicts?.findings ?? []).filter((f) => !isQuiet(f))
   const mark = expectMark(decided, expected, weaker)
@@ -139,6 +142,11 @@ export function OutcomeMoment({ props, tone, animate, inert }: { props: RunLayou
         {deny && deny.kind === 'deny' && (
           <motion.p className="rl-focus__deny" variants={line} title={deny.message}>
             “{deny.message}”
+          </motion.p>
+        )}
+        {DENIAL_REASONS && reason && (
+          <motion.p className="rl-focus__reason" variants={line}>
+            {DENY_REASON_WORD[reason]} · <span>{denyRef(reason)}</span>
           </motion.p>
         )}
         {o.status === 'depends' && o.view.outcomes.length > 0 && (

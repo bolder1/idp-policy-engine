@@ -30,6 +30,7 @@ import {
   type EngineRun,
   type Intro,
 } from './engine-run'
+import { denyReasonOf } from './deny-reason'
 import { askedFields, cardIssues, emptyDraft, forRun, withDefaults } from './sign-in-card'
 
 /* The engine run's plan (engine-run.ts), on the showcase tenant the console
@@ -235,6 +236,7 @@ describe('engineRun — checking the rules', () => {
     expect(r.rules[3]).toMatchObject({ id: LAST_ROW, name: 'Nothing else matched', state: 'match', decision: 'deny' })
     expect(r.landing).toBe(3)
     expect(r.outcome).toMatchObject({ status: 'decided', decision: 'deny', ruleLine: 'Nothing else matched' })
+    expect(denyReasonOf(r)).toBe('default-deny')
   })
 
   it('a device profile is one row with its checks under it; risk bounds are one Risk row', () => {

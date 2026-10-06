@@ -36,3 +36,6 @@ export const SAVED_SIGN_INS: boolean = false
 
 /** Break-in attempts on Access checks: the Why section, the strip, the attempts panel. On, with `features.breakInTest`. */
 export const BREAK_IN_ATTEMPTS: boolean = true
+
+/** Denial reasons (docs/specs/DENIAL-REASONS.md): the cause of a refusal, said in plain words under the message. Off until the owner flips it. */
+export const DENIAL_REASONS: boolean = true

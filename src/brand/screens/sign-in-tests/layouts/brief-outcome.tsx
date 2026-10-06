@@ -1,4 +1,6 @@
 import { motion } from 'motion/react'
+import { DENIAL_REASONS } from '../phase'
+import { DENY_REASON_WORD, denyReasonOf, denyRef } from '../deny-reason'
 import { ArrowRight, Ban, ChevronDown, ChevronRight, KeyRound, ShieldCheck, Split, TriangleAlert, type LucideIcon } from 'lucide-react'
 
 import type { AccessDecision } from '../../../data'
@@ -44,6 +46,7 @@ export interface OutcomeProps {
 }
 
 export function OutcomeCard(p: OutcomeProps) {
+  const reason = denyReasonOf(p.plan)
   const o = p.plan.outcome
   const decided = o.status === 'decided' && o.decision ? o.decision : null
   const Icon = decided ? ICON[decided] : Split
@@ -97,6 +100,11 @@ export function OutcomeCard(p: OutcomeProps) {
           {deny && deny.kind === 'deny' && (
             <motion.p className="rl-brief__deny" variants={item} title={deny.message}>
               “{deny.message}”
+            </motion.p>
+          )}
+          {DENIAL_REASONS && reason && (
+            <motion.p className="rl-brief__reason" variants={item}>
+              {DENY_REASON_WORD[reason]} · <span>{denyRef(reason)}</span>
             </motion.p>
           )}
           {o.status === 'depends' && o.view.outcomes.length > 0 && (

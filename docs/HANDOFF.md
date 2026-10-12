@@ -1,6 +1,6 @@
 # Handoff: start here
 
-For Surajit (the owner) and for the next Claude Code session. State as of **6 Oct 2026**. `main` and the day branch `2026-10-06-check-access-troubleshooting` are at **306f64e**. The 6 Oct fixes described under [Access checks, 3 to 6 Oct](#access-checks-3-to-6-oct-2026) are **uncommitted** in the `okta-device-policy-walkthrough-cea5b7` worktree (served on :5181) until the owner asks for a commit.
+For Surajit (the owner) and for the next Claude Code session. State as of **12 Oct 2026**. `main` and the day branch `2026-10-12-applications-users-groups` carry everything: the 3 to 9 Oct work and the 10 Oct [Applications, Users and Groups](#10-oct-2026-applications-users-groups-and-sounds) build. No worktree holds work that `main` lacks (see [Git](#git)).
 
 ## What this is
 
@@ -139,6 +139,65 @@ One switch stays on screen even in the showcase build until he chooses; then pin
 - **Accept as expected** for Break-in attempts is built (`ACCEPT_ATTEMPTS`, on). The builder's own Break-in test stays hidden.
 - Also parked: Describe it; the review dialog on the bar (the bar saves directly); the device-profile Live builder (component exists, not wired); the trail builder.
 
+## 7 to 9 Oct 2026: Access checks, Authentication methods, the condition menu (in `main`)
+
+**Where it lives now.** This was built uncommitted in the `keen-goldwasser-ce39db` worktree (7 to 9 Oct), while `main` held an older partial copy. On 10 Oct, on the owner's word ("combine all the changes into this localhost"), it was merged into the main checkout and committed with the 10 Oct work: worktree-only files copied, files where `main` held an older copy took the worktree's, and the seven files both sides had changed were three-way merged against `main` as it stood before 10 Oct. The 9 Oct condition attribute menu was built on `main` directly. The worktree still has its own uncommitted copy; `main` supersedes it, so don't copy from it.
+
+- **Authentication methods** is its own rail item (owner, 7 Oct: "move it outside Policies as a specific tab"), with the collapsed "What's new" card and the hands-on tour (`tour/MethodsTour.tsx`, `methods-tour.ts`). Display tokens lights it (`UNDER_ITEM`).
+- **Fixes in the builder.** A Why finding's Fix opens the builder with the run's whole list in a Fixes panel (`board/FixesPanel.tsx`); the board route's `fix` is `{ conflicts, pressed }`.
+- **Condition attribute menu (9 Oct).** See `docs/memory/condition-attribute-menu-9-oct.md`.
+
+### Access checks
+
+- **Why panel, group rows.** "As each group" no longer draws the person's own row ("As Maya (both)") when a group alone already gets her answer. That group's row is highlighted instead (`follows` on `GroupRowView`, `journey.ts`; `WhyCard.tsx`). The person's row stays only when no single group matches (the "Can't tell" case, a person whose groups together decide otherwise).
+- **Open rule** sits right after Fix on a finding card, not pushed to the card's edge (`journey.css`, `.tj-find:is(.tj-why__att, .has-art)`).
+- **Check access form footer.** "Changes not run yet" is gone (`TryPanel.tsx`); "Not run" on the sign-in card stays.
+- **Policy details slider** (from Policies, `policy-details-drawer.tsx`): Rules is the builder's own chain, read only, at its own size, no pan, zoom or dock; a card unfolds to read its rule (`ReadOnlyCanvas` in `InspectPanel.tsx`, CSS at the end of `board/board.css`). The board's wheel handler is stopped so the slider scrolls. Applications and Audience: one value shows its name; several show the Policies table's logo stack and list under the pointer (`apps-peek.tsx`). **Past sign-ins is hidden** behind `PAST_IN_DETAILS = false` (kept, not deleted).
+- **Tried and reverted:** (1) the canvas in the Access checks details panel. The accordion carries the run's per-rule states (Depends, "If not", "Not matched"), which a canvas cannot show, and 7 tests pin them. The panel keeps its accordion. (2) A single "Fix policy" button that steps through the fixes in the builder. Reverted on the owner's word; each finding keeps its own Fix and the builder's Fixes panel is still the list with Apply all. `tools/rigs/access-checks/s11.cjs` drives that old idea and is stale.
+
+### Authentication methods (admin)
+
+- The "All methods" filter menu is **admin only** (restored after it was removed for both sides). `USES` is a plain const again.
+
+### Authentication methods (user dashboard: "Setup 2FA")
+
+- No filter on the user side.
+- **Row controls.** A family with one method is named for the method and carries its own controls on the row (`FamilyListRow`, `me` prop): not set up = blue **Configure** link; set up = gear (edit) + toggle (use). "Configured" sits beside the name, not at the row's end. Configure opens the slider with that method's form already open.
+- **Security Questions and the other single-method sliders** are the method's own page: no card around the form, each question and each answer on its own row, **Cancel and Save in the slider footer** (`soloOpen`, `EnrolForm bare`, `.bmu__form--bare`).
+- **SMS, call and email are not configured in the methods.** They send to the person's profile, which is not built, so there is dummy data: `PROFILE` in `user-methods.ts` (phone, email, **no alternate email**, so OTP over Alternate Email shows "Not on your profile"). The panel gets a read-only "From your profile" card (`ProfileFacts`); the cards have a toggle only; a single-method row shows the value as its line. `readyFor` and `configuredIds` treat these as ready when the profile holds what they send to.
+- **Setup flows recreated from the live end-user page** (read 7 Oct 2026, nothing saved or switched on there):
+  - Google, Microsoft, Authy Authenticator: 1 install (Android, iOS), 2 scan the QR or use the secret, 3 enter the passcode, Save or Cancel.
+  - miniOrange OTP, Push, QR Verify: banner "update to 4.0.0 or higher", 1 install (Android, iOS, Windows), 2 scan the QR. No passcode, so the prototype has a **Confirm registration** button (the live page detects the scan itself). Modelled with `EnrolShape.setup: 'scan'` so the sign-in side keeps its kinds.
+  - Microsoft Push: "MFA configuration not provided by the administrator…" (`setup: 'unavailable'`).
+  - Yubikey: three text steps and an OTP field. RSA: three steps and a test link. Passkey: Platform vs Cross-platform authenticators, pick one, **Add device**. Security Questions use the live list of ten questions (`SECURITY_QUESTIONS`).
+  - The Android/iOS/Windows buttons only show a toast (no store links found). The secret is a fixed dummy.
+
+### Not verified in the browser
+
+Yubikey, RSA, passkey and Security Questions forms, Save on any user form, the gear and toggle on a row, the Why-panel group rows after the last edit, and the 560px read-only canvas at phone width. Unit and render tests cover the markup, not the clicks.
+
+### Open questions for the owner
+
+- The "Fix policy" stepper idea was dropped, not decided against for good: say if you want it back.
+- Does the Call family (voice code) also come from the profile? It does now, because it shares the phone shape.
+- A profile page does not exist; `PROFILE` is a constant. Where should "change it in your profile" lead?
+
+## 10 Oct 2026: Applications, Users, Groups and sounds
+
+Product owners say most admins add policies from the application, right after creating it, so the app got a page of its own. Built from a design-panel spec, the live console's own pages (read in the owner's Chrome) and Mobbin research; the spec and the live-console notes are local only in `docs/research/` (`app-users-groups-spec-10-oct.md`, `live-console-apps-users-groups-10-oct.md`).
+
+- **Application page** (`screens/ApplicationPage.tsx`, route `application`): the name in Apps opens it. Zone head with the rename pencil; line tabs Basic, Policies (default), Users, Groups. The Protection cell on Apps still opens the AppProtection drawer as the quick add.
+  - **Policies:** earned-number rows (`PolicyRow`) and the ⌄ fallback row. **New policy** = an Untitled draft straight into the board; the board's back link returns to the app and the row flashes. **Add existing policy** (`AddExistingPolicy.tsx`) previews where it lands ("Position 3 · takes over from …", "Never decides"), flags a policy shared with other apps and one that names another app, and offers Add a copy. **Remove** says who moves where ("Sign-ins move to"), people in two groups included. Attaching or removing a live policy runs the board's Before saving checks (`board/apps-guard.ts`).
+  - **Users / Groups** (`app-people-tabs.tsx`, `UserDrawer.tsx`): everyone in the directory with the policy that decides for them on this app.
+  - **Basic:** Description; App secret (reveal, copy, Regenerate) on OIDC apps, saved through the SaveBar.
+- **The model** (`screens/app-standing.ts`): `deciderFor` (in `tenant-resolver.ts`) is pinned by test to the engine's `governingPolicy` for every person on every app; row states, the remove prediction, membership effects, the Policies delete confirm and the Apps-list notes all read it.
+- **Users** (`UsersPage.tsx`): User list (search, Group and Role filters, user drawer) and User roles. **Groups** (`GroupsPage.tsx`): the list and a group page with Basic, Assignment (live words: "Filter data by text or value", Assign users, Unassign user) and Applications. Unassign asks first only when someone's sign-in would change; every write has Undo.
+- **Sounds** (`sound.ts`): synthesised Web Audio cues, no audio files. Every toast sounds by its tone; attach, publish, a Check access outcome, the first deciding policy on an app and a toggle have their own cues; a press never silences a warning or error. Speaker button in the top bar, `localStorage` `brand-sound`, on by default.
+- **Fixed in shared code:** Escape now closes a drawer when focus is on a closed picker (`picker.tsx`); a bold word in a callout body no longer breaks onto its own line (`kit.css`); a toast's action runs once (`toast-action.ts`).
+- **Gate on 10 Oct:** tsc 0, oxlint 27, vitest 5114 pass (`ui-copy` and `player-ui` pass alone), build ok. Browser-checked in the owner's :5173 and with `tools/rigs/app-pages/check.cjs` (screens, sound counts, phone width).
+- **Open questions for the owner:** (1) the live console's add-from-app flow is group-first ("Assign Group": groups, then First factor / MFA / Adaptive); ours keeps the audience on the policy. Ask for groups when adding from an app? (2) Should a template set the policy's audience? (3) These pages count directory members while the Who picker uses each group's stated size: keep both? (4) What should a group's "Make Default" change?
+- **Not built (toasts say so):** add, edit or delete users, roles and groups; group and membership custom fields; deleting an app; App Access Configuration; reordering policies from the app page.
+
 ## House rules
 
 These are the owner's rulings, and the details are in `docs/memory/`.
@@ -170,11 +229,12 @@ Test objects were left in the vendor tenants (Entra, Okta, Duo), all named "Clau
 - `main` is the line of work. The old worktree branches (`claude/*`, the dated `2026-09-*` branches) are kept as archive backups. Don't merge them.
 - **6 Oct 2026.** `main` was fast-forwarded to **306f64e** ("Specs: denial reasons, the troubleshooting plan, the Check access details panel"), on top of **5575ce7** ("Access checks, 3-6 Oct 2026: Focus and Classic v2, denial troubleshooting, the details panel") and 38dfd7e (2 Oct). The day's branch is `2026-10-06-check-access-troubleshooting`, at the same commit. Both were pushed to `origin` the same day with his OK (bolder1, then switched back), and Vercel production built 306f64e. The Why panel in Focus, the five Check access fixes and this handoff follow as the next commit on the same day branch.
 - **Saved on a branch, not lost.** The main checkout's old reason-line draft was archived on `archive/2026-10-06-main-reason-line-draft` (00b4fff) and cleared. It is a backup, not a line of work.
-- **Uncommitted, in the `okta-device-policy-walkthrough-cea5b7` worktree** (branch `2026-10-06-check-access-troubleshooting`, :5181): the 6 Oct fixes (Why in Focus, the details-panel fixes, page keys and focus, the temporary-access date) and the `.claude/launch.json` :5181 config, which stays local. Commit them there when the owner asks, then fast-forward `main`.
+- **12 Oct 2026.** One commit on the day branch `2026-10-12-applications-users-groups` carries the 7 to 9 Oct work (brought in from `keen-goldwasser-ce39db`), the 9 Oct condition menu and the 10 Oct Applications, Users, Groups and sounds build, with this handoff. `main` was fast-forwarded to it and both were pushed to `origin` on the owner's word. It is one commit, not one per day, because the days were never committed separately and their snapshots do not build on their own. Local backups of `src/` from before the 10 Oct build and before the merge are in `local-archive/snapshots/`.
+- The `okta-device-policy-walkthrough-cea5b7` tree's 6 Oct fixes are in `main` (ebb547f and later); it differs only by its local `.claude/launch.json` :5181 config.
 - Remotes:
-  - `origin` = github.com/bolder1/idp-policy-engine. Vercel production (https://idp-policy-engine-zrhl.vercel.app) follows `origin/main`. Last pushed 6 Oct (306f64e and the day branch). Pushing needs the `bolder1` account: the active `gh` account is read-only there, so switch with his OK and switch back.
+  - `origin` = github.com/bolder1/idp-policy-engine. Vercel production (https://idp-policy-engine-zrhl.vercel.app) follows `origin/main`. Last pushed 12 Oct (`main` and `2026-10-12-applications-users-groups`). Pushing needs the `bolder1` account; check `gh auth status` for which account is active before a push.
   - `origin` (bolder1) is the only repo to manage (owner, 6 Oct 2026). The `creator` remote is not kept up to date and is not pushed to.
-- Worktrees on disk (`git worktree list`): `okta-device-policy-walkthrough-cea5b7` (live, above), `sweet-blackwell-b5bb79` (at 306f64e on `claude/created-videos-list-eefb36`), `classic-mode-v2-551abb` (38dfd7e), `charming-banach-5e7569` and `unruffled-haslett-aca2da` (both e76b901), and `keen-goldwasser-ce39db` (detached at eb8310d, fully in `main`). Before removing ANY worktree: `git -C <tree> status`, and check that no session or dev server is working in it. A clean status at an earlier survey is not enough.
+- Worktrees on disk (`git worktree list`): `okta-device-policy-walkthrough-cea5b7` (above), `sweet-blackwell-b5bb79` (at 306f64e on `claude/created-videos-list-eefb36`), `classic-mode-v2-551abb` (38dfd7e), `charming-banach-5e7569` and `unruffled-haslett-aca2da` (both e76b901), and `keen-goldwasser-ce39db` (at 90828b2 on `claude/background-tasks-account-switch-3e5f28`, with its own uncommitted copy of the 7 to 9 Oct work, which `main` supersedes). Before removing ANY worktree: `git -C <tree> status`, and check that no session or dev server is working in it. A clean status at an earlier survey is not enough.
 - **Both remotes are public** (`gh repo view`, 1 Oct). So the internal material is **local only — on this disk, never in git** (owner's choice, 1 Oct 2026): `docs/memory/`, `docs/research/`, `docs/artifacts/` and `tools/rigs/walkthroughs/` are in `.gitignore`. They hold tenant identifiers (the Okta integrator org and its admin URL, the Entra test user, a miniOrange test address, the Vercel project and team ids) and internal material (the manager's scenario sheet, the audits, the team deck, the memory notes). Everything else in the repo carries none of these; there are no passwords, tokens or cookies anywhere. Back the four folders up yourself if this disk is ever replaced.
 - The owner's convention when he does push: push `main`, plus a `YYYY-MM-DD-<topic>` tracking branch for the day's work.
 
@@ -193,4 +253,4 @@ Test objects were left in the vendor tenants (Entra, Okta, Duo), all named "Clau
   - Not built: alerts when refusals jump after a change; more reasons (no method enrolled, account off) because the evaluator does not read that state; a tenant default-contact setting (`TENANT_DENY_CONTACT` in `data.ts` is one constant); real remediation links.
   - Sign-in activity is a modelled sample, not a log.
   - The 6 Oct fixes are proven by tests and, for Why in Focus, a browser check in the owner's :5181 tab; the rest of the 6 Oct fixes have not had a full browser pass.
-- The public Vercel showcase predates the 3 to 6 Oct work unless `origin/main` has moved (see Git).
+- The public Vercel showcase builds `origin/main`, so it shows whatever was last pushed (see Git).

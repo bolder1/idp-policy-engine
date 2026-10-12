@@ -1,15 +1,15 @@
-import { useId, type RefObject } from 'react'
-import { ArrowUpRight, ChevronRight, CircleHelp, Info, Layers, ListOrdered, PowerOff, TriangleAlert, UserMinus, Users, X, type LucideIcon } from 'lucide-react'
+import { useContext, useId, type RefObject } from 'react'
+import { ArrowUpRight, ChevronRight, CircleHelp, Info, Layers, ListOrdered, PowerOff, ShieldAlert, TriangleAlert, UserMinus, Users, X, type LucideIcon } from 'lucide-react'
 
 import type { Policy } from '../../data'
 import { CantTell, DecisionBadge } from '../../decision-badge'
+import { useBrand } from '../../store'
 import { Face } from '../../faces'
 import { TipDot } from '../../kit'
 import { REVIEW_ATTEMPTS, attemptsOnSaid, type AppBreakInSummary } from '../break-in-app'
 import { BREAK_IN_TIP } from '../break-in-model'
 import type { NameLookup } from '../predicate-prose'
 import type { FormField, SignInForm } from '../testing/sign-in-form'
-import { AttemptCells } from './BreakInPanel'
 import type { ChangeEntry } from '../../change-log'
 import { CopyText } from './CopyText'
 import { relativeTime } from './runs'
@@ -19,7 +19,11 @@ import type { EngineRun } from './engine-run'
 import type { GetIn } from './get-in'
 import { DENIAL_REASONS } from './phase'
 import type { GroupRowView, WhyAction, WhyIcon, WhyItem, WhyTone } from './journey'
-import { ConflictRuleCard } from './RunChain'
+import { FixButton, type FixPress } from './RunChain'
+import { artOf, findingCardOf } from './finding-card'
+import { FindingArt } from './FindingArt'
+import { FixHere, conflictFixOf, fixButtonSaid, type FixItem } from './conflict-fix'
+import { TestingSessionContext } from '../testing/session-state'
 
 /* -----------------------------------------------------------------------------
    Why — the troubleshooting view under the answer (owner, 1 Oct: "one person
@@ -96,6 +100,8 @@ const MARK: Record<WhyIcon, LucideIcon> = {
 
 const HEAD_MARK: Record<WhyTone, LucideIcon> = { conflict: TriangleAlert, depends: CircleHelp, info: Info }
 
+
+
 export interface WhyCardProps {
   plan: EngineRun
   items: readonly WhyItem[]
@@ -131,22 +137,51 @@ export interface WhyCardProps {
   changes?: readonly ChangeEntry[]
 }
 
-export function WhyCard({ plan, items, groups, headline, policies, resolve, person, id, titleRef, interactive, onClose, onOpenRule, onOpenPolicy, onAdd, onAsGroup, breakIn = null, getIn = null, onGetIn, grant = null, changes = [] }: WhyCardProps) {
+export function WhyCard({ plan, items, groups, headline, policies, person, id, titleRef, interactive, onClose, onOpenRule, onOpenPolicy, onAdd, onAsGroup, breakIn = null, getIn = null, onGetIn, grant = null, changes = [] }: WhyCardProps) {
   const titleId = useId()
   const groupsId = useId()
   const attemptsId = useId()
   const getInId = useId()
   const changesId = useId()
-  /* The attempts' label, unless there is no finding: then the why's title says it, once. */
-  const labelled = items.length > 0
   const HeadMark = HEAD_MARK[headline.tone]
-  const stored = plan.decider ? (policies.find((p) => p.id === plan.decider!.id) ?? null) : null
   const act = (a: WhyAction) => {
     if (a.kind === 'rule' && a.ruleId) onOpenRule(a.policyId, a.ruleId)
     else if (a.kind === 'fact' && a.field) onAdd(a.field)
     else onOpenPolicy(a.policyId)
   }
   const tab = interactive ? undefined : -1
+  /* The person's own row only when no group alone gets their answer (owner, 7 Oct 2026: "remove it if we don't need
+     this"). Otherwise it repeats that group's row, and its why is the title's or a finding's: the group's row is marked. */
+  const rows = groups?.some((g) => g.follows) ? groups.filter((g) => !g.current) : groups
+  const holes = breakIn?.summary.holes ?? 0
+  /* A finding's fix as one press (conflict-fix.ts). It takes every fix of this run into the builder together — the
+     one pressed applied, the rest in its Fixes panel — with this sign-in for its Check access (owner, 7 Oct 2026). In
+     that policy's own Check access it is applied in place (`FixHere`). */
+  const { users, groups: library, go } = useBrand()
+  const session = useContext(TestingSessionContext)
+  const here = useContext(FixHere)
+  const whoId = plan.conflicts?.personId ?? null
+  const who = whoId ? (users.find((u) => u.id === whoId) ?? null) : null
+  const fixable = interactive ? items.flatMap((it) => {
+    const fix = conflictFixOf(it, plan, who, policies, (name) => library.find((g) => g.name === name)?.id)
+    return fix ? [{ it, fix }] : []
+  }) : []
+  const list: FixItem[] = fixable.map(({ it, fix }) => ({ fix, ...findingCardOf(it, plan) }))
+  const pressOf = (it: WhyItem): FixPress | undefined => {
+    const at = fixable.findIndex((f) => f.it === it)
+    if (at < 0) return undefined
+    const fix = list[at].fix
+    if (here?.policyId === fix.policyId) return { label: fixButtonSaid(fix, plan), title: 'Makes this change in the draft', onApply: () => here.onFixes(list, at) }
+    const into = policies.find((p) => p.id === fix.policyId)?.name ?? 'the policy'
+    return {
+      label: fixButtonSaid(fix, plan),
+      title: `Opens ${into} with this change in its draft`,
+      onApply: () => {
+        if (session) session.loadBoard(fix.policyId, here?.form ?? session.form)
+        go({ name: 'board', policyId: fix.policyId, fix: { conflicts: list, pressed: at } })
+      },
+    }
+  }
 
   return (
     <section id={id} className="tj-why" data-node="why" aria-labelledby={titleId}>
@@ -165,13 +200,15 @@ export function WhyCard({ plan, items, groups, headline, policies, resolve, pers
       </header>
 
       <div className="tj-why__body">
-        {groups && (
+        {rows && (
           <section className="tj-why__sec" aria-labelledby={groupsId}>
             <p id={groupsId} className="tj-why__label">
               As each group
             </p>
             <ul className="tj-why__groups">
-              {groups.map((g) => {
+              {rows.map((g) => {
+                const mark = g.current || g.follows ? ' is-current' : ''
+                const said = g.current ? ' — this sign-in' : g.follows ? ' — what this sign-in gets' : ''
                 const inner = (
                   <>
                     <span className="tj-why__face" aria-hidden>
@@ -192,13 +229,14 @@ export function WhyCard({ plan, items, groups, headline, policies, resolve, pers
                 return (
                   <li key={g.key}>
                     {g.current || !g.groupId || !onAsGroup ? (
-                      <div className={`tj-why__grow${g.current ? ' is-current' : ''}`} {...(g.current ? { 'aria-current': 'true' as const } : null)}>
+                      <div className={`tj-why__grow${mark}`} {...(g.current ? { 'aria-current': 'true' as const } : null)}>
                         {inner}
-                        {g.current && <span className="u-sr-only"> — this sign-in</span>}
+                        {said && <span className="u-sr-only">{said}</span>}
                       </div>
                     ) : (
-                      <button type="button" className="tj-why__grow" tabIndex={tab} title={`Run as anyone in ${g.label.replace(/^As /, '')}`} onClick={() => onAsGroup(g.groupId!)}>
+                      <button type="button" className={`tj-why__grow${mark}`} tabIndex={tab} title={`Run as anyone in ${g.label.replace(/^As /, '')}`} onClick={() => onAsGroup(g.groupId!)}>
                         {inner}
+                        {said && <span className="u-sr-only">{said}</span>}
                       </button>
                     )}
                   </li>
@@ -211,45 +249,27 @@ export function WhyCard({ plan, items, groups, headline, policies, resolve, pers
         {items.length > 0 && (
           <ul className="tj-why__list" aria-label="Findings">
             {items.map((it) => {
-              const r = it.rule ? plan.rules.find((x) => x.id === it.rule!.ruleId) : undefined
-              const rule = r && stored ? stored.rules.find((x) => x.id === r.id) : undefined
-              if (it.rule && r && rule) {
-                return (
-                  <li key={it.key} className="tj-why__rule" data-kind={it.kind}>
-                    <ConflictRuleCard r={r} rule={rule} c={it.rule} why={it.detail} resolve={resolve} person={person} onOpen={interactive && it.action?.ruleId ? () => act(it.action!) : undefined} />
-                  </li>
-                )
-              }
+              /* One card for every finding (owner, 6 Oct 2026: "a heading, then a one- or two-liner at most, then a
+                 solution button — they don't want to read, so only click"): what is going on, what the other policy or
+                 rule would do and why it doesn't, and the fix as the press that makes it. Open rule only looks. */
               const Mark = MARK[it.icon]
+              const card = findingCardOf(it, plan)
+              const art = artOf(it.kind)
+              const press = pressOf(it)
+              const look = it.action && interactive && !(it.action.kind === 'fact' && press)
               return (
-                <li key={it.key} className={`tj-why__item is-${it.tone}`} data-kind={it.kind}>
+                <li key={it.key} className={`tj-why__item tj-find is-${it.tone}${art ? ' has-art' : ''}`} data-kind={it.kind}>
                   <span className="tj-why__icon" aria-hidden>
                     <Mark size={14} strokeWidth={2.1} />
                   </span>
+                  {art && <FindingArt kind={art} />}
                   <div className="tj-why__text">
-                    <p className="tj-why__line">
-                      <span className="tj-why__head">
-                        {it.link && (
-                          <>
-                            {interactive ? (
-                              <button type="button" className="tj-why__name" title={`Open ${it.link.label}`} onClick={() => onOpenPolicy(it.link!.policyId)}>
-                                {it.link.label}
-                              </button>
-                            ) : (
-                              it.link.label
-                            )}{' '}
-                          </>
-                        )}
-                        {it.head}
-                      </span>
-                      {it.would &&
-                        (it.would.decision ? (
-                          <DecisionBadge decision={it.would.decision} className="tj-why__would" />
-                        ) : it.would.possible.length > 0 ? (
-                          <CantTell outcomes={it.would.possible} className="tj-why__would" />
-                        ) : null)}
-                    </p>
-                    {it.detail && <p className="tj-why__detail">{it.detail}</p>}
+                    <p className="tj-find__title">{card.title}</p>
+                    {card.line && (
+                      <p className="tj-find__line" title={it.detail && it.detail.replace(/\.$/, '') !== card.line.replace(/\.$/, '') ? it.detail : undefined}>
+                        {card.line}
+                      </p>
+                    )}
                     {it.covers.length > 0 && (
                       <ul className="tj-why__covers" aria-label="Who each policy covers">
                         {it.covers.map((m) => (
@@ -276,15 +296,20 @@ export function WhyCard({ plan, items, groups, headline, policies, resolve, pers
                         ))}
                       </p>
                     )}
-                    {it.fix && <p className="tj-why__fix">{it.fix}</p>}
                     {it.caution && <p className="tj-why__caution">{it.caution}</p>}
+                    {/* No press for it (a policy switched off, a fact not stated): the fix is written instead. */}
+                    {(press || look || it.fix) && (
+                      <div className="tj-find__acts">
+                        {press ? <FixButton apply={press} /> : it.fix ? <p className="tj-why__fix">{it.fix}</p> : null}
+                        {look && (
+                          <button type="button" className="tj-conflict__open tj-why__act" onClick={() => act(it.action!)}>
+                            {it.action!.label}
+                            {it.action!.kind !== 'fact' && <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden />}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {it.action && interactive && (
-                    <button type="button" className="tj-conflict__open tj-why__act" onClick={() => act(it.action!)}>
-                      {it.action.label}
-                      {it.action.kind !== 'fact' && <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden />}
-                    </button>
-                  )}
                 </li>
               )
             })}
@@ -342,25 +367,28 @@ export function WhyCard({ plan, items, groups, headline, policies, resolve, pers
         )}
 
         {breakIn && (
-          <section className="tj-why__sec tj-why__att" aria-labelledby={labelled ? attemptsId : titleId}>
-            {labelled && (
-              <p id={attemptsId} className="tj-why__label tj-why__attlabel">
+          /* Break-in attempts on the application, one card in the findings' own shape (owner, 6 Oct 2026: "remove this
+             part, make the card bigger, and just add a break-in part"): how many got through, and Review, which opens
+             them in the panel (BreakInPanel.tsx). The count is said here once. */
+          <section className={`tj-why__item tj-find tj-why__att is-${holes > 0 ? 'conflict' : 'info'}`} aria-labelledby={attemptsId}>
+            <span className="tj-why__icon" aria-hidden>
+              <ShieldAlert size={14} strokeWidth={2.1} />
+            </span>
+            <div className="tj-why__text">
+              <p id={attemptsId} className="tj-find__title tj-why__attlabel">
                 <span>{attemptsOnSaid(breakIn.summary.appName)}</span>
                 <TipDot text={BREAK_IN_TIP} label="About break-in attempts" />
               </p>
-            )}
-            <AttemptCells counts={breakIn.summary.counts} />
-            {(!labelled || interactive) && (
-              <div className="tj-why__attfoot">
-                {!labelled && <TipDot text={BREAK_IN_TIP} label="About break-in attempts" />}
-                {interactive && (
-                  <button type="button" className="tj-conflict__open tj-why__attgo" onClick={breakIn.onReview}>
+              <p className="tj-find__line">{holes > 0 ? `${breakIn.summary.counts.gotThrough + breakIn.summary.counts.weakerFactor + breakIn.summary.counts.lessThanAsked} got through or in on less` : 'None got through'}</p>
+              {interactive && (
+                <div className="tj-find__acts">
+                  <button type="button" className="tj-conflict__open tj-why__act" onClick={breakIn.onReview}>
                     {REVIEW_ATTEMPTS}
                     <ChevronRight size={12} strokeWidth={2.2} aria-hidden />
                   </button>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </section>
         )}
       </div>

@@ -8,9 +8,11 @@ import {
   countsMoved,
   fixFor,
   fixToast,
+  GROUP_ORDER,
   secondFactorSaid,
   type Accepted,
   type BreakInFix,
+  type BreakInGroup,
   type BreakInRow,
   type CountKey,
 } from './break-in-model'
@@ -233,10 +235,17 @@ export interface AppBreakInSummary {
      finding for the person, the outcome strip says so; never as a number —
      the Why section's cells say the numbers, once. */
   holes: number
+  /* The attempts worth a look first, by name (owner, 6 Oct 2026: "show some suggested review attempts here, with a
+     view all"): the ones that got in, or in on less, first — then the rest in the list's order — at most three. */
+  top?: { id: string; name: string; group: BreakInGroup; got: AccessDecision | null }[]
 }
 
-export function breakInSummary(result: Pick<AppBreakInResult, 'appId' | 'counts'>, env: Pick<SimEnv, 'appName'>): AppBreakInSummary {
-  return { appId: result.appId, appName: env.appName?.(result.appId) ?? result.appId, counts: result.counts, holes: holesOf(result.counts) }
+const SUGGESTED = 3
+
+export function breakInSummary(result: Pick<AppBreakInResult, 'appId' | 'counts'> & { rows?: readonly AppBreakInRow[] }, env: Pick<SimEnv, 'appName'>): AppBreakInSummary {
+  const rows = [...(result.rows ?? [])].sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group))
+  const top = rows.slice(0, SUGGESTED).map((r) => ({ id: r.id, name: r.name, group: r.group, got: r.got }))
+  return { appId: result.appId, appName: env.appName?.(result.appId) ?? result.appId, counts: result.counts, holes: holesOf(result.counts), top }
 }
 
 /** The Why section's label: "Break-in attempts on AWS". */

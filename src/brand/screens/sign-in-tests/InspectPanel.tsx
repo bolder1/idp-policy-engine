@@ -25,6 +25,8 @@ import { DecisionBadge } from '../../decision-badge'
 import { DECISION_WORDS } from '../../decision-words'
 import { Button, StatusPill } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
+import { Board } from '../board/Board'
+import type { Selection } from '../board/model'
 import { IfBlock } from '../board/IfBlock'
 import { useDraftDiff } from '../board/use-lines'
 import { readFoot, storedVersions } from '../board/read-as-text'
@@ -32,7 +34,8 @@ import type { EngineRun } from './engine-run'
 import { FATE_WORDS, PEEK_FALLBACK, evidenceOf, isPeek, ruleList, ruleOf, targetLabel, type Evidence, type InspectTarget, type PeekTarget, type RuleFate, type RuleListRow } from './inspect-model'
 import { factsOf } from './inspect-facts'
 import { objectsOfRule, peekNames, PEEK_LIBRARY } from './peek-model'
-import { Block, Facts, Hero, KindMark, PeekPage } from './PeekViews'
+import { AppsPeek } from '../apps-peek'
+import { Block, CountTip, Facts, Hero, KindMark, PeekPage } from './PeekViews'
 import { PANEL_SLIDE as SLIDE } from './sign-in-card'
 import './inspect.css'
 
@@ -167,8 +170,10 @@ export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClo
 /* --- What it did to this sign-in --------------------------------------------------------------------------------- */
 
 type Tone = 'positive' | 'notice' | 'negative' | 'neutral'
-const DECISION_TONE: Record<AccessDecision, Tone> = { '1fa': 'positive', '2fa': 'notice', deny: 'negative' }
+const DECISION_TONE: Record<AccessDecision, Tone> = { '1fa': 'positive', '2fa': 'positive', deny: 'negative' }
 const DECISION_MARK: Record<AccessDecision, LucideIcon> = { '1fa': ShieldCheck, '2fa': ShieldAlert, deny: ShieldX }
+/** A decision as a class word: the decided rule's edge (inspect.css `is-d-*`). */
+const DECISION_KEY: Record<AccessDecision, string> = { '1fa': 'allow', '2fa': 'mfa', deny: 'deny' }
 
 /** The strip at the overview card's foot: how this thing met the sign-in on the canvas, in the outcome's own tone. */
 function Verdict({ tone, icon: Icon, title, line }: { tone: Tone; icon: LucideIcon; title: string; line?: string }) {
@@ -230,14 +235,18 @@ function dependsLine(waiting: readonly RuleListRow[], needs: readonly string[]):
 /* --- A policy, on one page --------------------------------------------------------------------------------------- */
 
 const rowKey = (id: string | null) => id ?? 'last'
+/** No run on screen (the Policies list's details panel): no rule has a fate, and nothing is said about a sign-in. */
+const NO_RUN: Pick<EngineRun, 'decider' | 'rules'> = { decider: null, rules: [] }
 
-function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: string; focus: string | null | undefined; plan: EngineRun; onEdit: (t: InspectTarget) => void; onOpenOne: (id: string | null | undefined) => void }) {
+/* The policy's page. `plan` null is the page without a sign-in — the Policies list's details panel (owner, 6 Oct 2026:
+   "add the Policy details view here as well, with an Open in builder"): the overview card and the rules, no verdict. */
+export function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne, canvas = false }: { policyId: string; focus: string | null | undefined; plan: EngineRun | null; onEdit: (t: InspectTarget) => void; onOpenOne: (id: string | null | undefined) => void; canvas?: boolean }) {
   const { policies, apps, groups, users } = useBrand()
   const policy = policies.find((p) => p.id === policyId)
   const versions = useMemo(() => (policy ? storedVersions(policy) : { draft: blankPolicy(''), live: null }), [policy])
   const diff = useDraftDiff(versions)
-  const list = policy ? ruleList(policy, plan) : []
-  const depends = policy ? dependsIn(plan, policy.id) : false
+  const list = policy ? ruleList(policy, plan ?? NO_RUN) : []
+  const depends = policy && plan ? dependsIn(plan, policy.id) : false
   /* Open on arrival: the rule pressed on the canvas; else the one that decided; on a run that Depends, the ones it waits on. */
   const [open, setOpen] = useState<ReadonlySet<string>>(() => {
     if (focus !== undefined) return new Set([rowKey(focus)])
@@ -255,7 +264,15 @@ function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: st
   }, [open, onOpenOne])
   if (!policy) return <p className="insp__gone">This policy is no longer there.</p>
   const audience = policy.isSystem ? 'Everyone' : audienceSummary(policy.audience, groups, users).label || 'Nobody'
-  const decided = plan.decider?.id === policy.id
+  /* Its groups and people by name, under the pointer (`CountTip`); everyone has no list. */
+  const audienceLists =
+    policy.isSystem || policy.audience.everyone
+      ? []
+      : [
+          { kind: 'Groups', names: policy.audience.groupIds.map((id) => groups.find((g) => g.id === id)?.name ?? 'A deleted group') },
+          { kind: 'People', names: policy.audience.userIds.map((id) => users.find((u) => u.id === id)?.name ?? 'A deleted person') },
+        ]
+  const decided = plan?.decider?.id === policy.id
   const by = decided && !depends ? list.find((r) => r.fate === 'decided') : undefined
   const changed = readFoot(policy).split(' · ').slice(1).join(' · ')
   const appsSaid = policy.isSystem ? (
@@ -263,18 +280,14 @@ function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: st
   ) : policy.appIds.length === 0 ? (
     'None'
   ) : (
-    <span className="insp__apps">
-      {policy.appIds.map((id) => {
-        const app = apps.find((a) => a.id === id)
-        return (
-          <span key={id} className="insp__app">
-            {app && <KindMark target={{ kind: 'app', id }} small />}
-            {app?.name ?? 'A deleted application'}
-          </span>
-        )
-      })}
-    </span>
+    /* One: its name. More: the Policies table's marks and list under the pointer (owner, 7 Oct 2026). */
+    <AppsPeek
+      apps={policy.appIds.flatMap((id) => apps.find((x) => x.id === id) ?? [])}
+      policyName={policy.name}
+      onEdit={() => onEdit({ kind: 'policy', policyId: policy.id })}
+    />
   )
+  const audienceNames = audienceLists.flatMap((l) => l.names)
   const toggle = (k: string) =>
     setOpen((cur) => {
       const next = new Set(cur)
@@ -290,12 +303,12 @@ function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: st
         name={policy.name}
         badge={<StatusPill status={policy.status} />}
         facts={[
-          { label: 'Applications', value: appsSaid, wide: !policy.isSystem && policy.appIds.length > 1 },
-          { label: 'Audience', value: audience },
+          { label: 'Applications', value: appsSaid, },
+          { label: 'Audience', value: audienceNames.length === 1 ? audienceNames[0] : <CountTip label={audience} lists={audienceLists} /> },
           ...(changed ? [{ label: 'Last change', value: changed, wide: true }] : []),
         ]}
         strip={
-          depends ? (
+          !plan ? undefined : depends ? (
             <Verdict tone="notice" icon={CircleHelp} title="Depends" line={dependsLine(waitingOn(list), plan.outcome.view.needs)} />
           ) : decided && by ? (
             <Verdict tone={DECISION_TONE[by.decision]} icon={DECISION_MARK[by.decision]} title="Decided this sign-in" line={`${by.n === null ? by.name : `Rule ${by.n} · ${by.name}`} · ${DECISION_WORDS[by.decision]}`} />
@@ -323,6 +336,10 @@ function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: st
         </Block>
       )}
       <Block title="Rules" aside="In order">
+        {canvas ? (
+          /* The builder's own canvas, read only (owner, 7 Oct 2026: "instead of this, the canvas itself"). */
+          <ReadOnlyCanvas policy={policy} traced={by ? [by.id ?? 'fallback'] : []} />
+        ) : (
         <ul className="insp__accs">
           {list.map((r) => {
             const k = rowKey(r.id)
@@ -332,7 +349,7 @@ function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: st
             const isOpen = open.has(k)
             const bodyId = `insp-rule-${policy.id}-${k}`
             return (
-              <li key={k} ref={focus !== undefined && rowKey(focus) === k ? focusRef : undefined} className={`insp__acc${isOpen ? ' is-open' : ''}${fate ? ` is-${fate}` : ''}`}>
+              <li key={k} ref={focus !== undefined && rowKey(focus) === k ? focusRef : undefined} className={`insp__acc${isOpen ? ' is-open' : ''}${fate ? ` is-${fate}` : ''}${fate === 'decided' ? ` is-d-${DECISION_KEY[r.decision]}` : ''}`}>
                 <button type="button" className="insp__acchead" aria-expanded={isOpen} aria-controls={bodyId} onClick={() => toggle(k)}>
                   <span className="insp__n" aria-hidden>
                     {r.n ?? '*'}
@@ -358,6 +375,7 @@ function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: st
             )
           })}
         </ul>
+        )}
       </Block>
     </>
   )
@@ -367,7 +385,7 @@ function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne }: { policyId: st
 
 const MARK = { pass: Check, fail: X, unknown: CircleHelp } as const
 
-function RuleBody({ policy, ruleId, plan, shown, list, onEdit }: { policy: Policy; ruleId: string | null; plan: EngineRun; shown: Shown | null; list: readonly RuleListRow[]; onEdit: (t: InspectTarget) => void }) {
+function RuleBody({ policy, ruleId, plan, shown, list, onEdit }: { policy: Policy; ruleId: string | null; plan: EngineRun | null; shown: Shown | null; list: readonly RuleListRow[]; onEdit: (t: InspectTarget) => void }) {
   const lib = useBrand()
   const { zones, fingerprints, hooks, riskProfiles, activeRiskProfileId, users, apps } = lib
   const resolve = useNameLookup()
@@ -375,7 +393,7 @@ function RuleBody({ policy, ruleId, plan, shown, list, onEdit }: { policy: Polic
   const found = ruleOf(policy, ruleId)
   if (!found) return <p className="insp__gone">This rule is no longer there.</p>
   const { rule, terminal } = found
-  const evidence: Evidence[] = evidenceOf(plan, policy.id, ruleId)
+  const evidence: Evidence[] = plan ? evidenceOf(plan, policy.id, ruleId) : []
   const refuses = rule.decision === 'deny'
   const uses = terminal ? [] : objectsOfRule(rule, activeRiskProfileId)
   const names = peekNames({ zones, fingerprints, hooks, riskProfiles, users, apps })
@@ -391,7 +409,7 @@ function RuleBody({ policy, ruleId, plan, shown, list, onEdit }: { policy: Polic
           ? `If it matches: ${DECISION_WORDS[rule.decision]}.`
           : shown === 'off' && endedGrant(rule)
             ? `Ran until ${dateSaid(rule.tempAccess!.until)}.`
-            : shown === null
+            : shown === null && plan
               ? `Not checked: ${policy.name} did not decide this sign-in.`
               : ''
   const picked = uses.find((o) => `${o.kind}:${o.id}` === use) ?? null
@@ -468,6 +486,51 @@ function UseFacts({ target, onEdit }: { target: PeekTarget; onEdit: (t: InspectT
           <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden />
         </button>
       )}
+    </div>
+  )
+}
+
+/* The builder's canvas, read only: `.bb.is-left-open` already draws it without insert points, switches, menus or grips
+   (board.css), and every handler stands down. Pan and zoom stay. */
+const NONE: Selection = { kind: 'none' }
+const noop = () => {}
+function ReadOnlyCanvas({ policy, traced }: { policy: Policy; traced: readonly string[] }) {
+  const { apps } = useBrand()
+  const resolve = useNameLookup()
+  const mine = policy.appIds.flatMap((id) => apps.find((a) => a.id === id) ?? [])
+  /* An overview, not a canvas: the chain at its own size in the page, no pan or zoom; a card unfolds to read its rule. */
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
+  /* The board's wheel handler zooms and cancels the scroll; here the wheel belongs to the slider, so it never gets there. */
+  const wrap = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = wrap.current
+    const stop = (e: WheelEvent) => e.stopPropagation()
+    el?.addEventListener('wheel', stop, { capture: true })
+    return () => el?.removeEventListener('wheel', stop, { capture: true })
+  }, [])
+  return (
+    <div ref={wrap} className="bb is-left-open insp__canvas">
+      <Board
+        policy={policy}
+        destination={mine[0]?.name ?? (policy.isSystem ? 'any application' : null)}
+        destinationAppId={mine[0]?.id ?? null}
+        destinationMore={Math.max(mine.length - 1, 0)}
+        selection={NONE}
+        diagnostics={[]}
+        shadowed={[]}
+        fitKey={policy.id}
+        traced={traced}
+        resolve={resolve}
+        onSelect={noop}
+        onInsert={noop}
+        onMove={noop}
+        onToggle={noop}
+        onDuplicate={noop}
+        onDelete={noop}
+        onHover={noop}
+        expandedOf={(id) => open.has(id)}
+        onToggleExpand={(id) => setOpen((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n })}
+      />
     </div>
   )
 }

@@ -50,7 +50,7 @@ export const GlideCtx = createContext<Glide | null>(null)
 export const GLIDE_S = 0.42
 /** Between one box's landing and the next's, in the chain's order. */
 export const GLIDE_STAGGER_S = 0.04
-const GLIDE_EASE = [0.2, 0, 0, 1] as const
+export const GLIDE_EASE = [0.2, 0, 0, 1] as const
 
 /** The whole move, the last box's stagger included: when the links may come back. */
 export const glideTotal = (boxes: number): number => GLIDE_S + Math.max(0, boxes - 1) * GLIDE_STAGGER_S

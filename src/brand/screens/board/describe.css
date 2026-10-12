@@ -448,3 +448,45 @@ button.bdsc__check:focus-visible { outline: 2px solid var(--ctl-border-focus); o
   .bdsc__send,
   .bdsc-door { transition: none; }
 }
+
+/* Describe it, the short way in (DescribeQuick.tsx). */
+.bdsq { display: flex; flex-direction: column; gap: var(--space-6); width: 100%; }
+.bdsq__q { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdsq__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bdsq__opts { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.bdsq__opt {
+  padding: var(--space-3) var(--space-5);
+  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+  background: var(--surface); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.bdsq__opt:hover { background: var(--surface-sunken); }
+.bdsq__opt[aria-pressed="true"] { background: var(--tint-blue-bg); border-color: var(--tint-blue-fg); color: var(--tint-blue-fg); }
+.bdsq__more { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bdsq__morebtn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font: inherit; font-size: var(--fs-sm); color: var(--text-secondary);
+  background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer;
+}
+.bdsq__morebtn:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bdsq__menu {
+  position: absolute; top: 100%; left: 0; z-index: 5; margin-top: var(--space-2);
+  min-width: 240px; padding: var(--space-2);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--el-low);
+}
+.bdsq__item {
+  text-align: left; padding: var(--space-3) var(--space-4);
+  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+  background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer;
+}
+.bdsq__item:hover { background: var(--surface-sunken); }
+.bdsq__item[aria-checked="true"] { color: var(--tint-blue-fg); font-weight: var(--fw-medium); }
+.bdsq__chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.bdsq__chip {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font: inherit; font-size: var(--fs-sm); color: var(--tint-blue-fg);
+  background: var(--tint-blue-bg); border: 0; border-radius: var(--radius-sm); cursor: pointer;
+}

@@ -831,7 +831,8 @@
    and says its line more quietly (owner, 22 Sep 2026: "it feels a little
    congested — add some space to each section and make the subheading lighter
    grey"). The lightest grey that still clears 4.5:1 on white. */
-.cp__mrow:has(> span > em) { padding-block: 10px; }
+.cp__mrow:has(> span > em),
+.cp__mrow:has(> span > .cp__mkind) { padding-block: 10px; }
 .cp__mrow:has(> span > em) + .cp__mrow { margin-top: 2px; }
 .cp__mrow > span > em { margin-top: 1px; font-size: 12px; line-height: 1.4; color: var(--text-placeholder, var(--text-muted)); }
 /* Each row's mark sits level with the middle of its title line (owner, 22 Sep
@@ -891,3 +892,17 @@
 .cp__stackrow > .cp__fld.is-idle:hover { background: none; }
 .cp__fld.is-idle .cp__fldtext,
 .bb__insp .cp__fld.is-idle .cp__fldtext { font-weight: var(--fw-regular); color: var(--text-muted); }
+
+/* The family pill under an attribute's name (9 Oct 2026), the kit badge in the
+   neutral fill with its mark in the family's tone. `align-self` because the
+   label column is a flex column and would stretch it into a bar; the badge cap
+   is raised so "Custom attribute" is never clipped. */
+.cp__mkind {
+  --badge-max: 24ch;
+  align-self: flex-start;
+  margin-top: var(--space-2);
+}
+.cp__mkind > svg { flex: none; margin-top: 0; color: var(--cond-fg, currentcolor); }
+
+/* The v1/v2 preview switch at the head of the attribute menu (9 Oct 2026). */
+.cp__attrver { padding: var(--space-3) var(--space-4) 0; }

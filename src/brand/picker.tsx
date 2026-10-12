@@ -272,7 +272,11 @@ export function Picker({
   }
 
   const onKey = (e: React.KeyboardEvent) => {
+    /* Only an open list takes Escape. A closed picker stopped it too, so a
+       drawer whose focus sat on its picker could not be closed from the keys
+       (Assign users, 10 Oct 2026). */
     if (e.key === 'Escape') {
+      if (!open) return
       e.stopPropagation()
       setOpen(false)
       anchor.current?.focus()

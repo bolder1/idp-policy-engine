@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, X } from 'lucide-react'
 import { Button } from '../kit'
 import { blankRule, type Policy, type Rule } from '../data'
 import { ruleAt, type Part, type Selection } from '../screens/board/model'
+import { playCue } from '../sound'
 import { BoardTourHero } from './BoardTourArt'
 import { DemoButton } from './DemoButton'
 import { measureAnchor, place, type Rect } from './spotlight'
@@ -309,8 +310,12 @@ export function BoardTour({
     onClose()
   }, [onClose])
 
+  /* Done, and only Done, earns the little celebration (sound.ts); Skip and Escape leave quietly. */
   const next = useCallback(() => {
-    if (last) return leave()
+    if (last) {
+      playCue('celebrate')
+      return leave()
+    }
     setI((n) => n + 1)
   }, [last, leave])
 

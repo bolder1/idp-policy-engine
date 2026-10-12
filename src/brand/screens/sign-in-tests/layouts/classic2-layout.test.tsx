@@ -31,6 +31,7 @@ import {
   policyRows,
   ruleHead,
   ruleShown,
+  rulesWalked,
   signInHead,
   workingOn,
 } from './classic2-model'
@@ -320,14 +321,20 @@ describe('Classic v2 draws every showcase sign-in (ClassicV2Layout.tsx)', () => 
     for (const gone of ['WhatTheySee', 'WhyCard', 'BreakIn', 'focus2-', 'SignInRow', 'speak', 'Brief', 'RuleTraceCard']) expect(layoutSrc, gone).not.toContain(gone)
   })
 
-  it('is the builder’s chain: its start pill, read and never a button; its dashed connector with nothing to insert; four of its cards', () => {
+  it('is the builder’s chain: its start pill, read and never a button; its connector, one unbroken line with nothing to insert; four of its cards', () => {
     const out = render(propsFor(maya, 'settled'))
     expect(out).toContain('<div class="bb__start rl-c2__start">')
     expect(out).not.toMatch(/<button[^>]*class="bb__start/)
     expect(text(out)).toContain('A sign-in arrives at AWS Console')
     expect(out).not.toContain('bb__start__go')
-    /* A connector above each card — the one under the start pill and one between each two — and no `+` or hint. */
-    expect((out.match(/class="bb__link rl-c2__link"/g) ?? []).length).toBe(4)
+    /* A connector above each card — the one under the start pill and one between each two — and no `+` or hint.
+       6 Oct 2026: each carries its ink (`is-run` while the engine travels, `is-landed` as the outcome's colour flows down,
+       `is-rest` once settled) and the outcome's tone; a run drawn settled (reduced motion here) is at rest at once. */
+    expect((out.match(/class="bb__link rl-c2__link is-rest is-out-allow"/g) ?? []).length).toBe(4)
+    expect(out).not.toMatch(/class="bb__link rl-c2__link is-(run|landed)/)
+    /* 6 Oct 2026: one line, unbroken — no gap left where the builder's `+` stands (two gradients, top and bottom). */
+    expect(css).toMatch(/\.rl-c2 \.bb__link::before \{[^}]*background: var\(--bb-link\);/)
+    expect(css).not.toMatch(/\.rl-c2 \.bb__link::before \{[^}]*linear-gradient/)
     for (const gone of ['bb__link__add', 'bb__link__hint', 'is-bare', 'Insert here']) expect(out, gone).not.toContain(gone)
     expect((out.match(/class="bb__card /g) ?? []).length).toBe(4)
     expect(cardsIn(out)).toEqual(CARDS)
@@ -407,11 +414,15 @@ describe('Classic v2 draws every showcase sign-in (ClassicV2Layout.tsx)', () => 
     const rule = cardHtml(out, 'rule')
     expect(rule).toContain('Rule 2 of 3')
     expect(rule).not.toContain('rl-c2__passed')
-    /* While the engine reads, only the rule it is on is listed, open; the rest would give the answer away. */
+    /* While the engine walks, the rules it has reached are listed — rule 1 read and not matched, folded; rule 2 being
+       read, open — and none says how it fares before it is read (6 Oct 2026: "it should feel more real"). */
     expect(rule).toContain('class="rl-c2__rules"')
     expect(rule).not.toContain('rl-c2__others')
-    expect((rule.match(/<li class="rl-c2__rule /g) ?? []).length).toBe(1)
-    expect(rule).toContain('rl-c2__rule is-match is-open')
+    const rows = [...rule.matchAll(/<li class="rl-c2__rule ([^"]*)"/g)].map((m) => m[1])
+    expect(rows).toEqual(['is-no-match', 'is-reading is-open'])
+    expect(text(rule)).toMatch(/1\s*Contractors away from the office\s*Not matched · Who/)
+    expect(text(rule)).toMatch(/2\s*Engineers on a compliant device\s*Reading/)
+    expect(rule).not.toContain('Matches')
   })
 
   it('the pencil and Replay sit beside the sign-in card’s fold; Decided by opens the rule', () => {
@@ -477,5 +488,23 @@ describe('Classic v2 draws every showcase sign-in (ClassicV2Layout.tsx)', () => 
     expect(code.match(/\d+(\.\d+)?px/g)).toEqual(['520px'])
     expect(code).toContain('--bb-card: 520px')
     expect(code).toContain('width: min(var(--bb-card)')
+  })
+})
+
+/* 7 Oct 2026: a rule switched off is passed over in a beat of its own (focus2-pace.ts), so it is on the card from that
+   beat, not only once the answer lands — the matched row no longer jumps down as the answer arrives. */
+describe('the rules the walk has reached', () => {
+  it('lists a switched-off rule from its own beat, a rule never reached only once the walk is over', () => {
+    const plan = {
+      at: { outcome: 9 },
+      steps: [],
+      rules: [
+        { id: 'off', visited: false, startAt: 2, state: 'off' },
+        { id: 'hit', visited: true, startAt: 3, state: 'matched' },
+        { id: 'after', visited: false, startAt: -1, state: 'not-reached' },
+      ],
+    } as unknown as Parameters<typeof rulesWalked>[0]
+    const ids = (s: number) => rulesWalked(plan, s).map((r) => (r as unknown as { id: string }).id)
+    expect([ids(1), ids(2), ids(3), ids(9)]).toEqual([[], ['off'], ['off', 'hit'], ['off', 'hit', 'after']])
   })
 })

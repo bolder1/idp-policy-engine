@@ -54,17 +54,15 @@ describe('the route union', () => {
   })
 
   /* Display tokens is opened from Authentication methods, and the rail has to
-     keep saying so. The console's own "Assign Hardware Token to Users" item
-     opens it too, without lighting a second place. */
+     keep saying so. Authentication methods is its own item since 7 Oct 2026
+     (owner: "move it outside Policies"), and the console's 2-Factor
+     Authentication group — "Assign Hardware Token to Users" with it — is gone:
+     the Hardware Token row is the way in. */
   it('lights Authentication methods on the Display tokens page', () => {
     expect(ROUTES).toContain('display-tokens')
     expect(shellSrc).toContain("methods: ['display-tokens']")
-  })
-
-  it('opens Display tokens from the rail item the live console uses, unlit', () => {
-    const line = shellSrc.split('\n').find((l) => l.includes("label: 'Assign Hardware Token to Users'")) ?? ''
-    expect(line).toContain("screen: { name: 'display-tokens', tab: 'assignments' }")
-    expect(line).toContain('lights: false')
+    expect(shellSrc).toContain("{ label: 'Authentication methods', icon: KeyRound, screen: { name: 'methods' } },")
+    expect(shellSrc).not.toContain("label: 'Assign Hardware Token to Users'")
   })
 
   /* A lazy screen that is not prewarmed shows a blank busy page on its first

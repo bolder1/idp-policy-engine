@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import {
   ArrowLeft,
-  Check,
   KeyRound,
-  Minus,
   Plus,
   RefreshCw,
   Trash2,
@@ -39,6 +37,7 @@ import {
 import { ConfirmDelete } from './confirm-delete'
 import { ListPager } from './list-pager'
 import { usePagedList } from './paged-list'
+import { RowCheck, SelectAll, SliderActions } from './select-rows'
 import {
   AddTokenForm,
   AssignForm,
@@ -62,7 +61,6 @@ import {
   namesBrief,
   plural,
   selectionPlan,
-  toggleAll,
   toggleSelected,
   withSkips,
   type Assignment,
@@ -710,91 +708,7 @@ function deleteDetail(deleting: number, kept: readonly string[]): string {
   return `${head} ${kept.length === 1 ? `${kept[0]} is assigned, so it stays.` : `${plural(kept.length, 'assigned token')} stay.`}`
 }
 
-/* --- Slider footer ---------------------------------------------------------------------- */
-
-function SliderActions({
-  onCancel,
-  primary,
-  another,
-}: {
-  onCancel: () => void
-  primary: { label: string; run: () => void; disabled?: boolean } | null
-  another: { label: string; run: () => void } | null
-}) {
-  return (
-    <>
-      <Button variant="ghost" onClick={onCancel}>
-        Cancel
-      </Button>
-      {another && (
-        <Button variant="secondary" onClick={another.run}>
-          {another.label}
-        </Button>
-      )}
-      {primary && (
-        <Button variant="brand" disabled={primary.disabled} onClick={primary.run}>
-          {primary.label}
-        </Button>
-      )}
-    </>
-  )
-}
-
-/* --- Selection -------------------------------------------------------------------------- */
-
-/* Select all, and what a selection can have done to it on the right of the same
-   line. There rather than in the toolbar: the toolbar is already full at the
-   compact width, and a button arriving there with the first tick wrapped it and
-   moved Upload CSV and the primary action out from under the pointer. */
-function SelectAll({
-  shown,
-  selected,
-  onSelected,
-  children,
-}: {
-  shown: string[]
-  selected: string[]
-  onSelected: (next: string[]) => void
-  children?: ReactNode
-}) {
-  const on = shown.filter((s) => selected.some((x) => serialKey(x) === serialKey(s))).length
-  const all = shown.length > 0 && on === shown.length
-  return (
-    <div className="bdt__selbar">
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={all ? true : on > 0 ? 'mixed' : false}
-        className={`bdt__check bdt__check--all ${on > 0 ? 'is-on' : ''}`}
-        onClick={() => onSelected(toggleAll(selected, shown))}
-      >
-        <span className="bx-tick" aria-hidden>
-          {on > 0 && !all ? <Minus size={11} strokeWidth={3.2} /> : <Check size={11} strokeWidth={3.2} />}
-        </span>
-        {/* No count: the bulk button at the end of this line says how many. */}
-        <span>Select all</span>
-      </button>
-      {children && <span className="bdt__bulk">{children}</span>}
-    </div>
-  )
-}
-
-function RowCheck({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={on}
-      aria-label={label}
-      className={`bdt__check ${on ? 'is-on' : ''}`}
-      onClick={onToggle}
-    >
-      <span className="bx-tick" aria-hidden>
-        <Check size={11} strokeWidth={3.2} />
-      </span>
-    </button>
-  )
-}
+/* The slider footer, Select all and the row ticks are in select-rows.tsx. */
 
 /* The token half of a row: serial, then type, and when a C100 was last synced. */
 function TokenCell({ token, className }: { token: HardwareToken; className?: string }) {
@@ -912,7 +826,7 @@ function AssignmentsTab({
         <NoMatches noun="assignments" query={query} onClear={() => onQuery('')} />
       ) : (
         <>
-          <SelectAll shown={shown.map((r) => r.token.serial)} selected={selected} onSelected={onSelected}>
+          <SelectAll shown={shown.map((r) => r.token.serial)} selected={selected} onSelected={onSelected} keyOf={serialKey}>
             {count > 0 && (
               <Button variant="danger" size="sm" icon={UserX} onClick={() => onUnassign(plan.assigned.map((t) => t.serial))}>
                 Unassign {plural(count, 'token')}
@@ -1103,7 +1017,7 @@ function TokensTab({
         />
       ) : (
         <>
-          <SelectAll shown={shown.map((t) => t.serial)} selected={selected} onSelected={onSelected}>
+          <SelectAll shown={shown.map((t) => t.serial)} selected={selected} onSelected={onSelected} keyOf={serialKey}>
             {bulk}
           </SelectAll>
           <ul className="blist blist--paged bdt__list" ref={paged.listRef} aria-label="Tokens">

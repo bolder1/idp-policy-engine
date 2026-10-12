@@ -714,7 +714,7 @@
    have read a word of it. */
 .bb__stage.is-wf .bb__card.is-allow { border-color: var(--fb-positive-border); }
 .bb__stage.is-wf .bb__card.is-deny { border-color: var(--fb-negative-border); }
-.bb__stage.is-wf .bb__card.is-mfa { border-color: var(--fb-notice-border); }
+.bb__stage.is-wf .bb__card.is-mfa { border-color: var(--fb-positive-strong-border); }
 
 /* The head reads as a caption over the panel below it, not as a title bar. */
 .bb__stage.is-wf .bb__title strong { font-size: var(--fs-md); font-weight: var(--fw-medium); }
@@ -833,7 +833,7 @@
 /* Test mode's card states — lit, missed, dim — are trace.css's, scoped to
    `.bb.is-testing`; the route's marked edge is in try-sign-in.css. */
 .bb__card.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); --tone-dot: var(--fb-negative-dot, #d01243); }
-.bb__card.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); --tone-dot: var(--fb-notice-dot, #b07a00); }
+.bb__card.is-mfa { --tone-bg: var(--fb-positive-strong-bg); --tone-fg: var(--fb-positive-strong-fg); --tone-border: var(--fb-positive-strong-border); --tone-dot: var(--fb-positive-strong-dot); }
 .bb__card.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 /* The same three tones, on the badge rather than on a card ancestor.
@@ -2022,7 +2022,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 /* The same three tones the decision carries everywhere else in the console,
    rather than three colours picked to sit on a navy slab. */
 .bb__ifchip.is-tone-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
-.bb__ifchip.is-tone-mfa { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bb__ifchip.is-tone-mfa { background: var(--fb-positive-strong-bg); border-color: var(--fb-positive-strong-border); color: var(--fb-positive-strong-fg); }
 .bb__ifchip.is-tone-flag { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bb__ifchip.is-tone-allow { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
 
@@ -3632,3 +3632,26 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 @media (prefers-reduced-motion: reduce) {
   .bb__tspin { animation: none; }
 }
+
+/* Fixes (FixesPanel.tsx, 7 Oct 2026): the Why's finding cards in the
+   inspector's slot, Read as text's chrome. What a fix is now is said in
+   words, quiet; Apply all and the way back sit under the list. */
+.bfix__list { align-self: stretch; }
+.bfix__state { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bfix__foot { align-self: stretch; display: flex; align-items: center; gap: var(--space-4); }
+.bfix__back { margin-left: auto; }
+/* Its door while it is shut: Describe it's door, at the board's other end. */
+.bfix-door { justify-self: end; }
+
+/* The policy's rules as the builder's chain, read only, at its own size in the details slider (InspectPanel.tsx
+   `ReadOnlyCanvas`): no pan, no zoom, no dock — the board's inline transform is overridden, and the page scrolls. */
+.bb.insp__canvas {
+  --bb-card: 100%;
+  display: block;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bb-stage);
+}
+.insp__canvas .bb__stage { width: auto; position: relative; inset: auto; height: auto; overflow: visible; cursor: default; }
+.insp__canvas .bb__world { position: static; transform: none !important; padding: var(--space-6); }
+.insp__canvas .bb__dock { display: none; }

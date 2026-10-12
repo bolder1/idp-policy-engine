@@ -8,6 +8,7 @@ import { engineRun, readersOf } from '../sign-in-tests/engine-run'
 import { askedFields, emptyDraft } from '../sign-in-tests/sign-in-card'
 import { GRANT_ENDED, grantTempAccess } from '../sign-in-tests/temp-access'
 import classic2Src from '../sign-in-tests/layouts/classic2-chain.tsx?raw'
+import modelSrc from '../sign-in-tests/layouts/classic2-model.ts?raw'
 import inspectSrc from '../sign-in-tests/InspectPanel.tsx?raw'
 import { envOf, resolveSignIn } from '../tenant-resolver'
 import { rowsRead } from './rows-read'
@@ -137,8 +138,8 @@ describe('an ended grant says so (6 Oct 2026)', () => {
     const row = run.rules.find((r) => r.id === grant.rules[0].id)
     expect(row?.state).toBe('off')
     expect(grant.rules[0].tempAccess?.until).toBe(END)
-    expect(classic2Src).toContain("const ended = r.state === 'off' && !!rule?.tempAccess && rule.enabled !== false")
-    expect(classic2Src).toContain("possible: 'If not'")
+    expect(classic2Src).toContain("const ended = row.tone === 'off' && !!rule?.tempAccess && rule.enabled !== false")
+    expect(modelSrc).toContain("possible: { word: 'If not'")
     /* The details page: the rule's line in the accordion, and the note when it is open. */
     expect(inspectSrc).toContain("fate === 'off' && endedGrant(stored) ? GRANT_ENDED : FATE_SAID[fate]")
     expect(inspectSrc).toContain('`Ran until ${dateSaid(rule.tempAccess!.until)}.`')

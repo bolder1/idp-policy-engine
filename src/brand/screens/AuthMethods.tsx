@@ -1,11 +1,14 @@
-import { motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEffect } from 'react'
 import {
   ArrowLeft,
   BellRing,
   Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
+  Compass,
   CreditCard,
   Fingerprint,
   Grid3x3,
@@ -24,13 +27,15 @@ import {
   Star,
 } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, IconButton, MenuButton, Modal, SearchBox, TipDot, Toggle } from '../kit'
+import { Badge, Button, Callout, CalloutIcon, Drawer, IconButton, MenuButton, Modal, SearchBox, TipDot, Toggle } from '../kit'
+import { MethodsTour } from '../tour/MethodsTour'
+import { NEW_LAYOUT, SETTING_WAS } from '../tour/methods-tour'
 import { methodBlocker, type AuthMethod } from '../methods'
 import { useBrand, type Role } from '../store'
 import { EmptyState, NoMatches } from '../empty'
 import { MethodIcon, RecoveryTab } from './recovery'
-import { UserMethodCard } from './user-config'
-import { activateIn, enrolIssue, enrolShapeFor, readyFor, type UserEnrolment } from '../user-methods'
+import { EnrolForm, ProfileFacts, UserMethodCard } from './user-config'
+import { PROFILE, PROFILE_LABEL, activateIn, enrolIssue, enrolShapeFor, profileFieldsFor, profileHas, readyFor, type UserEnrolment } from '../user-methods'
 import { ActiveMethod } from './active-method'
 import { SettingField } from '../setting-field'
 import { ConfigFields } from './method-forms'
@@ -254,6 +259,11 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const [use, setUse] = useState<UseFilter>('all')
 
   const [tab, setTab] = useState<Tab>('methods')
+  /* What moved (tour/methods-tour.ts), for admins who knew the five 2-Factor Authentication pages: open
+     or shut. The announcement above the tabs starts it, and nothing else does. */
+  const [touring, setTouring] = useState(false)
+  /* The announcement opens to its four points, and starts shut: one line and the tour until somebody asks. */
+  const [newsOpen, setNewsOpen] = useState(false)
   /* The slider, as a stack of pages — a family, its settings, or a method's
      setup — deepest last. Empty closes it. See `PanelPage`. */
   const [panel, setPanel] = useState<PanelPage[]>([])
@@ -426,7 +436,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const heldFor = (id: string) => (id === DISPLAY_TOKEN_METHOD_ID ? held : 0)
   /** Methods this person has set up (or holds a token for). */
   const configuredIds = reachable
-    .filter((m) => enrolment.configured.includes(m.id) || heldFor(m.id) > 0)
+    .filter((m) => enrolment.configured.includes(m.id) || heldFor(m.id) > 0 || (profileFieldsFor(m.id) !== null && profileHas(m.id)))
     .map((m) => m.id)
   /** Methods this person could switch on now. */
   const readyIds = reachable.filter((m) => readyFor(m.id, enrolment, heldFor(m.id))).map((m) => m.id)
@@ -466,7 +476,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const [openCard, setOpenCard] = useState<string | null>(null)
   const [cardDraft, setCardDraft] = useState<Record<string, string>>({})
   const questions = Number(behaviour[KBA_LIMIT_KEY] ?? 3)
-  const cardIssue = openCard ? enrolIssue(enrolShapeFor(openCard).kind, cardDraft, questions) : null
+  const cardIssue = openCard ? enrolIssue(enrolShapeFor(openCard).kind, cardDraft, questions, enrolShapeFor(openCard).setup) : null
   const cardDirty = !!openCard && !sameValues(cardDraft, enrolment.values[openCard] ?? {})
 
   /* Opening another card, or closing this one from its Edit button, asks first
@@ -516,6 +526,11 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     setOpenCard(null)
     setCardDraft({})
   }
+  /* The tour lights the list, so a drawer over it is shut first. */
+  const startTour = () => {
+    closePanel()
+    setTouring(true)
+  }
 
   return (
     /* Compact on both tabs and for both roles while the width switch says so.
@@ -523,7 +538,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
        the page. */
     <div className={`bpage${compactClass(width)} bm8`}>
       <header className="bm8__head">
-        <div className="bm8__title">
+        <div className="bm8__title" data-tour="methods-head">
           <h1 ref={heading} tabIndex={-1}>
             {isUser ? 'Two-step verification' : 'Authentication methods'}
           </h1>
@@ -540,6 +555,60 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
         </div>
       </header>
 
+      {/* The announcement (owner, 7 Oct 2026: "treat it like an announcement … 3 to 4 major bullet points
+          of what has been done, and at the right side a tour — no need to add a hide option"). Always there
+          for an admin, so the tour is never more than one press away; never started for them. */}
+      {!isUser && (
+        <section className="bm8__news" aria-labelledby="bm8-news-title">
+          <CalloutIcon tone="info" />
+          <div className="bm8__newsbody">
+            {/* One row that never moves: the title and its line, Read more at the line's end, the tour at the
+                right (owner, 7 Oct 2026: "add a read more button, make the button position consistent"). The
+                points open under it, in the text's column. */}
+            <div className="bm8__newshead">
+              <div className="bm8__newstext">
+                <strong id="bm8-news-title">{NEW_LAYOUT.title}</strong>
+                <span className="bm8__newsline">
+                  {NEW_LAYOUT.line}
+                  <button
+                    type="button"
+                    className="bm8__newsmore-toggle"
+                    aria-expanded={newsOpen}
+                    aria-controls="bm8-news-points"
+                    onClick={() => setNewsOpen((o) => !o)}
+                  >
+                    {newsOpen ? 'Show less' : 'Read more'}
+                    {newsOpen ? <ChevronUp size={14} strokeWidth={2} aria-hidden /> : <ChevronDown size={14} strokeWidth={2} aria-hidden />}
+                  </button>
+                </span>
+              </div>
+              <Button variant="secondary" size="sm" icon={Compass} onClick={startTour}>
+                Take the tour
+              </Button>
+            </div>
+            <AnimatePresence initial={false}>
+              {newsOpen && (
+                <motion.div
+                  key="points"
+                  id="bm8-news-points"
+                  className="bm8__newsmore"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: PAGE_EASE }}
+                >
+                  <ul className="bm8__newslist">
+                    {NEW_LAYOUT.points.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </section>
+      )}
+
       {/* Recovery is a tenant policy rather than a personal setting, so a person
           does not get the tab — and a single-tab tab bar is furniture. */}
       {!isUser && (
@@ -550,6 +619,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
               role="tab"
               type="button"
               aria-selected={tab === t.id}
+              data-tour={`methods-tab-${t.id}`}
               className={`bm8__tab ${tab === t.id ? 'is-on' : ''}`}
               onClick={() => {
                 setTab(t.id)
@@ -565,7 +635,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
 
       {/* Inside a `bv5` wrapper: recovery.css writes some rules as `.bv5 .bv5__x`. */}
       {tab === 'recovery' && !isUser && (
-        <div className="bv5">
+        <div className="bv5" data-tour="methods-recovery">
           <RecoveryTab methods={methods} />
         </div>
       )}
@@ -592,6 +662,12 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             onCaChains={isUser ? undefined : () => setCaOpen(true)}
             enrolment={enrolment}
             configuredIds={configuredIds}
+            readyIds={readyIds}
+            onActivate={activate}
+            onConfigure={(m) => {
+              setPanel([{ kind: 'family', channel: m.channel }])
+              openEnrol(m.id)
+            }}
           />
 
           <CategoryDrawer
@@ -647,6 +723,19 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           ))}
         </div>
       </Modal>
+
+      {!isUser && (
+        <MethodsTour
+          open={touring}
+          onClose={() => setTouring(false)}
+          onTab={(t) => {
+            if (t === tab) return
+            setTab(t)
+            closePanel()
+          }}
+          onClear={closePanel}
+        />
+      )}
     </div>
   )
 }
@@ -871,6 +960,9 @@ function CategoryList({
   onCaChains,
   enrolment,
   configuredIds,
+  readyIds,
+  onActivate,
+  onConfigure,
 }: {
   methods: AuthMethod[]
   onOpen: (channel: string) => void
@@ -888,6 +980,10 @@ function CategoryList({
   enrolment: UserEnrolment
   /** The person's set-up methods, for the Configured pill on their rows. */
   configuredIds: string[]
+  /** The person's side, a family of one: what its row needs to be set up and switched on from the row itself. */
+  readyIds: string[]
+  onActivate: (id: string, on: boolean) => void
+  onConfigure: (m: AuthMethod) => void
 }) {
   const [q, setQ] = useState('')
   const needle = q.trim().toLowerCase()
@@ -972,18 +1068,21 @@ function CategoryList({
 
         {/* The kit's own menu, anchored to the trigger's right edge so it does
             not run off the page. No count on the trigger: the list says how
-            many it holds. */}
-        <MenuButton
-          size="sm"
-          align="end"
-          label={current.label}
-          items={offered.map((u) => ({
-            id: u.id,
-            label: u.label,
-            icon: u.id === use ? Check : undefined,
-          }))}
-          onSelect={(id) => onUse(id as UseFilter)}
-        />
+            many it holds. The admin's list only (owner, 8 Oct 2026: "remove the filter from the user side"):
+            a person's methods are all second factors, so there is nothing to filter. */}
+        {!isUser && (
+          <MenuButton
+            size="sm"
+            align="end"
+            label={current.label}
+            items={offered.map((u) => ({
+              id: u.id,
+              label: u.label,
+              icon: u.id === use ? Check : undefined,
+            }))}
+            onSelect={(id) => onUse(id as UseFilter)}
+          />
+        )}
       </div>
 
       {items.length === 0 ? (
@@ -1022,7 +1121,12 @@ function CategoryList({
                   row={item.row}
                   isUser={isUser}
                   defaultMethod={defaultMethod}
-                  configured={item.row.inside.some((m) => configuredIds.includes(m.id))}
+                  activeId={isUser ? enrolment.active : null}
+                  me={
+                    isUser && item.row.inside.length === 1
+                      ? { m: item.row.inside[0], ready: readyIds.includes(item.row.inside[0].id), active: enrolment.active === item.row.inside[0].id, onActivate, onConfigure }
+                      : undefined
+                  }
                   onOpen={onOpen}
                   onSettings={onSettings}
                   onToggle={onToggle}
@@ -1140,7 +1244,8 @@ function FamilyListRow({
   row,
   isUser,
   defaultMethod,
-  configured,
+  activeId = null,
+  me,
   onOpen,
   onSettings,
   onToggle,
@@ -1152,7 +1257,10 @@ function FamilyListRow({
   isUser: boolean
   defaultMethod: string | null
   /** The person has set up a method in this family. */
-  configured: boolean
+  /** The person's side: the method that runs, so its row can say so. */
+  activeId?: string | null
+  /** The person's side, a family of one: its method and what the row needs to set it up and switch it on, as the card inside would. */
+  me?: { m: AuthMethod; ready: boolean; active: boolean; onActivate: (id: string, on: boolean) => void; onConfigure: (m: AuthMethod) => void }
   onOpen: (channel: string) => void
   onSettings: (channel: string) => void
   onToggle: (id: string, on: boolean) => void
@@ -1168,19 +1276,48 @@ function FamilyListRow({
      set something up here. */
   const holdsDefault =
     !isUser && (single ? defaultMethod === single.id : defaultMethod !== null && inside.some((m) => m.id === defaultMethod))
-  const title = single ? single.name : f.channel
+  /* A family of one, to a person: named for its method, with its own controls on the row, as the admin's are (owner,
+     7 Oct 2026: "if it has only one, show it outside directly") — no panel to open for one card. */
+  const solo = me?.m ?? null
+  /* Email, SMS and call send to the profile: the row says what is on file, and only switches on. */
+  const profileFields = solo ? profileFieldsFor(solo.id) : null
+  const title = single ? single.name : solo ? solo.name : f.channel
   const target = rowTarget(shape)
   const caChains = caChainsRow(shape, onCaChains)
   const open =
     caChains ??
-    (!target
+    (solo || !target
       ? null
       : target.kind === 'family'
         ? () => onOpen(f.channel)
         : target.kind === 'settings'
           ? () => onSettings(f.channel)
           : () => onSetup(target.method))
-  const ctl = single ? (
+  const mine = (() => {
+    if (!me) return undefined
+    const shape = enrolShapeFor(me.m.id)
+    const setUp = shape.kind !== 'none' && shape.kind !== 'assigned' && !profileFields
+    return (
+      <div className="bm8__ctlrow">
+        {profileFields && !me.ready ? (
+          <span className="bmu__hint">Not on your profile</span>
+        ) : me.ready ? (
+          <>
+            {setUp && <IconButton icon={Settings} size="sm" tone="ghost" label={`Edit ${me.m.name}`} onClick={() => me.onConfigure(me.m)} />}
+            <Toggle checked={me.active} onChange={(on) => me.onActivate(me.m.id, on)} label={`Use ${me.m.name}`} />
+          </>
+        ) : shape.kind === 'assigned' ? (
+          <span className="bmu__hint">{shape.note}</span>
+        ) : (
+          <Button variant="link" size="sm" onClick={() => me.onConfigure(me.m)}>
+            Configure
+            <span className="u-sr-only"> {me.m.name}</span>
+          </Button>
+        )}
+      </div>
+    )
+  })()
+  const ctl = mine ?? (single ? (
     <MethodControls
       compact
       m={single}
@@ -1189,12 +1326,14 @@ function FamilyListRow({
       onSetup={onSetup}
       onMakeDefault={open ? undefined : onMakeDefault}
     />
-  ) : undefined
+  ) : undefined)
 
   return (
     <li
       className={`bm8__card bm8__card--family ${open ? 'is-link' : ''} ${live === 0 ? 'is-off' : ''}`}
       data-channel={f.channel}
+      /* What moved (tour/methods-tour.ts) lights rows by this: the method's id on a family of one, else the channel. */
+      data-tour={`methods-row-${single ? single.id : f.channel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
     >
       <span className="bm8__tile is-brand" aria-hidden>
         <f.icon size={19} strokeWidth={1.7} />
@@ -1225,8 +1364,8 @@ function FamilyListRow({
               description — so where it HAS no summary the line below already is
               the description, and an ungated tip repeated it word for word.
               Gated the way MethodCard gates its own. */}
-          {(single ? !!single.summary : true) && (
-            <TipDot text={single ? single.description : `${f.blurb} ${f.detail}`} label={`About ${title}`} />
+          {((single ?? solo) ? !!(single ?? solo)!.summary : true) && (
+            <TipDot text={(single ?? solo) ? (single ?? solo)!.description : `${f.blurb} ${f.detail}`} label={`About ${title}`} />
           )}
           {/* The family's own name rode here on a row named for its one method
               — "OTP over Phone Call · Call Verification" (owner, 23 Sep 2026:
@@ -1234,7 +1373,7 @@ function FamilyListRow({
               the switch turns on, and the family adds nothing to that. */}
           {f.isNew && <i className="bm8__new">New</i>}
           {holdsDefault && (
-            <i className="bm8__defchip">
+            <i className="bm8__defchip" data-tour="methods-default">
               <Star size={10} strokeWidth={2.4} aria-hidden />
               Default
             </i>
@@ -1264,8 +1403,17 @@ function FamilyListRow({
             </Badge>
           )}
           {caChains && <CaChainCount />}
+          {/* Beside the name, as the chips are (owner, 7 Oct 2026). */}
+          {/* The person's side has no switches to count: one method runs, so the one chip marks the row that holds it. */}
+          {isUser && activeId !== null && inside.some((m) => m.id === activeId) && (
+            <Badge tone="positive">Active</Badge>
+          )}
         </span>
-        <span className="bm8__blurb">{single ? single.summary ?? single.description : f.blurb}</span>
+        <span className="bm8__blurb">
+          {profileFields
+            ? profileFields.map((k) => PROFILE[k] || `No ${PROFILE_LABEL[k].toLowerCase()}`).join(' · ')
+            : (single ?? solo) ? ((single ?? solo)!.summary ?? (single ?? solo)!.description) : f.blurb}
+        </span>
       </span>
 
       <span className="bm8__right">
@@ -1283,8 +1431,6 @@ function FamilyListRow({
             spent the same width on a dash. The figures live on each method in
             `methods.ts` and can come back wherever they are actually the
             question. See the "numbers once" rule. */}
-        {isUser && configured && <Badge tone="positive">Configured</Badge>}
-
         {/* Both slots, always — see `RowEnd`. */}
         <RowEnd
           control={ctl}
@@ -1312,6 +1458,12 @@ function FamilyListRow({
       </span>
     </li>
   )
+}
+
+/* Where a setting lived in the old console, quiet beside its label (tour/methods-tour.ts `SETTING_WAS`). */
+const wasIn = (s: MfaSetting): ReactNode => {
+  const said = s.source ? SETTING_WAS[s.source] : undefined
+  return said ? <span className="bm8__was">{said}</span> : undefined
 }
 
 /* --- The slide-over ------------------------------------------------------------ */
@@ -1442,6 +1594,10 @@ function CategoryDrawer({
   const inside = family
     ? methods.filter((m) => m.channel === family.channel && matchesUse(m, use))
     : []
+  /* A person's family of one, its form open: the slider is that method's own page — its fields, and Cancel and Save in
+     the footer — not a card of it in a list (owner, 7 Oct 2026: "the whole slider is our security question part"). */
+  const soloOpen = isUser && inside.length === 1 && enrol.openCard === inside[0].id
+  const soloIssue = soloOpen ? enrolIssue(enrolShapeFor(inside[0].id).kind, enrol.draft, enrol.questions, enrolShapeFor(inside[0].id).setup) : null
   /* Every second factor in the family, whatever the filter shows: a family
      setting reaches all of them, so the note has to name all of them. */
   const wholeFamily = family ? methods.filter((m) => m.channel === family.channel && m.use === 'second') : []
@@ -1603,7 +1759,22 @@ function CategoryDrawer({
         ) : undefined
       }
       actions={
-        pageSetup ? (
+        soloOpen ? (
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                enrol.onCancelCard()
+                onClose()
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="brand" disabled={soloIssue !== null} onClick={enrol.onSave}>
+              Save
+            </Button>
+          </>
+        ) : pageSetup ? (
           <>
             {/* Cancel goes where Back goes when there is somewhere to go back
                 to. Closing the whole panel from a pushed page would throw away
@@ -1655,6 +1826,7 @@ function CategoryDrawer({
                   role="tab"
                   type="button"
                   aria-selected={pane === 'methods'}
+                  data-tour="drawer-tab-methods"
                   className={`bm8__dwtab ${pane === 'methods' ? 'is-on' : ''}`}
                   onClick={() => setPane('methods')}
                 >
@@ -1665,6 +1837,7 @@ function CategoryDrawer({
                   role="tab"
                   type="button"
                   aria-selected={pane === 'settings'}
+                  data-tour="drawer-tab-settings"
                   className={`bm8__dwtab ${pane === 'settings' ? 'is-on' : ''}`}
                   onClick={() => setPane('settings')}
                 >
@@ -1689,9 +1862,30 @@ function CategoryDrawer({
                     blurb={isUser ? "Your admin hasn't turned any on." : 'Set the filter to All methods to see them.'}
                   />
                 ) : (
-                  <div className="bm8__list">
+                  <>
+                  {isUser && <ProfileFacts methods={inside} />}
+                  {isUser && family?.channel === 'miniOrange Authenticator' && (
+                    /* The live page's banner above the three methods (7 Oct 2026). */
+                    <Callout tone="notice">
+                      Please ensure the miniOrange Authenticator application is updated to version 4.0.0 or higher before proceeding with the configuration process.
+                    </Callout>
+                  )}
+                  <div className={`bm8__list${soloOpen ? ' is-bare' : ''}`} data-tour="drawer-methods">
                     {inside.map((m) =>
-                      isUser ? (
+                      isUser && soloOpen ? (
+                        <div key={m.id} className="bmu__form bmu__form--bare">
+                          <EnrolForm
+                            methodId={m.id}
+                            bare
+                            shape={enrolShapeFor(m.id)}
+                            draft={enrol.draft}
+                            onDraft={enrol.onDraft}
+                            questions={enrol.questions}
+                            onCancel={enrol.onCancelCard}
+                            onSave={enrol.onSave}
+                          />
+                        </div>
+                      ) : isUser ? (
                         <UserMethodCard
                           key={m.id}
                           m={m}
@@ -1732,6 +1926,7 @@ function CategoryDrawer({
                       ),
                     )}
                   </div>
+                  </>
                 )}
               </>
             ) : (
@@ -1893,7 +2088,7 @@ function SettingsPane({
       : setting
 
   return (
-    <div className="bm8__settings">
+    <div className="bm8__settings" data-tour="drawer-settings">
       {notes.length > 0 && (
         <section className="bm8__setnote" aria-label="Note">
           <Callout tone="info" title="Note">
@@ -1914,6 +2109,7 @@ function SettingsPane({
                 <SettingField
                   key={s.id}
                   setting={shown(s)}
+                  extra={wasIn(s)}
                   value={read(key, fieldValue(s.field))}
                   onChange={(v) => (s.field.kind === 'link' ? onLink?.(s.id) : writeFamily(s.id, v))}
                   /* Revealed settings store against the same scope as the row
@@ -1940,6 +2136,7 @@ function SettingsPane({
                 <SettingField
                   key={s.id}
                   setting={s}
+                  extra={wasIn(s)}
                   value={read(key, fieldValue(s.field))}
                   onChange={(v) => (s.field.kind === 'link' ? onLink?.(s.id) : onBehaviour({ [key]: v }))}
                   child={{

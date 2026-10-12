@@ -7,18 +7,16 @@ import { useSyncExternalStore } from 'react'
    See zone-notes.tsx for why there are four versions (owner, 1 and 2 Oct 2026).
    -------------------------------------------------------------------------- */
 
-export type NoteStyle = 'classic' | 'blue' | 'sticky' | 'clip' | 'pointer'
+export type NoteStyle = 'classic' | 'blue' | 'sticky'
 
-/* Classic first and the default: it is the note the page had before any of
-   this, so a viewer who never touches the switch sees the page as it was.
+/* Blue first and the default (owner, 9 Oct 2026: "the blue should be by default"; keep Classic, Blue and
+   Sticky note, remove the rest, so Clipboard and Pointer are gone).
    Note pile and Index card stood between the sticky note and the clipboard
    for a day (owner, 2 Oct 2026: "Remove Note pile, Index card"). */
 export const NOTE_STYLES: { value: NoteStyle; label: string }[] = [
-  { value: 'classic', label: 'Classic' },
   { value: 'blue', label: 'Blue' },
+  { value: 'classic', label: 'Classic' },
   { value: 'sticky', label: 'Sticky note' },
-  { value: 'clip', label: 'Clipboard' },
-  { value: 'pointer', label: 'Pointer' },
 ]
 
 export const NOTE_STYLE_KEY = 'idp.zones.noteStyle'
@@ -28,7 +26,7 @@ export const NOTE_STYLE_KEY = 'idp.zones.noteStyle'
     2026, 'pile' and 'card' on 2 Oct — so a viewer who had one on is back on
     the original note, not on a blank. */
 export function parseNoteStyle(value: unknown): NoteStyle {
-  return NOTE_STYLES.find((o) => o.value === value)?.value ?? 'classic'
+  return NOTE_STYLES.find((o) => o.value === value)?.value ?? 'blue'
 }
 
 function readNoteStyle(): NoteStyle {
@@ -36,7 +34,7 @@ function readNoteStyle(): NoteStyle {
     return parseNoteStyle(window.localStorage.getItem(NOTE_STYLE_KEY))
   } catch {
     /* No window (tests), a private window, or storage blocked by policy. */
-    return 'classic'
+    return 'blue'
   }
 }
 
@@ -66,7 +64,7 @@ export function useNoteStyle(): [NoteStyle, (s: NoteStyle) => void] {
   const style = useSyncExternalStore(
     subscribe,
     () => (current ??= readNoteStyle()),
-    () => 'classic' as NoteStyle,
+    () => 'blue' as NoteStyle,
   )
   return [style, applyNoteStyle]
 }

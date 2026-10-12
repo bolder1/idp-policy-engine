@@ -14,6 +14,7 @@ import {
   MapPin,
   MonitorSmartphone,
   Play,
+  RotateCcw,
   Users,
   X,
   XCircle,
@@ -140,6 +141,8 @@ export interface TryPanelProps {
   onToggleWidth: () => void
   /** The X: the panel shuts (the page's Escape does the same). */
   onClose: () => void
+  /** Reset: the form back as a visit finds it. Absent while there is nothing to take away, and the press goes. */
+  onReset?: () => void
   /* Who and what may be chosen. The page's: everybody, every application.
      A policy's, in the builder's Check access (`boardScope`): its
      applications only — every one "As if on" for a draft with none — and
@@ -163,7 +166,7 @@ const FACT: Partial<Record<TokenId, { label: string; icon: LucideIcon }>> = {
 
 export function TryPanel(props: TryPanelProps) {
   const { title, form, rows, issues, boundaries, tips, reduced, identities, onIdentities, onPatch, onRun, saved, onUseSaved, savedOpen, onSavedOpen } = props
-  const { ran, saveOpen, onSaveOpen, wide, onToggleWidth, onClose, scope = GLOBAL_SCOPE, unrun = false } = props
+  const { ran, saveOpen, onSaveOpen, wide, onToggleWidth, onClose, onReset, scope = GLOBAL_SCOPE, unrun = false } = props
   /* On its way out (AnimatePresence): inert, so it keeps no focus and takes no press. */
   const present = useIsPresent()
   const { users, groups, apps } = useBrand()
@@ -320,9 +323,12 @@ export function TryPanel(props: TryPanelProps) {
       </div>
 
       <div className="bb__inspfoot sit-panel__foot">
-        {unrun && (
-          <span className="sit-panel__unrun" role="status">
-            Changes not run yet
+        {/* Quiet, at the far end from Run: Run stays the panel's one orange press. */}
+        {onReset && (
+          <span className="sit-panel__reset">
+            <Button variant="ghost" size="sm" icon={RotateCcw} onClick={onReset}>
+              Reset
+            </Button>
           </span>
         )}
         {SAVED_SIGN_INS && ran && !unrun && (

@@ -34,6 +34,7 @@ interface Board {
   id?: string
   tab?: Exclude<DockTab, 'break-in'>
   edit?: (p: Policy) => Policy
+  summary?: 'cards' | 'none'
 }
 
 /* What the test panel handed each view: the policy's own applications, the
@@ -49,7 +50,7 @@ function View({ board }: { board: Board }) {
   const mine = policyApps(draft, store.apps)
   const tab = board.tab ?? 'saved'
   if (tab === 'people') return <DockPeople draft={draft} apps={mine} form={form} version={version} onPatch={noop} />
-  if (tab === 'past') return <DockPast draft={draft} apps={mine} version={version} onLoad={noop} />
+  if (tab === 'past') return <DockPast draft={draft} apps={mine} version={version} onLoad={noop} summary={board.summary} />
   const onApps = draft.isSystem ? store.savedSignIns : store.savedSignIns.filter((s) => s.facts.appId !== undefined && draft.appIds.includes(s.facts.appId))
   const rows = savedOnPolicy(savedRows(onApps, store.policies, env, version?.substitute), draft, 'policy')
   return <DockSaved draft={draft} rows={rows} apps={mine} onLoad={noop} onSaveThis={noop} onManage={noop} />
@@ -162,6 +163,8 @@ describe('Past sign-ins, at the panel’s width', () => {
   it('draws today and the policy turned on as bars, with a key', () => {
     expect(out).toMatch(/role="img" aria-label="Today: Allow on 1 factor \d+%, Allow with 2FA \d+%, Deny \d+%, Can&#x27;t tell \d+%"/)
     expect(out).toMatch(/role="img" aria-label="If turned on: Allow with 2FA \d+%, Deny \d+%, Can&#x27;t tell \d+%"/)
+    /* Two sides keep the bars; the decision cards are one side's alone (6 Oct 2026). */
+    expect(out).not.toContain('tpanel-dcard')
   })
 
   it('has three tiles abreast that are the filter, Would change pressed', () => {
@@ -170,16 +173,45 @@ describe('Past sign-ins, at the panel’s width', () => {
     expect(out).toMatch(/aria-pressed="true"><span class="tpanel-tile__n">[\d,]+<\/span><span class="tpanel-tile__label">Would change/)
   })
 
-  it('with nothing to compare, draws one bar and the week as it is, the total said once', () => {
+  /* 6 Oct 2026: with one side the week is a card per decision, each the list's
+     filter, in place of the bar and its key ("add cards here"); the compared
+     tiles stay out, and the cards add up to the headline without repeating it. */
+  it('with nothing to compare, draws a card per decision and the week as it is, the total said once', () => {
     const live = draw({ id: 'sc-dev-tools', tab: 'past' })
     const said = text(live)
     expect(said.match(/Last 7 days · [\d,]+ sign-ins/g)).toHaveLength(1)
-    expect(live).not.toContain('tpanel-tile')
+    expect(count(live, 'class="tpanel-tile"')).toBe(0)
+    expect(said).not.toMatch(/Would change|Newly blocked|Unchanged/)
     expect(live).not.toContain('No sign-ins would change')
-    expect(count(live, 'class="tpanel-dist__row"')).toBe(1)
+    expect(count(live, 'class="tpanel-dist__row"')).toBe(0)
+    expect(live).not.toContain('tpanel-legend')
+    expect(count(live, 'class="tpanel-tiles tpanel-dcards" role="group" aria-label="Show"')).toBe(1)
+    const cards = [...live.matchAll(/class="tpanel-tile tpanel-dcard is-(\w+)" aria-pressed="false"><span class="tpanel-tile__n">([\d,]+)<\/span><span class="tpanel-tile__label">([^<]*)</g)]
+    expect(cards.map((m) => [m[1], m[3].replace(/&#x27;/g, "'")])).toEqual([
+      ['1fa', 'Allow on 1 factor'],
+      ['2fa', 'Allow with 2FA'],
+      ['deny', 'Deny'],
+      ['unknown', "Can't tell"],
+    ])
+    expect(count(live, 'class="tpanel-tile tpanel-dcard is-')).toBe(cards.length)
+    expect(live).not.toContain('aria-pressed="true"')
+    const total = /Last 7 days · ([\d,]+) sign-ins/.exec(said)![1]
+    expect(cards.reduce((n, m) => n + Number(m[2].replace(/,/g, '')), 0)).toBe(Number(total.replace(/,/g, '')))
+    expect(said.split(total)).toHaveLength(2)
     expect(live).toContain('class="tpanel-pastgrid tpanel-head is-one" aria-hidden="true"><span>Today</span></div>')
     expect(count(live, 'class="tpanel-rowbtn tpanel-past__who"')).toBeGreaterThan(0)
     expect(live).not.toContain('With your edits')
+  })
+
+  /* 6 Oct 2026: the Policies details slider asks for the list alone ("remove"). */
+  it('draws the list alone when asked for no summary', () => {
+    const bare = draw({ id: 'sc-dev-tools', tab: 'past', summary: 'none' })
+    expect(bare).not.toContain('tpanel-past__top')
+    expect(text(bare)).not.toMatch(/Sample|Last 7 days/)
+    expect(bare).not.toContain('tpanel-tile')
+    expect(bare).not.toContain('tpanel-dist')
+    expect(bare).toContain('class="tpanel-pastgrid tpanel-head is-one" aria-hidden="true"><span>Today</span></div>')
+    expect(count(bare, 'class="tpanel-rowbtn tpanel-past__who"')).toBe(count(draw({ id: 'sc-dev-tools', tab: 'past' }), 'class="tpanel-rowbtn tpanel-past__who"'))
   })
 
   it('lists the sign-ins two lines each under one header: when, who, where to; Today → If turned on', () => {

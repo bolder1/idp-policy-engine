@@ -6,6 +6,7 @@ import { ChevronsDownUp, ChevronsUpDown, Maximize, ZoomIn, ZoomOut } from 'lucid
 import type { AccessDecision, Policy } from '../../data'
 import { Tip } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
+import { cueForDecision, playCue } from '../../sound'
 import type { AppBreakInSummary } from '../break-in-app'
 import { columnView, columnsFor, runColumns, type ColumnSpec, type ColumnView } from '../board/try-sign-in'
 import { useSimEnv } from '../sim-env'
@@ -420,6 +421,12 @@ export function TryJourney({
     const landed = wasRunning.current && !running
     wasRunning.current = running
     if (!landed) return
+    /* The answer's sound (sound.ts), as the answer is said. Focus tells the run at a slower pace of its own, so it
+       plays it as its story lands instead (Focus2Layout.tsx). */
+    if (layout !== 'focus2') {
+      const cue = cueForDecision(live.outcome.decision)
+      if (cue) playCue(cue)
+    }
     if (page.prev) {
       const before = resolveDrawn(page.prev)
       const field = decisionSig(before) !== decisionSig(res) ? changedBy(page.prev, form) : null

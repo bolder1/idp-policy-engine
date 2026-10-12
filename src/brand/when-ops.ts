@@ -1,4 +1,4 @@
-import { cond, emptyGroup, pruneScopes, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
+import { cond, splitPick, emptyGroup, pruneScopes, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
 import { cardJoin, ckey, drawsAsBracket, topJoin } from './predicate'
 import type { Joiner } from './data'
 
@@ -135,8 +135,9 @@ export function retypeCondition(w: Predicate, conditionId: string, typeId: strin
 
      The rebuild names only what every condition has, so a field the new type
      does not own cannot survive by being forgotten here. */
-  if (isLegacyWhoType(typeId)) return w
-  return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId, operator: firstOperator, values: [] } : c))
+  const { typeId: id, key } = splitPick(typeId)
+  if (isLegacyWhoType(id)) return w
+  return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId: id, operator: firstOperator, values: [], ...(key ? { key } : {}) } : c))
 }
 
 /* Which half of ONE of its zones a condition tests. The one writer for
@@ -389,4 +390,8 @@ export function setOuterJoin(w: Predicate, join: Joiner): Predicate {
 }
 
 /** A fresh, unset condition of a type — what every "add" route inserts. */
-export const freshCondition = (typeId: string, firstOperator: string) => cond(typeId, firstOperator, [])
+export const freshCondition = (typeId: string, firstOperator: string) => {
+  const { typeId: id, key } = splitPick(typeId)
+  const c = cond(id, firstOperator, [])
+  return key ? { ...c, key } : c
+}

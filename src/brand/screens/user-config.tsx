@@ -1,17 +1,22 @@
-import { useId } from 'react'
-import { Pencil, QrCode, ShieldCheck, Smartphone, X } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { Check, Copy, Monitor, QrCode, Settings, ShieldCheck, Smartphone, X } from 'lucide-react'
 
-import { Badge, Button, TipDot, Toggle } from '../kit'
+import { Button, IconButton, TipDot, Toggle } from '../kit'
 import { Picker } from '../picker'
+import { useBrand } from '../store'
 import type { AuthMethod } from '../methods'
 import {
   SECURITY_QUESTIONS,
   enrolIssue,
+  PROFILE,
+  PROFILE_LABEL,
   enrolShapeFor,
   isEmail,
   isPhone,
+  profileFieldsFor,
   questionPlan,
   type EnrolShape,
+  type ProfileField,
 } from '../user-methods'
 import { MethodIcon } from './recovery'
 
@@ -42,9 +47,136 @@ import { MethodIcon } from './recovery'
    guard, which has to be able to see what was typed and save it.
    -------------------------------------------------------------------------- */
 
+/* The apps a person installs and registers, as the live end-user page words them (read 7 Oct 2026):
+   which stores it offers, whether it gives a secret to type instead of the QR, and whether a passcode is typed back. */
+const APP_FLOW: Record<string, { app: string; stores: string[]; secret: boolean }> = {
+  'google-auth': { app: 'Google Authenticator', stores: ['Android', 'iOS'], secret: true },
+  'ms-auth': { app: 'Microsoft Authenticator', stores: ['Android', 'iOS'], secret: true },
+  authy: { app: 'Authy Authenticator', stores: ['Android', 'iOS'], secret: true },
+  'mo-otp': { app: 'miniOrange Authenticator', stores: ['Android', 'iOS', 'Windows'], secret: false },
+  'mo-qr': { app: 'miniOrange Authenticator', stores: ['Android', 'iOS', 'Windows'], secret: false },
+  'mo-push': { app: 'miniOrange Authenticator', stores: ['Android', 'iOS', 'Windows'], secret: false },
+}
+/* Not a real secret: the prototype enrols nothing. */
+const DUMMY_SECRET = 'KJ2F 6W3Q 9HDM 4XPB'
+const tokenName = (id: string) => (id === 'yubikey' ? 'Yubikey' : 'token')
+const PASSKEY_GROUPS = [
+  {
+    title: 'Platform authenticators',
+    blurb: 'Built-in authenticators on a device (phone, laptop, or tablet) that create and use passkeys locally. User verification is done with biometrics or a device PIN.',
+    options: ['Fingerprint recognition', 'Face recognition', 'Device PIN'],
+  },
+  {
+    title: 'Cross-platform authenticators',
+    blurb: 'External authenticators such as USB, NFC, or Bluetooth security keys that store passkeys on the hardware itself. Authentication requires user presence, such as a touch, button press, or PIN.',
+    options: ['Security key', 'Phone / tablet'],
+  },
+]
+
+/* Numbered steps, as the live page draws them. */
+function Steps({ children }: { children: ReactNode }) {
+  return <ol className="bmu__steps">{children}</ol>
+}
+function Step({ n, title, aside, children }: { n: number; title?: string; aside?: ReactNode; children?: ReactNode }) {
+  return (
+    <li className="bmu__step">
+      <span className="bmu__stepn" aria-hidden>
+        {n}
+      </span>
+      <div className="bmu__stepbody">
+        <div className="bmu__steprow">
+          {title && <p className="bmu__steptitle">{title}</p>}
+          {aside}
+        </div>
+        {children}
+      </div>
+    </li>
+  )
+}
+
+/* The setup key: grouped in fours, monospaced, copied whole without the spaces. */
+function SecretKey({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(false), 1600)
+    return () => clearTimeout(t)
+  }, [copied])
+  return (
+    <div className="bmu__secret">
+      <span className="bmu__secretlabel">Setup key</span>
+      <div className="bmu__secretrow">
+        <code>{value}</code>
+        <IconButton
+          icon={copied ? Check : Copy}
+          size="sm"
+          label={copied ? 'Copied' : 'Copy key'}
+          onClick={() => {
+            void navigator.clipboard?.writeText(value.replace(/\s/g, '')).catch(() => undefined)
+            setCopied(true)
+          }}
+        />
+      </div>
+      <span className="u-sr-only" aria-live="polite">
+        {copied ? 'Key copied' : ''}
+      </span>
+    </div>
+  )
+}
+
+/* Six boxes, one digit each: typing moves on, Backspace moves back, a paste fills them all. */
+function CodeBoxes({ value, label, onChange }: { value: string; label: string; onChange: (v: string) => void }) {
+  const refs = useRef<(HTMLInputElement | null)[]>([])
+  const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? '')
+  const focus = (i: number) => refs.current[Math.max(0, Math.min(5, i))]?.focus()
+  const put = (i: number, raw: string) => {
+    const typed = raw.replace(/\D/g, '')
+    if (!typed) return
+    /* Never leave a gap: a digit typed past the end lands at the end. */
+    const at = Math.min(i, value.length)
+    const next = [...digits]
+    typed.slice(0, 6 - at).split('').forEach((c, k) => (next[at + k] = c))
+    onChange(next.join(''))
+    focus(at + typed.length)
+  }
+  return (
+    <div className="bmu__codes" role="group" aria-label={label}>
+      {digits.map((d, i) => (
+        <input
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+          className="bmu__codebox"
+          inputMode="numeric"
+          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+          maxLength={6}
+          value={d}
+          aria-label={`Digit ${i + 1}`}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => put(i, e.target.value)}
+          onPaste={(e) => {
+            e.preventDefault()
+            put(0, e.clipboardData.getData('text'))
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace') {
+              e.preventDefault()
+              const at = d ? i : i - 1
+              if (at < 0) return
+              onChange(value.slice(0, at) + value.slice(at + 1))
+              focus(at)
+            } else if (e.key === 'ArrowLeft') focus(i - 1)
+            else if (e.key === 'ArrowRight') focus(i + 1)
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function UserMethodCard({
   m,
-  enrolled,
   ready,
   isActive,
   open,
@@ -79,6 +211,8 @@ export function UserMethodCard({
   /* A token an admin hands out. There is no setup for the person to do, and no
      switch until they hold one — so, before that, the card says who does it. */
   const adminIssued = shape.kind === 'assigned'
+  /* SMS, call and email send to what is on the profile: nothing to set up here, only to switch on. */
+  const fromProfile = profileFieldsFor(m.id) !== null
 
   return (
     <div className={`bm8__card bm8__card--method bmu__card ${open ? 'is-open' : ''}`}>
@@ -92,7 +226,6 @@ export function UserMethodCard({
             {m.name}
             {/* The tip against the name, then the chips, as on the admin's rows. */}
             {m.summary && <TipDot text={m.description} label={`About ${m.name}`} />}
-            {enrolled && <Badge tone="positive">Configured</Badge>}
             {m.tier === 'Phishing-resistant' && (
               <i className="bm8__badge">
                 <ShieldCheck size={11} strokeWidth={2.2} aria-hidden />
@@ -109,30 +242,36 @@ export function UserMethodCard({
             enrolment there are two real and different choices: change what you
             gave us, and use this one or not. */}
         <div className="bm8__right">
-          {ready ? (
+          {fromProfile ? (
+            ready ? (
+              <div className="bm8__ctlrow">
+                <Toggle checked={isActive} onChange={onActivate} label={`Use ${m.name}`} />
+              </div>
+            ) : (
+              <span className="bmu__hint">Not on your profile</span>
+            )
+          ) : ready ? (
             <div className="bm8__ctlrow">
               {!nothingToSetUp && !adminIssued && (
-                <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
-                  <Pencil size={13} strokeWidth={2} aria-hidden />
-                  Edit
-                </Button>
+                <IconButton icon={Settings} size="sm" tone="ghost" label={`Edit ${m.name}`} onClick={() => onOpen(!open)} />
               )}
               <Toggle checked={isActive} onChange={onActivate} label={`Use ${m.name}`} />
             </div>
           ) : adminIssued ? (
             <span className="bmu__hint">{shape.note}</span>
           ) : (
-            <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
-              <Pencil size={13} strokeWidth={2} aria-hidden />
-              Set up
+            <Button variant="link" size="sm" onClick={() => onOpen(!open)}>
+              Configure
+              <span className="u-sr-only"> {m.name}</span>
             </Button>
           )}
         </div>
       </div>
 
-      {open && !adminIssued && (
+      {open && !adminIssued && !fromProfile && (
         <div className="bmu__form">
           <EnrolForm
+            methodId={m.id}
             shape={shape}
             draft={draft}
             onDraft={onDraft}
@@ -154,13 +293,15 @@ export function UserMethodCard({
 const EMAIL_ERROR = 'Enter a valid email address.'
 const PHONE_ERROR = 'Enter a phone number with country code.'
 
-function EnrolForm({
+export function EnrolForm({
   shape,
   draft,
   onDraft,
   questions,
   onCancel,
   onSave,
+  bare = false,
+  methodId = '',
 }: {
   shape: EnrolShape
   draft: Record<string, string>
@@ -168,21 +309,26 @@ function EnrolForm({
   questions: number
   onCancel: () => void
   onSave: () => void
+  /** The slider holds Cancel and Save in its footer: none under the fields. */
+  bare?: boolean
+  /** The method it is for: the apps and tokens each have their own steps. */
+  methodId?: string
 }) {
   const uid = useId()
-  const issue = enrolIssue(shape.kind, draft, questions)
+  const { showToast: toast } = useBrand()
+  const issue = enrolIssue(shape.kind, draft, questions, shape.setup)
   const value = (k: string) => (draft[k] ?? '').trim()
   /* Said only once something is typed: a blank field is not wrong, it is not done yet. */
   const emailError = value('email') && !isEmail(value('email')) ? EMAIL_ERROR : null
   const phoneError = value('phone') && !isPhone(value('phone')) ? PHONE_ERROR : null
 
-  const footer = (saveLabel = 'Save') => (
+  const footer = (saveLabel = 'Save') => bare ? null : (
     <div className="bmu__foot">
-      <Button variant="brand" size="sm" disabled={issue !== null} onClick={onSave}>
-        {saveLabel}
-      </Button>
       <Button variant="ghost" size="sm" onClick={onCancel}>
         Cancel
+      </Button>
+      <Button variant="brand" size="sm" disabled={issue !== null} onClick={onSave}>
+        {saveLabel}
       </Button>
     </div>
   )
@@ -312,68 +458,139 @@ function EnrolForm({
       )
     }
 
-    case 'authenticator':
-      return (
-        <>
-          <div className="bmu__scan">
-            {/* A drawn stand-in, not a real code. A prototype that renders a
-                scannable QR is a prototype that enrolls a real device. */}
-            <span className="bmu__qr" aria-hidden>
-              <QrCode size={92} strokeWidth={1.1} />
-            </span>
-            <div>
-              <p className="bmu__hint">Scan this in the app, then enter the 6-digit code it shows.</p>
-              <label className="bmu__field bmu__field--code">
-                <span id={`${uid}-code`}>Code from the app</span>
-                <input
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={draft.code ?? ''}
-                  placeholder="000000"
-                  aria-labelledby={`${uid}-code`}
-                  onChange={(e) => onDraft('code', e.target.value.replace(/\D/g, ''))}
-                />
-              </label>
-            </div>
-          </div>
-          {footer('Verify and save')}
-        </>
-      )
-
     case 'push-app':
+    case 'authenticator': {
+      if (shape.setup === 'unavailable') {
+        return (
+          <>
+            <p className="bmu__hint">{shape.note}</p>
+            <div className="bmu__foot">
+              <Button variant="ghost" size="sm" onClick={onCancel}>
+                Close
+              </Button>
+            </div>
+          </>
+        )
+      }
+      const flow = APP_FLOW[methodId] ?? APP_FLOW['google-auth']
       return (
         <>
-          <div className="bmu__scan">
-            <span className="bmu__qr" aria-hidden>
-              <Smartphone size={92} strokeWidth={1.1} />
-            </span>
-            <p className="bmu__hint">
-              Open the app on the device you want to be asked on and accept the registration. The
-              device stays registered until you remove it here.
-            </p>
-          </div>
-          {footer('Register this device')}
+          <Steps>
+            <Step
+              n={1}
+              title={`Install ${flow.app}`}
+              aside={
+                <span className="bmu__stores">
+                  {flow.stores.map((p) => (
+                    <Button key={p} variant="secondary" size="sm" icon={p === 'Windows' ? Monitor : Smartphone} onClick={() => toast(`${p} download is not live in this prototype.`)}>
+                      {p}
+                    </Button>
+                  ))}
+                </span>
+              }
+            />
+            <Step n={2} title={flow.secret ? 'Scan the QR code, or enter the key' : 'Scan the QR code'}>
+              <div className="bmu__scan">
+                {/* A drawn stand-in, not a real code. A prototype that renders a
+                    scannable QR is a prototype that enrolls a real device. */}
+                <span className="bmu__qr" aria-hidden>
+                  <QrCode size={88} strokeWidth={1.1} />
+                </span>
+                {flow.secret && <SecretKey value={DUMMY_SECRET} />}
+              </div>
+            </Step>
+            {!shape.setup && (
+              <Step
+                n={3}
+                title="Enter the 6-digit code"
+              >
+                <CodeBoxes value={draft.code ?? ''} label={`Code from ${flow.app}`} onChange={(v) => onDraft('code', v)} />
+              </Step>
+            )}
+          </Steps>
+          {/* The live page registers a scan by itself; a prototype has nothing to watch for it, so the press says it. */}
+          {footer(shape.setup ? 'Confirm registration' : 'Save')}
         </>
       )
+    }
 
-    case 'token':
+    case 'token': {
+      /* RSA is not a serial you type: three steps, and a test that your admin set you up (live page, 7 Oct 2026). */
+      if (methodId === 'rsa') {
+        return (
+          <>
+            <Steps>
+              <Step n={1}>
+                <p className="bmu__hint">Make sure you are registered and present in the RSA Authentication Manager.</p>
+              </Step>
+              <Step n={2}>
+                <p className="bmu__hint">Confirm if admin has configured the MFA for you.</p>
+              </Step>
+              <Step n={3}>
+                <p className="bmu__hint">Test whether RSA Authenticator (SecurID) is configured for your account, then save.</p>
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => {
+                    onDraft('serial', 'tested')
+                    toast('RSA Authenticator (SecurID) is configured for your account.')
+                  }}
+                >
+                  Click here to test if MFA is configured for me
+                </Button>
+              </Step>
+            </Steps>
+            {footer()}
+          </>
+        )
+      }
       return (
         <>
-          <label className="bmu__field">
-            <span>{shape.label}</span>
-            <input value={draft.serial ?? ''} placeholder={shape.placeholder} onChange={(e) => onDraft('serial', e.target.value)} />
-          </label>
+          <Steps>
+            <Step n={1}>
+              <p className="bmu__hint">Insert your Hardware Token into a USB port.</p>
+            </Step>
+            <Step n={2}>
+              <p className="bmu__hint">Click on Enter Your OTP field, and touch the Hardware Token button.</p>
+            </Step>
+            <Step n={3}>
+              <p className="bmu__hint">When the OTP is entered in the field below, click on Save to save the configuration.</p>
+              <label className="bmu__field">
+                <span>Add {tokenName(methodId)}</span>
+                <input value={draft.serial ?? ''} placeholder="Enter your OTP" onChange={(e) => onDraft('serial', e.target.value)} />
+              </label>
+            </Step>
+          </Steps>
           {footer()}
         </>
       )
+    }
 
     case 'passkey':
+      /* Two kinds of authenticator, as the live page groups them; one picked, then Add device. */
       return (
         <>
-          <p className="bmu__hint">
-            Your browser asks for Face ID, a fingerprint or your security key. The credential stays on the device.
-          </p>
-          {footer('Create a passkey')}
+          {PASSKEY_GROUPS.map((g) => (
+            <section key={g.title} className="bmu__pkgroup">
+              <h4>{g.title}</h4>
+              <p className="bmu__hint">{g.blurb}</p>
+              <div className="bmu__pkopts" role="radiogroup" aria-label={g.title}>
+                {g.options.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.device === o}
+                    className={`bmu__pkopt${draft.device === o ? ' is-on' : ''}`}
+                    onClick={() => onDraft('device', o)}
+                  >
+                    {o}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+          {footer('Add device')}
         </>
       )
 
@@ -390,4 +607,25 @@ function EnrolForm({
         </>
       )
   }
+}
+
+/* What the profile holds for the methods in this panel, read only (owner, 7 Oct 2026: "a card with the email and the
+   phone number in a non-editable format"). One card for the panel: the fields its methods send to, each with what is
+   on file, or "Not added". Changing them is on the profile page, not here. */
+export function ProfileFacts({ methods }: { methods: readonly Pick<AuthMethod, 'id'>[] }) {
+  const fields = [...new Set(methods.flatMap((m) => profileFieldsFor(m.id) ?? []))] as ProfileField[]
+  if (fields.length === 0) return null
+  return (
+    <section className="bmu__profile" aria-label="From your profile">
+      <h3 className="bmu__profilehead">From your profile</h3>
+      <dl className="bmu__profilegrid">
+        {fields.map((k) => (
+          <div key={k}>
+            <dt>{PROFILE_LABEL[k]}</dt>
+            <dd className={PROFILE[k] ? undefined : 'is-empty'}>{PROFILE[k] || 'Not added'}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
 }

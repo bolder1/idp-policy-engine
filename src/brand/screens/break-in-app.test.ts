@@ -50,7 +50,10 @@ describe('AWS Console', () => {
 
   it('counts 3 got through, 2 locked out, 1 less than asked and 1 can’t tell', () => {
     expect(r.counts).toEqual({ held: 8, gotThrough: 3, weakerFactor: 0, lessThanAsked: 1, lockedOut: 2, extraPrompts: 0, undecided: 1, skipped: 0 })
-    expect(breakInSummary(r, env)).toEqual({ appId: 'aws', appName: 'AWS Console', counts: r.counts, holes: 4 })
+    const s = breakInSummary(r, env)
+    expect({ ...s, top: undefined }).toEqual({ appId: 'aws', appName: 'AWS Console', counts: r.counts, holes: 4, top: undefined })
+    /* The three worth a look, the ones that got in first (the Why's suggested attempts, 6 Oct 2026). */
+    expect(s.top?.map((a) => a.group)).toEqual(['got-through', 'got-through', 'got-through'])
   })
 
   /* In the order the resolver asks them: the custom policies, then the

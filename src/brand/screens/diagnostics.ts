@@ -625,7 +625,7 @@ export function diagnose(
              This was reachable before today only through hand-authored data,
              because both value pickers were single-select. They are not any
              more. The same unsoundness has always been latent for `list` kinds
-             whose operators are a `not`-pair — Country, Day of week, MDM
+             whose operators are a `not`-pair — Country, Sign-in days, MDM
              Managed — and this closes those too. Device posture is NOT among
              them, and neither is External hook: `passes`/`fails` and
              `returns true`/`returns false` are not in NEGATIONS, so `opposed`

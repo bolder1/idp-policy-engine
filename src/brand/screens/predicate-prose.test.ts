@@ -189,9 +189,9 @@ describe('decisionSentence says the first factor and the deny message', () => {
 
 describe('conditionSentence says the time zone and the attribute', () => {
   it('reads a window as between one time and another, in its zone when it has one', () => {
-    expect(conditionSentence(cond('time', 'between', ['09:00', '18:00'], undefined, { tz: 'Asia/Kolkata' }))).toBe('Time of day between 09:00 and 18:00 (Asia/Kolkata)')
-    expect(conditionSentence(cond('time', 'not between', ['22:00', '06:00'], undefined, { tz: 'Europe/Berlin' }))).toBe('Time of day not between 22:00 and 06:00 (Europe/Berlin)')
-    expect(conditionSentence(cond('time', 'between', ['09:00', '18:00']))).toBe('Time of day between 09:00 and 18:00')
+    expect(conditionSentence(cond('time', 'between', ['09:00', '18:00'], undefined, { tz: 'Asia/Kolkata' }))).toBe('Sign-in hours between 09:00 and 18:00 (Asia/Kolkata)')
+    expect(conditionSentence(cond('time', 'not between', ['22:00', '06:00'], undefined, { tz: 'Europe/Berlin' }))).toBe('Sign-in hours not between 22:00 and 06:00 (Europe/Berlin)')
+    expect(conditionSentence(cond('time', 'between', ['09:00', '18:00']))).toBe('Sign-in hours between 09:00 and 18:00')
   })
 
   it('names the attribute a condition is about', () => {

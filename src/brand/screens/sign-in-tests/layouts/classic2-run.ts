@@ -9,6 +9,7 @@ import { audienceViaOf, type Via } from '../conflicts'
 import {
   arrivals,
   cardsAt,
+  foldOne,
   foldOpen,
   outcomeView,
   passedLine,
@@ -129,10 +130,11 @@ export interface ChainFold {
 
 /* The fold: open as reached while it plays, folded once it lands; what the admin pressed stands until the next run (or
    another identity of it) — `key` is what says which run that is. */
-export function useChainFold(key: string, shown: readonly CardKey[], landed: boolean): ChainFold {
+export function useChainFold(key: string, shown: readonly CardKey[], landed: boolean, one?: { on: CardKey | null }): ChainFold {
   const [hand, setHand] = useState<{ key: string; open: Partial<Record<CardKey, boolean>> }>({ key, open: {} })
   const pressed = hand.key === key ? hand.open : {}
-  const open = foldOpen(shown, landed, pressed)
+  /* `one`: Focus's card-by-card fold (classic2-model.ts `foldOne`); absent, Classic v2's every-card-open-while-it-plays. */
+  const open = one ? foldOne(shown, one.on, landed, pressed) : foldOpen(shown, landed, pressed)
   const anyOpen = shown.some((k) => open[k])
   return {
     open,

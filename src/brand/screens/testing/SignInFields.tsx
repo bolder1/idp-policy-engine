@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 import type { Audience } from '../../data'
-import { DECISION_TONE } from '../../decision-words'
+import { DECISION_BADGE_TONE } from '../../decision-words'
 import { Face } from '../../faces'
 import { Button, NumberStepper, TipDot } from '../../kit'
 import { AppLogo } from '../../logos/AppLogo'
@@ -453,7 +453,7 @@ export function BandStrip({ bands, max, ticks }: { bands: readonly Band[]; max: 
       </div>
       <div className="tband__strip">
         {bands.map((b) => (
-          <span key={b.from} className={`tband__seg is-${b.decision ? DECISION_TONE[b.decision] : 'unknown'}`} style={{ flexGrow: b.to - b.from + 1 }} title={bandWords(b)} />
+          <span key={b.from} className={`tband__seg is-${b.decision ? DECISION_BADGE_TONE[b.decision] : 'unknown'}`} style={{ flexGrow: b.to - b.from + 1 }} title={bandWords(b)} />
         ))}
       </div>
       <div ref={labelsRef} className="tband__labels">

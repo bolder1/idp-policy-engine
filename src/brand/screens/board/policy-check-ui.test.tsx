@@ -350,8 +350,8 @@ describe('the way back, and the keys', () => {
     expect(builderSrc).toContain("fitKey={describeOpen ? 'describe' : 'edit'}")
     /* The ground's dots are the board's again as Check access shuts. */
     expect(builderSrc).toMatch(/const groundBefore = useRef[\s\S]*?if \(before\[v\]\) el\.style\.setProperty\(v, before\[v\]\)/)
-    /* The editor waits, and is back as Check access shuts. */
-    expect(builderSrc).toContain('{!testOn && !describeOpen && !readOpen && panelAlive && (')
+    /* The editor waits, and is back as Check access shuts (and while the Fixes panel holds the column, 7 Oct 2026). */
+    expect(builderSrc).toContain('{!testOn && !describeOpen && !readOpen && !fixesShown && panelAlive && (')
   })
 
   it('Open policy on this policy, or Open rule, goes back to the builder — on that rule', () => {

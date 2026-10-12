@@ -12,7 +12,7 @@ import { screensOf } from '../testing/screens-of'
 import { factsOf, formOf, type SignInForm } from '../testing/sign-in-form'
 import { engineRun } from './engine-run'
 import { Answer, EngineJourney } from './EngineJourney'
-import { eachGroupRows, expectMark, findingsCount, heroFinding, pathTone, whyItems, whyTitle, type WhyTone } from './journey'
+import { eachGroupRows, expectMark, findingsCount, heroFinding, pathTone, whyItems, whyTitle, type GroupRowView, type WhyTone } from './journey'
 import { GROUP_PREFIX, emptyDraft, personPick, withDefaults } from './sign-in-card'
 import { WhyCard } from './WhyCard'
 import { ATTEMPTS_LINK, REVIEW_ATTEMPTS, attemptsGetThroughSaid, attemptsOnSaid, breakInSummary, runBreakInOnApp, type AppBreakInSummary } from '../break-in-app'
@@ -92,7 +92,7 @@ function glance(f: SignInForm, expected: AccessDecision | null = null, weaker: s
 }
 
 /* The why, as the journey draws it under the answer once Why? is pressed. */
-function WhyOf({ f, asGroup, x = t }: { f: SignInForm; asGroup?: (g: string) => void; x?: Tenant }) {
+function WhyOf({ f, asGroup, x = t, interactive = true, rows = (r) => r }: { f: SignInForm; asGroup?: (g: string) => void; x?: Tenant; interactive?: boolean; rows?: (r: GroupRowView[]) => GroupRowView[] }) {
   const resolve = useNameLookup()
   const { plan } = planOf(f, x)
   const person = x.directory.people.find((u) => u.id === f.personId)!.name
@@ -100,13 +100,13 @@ function WhyOf({ f, asGroup, x = t }: { f: SignInForm; asGroup?: (g: string) => 
     <WhyCard
       plan={plan}
       items={whyItems(plan)}
-      groups={eachGroupRows(plan)}
+      groups={(() => { const g = eachGroupRows(plan); return g && rows(g) })()}
       headline={whyTitle(plan)!}
       policies={x.policies}
       resolve={resolve}
       person={person}
       id="why"
-      interactive
+      interactive={interactive}
       onClose={noop}
       onOpenRule={noop}
       onOpenPolicy={noop}
@@ -115,11 +115,11 @@ function WhyOf({ f, asGroup, x = t }: { f: SignInForm; asGroup?: (g: string) => 
     />
   )
 }
-/* `null`: no way to run again, so the rows are only read. */
-const why = (f: SignInForm, asGroup: ((g: string) => void) | null = noop, x: Tenant = t) =>
+/* `null`: no way to run again, so the rows are only read. `interactive` false: read only, open over the run. */
+const why = (f: SignInForm, asGroup: ((g: string) => void) | null = noop, x: Tenant = t, interactive = true, rows?: (r: GroupRowView[]) => GroupRowView[]) =>
   renderToStaticMarkup(
     <BrandProvider>
-      <WhyOf f={f} asGroup={asGroup ?? undefined} x={x} />
+      <WhyOf f={f} asGroup={asGroup ?? undefined} x={x} interactive={interactive} rows={rows} />
     </BrandProvider>,
   )
 
@@ -141,9 +141,26 @@ const heroOf = (o: string) => o.slice(o.indexOf('data-node="outcome"'))
 const titleOf = (w: string) => text(between(w, '<h3', '</h3>')).replace(/^Why: /, '')
 /* A row's words, its face (initials, drawn for the eye) left out. */
 const rowsOf = (w: string) => [...w.matchAll(/<li><(?:div|button)[^>]*class="tj-why__grow[^"]*"[\s\S]*?<\/li>/g)].map((m) => text(m[0].replace(/<span class="tj-why__face"[\s\S]*?<\/span><\/span>/, '')))
+/* 6 Oct 2026: every finding is ONE card (WhyCard.tsx, finding-card.ts) — `tj-why__item tj-find`, its tone, and
+   `has-art` where its picture (FindingArt.tsx) sits: two policy cards, or rules in order. No finding draws its
+   rule's whole card any more (the `tj-why__rule` shape is gone). */
 const findingsOf = (w: string) => {
   const list = between(w, '<ul class="tj-why__list"')
-  return [...list.matchAll(/<li class="tj-why__(rule|item)[^"]*" data-kind="([^"]+)">([\s\S]*?)<\/li>(?=<li class="tj-why__|<\/ul>)/g)].map((m) => ({ shape: m[1], kind: m[2], words: text(m[3]), html: m[3] }))
+  return [...list.matchAll(/<li class="tj-why__item tj-find is-(\w+)( has-art)?" data-kind="([^"]+)">([\s\S]*?)<\/li>(?=<li class="tj-why__|<\/ul>)/g)].map((m) => {
+    const svg = /<svg class="tj-art"[\s\S]*?<\/svg>/.exec(m[4])?.[0] ?? null
+    const art = svg === null ? null : svg.includes('tj-art__card') ? 'policies' : svg.includes('tj-art__row') ? 'rules' : 'unknown'
+    return { tone: m[1], hasArt: m[2] !== undefined, art, kind: m[3], words: text(m[4]), html: m[4] }
+  })
+}
+/* A card's line, and the model's longer why in its tooltip (null where it has none). */
+const lineOf = (html: string) => {
+  const m = /<p class="tj-find__line"(?: title="([^"]*)")?>([\s\S]*?)<\/p>/.exec(html)
+  return m ? { line: text(m[2]), detail: m[1] === undefined ? null : text(m[1]) } : null
+}
+/* The Fix press (RunChain.tsx `FixButton`): the fix in its aria-label, where it opens in its title; its words are just "Fix". */
+const fixOf = (html: string) => {
+  const m = /<button type="button" class="tj-fix" title="([^"]*)" aria-label="([^"]*)">([\s\S]*?)<\/button>/.exec(html)
+  return m ? { label: text(m[2]), title: text(m[1]), words: text(m[3]) } : null
 }
 
 /* One matrix row: what the glance and the why must say. */
@@ -160,7 +177,9 @@ interface Case {
   quiet?: boolean
   path: 'positive' | 'notice' | 'negative' | 'neutral'
   rows?: string[]
-  findings: { kind: string; shape: 'rule' | 'item'; says: string[] }[]
+  /** Each finding's card (6 Oct 2026): its picture, its words (heading, line, links), the model's longer why in the
+      line's tooltip, and the Fix press's fix (its aria-label) — absent, the card has no Fix. */
+  findings: { kind: string; art: 'policies' | 'rules' | null; says: string[]; detail?: string; fix?: string }[]
 }
 
 const MAYA_GITHUB = saved('ssi-maya-github')
@@ -173,25 +192,19 @@ const MATRIX: Case[] = [
     line: "Maya Iyer is in Engineering and Finance — Engineering's rule applies first",
     path: 'positive',
     rows: [
-      'As Engineering Allow on 1 factor Rule 1 · In the office on a compliant device',
+      'As Engineering Allow on 1 factor Rule 1 · In the office on a compliant device — what this sign-in gets',
       'As Finance Allow with 2FA Rule 3 · Finance, on a compliant device',
-      "As Maya (both) Allow on 1 factor Engineering's rule comes first — this sign-in",
     ],
     findings: [
+      /* 6 Oct 2026: the rule that also applies is no longer drawn whole — one card, by its number; the fix is the Fix press. */
       {
         kind: 'rule-conflict',
-        shape: 'rule',
-        says: [
-          'Finance, on a compliant device',
-          'Also applies',
-          'via Finance',
-          'Also applies to Maya Iyer · via Finance',
-          'Not used: Rule 1 matched first via Engineering, and the first rule that matches decides',
-          'Move it above rule 1 to ask Finance for 2FA',
-          'Open rule',
-        ],
+        art: 'rules',
+        says: ['Two rules match Maya Iyer', 'Rule 3 would allow with 2FA, but rule 1 matched first.', 'Open rule'],
+        detail: 'Rule 1 matched first via Engineering, and the first rule that matches decides',
+        fix: 'Fix: Move rule 3 above rule 1',
       },
-      { kind: 'off-no-change', shape: 'item', says: ['Code review for Finance · Draft · via Finance', 'Draft — on, it would change nothing: Developer tools — office and device checks comes first', 'Open policy'] },
+      { kind: 'off-no-change', art: null, says: ['Code review for Finance · Draft · via Finance', 'Draft — on, it would change nothing: Developer tools — office and device checks comes first', 'Open policy'] },
     ],
   },
   {
@@ -200,17 +213,14 @@ const MATRIX: Case[] = [
     tone: 'conflict',
     line: 'Maya Iyer is in Engineering and Finance — AWS for engineering teams applies first',
     path: 'positive',
-    rows: ['As Engineering Allow on 1 factor AWS for engineering teams · rule 2', 'As Finance Allow with 2FA AWS billing for Finance · rule 1', 'As Maya (both) Allow on 1 factor AWS for engineering teams is higher in the list — this sign-in'],
+    rows: ['As Engineering Allow on 1 factor AWS for engineering teams · rule 2 — what this sign-in gets', 'As Finance Allow with 2FA AWS billing for Finance · rule 1'],
     findings: [
       {
         kind: 'policy-conflict',
-        shape: 'item',
-        says: [
-          'AWS billing for Finance also covers Maya Iyer · via Finance Allow with 2FA',
-          'Not used: Maya Iyer is in Finance for this one and Engineering for AWS for engineering teams. One policy applies to a person on an application: the one higher in the list',
-          'Add a rule that names Maya Iyer to AWS for engineering teams, above rule 2',
-          'Open rule',
-        ],
+        art: 'policies',
+        says: ['Two policies cover Maya Iyer', 'AWS billing for Finance would allow with 2FA, but AWS for engineering teams comes first.', 'Open rule'],
+        detail: 'Not used: Maya Iyer is in Finance for this one and Engineering for AWS for engineering teams. One policy applies to a person on an application: the one higher in the list',
+        fix: 'Fix: Add a rule for Maya Iyer above rule 2',
       },
     ],
   },
@@ -223,43 +233,51 @@ const MATRIX: Case[] = [
     findings: [
       {
         kind: 'same-group-policy',
-        shape: 'item',
-        says: [
-          'AWS production for DevOps also covers Tom Whelan · via DevOps Allow with 2FA',
-          'Not used: Both cover DevOps on AWS Console. One policy applies per application and group: the one higher in the list',
-          'Add a rule for DevOps to AWS for engineering teams, above rule 2, that asks for 2FA (miniOrange Push)',
-          'Open rule',
-        ],
+        art: 'policies',
+        says: ['Two policies cover DevOps', 'AWS production for DevOps would allow with 2FA, but AWS for engineering teams comes first.', 'Open rule'],
+        detail: 'Not used: Both cover DevOps on AWS Console. One policy applies per application and group: the one higher in the list',
+        fix: 'Fix: Add a rule for DevOps above rule 2',
       },
     ],
   },
+  /* 6 Oct 2026: 2FA is an allow, so its path is green (decision-words.ts DECISION_TONE['2fa'] = 'positive'); amber is
+     left for what can't be told. */
   {
     id: 'ssi-devon-slack',
     count: '1 finding',
     tone: 'info',
     line: 'Slack for everyone does not apply — a policy for Contractors comes first',
-    path: 'notice',
-    findings: [{ kind: 'group-policy-first', shape: 'item', says: ['Slack for everyone also covers Devon Rao · for everyone Allow on 1 factor', 'Not used: A policy for Contractors comes before a policy for everyone, wherever it is in the list'] }],
+    path: 'positive',
+    findings: [
+      {
+        kind: 'group-policy-first',
+        art: 'policies',
+        says: ['Another policy covers Devon Rao', 'Slack for everyone would allow on 1 factor, but Slack for engineering and contractors comes first.'],
+        detail: 'Not used: A policy for Contractors comes before a policy for everyone, wherever it is in the list',
+      },
+    ],
   },
   {
     id: 'ssi-leo-slack',
     count: '1 conflict',
     tone: 'conflict',
     line: 'Contractors is an exception on rule 1, and Leo Fernandes is in Contractors',
-    path: 'notice',
-    rows: ['As Engineering Allow on 1 factor Rule 1 · Engineers, where we operate', 'As Contractors Allow with 2FA Rule 2 · Contractors on a corporate device', 'As Leo (both) Allow with 2FA Contractors is an exception on rule 1 — this sign-in'],
+    path: 'positive',
+    rows: ['As Engineering Allow on 1 factor Rule 1 · Engineers, where we operate', 'As Contractors Allow with 2FA Rule 2 · Contractors on a corporate device — what this sign-in gets'],
     findings: [
       {
         kind: 'exception',
-        shape: 'item',
-        says: [
-          'Rule 1 leaves Leo Fernandes out · Contractors is an exception',
-          'Rule 1 is for Engineering except Contractors. Leo Fernandes is in Engineering and in Contractors — an exception always wins.',
-          'Add a rule that names Leo Fernandes above rule 1',
-          'Open rule',
-        ],
+        art: 'rules',
+        says: ['Rule 1 leaves Leo Fernandes out', 'Contractors is an exception, and an exception always wins.', 'Open rule'],
+        detail: 'Rule 1 is for Engineering except Contractors. Leo Fernandes is in Engineering and in Contractors — an exception always wins.',
+        fix: 'Fix: Add a rule for Leo Fernandes above rule 1',
       },
-      { kind: 'group-policy-first', shape: 'item', says: ['Slack for everyone also covers Leo Fernandes · for everyone'] },
+      {
+        kind: 'group-policy-first',
+        art: 'policies',
+        says: ['Another policy covers Leo Fernandes', 'Slack for everyone would allow on 1 factor, but Slack for engineering and contractors comes first.'],
+        detail: 'Not used: A policy for Engineering and Contractors comes before a policy for everyone, wherever it is in the list',
+      },
     ],
   },
   {
@@ -267,20 +285,15 @@ const MATRIX: Case[] = [
     count: '1 conflict',
     tone: 'conflict',
     line: 'Thomas Byrne is named in rule 2 — rule 1 applies first',
-    path: 'notice',
+    path: 'positive',
     findings: [
       {
         kind: 'named-later',
-        shape: 'rule',
-        says: [
-          'Thomas Byrne — access ends Friday',
-          'by name',
-          'Also applies to Thomas Byrne · by name',
-          /* The whole point of the case: a name does not move a rule up. */
-          'Not used: Naming Thomas Byrne does not move a rule up. Rule 1 matched first, and the first rule that matches decides',
-          'Move it above rule 1 to refuse Thomas Byrne',
-          'Open rule',
-        ],
+        art: 'rules',
+        says: ['Thomas Byrne is named in a later rule', 'Rule 2 would deny, but rule 1 matched first.', 'Open rule'],
+        /* The whole point of the case: a name does not move a rule up — the model's why, in the line's tooltip. */
+        detail: 'Naming Thomas Byrne does not move a rule up. Rule 1 matched first, and the first rule that matches decides',
+        fix: 'Fix: Move rule 2 above rule 1',
       },
     ],
   },
@@ -290,19 +303,14 @@ const MATRIX: Case[] = [
     tone: 'conflict',
     line: "Leo Fernandes is in Engineering and Contractors — Contractors' rule applies first",
     path: 'negative',
-    rows: ['As Engineering Allow on 1 factor Rule 2 · Engineers on a compliant device', 'As Contractors Deny Rule 1 · Contractors away from the office', "As Leo (both) Deny Contractors' rule comes first — this sign-in"],
+    rows: ['As Engineering Allow on 1 factor Rule 2 · Engineers on a compliant device', 'As Contractors Deny Rule 1 · Contractors away from the office — what this sign-in gets'],
     findings: [
       {
         kind: 'deny-first',
-        shape: 'rule',
-        says: [
-          'Engineers on a compliant device',
-          'Also applies to Leo Fernandes · via Engineering',
-          'Not used: Rule 1 refuses Contractors first, and the first rule that matches decides',
-          'Move it above rule 1 to let Engineering in on 1 factor',
-          'It would let in people rule 1 refuses today',
-          'Open rule',
-        ],
+        art: 'rules',
+        says: ['A refusal comes first for Leo Fernandes', 'Rule 2 would allow on 1 factor, but rule 1 matched first.', 'It would let in people rule 1 refuses today', 'Open rule'],
+        detail: 'Rule 1 refuses Contractors first, and the first rule that matches decides',
+        fix: 'Fix: Move rule 2 above rule 1',
       },
     ],
   },
@@ -312,9 +320,9 @@ const MATRIX: Case[] = [
     tone: 'info',
     line: 'HRMS access from corporate offices is off — on, it would allow with 2FA',
     path: 'positive',
-    findings: [
-      { kind: 'off-would-change', shape: 'item', says: ['HRMS access from corporate offices · Switched off · via Human Resources', 'Switched off — on, it would decide Allow with 2FA (rule 1)', 'Turn it on to ask Kavya Menon for 2FA', 'Open policy'] },
-    ],
+    /* 6 Oct 2026: no Fix press for a policy switched off (conflict-fix.ts), and in an interactive why its fix is not
+       written out — Open policy is its press; read only, the fix is said (see "every finding is one card"). */
+    findings: [{ kind: 'off-would-change', art: null, says: ['HRMS access from corporate offices · Switched off · via Human Resources', 'Switched off — on, it would decide Allow with 2FA (rule 1)', 'Open policy'] }],
   },
   {
     id: 'ssi-priya-github',
@@ -322,8 +330,8 @@ const MATRIX: Case[] = [
     tone: 'info',
     line: 'Code review for Finance is a draft — on, it would change nothing',
     quiet: true,
-    path: 'notice',
-    findings: [{ kind: 'off-no-change', shape: 'item', says: ['Code review for Finance · Draft · via Finance', 'Draft — on, it would change nothing: Developer tools — office and device checks comes first'] }],
+    path: 'positive',
+    findings: [{ kind: 'off-no-change', art: null, says: ['Code review for Finance · Draft · via Finance', 'Draft — on, it would change nothing: Developer tools — office and device checks comes first'] }],
   },
   {
     id: 'ssi-maya-github (device not stated)',
@@ -333,13 +341,12 @@ const MATRIX: Case[] = [
     line: 'Depends on the device — state it to see which rule decides',
     path: 'notice',
     rows: [
-      "As Engineering Can't tell Allow on 1 factor or Allow with 2FA or Deny",
+      "As Engineering Can't tell Allow on 1 factor or Allow with 2FA or Deny — what this sign-in gets",
       "As Finance Can't tell Allow with 2FA or Deny",
-      "As Maya (both) Can't tell Allow on 1 factor or Allow with 2FA or Deny It depends on the device — this sign-in",
     ],
     findings: [
-      { kind: 'depends', shape: 'item', says: ['Depends on the device: Allow on 1 factor, Allow with 2FA or Deny', 'Rule 1 Allow on 1 factor', 'Rule 2 Allow with 2FA', 'Deny', 'Add device'] },
-      { kind: 'off-no-change', shape: 'item', says: ['Code review for Finance · Draft · via Finance'] },
+      { kind: 'depends', art: null, says: ['Depends on the device: Allow on 1 factor, Allow with 2FA or Deny', 'Rule 1 Allow on 1 factor', 'Rule 2 Allow with 2FA', 'Deny', 'Add device'] },
+      { kind: 'off-no-change', art: null, says: ['Code review for Finance · Draft · via Finance'] },
     ],
   },
   {
@@ -351,7 +358,7 @@ const MATRIX: Case[] = [
     findings: [
       {
         kind: 'not-covered',
-        shape: 'item',
+        art: null,
         /* His groups once, then each policy by name and who it covers; no fix the board cannot do, no ambiguous "its". */
         says: ['3 AWS Console policies do not cover Ravi Menon', 'Ravi Menon is in IT Admins', 'AWS for engineering teams Engineering, DevOps, Contractors', 'AWS billing for Finance Finance', 'AWS production for DevOps DevOps'],
       },
@@ -363,7 +370,7 @@ const MATRIX: Case[] = [
     tone: 'info',
     line: 'No Workday policy — the Global Default decides',
     path: 'negative',
-    findings: [{ kind: 'not-covered', shape: 'item', says: ['No policy on Workday', 'No application policy names Workday, so the Global Default decides every sign-in to it, by its own rules'] }],
+    findings: [{ kind: 'not-covered', art: null, says: ['No policy on Workday', 'No application policy names Workday, so the Global Default decides every sign-in to it, by its own rules'] }],
   },
   {
     id: 'ssi-maya-london',
@@ -371,11 +378,11 @@ const MATRIX: Case[] = [
     tone: 'info',
     line: 'Rule 3 also applies via Finance — the same decision, asking Google Authenticator instead of miniOrange Push',
     quiet: true,
-    path: 'notice',
-    rows: ['As Engineering Allow with 2FA Rule 2 · Compliant device, working remotely', 'As Finance Allow with 2FA Rule 3 · Finance, on a compliant device', "As Maya (both) Allow with 2FA Engineering's rule comes first — this sign-in"],
+    path: 'positive',
+    rows: ['As Engineering Allow with 2FA Rule 2 · Compliant device, working remotely — what this sign-in gets', 'As Finance Allow with 2FA Rule 3 · Finance, on a compliant device'],
     findings: [
-      { kind: 'also-matches', shape: 'item', says: ['Rule 3 also applies to Maya Iyer · via Finance', 'Not used — rule 2 matched first; it would give the same decision, asking Google Authenticator instead of miniOrange Push', 'Open rule'] },
-      { kind: 'off-no-change', shape: 'item', says: ['Code review for Finance · Draft · via Finance'] },
+      { kind: 'also-matches', art: null, says: ['Another rule also matches', 'Not used — rule 2 matched first; it would give the same decision, asking Google Authenticator instead of miniOrange Push.', 'Open rule'] },
+      { kind: 'off-no-change', art: null, says: ['Code review for Finance · Draft · via Finance'] },
     ],
   },
 ]
@@ -432,7 +439,7 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
         expect(w).toContain(`class="tj-why__mark is-${c.tone}"`)
       })
 
-      it(c.rows ? 'As each group: a row a group, then the person — each answer, where from, and why theirs is theirs' : 'one group: no As each group', () => {
+      it(c.rows ? 'As each group: a row a group — each answer, where from — the one they get marked, and no row of their own to repeat it' : 'one group: no As each group', () => {
         if (!c.rows) {
           expect(w).not.toContain('As each group')
           return
@@ -440,55 +447,92 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
         expect(rowsOf(w)).toEqual(c.rows)
       })
 
-      it('every finding, in the model’s order and words, each with its tone and at most one action', () => {
+      /* 6 Oct 2026: each finding is one card — its heading, one line (the model's longer why in its tooltip), then at
+         most one Fix press (its fix in its label, its word just "Fix") and one quiet link that only looks. */
+      it('every finding, in the model’s order and words, one card each with its tone and picture, at most one Fix and one link', () => {
         const got = findingsOf(w)
-        expect(got.map((g) => [g.kind, g.shape])).toEqual(c.findings.map((x) => [x.kind, x.shape]))
+        expect(got.map((g) => [g.kind, g.art])).toEqual(c.findings.map((x) => [x.kind, x.art]))
         expect(got.map((g) => g.kind)).toEqual(plan.conflicts!.findings.map((x) => x.kind))
+        expect(got.map((g) => g.tone)).toEqual(whyItems(plan).map((x) => x.tone))
         c.findings.forEach((x, i) => {
+          expect(got[i].hasArt, x.kind).toBe(x.art !== null)
           for (const say of x.says) expect(got[i].words, `${x.kind}: ${say}`).toContain(say)
+          if (x.detail) expect(lineOf(got[i].html)?.detail, x.kind).toBe(x.detail)
+          const fix = fixOf(got[i].html)
+          expect(fix?.label ?? null, x.kind).toBe(x.fix ?? null)
+          if (fix) expect(fix.words, x.kind).toBe('Fix')
+          expect([...got[i].html.matchAll(/class="tj-fix"/g)].length, x.kind).toBeLessThanOrEqual(1)
+          expect([...got[i].html.matchAll(/class="tj-conflict__open tj-why__act"/g)].length, x.kind).toBeLessThanOrEqual(1)
           expect([...got[i].html.matchAll(/tj-(?:conflict|why)__(?:open|act)/g)].length, x.kind).toBeLessThanOrEqual(2)
         })
       })
     })
   }
 
-  it('a rule that also applies is its card, whole, yellow, its rows that held marked in the notice tone; everything else is ONE line', () => {
+  /* 6 Oct 2026 (owner: "a heading, then a one- or two-liner at most, then a solution button — they don't want to read,
+     so only click"): a rule that also applies is no longer its whole trace card in the why (ConflictRuleCard) — it
+     is the same card as every other finding: a heading, one line, the model's why in its tooltip, then the Fix press
+     and Open rule. Read only (open over the run), the fix is said in words instead. */
+  it('every finding is one card, a rule that also applies too: a heading, one line, then Fix and Open rule — nothing of the rule drawn whole', () => {
     const w = why(MAYA_GITHUB)
     const [card] = findingsOf(w)
-    expect(card.html).toMatch(/class="bb__card is-trace is-mfa is-t-not-reached is-open is-conflict"/)
-    expect(card.html).toContain('bb__tbody')
-    expect(card.html).toMatch(/class="bb__state bb__tstate is-conflict">Also applies</)
-    expect(card.html).toContain('class="tj-conflict"')
-    /* The card takes no press of its own: Open rule, in its notice, is its one action — its title is words, out of the Tab order. */
-    expect([...card.html.matchAll(/class="tj-conflict__open"/g)]).toHaveLength(1)
-    expect(card.html).not.toContain('bb__topen')
-    expect(card.html).not.toMatch(/<button[^>]*class="bb__titlebtn"/)
-    expect(card.html).toMatch(/<span id="[^"]+" class="bb__titlebtn is-static"><span class="u-sr-only">Rule 3: <\/span><strong>Finance, on a compliant device<\/strong><\/span>/)
+    expect([card.kind, card.tone, card.hasArt, card.art]).toEqual(['rule-conflict', 'conflict', true, 'rules'])
+    expect(w).toContain('<li class="tj-why__item tj-find is-conflict has-art" data-kind="rule-conflict">')
+    expect(w).not.toContain('tj-why__rule')
+    expect(card.html).not.toMatch(/bb__card|bb__tbody|bb__titlebtn|class="tj-conflict"/)
+    expect(card.html).toMatch(/^<span class="tj-why__icon" aria-hidden="true"><svg[^>]*lucide-list-ordered[\s\S]*?<\/span><svg class="tj-art"[^>]*aria-hidden="true"/)
+    expect(card.html).toContain(
+      '<div class="tj-why__text"><p class="tj-find__title">Two rules match Maya Iyer</p><p class="tj-find__line" title="Rule 1 matched first via Engineering, and the first rule that matches decides">Rule 3 would allow with 2FA, but rule 1 matched first.</p><div class="tj-find__acts"><button type="button" class="tj-fix"',
+    )
+    /* The Fix opens the policy that decided with the rule moved in its draft; Open rule only looks — the card's one link. */
+    expect(fixOf(card.html)).toEqual({ label: 'Fix: Move rule 3 above rule 1', title: 'Opens Developer tools — office and device checks with this change in its draft', words: 'Fix' })
+    expect([...card.html.matchAll(/class="tj-conflict__open tj-why__act"/g)]).toHaveLength(1)
+    expect(text(between(card.html, '<div class="tj-find__acts">'))).toBe('Fix Open rule')
+    /* Read only: no press — the fix in words, where the Fix would be. */
+    const [still] = findingsOf(why(MAYA_GITHUB, noop, t, false))
+    expect(still.html).not.toMatch(/tj-fix|tj-why__act/)
+    expect(still.html).toContain('<div class="tj-find__acts"><p class="tj-why__fix">Move it above rule 1 to ask Finance for 2FA</p></div>')
+    /* A policy switched off has no Fix, so its fix is written where the Fix would be — interactive or not (7 Oct 2026,
+       the owner's "a solution, or a direct button with the solution written"); interactive, Open policy beside it. */
+    const kavya = saved('ssi-kavya-office')
+    const [off] = findingsOf(why(kavya))
+    expect(off.html).toContain('<div class="tj-find__acts"><p class="tj-why__fix">Turn it on to ask Kavya Menon for 2FA</p><button type="button" class="tj-conflict__open tj-why__act">Open policy')
+    expect(off.html).not.toContain('tj-fix')
+    expect(findingsOf(why(kavya, noop, t, false))[0].html).toContain('<p class="tj-why__fix">Turn it on to ask Kavya Menon for 2FA</p>')
     /* A trace card with a press keeps its title a button (the chain's). */
     expect(ruleCardSrc).toContain('{onFold || onOpen ? (')
   })
 
-  it('a policy that lost is fixed in the one that won: its one action opens the rule of the deciding policy the fix adds one above; its name opens it', () => {
-    const cases: [string, string, string][] = [
-      ['ssi-maya-aws', 'sc-aws-finance', 'AWS billing for Finance'],
-      ['ssi-tom-aws', 'sc-aws-devops', 'AWS production for DevOps'],
+  /* 6 Oct 2026: the policy that lost is no longer a link in its card (no `tj-why__name`): it is named in the card's
+     line, what it would do and the policy that comes first; the Fix opens the policy that won with the rule added in
+     its draft, and Open rule opens the rule it goes above. */
+  it('a policy that lost is fixed in the one that won: its Fix adds a rule there, its link opens the rule the fix adds one above; its name is said in the line', () => {
+    const cases: [string, string, string, string][] = [
+      ['ssi-maya-aws', 'sc-aws-finance', 'AWS billing for Finance', 'Maya Iyer'],
+      ['ssi-tom-aws', 'sc-aws-devops', 'AWS production for DevOps', 'DevOps'],
     ]
     const eng = t.policies.find((p) => p.id === 'sc-aws-engineering')!
-    for (const [id, loser, name] of cases) {
+    for (const [id, loser, name, forWho] of cases) {
       const item = whyItems(planOf(saved(id)).plan)[0]
       expect(item.action, id).toMatchObject({ kind: 'rule', label: 'Open rule', policyId: 'sc-aws-engineering', ruleId: eng.rules[1].id })
       expect(item.link, id).toEqual({ policyId: loser, label: name })
       const w = why(saved(id))
-      expect(w, id).toContain(`<button type="button" class="tj-why__name" title="Open ${name}">${name}</button>`)
+      expect(w, id).not.toContain('tj-why__name')
+      const [card] = findingsOf(w)
+      expect(lineOf(card.html)?.line, id).toBe(`${name} would allow with 2FA, but ${eng.name} comes first.`)
+      expect(fixOf(card.html), id).toEqual({ label: `Fix: Add a rule for ${forWho} above rule 2`, title: `Opens ${eng.name} with this change in its draft`, words: 'Fix' })
     }
-    /* And its name leads to a board that has her in it — through Finance, her second group — not "Not in this policy". */
+    /* And the policy it names is a board that has her in it — through Finance, her second group — not "Not in this policy". */
     const fin = t.policies.find((p) => p.id === 'sc-aws-finance')!
     const { facts } = factsOf(saved('ssi-maya-aws'), t.zones)
     const route = routeOf(runColumns(columnsFor(fin, fin, 'aws'), t.policies, facts, env).at(-1)!, fin, facts, env, t.policies)
     expect(route.who).toMatchObject({ word: 'In audience', state: 'pass' })
-    /* A policy that comes first by design has no fix: its name is the only way to it. */
+    /* A policy that comes first by design has no fix and no action: its card names it, and takes no press. */
     const devon = whyItems(planOf(saved('ssi-devon-slack')).plan)[0]
     expect([devon.action, devon.link]).toEqual([null, { policyId: 'sc-slack-everyone', label: 'Slack for everyone' }])
+    const [card] = findingsOf(why(saved('ssi-devon-slack')))
+    expect(card.html).not.toMatch(/<button|tj-find__acts/)
+    expect(lineOf(card.html)?.line).toMatch(/^Slack for everyone would allow on 1 factor, but /)
   })
 
   it('no policy covers them: each policy by name, a quiet link, and who it covers — and no action', () => {
@@ -508,8 +552,9 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
      was folded on it while the why was open (RunChain.tsx, before 1 Oct).
      Now the chain draws ONE card, the rule that decided (owner, 1 Oct: "for
      the matched policy only show which rule matched"): the rule that also
-     applies is its ⚠ on the rail, and whole only in the why. */
-  it('a rule the why draws whole is its ⚠ mark on the chain’s rail, not a second card: the chain draws the rule that decided, the why the one that also applies', () => {
+     applies is its ⚠ on the rail. Since 6 Oct 2026 the why no longer draws
+     it whole either: it is one card there, by its number. */
+  it('a rule that also applies is its ⚠ mark on the chain’s rail, not a second card: the chain draws the rule that decided, the why says the other by its number', () => {
     const o = glance(MAYA_GITHUB)
     const { plan } = planOf(MAYA_GITHUB)
     const [r1, , r3] = plan.rules
@@ -517,8 +562,9 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
     expect(deciderOf(o)).toMatch(/<button type="button" class="tj-rail__chip is-conflict" aria-pressed="false" aria-label="Rule 3: Finance, on a compliant device — Also applies"/)
     expect(o).not.toContain('class="tj-conflict"')
     const [card] = findingsOf(why(MAYA_GITHUB))
-    expect(card.html).toContain('<strong>Finance, on a compliant device</strong>')
-    expect(card.html).toContain('class="tj-conflict"')
+    expect(card.html).not.toContain('Finance, on a compliant device')
+    expect(card.html).not.toContain('class="tj-conflict"')
+    expect(lineOf(card.html)?.line).toBe(`Rule ${r3.index! + 1} would allow with 2FA, but rule ${r1.index! + 1} matched first.`)
     expect(r3.name).toBe('Finance, on a compliant device')
     /* Opened under the answer, the policy that decided folds to its line, so nothing of the rule is drawn twice there either. */
     expect(journeySrc).toContain('nodes.policy = false')
@@ -529,12 +575,12 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
     expect(journeySrc).toContain('const POLICY_LINE_MAX = 120')
   })
 
-  it('a person in three groups: the title and her row give the one reason, from the rule that decided', () => {
+  it('a person in three groups: the title gives the one reason; the groups that get her answer are marked, her own row left out', () => {
     const three: Tenant = { ...t, directory: { ...t.directory, people: t.directory.people.map((u) => (u.id === 'u-maya' ? { ...u, alsoGroupIds: ['finance', 'devops'] } : u)) } }
     const w = why(MAYA_GITHUB, noop, three)
     expect(titleOf(w)).toBe('Maya Iyer is in Engineering, Finance and DevOps — the rule for Engineering and DevOps applies first')
-    expect(rowsOf(w).at(-1)).toBe('As Maya (all 3) Allow on 1 factor The rule for Engineering and DevOps comes first — this sign-in')
-    expect(rowsOf(w).map((r) => r.split(' Allow')[0].split(' Can')[0])).toEqual(['As Engineering', 'As Finance', 'As DevOps', 'As Maya (all 3)'])
+    expect(rowsOf(w).at(-1)).toBe('As DevOps Allow on 1 factor Rule 1 · In the office on a compliant device — what this sign-in gets')
+    expect(rowsOf(w).map((r) => r.split(' Allow')[0].split(' Can')[0])).toEqual(['As Engineering', 'As Finance', 'As DevOps'])
   })
 
   it('a saved sign-in that fails says so once, beside the answer: “Expected Allow with 2FA”, in the notice tone; not when it passes', () => {
@@ -580,17 +626,21 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
     expect(rules).toMatch(/\.bb__card\.is-trace\.is-t-not-reached:not\(\.is-conflict\) \.bb__ifchip:is\(\.is-tone-allow, \.is-tone-mfa, \.is-tone-deny\) \{\s*background: var\(--surface-sunken\);\s*border-color: var\(--border-subtle\);\s*color: var\(--text-tertiary\);\s*\}/)
   })
 
-  it('a conflict and what can’t be told are yellow; the rest is quiet', () => {
-    const tones = (w: string) => [...w.matchAll(/class="tj-why__item is-(\w+)" data-kind="([^"]+)"/g)].map((m) => [m[2], m[1]])
+  /* 6 Oct 2026: the finding is a card (`tj-why__item tj-find`) with a heading (`tj-find__title`) in the primary text;
+     the yellow is its border and its mark — the old head line (`tj-why__head`) is not drawn. */
+  it('a conflict and what can’t be told are yellow — the card’s border and mark; the rest is quiet', () => {
+    const tones = (w: string) => [...w.matchAll(/class="tj-why__item tj-find is-(\w+)(?: has-art)?" data-kind="([^"]+)"/g)].map((m) => [m[2], m[1]])
     expect(tones(why(saved('ssi-leo-slack')))).toEqual([
       ['exception', 'conflict'],
       ['group-policy-first', 'info'],
     ])
     expect(tones(why({ ...MAYA_GITHUB, device: { kind: 'none' } }))[0]).toEqual(['depends', 'depends'])
+    expect(whySrc).not.toContain('tj-why__head')
     const rules = css.replace(/\/\*[\s\S]*?\*\//g, '')
     expect(rules).toMatch(/\.tj-why__item\.is-conflict,\s*\.tj-why__item\.is-depends \{ border-color: var\(--fb-notice-border\); \}/)
-    expect(rules).toMatch(/\.tj-why__item\.is-conflict \.tj-why__head,\s*\.tj-why__item\.is-depends \.tj-why__head \{ color: var\(--fb-notice-fg\); \}/)
+    expect(rules).toMatch(/\.tj-why__item\.is-conflict \.tj-why__icon,\s*\.tj-why__item\.is-depends \.tj-why__icon \{ color: var\(--fb-notice-dot\); \}/)
     expect(rules).toMatch(/\.tj-why__icon \{[^}]*color: var\(--text-tertiary\);/)
+    expect(rules).toMatch(/\.tj-find__title \{[^}]*color: var\(--text-primary\);/)
   })
 
   it('the count is yellow only for a conflict: what is only worth knowing is the neutral pill with ⓘ', () => {
@@ -659,12 +709,16 @@ describe('every row of the troubleshooting matrix, drawn: the glance and the why
 /* As each group, pressed: the sign-in runs again as "Anyone in <group>" —
    the Person picker's own pick (§13.3), a member of just that group. */
 describe('As each group runs again as the group', () => {
-  it('a group’s row is a button that names the run it starts; the person’s own row, the answer on screen, is not', () => {
+  it('a group’s row is a button that names the run it starts — the one she gets marked; her own row only when no group gets her answer, and not a press', () => {
     const got: string[] = []
     const w = why(MAYA_GITHUB, (g) => got.push(g))
-    expect(w).toMatch(/<button type="button" class="tj-why__grow" title="Run as anyone in Engineering">/)
+    expect(w).toMatch(/<button type="button" class="tj-why__grow is-current" title="Run as anyone in Engineering">/)
     expect(w).toMatch(/<button type="button" class="tj-why__grow" title="Run as anyone in Finance">/)
-    expect(w).toMatch(/<div class="tj-why__grow is-current" aria-current="true">/)
+    expect(w).not.toContain('aria-current')
+    /* The groups together decide otherwise (no group alone gets her answer): her row says it, the answer on screen. */
+    const own = why(MAYA_GITHUB, noop, t, true, (rows) => rows.map((r) => ({ ...r, follows: false })))
+    expect(own).toMatch(/<div class="tj-why__grow is-current" aria-current="true">/)
+    expect(rowsOf(own).at(-1)).toBe("As Maya (both) Allow on 1 factor Engineering's rule comes first — this sign-in")
     /* Without a way to run again, the rows are only read. */
     expect(why(MAYA_GITHUB, null)).not.toMatch(/<button type="button" class="tj-why__grow"/)
   })
@@ -873,7 +927,8 @@ describe('break-in attempts, on the answer and in the why', () => {
         <WhyWith f={f} summary={summary} interactive={interactive} />
       </BrandProvider>,
     )
-  const sectionOf = (w: string) => w.slice(w.indexOf('<section class="tj-why__sec tj-why__att"'))
+  /* 6 Oct 2026: the attempts are one card in the findings' own shape (WhyCard.tsx), no longer a section of counts. */
+  const sectionOf = (w: string) => w.slice(w.indexOf('<section class="tj-why__item tj-find tj-why__att'))
   const cellsOf = (w: string) => [...w.matchAll(/<li class="tj-cell is-(\w+)"><span class="tj-cell__num">(\d+)<\/span><span class="tj-cell__word">([^<]+)<\/span><\/li>/g)].map((m) => [m[3], m[2], m[1]])
 
   it('the cases: Arun on AWS Console and Priya on Google Workspace have no finding to say; attempts get through on the one and not the other', () => {
@@ -944,36 +999,46 @@ describe('break-in attempts, on the answer and in the why', () => {
     expect(policyCheckSrc).not.toMatch(/breakIn=|onReviewBreakIn=/)
   })
 
-  it('in the why: its own section after the findings — its label and ⓘ, the four counts once, a hole that is not 0 in the conflict’s tone, Review attempts', () => {
+  /* 6 Oct 2026 (owner: "remove this part, make the card bigger, and just add a break-in part"): the four counts and
+     the suggested attempts left the why — one card after the findings, its title and ⓘ, one line of how many got
+     through or in on less (said once), and Review attempts. */
+  it('in the why: one card after the findings — its title and ⓘ, one line of how many got through or in on less, in the conflict’s tone, Review attempts', () => {
     const w = whyWith(saved('ssi-maya-aws'), summaryOn('aws'))
     expect(w.indexOf('<ul class="tj-why__list"')).toBeGreaterThan(-1)
     expect(w.indexOf('<ul class="tj-why__list"')).toBeLessThan(w.indexOf('tj-why__att'))
-    /* The findings are as they were: the section is not one of them. */
+    /* The findings are as they were: the attempts' card is not one of them. */
     expect(findingsOf(w).map((x) => x.kind)).toEqual(['policy-conflict'])
     const sec = sectionOf(w)
-    expect(sec).toMatch(/^<section class="tj-why__sec tj-why__att" aria-labelledby="([^"]+)"><p id="\1" class="tj-why__label tj-why__attlabel"><span>Break-in attempts on AWS Console<\/span>/)
-    expect(sec).toContain('aria-label="About break-in attempts"')
-    expect(cellsOf(sec)).toEqual([
-      ['Got through', '3', 'hole'],
-      ['Weaker factor', '0', 'quiet'],
-      ['Locked out', '2', 'plain'],
-      ['Extra prompts', '0', 'quiet'],
-    ])
-    expect(sec).toMatch(/<button type="button" class="tj-conflict__open tj-why__attgo">Review attempts<svg[^>]*lucide-chevron-right/)
+    expect(sec).toMatch(
+      /^<section class="tj-why__item tj-find tj-why__att is-conflict" aria-labelledby="([^"]+)"><span class="tj-why__icon" aria-hidden="true"><svg[^>]*lucide-shield-alert[\s\S]*?<\/span><div class="tj-why__text"><p id="\1" class="tj-find__title tj-why__attlabel"><span>Break-in attempts on AWS Console<\/span><span class="bx-tip"><button type="button" class="bx-tipdot" aria-label="About break-in attempts">/,
+    )
+    /* How many got through or in on less, once: no counts of each, no attempts listed. */
+    const { counts } = summaryOn('aws')
+    expect(counts.gotThrough + counts.weakerFactor + counts.lessThanAsked).toBe(4)
+    expect(sec).toContain('<p class="tj-find__line">4 got through or in on less</p>')
+    expect(cellsOf(sec)).toEqual([])
+    expect(sec).not.toMatch(/tj-cells?\b|tj-why__attword/)
+    expect(sec).toMatch(/<div class="tj-find__acts"><button type="button" class="tj-conflict__open tj-why__act">Review attempts<svg[^>]*lucide-chevron-right/)
     /* Read only, while the card is open over the run: no press. */
     expect(sectionOf(whyWith(saved('ssi-maya-aws'), summaryOn('aws'), false))).not.toContain('Review attempts')
+    /* None getting through: the quiet card, and it says so. */
+    const none = sectionOf(whyWith(PRIYA_GOOGLE, summaryOn('google-workspace')))
+    expect(none).toMatch(/^<section class="tj-why__item tj-find tj-why__att is-info"/)
+    expect(none).toContain('<p class="tj-find__line">None got through</p>')
   })
 
-  it('a why with the attempts alone is titled by them: no empty findings list, and the section does not say its label again', () => {
+  /* 6 Oct 2026: the attempts' card always carries its own title, so with the attempts alone the why's title and the
+     card's say it both; the ⓘ stays beside the card's title (no foot). */
+  it('a why with the attempts alone is titled by them: no empty findings list, and the card under it keeps its title and ⓘ', () => {
     const w = whyWith(ARUN_AWS, summaryOn('aws'))
     expect(whyItems(planOf(ARUN_AWS).plan)).toEqual([])
     expect(titleOf(w)).toBe('Break-in attempts on AWS Console')
     expect(w).toContain('class="tj-why__mark is-conflict"')
     expect(w).not.toContain('tj-why__list')
-    expect(w).not.toContain('tj-why__attlabel')
-    expect(w.match(/Break-in attempts on AWS Console/g)).toHaveLength(1)
-    /* The ⓘ moves to the section's foot, beside Review attempts. */
-    expect(sectionOf(w)).toMatch(/<div class="tj-why__attfoot"><span class="bx-tip"><button type="button" class="bx-tipdot" aria-label="About break-in attempts">/)
+    expect(w.match(/Break-in attempts on AWS Console/g)).toHaveLength(2)
+    expect(w.match(/aria-label="About break-in attempts"/g)).toHaveLength(1)
+    expect(sectionOf(w)).toMatch(/<p id="[^"]+" class="tj-find__title tj-why__attlabel"><span>Break-in attempts on AWS Console<\/span><span class="bx-tip"><button type="button" class="bx-tipdot" aria-label="About break-in attempts">/)
+    expect(w).not.toContain('tj-why__attfoot')
     /* The journey's own title for it, and the why it may open. */
     expect(journeySrc).toContain("(whyTitleOf(plan) ?? (reason ? { text: DENY_REASON_WORD[reason], tone: 'info' as const } : null) ?? (attempts ? attemptsTitle(attempts) : null))")
     expect(journeySrc).toContain('breakIn={whyBreakIn}')

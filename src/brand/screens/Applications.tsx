@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AppWindow, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AppWindow, Pencil, Plus, Trash2, Users } from 'lucide-react'
 
 import { Button, RowMenu, SearchBox, type MenuItem } from '../kit'
 import { EmptyState, NoMatches } from '../empty'
@@ -24,9 +24,11 @@ import { SHOWCASE } from '../showcase'
    The columns, the search, the button and the pager follow the live page. The
    Protection column is new.
 
-   The row menu offers Edit and Delete and nothing else. Attaching a policy has
-   a form, in the protection panel, where new and existing are both visible
-   before either is chosen.
+   The name opens the application's own page, on Policies. The row menu is the
+   live one's, less App Access Configuration: Edit (the page's Basic tab), Users
+   and groups (the live "Show Associated Entities", the page's Users tab), and
+   Delete. The Protection cell keeps its quick add: the protection panel, where
+   new and existing are both visible before either is chosen.
    -------------------------------------------------------------------------- */
 
 type SortKey = 'name' | 'type' | 'protection' | 'updated'
@@ -42,6 +44,7 @@ const APP_VIEWS = LIB_VIEWS.map((v) => (v.id === 'table' ? v : { ...v, disabled:
 
 const ROW_ACTIONS: MenuItem[] = [
   { id: 'edit', label: 'Edit application', icon: Pencil },
+  { id: 'people', label: 'Users and groups', icon: Users },
   { id: 'delete', label: 'Delete application', icon: Trash2, danger: true, divide: true },
 ]
 
@@ -58,11 +61,12 @@ export function Applications() {
     setAdded(null)
   }, [panelFor])
 
+  /* With the directory, so a policy bound to named people is asked about them. */
   const summaries = useMemo(() => {
     const m = new Map<string, AppSummary>()
-    for (const a of store.apps) m.set(a.id, summarise(a.id, store.policies))
+    for (const a of store.apps) m.set(a.id, summarise(a.id, store.policies, store.users))
     return m
-  }, [store.apps, store.policies])
+  }, [store.apps, store.policies, store.users])
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -220,9 +224,9 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
         <div className="btable__primary">
           <span className="btable__app">
             <AppLogo appId={app.id} name={app.name} size={20} />
-            {/* The name opens the protection panel. The row itself is not a
+            {/* The name opens the application's page. The row itself is not a
                 target, so its text stays selectable and the kebab stays clear. */}
-            <button type="button" className="btable__link" onClick={onOpen}>
+            <button type="button" className="btable__link" onClick={() => store.go({ name: 'application', appId: app.id })}>
               {app.name}
             </button>
           </span>
@@ -240,17 +244,11 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
         <RowMenu
           label={`Actions for ${app.name}`}
           items={ROW_ACTIONS}
-          onSelect={(id) =>
-            store.showToast(
-              SHOWCASE
-                ? id === 'edit'
-                  ? 'Editing applications is coming soon.'
-                  : 'Deleting applications is coming soon.'
-                : id === 'edit'
-                  ? 'Editing applications is not built in this prototype.'
-                  : 'Deleting applications is not built in this prototype.',
-            )
-          }
+          onSelect={(id) => {
+            if (id === 'edit') store.go({ name: 'application', appId: app.id, tab: 'basic' })
+            else if (id === 'people') store.go({ name: 'application', appId: app.id, tab: 'users' })
+            else store.showToast(SHOWCASE ? 'Deleting applications is coming soon.' : 'Deleting applications is not built in this prototype.')
+          }}
         />
       </td>
     </tr>

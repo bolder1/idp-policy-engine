@@ -142,14 +142,24 @@ export function BoardBar({
     focusPencil()
   }
 
+  /* The way back goes where the board was opened from: an application's page
+     when it carried one (New policy, Edit policy, Add a copy there), lighting
+     this policy in its list; Policies otherwise. `apps.find`, never `appById`,
+     so an application deleted meanwhile falls back to Policies rather than to
+     the first app in the catalogue. */
+  const fromId = store.screen.name === 'board' ? store.screen.from?.appId : undefined
+  const fromApp = fromId ? store.apps.find((a) => a.id === fromId) : undefined
+  const back = () =>
+    store.go(fromApp ? { name: 'application', appId: fromApp.id, tab: 'policies', flash: policy.id } : { name: 'policies' })
+
   return (
     <header className="bbtop">
       <nav className="bbtop__crumbs" aria-label="Where this policy sits">
-        <button type="button" className="bbtop__back" aria-label="Back to policies" onClick={() => store.go({ name: 'policies' })}>
+        <button type="button" className="bbtop__back" aria-label={fromApp ? `Back to ${fromApp.name}` : 'Back to policies'} onClick={back}>
           <ArrowLeft size={16} strokeWidth={2} aria-hidden />
         </button>
-        <button type="button" className="bbtop__crumb" onClick={() => store.go({ name: 'policies' })}>
-          Policies
+        <button type="button" className="bbtop__crumb" onClick={back}>
+          {fromApp ? fromApp.name : 'Policies'}
         </button>
 
         <ChevronRight size={13} strokeWidth={2} className="bbtop__sl" aria-hidden />

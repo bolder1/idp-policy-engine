@@ -67,3 +67,9 @@ export const DETAILS_IN_BAR: boolean = false
    (layouts/focus2-why.tsx). Inside a card, by his ruling — never on the canvas's bar, never an icon on a card's head.
    Off: Focus draws neither, as before. */
 export const WHY_IN_FOCUS: boolean = true
+
+/** Beside each row's ✓ or ✕ on the rule card, the sign-in's own value that the row read ("Office network", "Windows 11
+    laptop"), sharpening in as the engine reads it — so a mark answers something on screen (6 Oct 2026, the run made to
+    feel real). Off, the rows carry their marks alone, as the builder's do — the owner's pick the same day ("remove, no
+    need"). */
+export const ROW_EVIDENCE: boolean = false

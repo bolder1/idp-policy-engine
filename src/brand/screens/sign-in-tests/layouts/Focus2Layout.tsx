@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from 'react-dom'
 
 import { useBrand } from '../../../store'
+import { cueForDecision, playCue } from '../../../sound'
 import { sentenceTokens, tokenValue } from '../../testing/sign-in-sentence'
 import { useCheckStage } from '../canvas-shelf'
 import { RunStage, type StageView } from './RunStage'
@@ -26,8 +27,8 @@ import { MORPH_HOLD, MORPH_LEAD, MORPH_STAGGER, ROW_H, STATION_OPENS, lineAt, ov
 import { readFocusView, writeFocusView, type FocusView } from './focus2-view'
 import { Focus2Route, LINE_S, RowFace, type RouteMood } from './focus2-route'
 import { Classic2Card, Classic2Chain } from './classic2-chain'
-import { glideTotal, type Glide } from './classic2-glide'
-import { CARDS, chainCardOf, type CardKey } from './classic2-model'
+import { GLIDE_EASE, GLIDE_S, glideTotal, type Glide } from './classic2-glide'
+import { CARDS, chainCardOf, onCard, type CardKey } from './classic2-model'
 import { SignInNode } from './classic2-pill'
 import { useChainFold, useChainRun } from './classic2-run'
 import type { OutcomeV2 } from './focus-outcome'
@@ -302,6 +303,8 @@ const DECIDING_MS = 520
 /* Only this moves a card: one spring, no overshoot (the view's one motion language). */
 const SPRING: Transition = { type: 'spring', stiffness: 190, damping: 26, mass: 1 }
 const NONE: Transition = { duration: 0 }
+/** The headline's room over the vertical chain, growing as the headline opens: the glide's own time and ease. */
+const ROOM_GROW = { duration: GLIDE_S, ease: GLIDE_EASE }
 const EASE = [0.2, 0, 0, 1] as const
 /* A card put on the path fades in where it stands, before the row turns to it. */
 const ARRIVE = 0.16
@@ -732,13 +735,28 @@ export default function Focus2Layout(
   const whyDone = landed && !running && !presenting
   const focusWhy = useFocusWhy(props, whyDone, rootRef)
 
+  /* The answer's sound (sound.ts), at the same moment: once per run, as the story lands — not as the engine does,
+     which can be seconds earlier here. Armed only by a run the engine played, so a revisit, drawn settled and never
+     running, is silent. The host plays it for every other layout (TryJourney.tsx). */
+  const cueArmed = useRef(false)
+  useEffect(() => {
+    if (running) cueArmed.current = true
+    else if (whyDone && cueArmed.current) {
+      cueArmed.current = false
+      const cue = cueForDecision(plan.outcome.decision)
+      if (cue) playCue(cue)
+    }
+  }, [running, whyDone, plan])
+
   // --- Classic v2's cards: the Vertical view's chain, and the Horizontal view's stations ---
   const chain = useChainRun(presented)
   const identityKey = props.identities?.find((i) => i.active)?.key ?? ''
   /* Vertical: open as the story reaches each card, folded once it lands — Classic v2's fold. Horizontal: the heads, so
      the route reads at a glance; a station's fold opens it in place. Each view's presses stand until the next run. */
   /* The chain's own cards: Focus draws no sign-in card, so the fold-all and its words count only the three. */
-  const vFold = useChainFold(`${runKey}:${identityKey}`, chainCards(chain.shown), chain.landed)
+  /* Card by card (classic2-model.ts `foldOne`): the card the engine is on is open, the ones it has done with fold to their
+     heads as the next opens, and all fold once it lands — the chain stays short and nothing is born under the bar. */
+  const vFold = useChainFold(`${runKey}:${identityKey}`, chainCards(chain.shown), chain.landed, { on: onCard(presented.plan, p) })
   const hFold = useChainFold(`${runKey}:${identityKey}:route`, CARDS, true)
   const { 'sign-in': signOpen, policy: policyOpen, rule: ruleOpen, outcome: outOpen } = hFold.open
   const stationOpen = useMemo<Partial<Record<StationKind, boolean>>>(() => ({ sign: signOpen, policies: policyOpen, rule: ruleOpen, outcome: outOpen }), [signOpen, policyOpen, ruleOpen, outOpen])
@@ -823,7 +841,11 @@ export default function Focus2Layout(
      over it or (across) the row's top changes — and never for anything else, nor before the canvas has been measured,
      so the first paint's planned room is never seen moving to the real one. Under reduced motion they are simply there. */
   const zoomNow = useCallback(() => stageRef.current?.zoom() ?? 1, [])
-  const glideKey = `${shape}:${headSpace}:${across ? rowTop : 0}`
+  /* Down the canvas the headline's room is not a glide: the room itself grows (ROOM_GROW), and everything under it moves
+     down with it in the flow. As a glide only the lower cards moved — the node and the policies card jumped to their
+     new place while the rest slid after them, and for a moment two card heads overlapped (6 Oct 2026). Across, the
+     row's top answers the room, so the two still glide together. */
+  const glideKey = `${shape}:${across ? `${headSpace}:${rowTop}` : 0}`
   const linksBack = useCallback(() => setLinksOn(true), [])
   const glide = useMemo<Glide | null>(() => (reduced || !room.ready ? null : { key: glideKey, zoom: zoomNow, onLanded: linksBack }), [reduced, room.ready, glideKey, zoomNow, linksBack])
   /* For this long after a switch the cards move on the morph's own timings, however the run was drawn; the line draws
@@ -960,7 +982,16 @@ export default function Focus2Layout(
       () => {
         const root = rootRef.current
         const el = root?.querySelector('.rl-f2v [data-follow]') ?? root?.querySelector('.rl-f2v .rl-c2__seg:last-child')
-        if (el) stageRef.current?.follow(el, { lazy: true, jump: reduced })
+        const sc = el?.closest('.rstage__scroll')
+        if (!el || !sc) return
+        /* In view means clear of the canvas's bar, which floats over the stage's foot (the stage's own room ignores it):
+           a card crossing its top edge is brought up — its top under the run's top when it is taller than the room. */
+        const e = el.getBoundingClientRect()
+        const v = sc.getBoundingClientRect()
+        const floor = v.bottom - (SIDE_PAD + CANVASBAR_H + 8)
+        const ceiling = v.top + TOP_PAD
+        if (e.bottom <= floor && e.top >= ceiling) return
+        stageRef.current?.follow(el, { lazy: false, y: e.height > floor - ceiling ? 0 : 0.42, jump: reduced })
       },
       reduced ? 0 : FOLD_S * 1000 + 40,
     )
@@ -1510,11 +1541,10 @@ export default function Focus2Layout(
   const anyOpen = folds.anyOpen
   useEffect(() => {
     if (!landed || briefDue === runKey) return
-    if (!anyOpen) {
-      setBriefDue(runKey)
-      return
-    }
-    const t = window.setTimeout(() => setBriefDue(runKey), BRIEF_AFTER_MS)
+    /* Read, fold, then the brief: the cards finish folding before the headline opens over them, so the fold and the
+       headline's glide never run in the same frames (they crossed, and card heads overlapped). A timer, not an animation's
+       end: a hidden pane stops animation frames, and the brief must come all the same. */
+    const t = window.setTimeout(() => setBriefDue(runKey), anyOpen ? BRIEF_AFTER_MS : FOLD_S * 1000 + 120)
     return () => window.clearTimeout(t)
   }, [landed, anyOpen, runKey, briefDue])
 
@@ -1611,7 +1641,11 @@ export default function Focus2Layout(
                 >
                   {/* The brief's room over the chain: the headline's measured height. Its change is one of the chain's
                       glides (`glideKey`), so the nodes move down under the headline rather than this box springing. */}
-                  <div className="rl-f2v__room" aria-hidden style={{ height: headSpace }} />
+                  {across ? (
+                    <div className="rl-f2v__room" aria-hidden style={{ height: headSpace }} />
+                  ) : (
+                    <motion.div className="rl-f2v__room" aria-hidden initial={false} animate={{ height: headSpace }} transition={reduced ? NONE : ROOM_GROW} />
+                  )}
                   {/* Out of the view's presence (see FRESH below): the chain's own arrivals and folds are its to play. */}
                   <PresenceContext.Provider value={null}>
                     <div className="rl-c2 rl-f2v__c2">

@@ -2,7 +2,7 @@ import { enforces, memberGroupIds, type AccessDecision, type Policy, type User }
 import { DECISION_PHRASE, strictestFirst } from '../decision-words'
 import type { Tenant } from '../fixtures'
 import { EMPTY_RISK_PROFILE, riskScale } from '../risk-signals'
-import { personOf, tracePolicy, type EvalLibrary, type FactKey, type PolicyTrace, type PossibleOutcome, type SignInFacts, type SimEnv, type SimUser } from './simulate'
+import { personOf, tracePolicy, type EvalLibrary, type FactKey, type PolicyTrace, type PossibleOutcome, type SignInFacts, type SimEnv } from './simulate'
 
 /* -----------------------------------------------------------------------------
    Which policy decides a sign-in — across the whole tenant.
@@ -149,8 +149,16 @@ export function tierOf(p: Policy): PolicyTier {
 
 const refOf = (p: Policy): PolicyRef => ({ policyId: p.id, policyName: p.name, isGlobalDefault: p.isSystem === true })
 
+/** Who `deciderFor` asks about: a directory person, or a stand-in for a group
+    (`{ id: '', groupId }`) or for everyone else (`{ id: '', groupId: '' }`). */
+export interface Member {
+  id: string
+  groupId: string
+  alsoGroupIds?: readonly string[]
+}
+
 /* A person in several groups is governed through any of them (TESTING-V4 §13). */
-const governs = (p: Policy, person: SimUser) =>
+const governs = (p: Policy, person: Member) =>
   p.audience.everyone || memberGroupIds(person).some((g) => p.audience.groupIds.includes(g)) || p.audience.userIds.includes(person.id)
 
 /* "Human Resources, Finance" — the audience a person is outside of, by name.
@@ -269,6 +277,28 @@ export function governingPolicy(policies: readonly Policy[], facts: SignInFacts,
   return decider
     ? { decider, standings: ordered, missing: [], watched, list }
     : { decider: null, standings: ordered, missing: ['a global default policy'], watched, list }
+}
+
+/* The engine's decider for one person on one app, with no trace and no env.
+
+   The candidate test and the tier pick of `governingPolicy` above, and nothing
+   else: no standings, no substitute, no person lookup. The application pages
+   ask it once per group, per person and per policy row, so it reads only the
+   policy list and the membership it is handed. app-standing.test.ts pins it to
+   `governingPolicy` for every person on every application of the showcase. */
+export function deciderFor(list: readonly Policy[], appId: string, person: Member): Policy | null {
+  const candidates = list.filter(
+    (p) =>
+      p.type === 'App Access' &&
+      /* `enforces`, so a monitoring policy is never a candidate. */
+      enforces(p) &&
+      (p.isSystem || p.appIds.includes(appId)) &&
+      (tierOf(p) !== 'custom' || governs(p, person)),
+  )
+  const custom = candidates.filter((p) => tierOf(p) === 'custom')
+  const byDefault = candidates.filter((p) => tierOf(p) === 'default-group')
+  const system = candidates.filter((p) => tierOf(p) === 'global-default')
+  return custom[0] ?? byDefault[0] ?? system[0] ?? null
 }
 
 /* "Monitoring: would allow with 2FA", or "Monitoring: can't tell (deny or

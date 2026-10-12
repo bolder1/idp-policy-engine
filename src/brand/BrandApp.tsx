@@ -41,6 +41,10 @@ const BuilderPage = lazy(() => import('./screens/BuilderPage').then((m) => ({ de
 const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ default: m.BoardPage })))
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
 const Applications = lazy(() => import('./screens/Applications').then((m) => ({ default: m.Applications })))
+const ApplicationPage = lazy(() => import('./screens/ApplicationPage').then((m) => ({ default: m.ApplicationPage })))
+const UsersPage = lazy(() => import('./screens/UsersPage').then((m) => ({ default: m.UsersPage })))
+const UserRolesPage = lazy(() => import('./screens/UsersPage').then((m) => ({ default: m.UserRolesPage })))
+const GroupsPage = lazy(() => import('./screens/GroupsPage').then((m) => ({ default: m.GroupsPage })))
 const SignInActivity = lazy(() => import('./screens/SignInActivity').then((m) => ({ default: m.SignInActivity })))
 const SignInTests = lazy(() => import('./screens/SignInTests').then((m) => ({ default: m.SignInTests })))
 
@@ -59,6 +63,9 @@ const warm = () => {
   void import('./screens/board/BoardPage')
   void import('./screens/PolicyDetails')
   void import('./screens/Applications')
+  void import('./screens/ApplicationPage')
+  void import('./screens/UsersPage')
+  void import('./screens/GroupsPage')
   void import('./screens/SignInTests')
   void import('./screens/SignInActivity')
 }
@@ -102,6 +109,21 @@ function ScreenBody() {
        names cannot be confused by anyone reading this switch. */
     case 'applications':
       return <Applications />
+    /* Keyed on the object, so going from one application or group to another
+       starts the page again (its tab, its draft, its filters) rather than
+       showing the last one's state against the new one. */
+    case 'application': {
+      const { appId, tab, group, flash, from } = screen
+      return <ApplicationPage key={appId} appId={appId} tab={tab} group={group} flash={flash} from={from} />
+    }
+    case 'users':
+      return <UsersPage role={screen.role} />
+    case 'user-roles':
+      return <UserRolesPage />
+    case 'groups': {
+      const { groupId, tab, from } = screen
+      return <GroupsPage key={groupId ?? 'list'} groupId={groupId} tab={tab} from={from} />
+    }
     case 'apps':
       return <UserApps />
     case 'policies':
@@ -109,6 +131,7 @@ function ScreenBody() {
     case 'builder':
       return <BuilderPage policyId={screen.policyId} open={screen.open} />
     case 'board':
+      /* `from` is not a prop: the bar reads it off the route (BoardBar.tsx). */
       return <BoardPage policyId={screen.policyId} open={screen.open} rule={screen.rule} fix={screen.fix} />
     case 'policy-details':
       /* Cast to the screen's own prop type, so the route can offer a return

@@ -180,6 +180,19 @@
 .sit-ident__groups { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .sit-ident__groups > .sit-ident__label { margin-right: var(--space-1); }
 .sit-ident__note { margin: 0; font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary); }
+/* Who signs in, one field (IdentityFieldSingle.tsx, 6 Oct 2026): the type and its dropdown side by side in one box —
+   one edge, a hairline between the halves, the halves' own edges gone. */
+.sit-ident__combo { display: flex; align-items: stretch; min-width: 0; border: var(--bw-thin) solid var(--ctl-border, var(--border-default)); border-radius: var(--radius-md); background: var(--surface-raised); }
+.sit-ident__combo:hover { border-color: var(--ctl-border-hover, var(--border-strong)); }
+.sit-ident__combo:focus-within { border-color: var(--ctl-border-focus, var(--focus-ring)); }
+.sit-ident__combo.is-invalid { border-color: var(--fb-negative-border); }
+.sit-ident__combo > .bx-picker { min-width: 0; }
+.sit-ident__combo > .bx-picker:first-child { flex: none; border-right: var(--bw-thin) solid var(--border-subtle); }
+.sit-ident__pick { display: flex; flex: 1 1 auto; min-width: 0; }
+.sit-ident__pick > .bx-picker { flex: 1 1 auto; min-width: 0; }
+.sit-ident__combo .bx-picker__trigger,
+.sit-ident__combo .bx-picker__trigger:hover,
+.sit-ident__combo .bx-picker__trigger:focus-visible { border-color: transparent; box-shadow: none; background: transparent; }
 
 /* The field: at rest the answer — the chips, or the grey mark and Choose
    users or groups — in a control's edge, the chevron saying it opens; open,
@@ -348,8 +361,8 @@
 /* The foot: Save sign-in is a plain secondary beside Run, the page's one
    orange — not the Inspector's brand-tinted Save rule, which would make two. */
 .sit-panel__savewrap { display: inline-flex; }
-/* Changes not run yet: quiet words at the foot's start, Run at its end. */
-.sit-panel__unrun { margin-right: auto; font-size: var(--fs-sm); color: var(--text-secondary); }
+/* Reset at the far end from Run (TryPanel.tsx). */
+.sit-panel__reset { margin-right: auto; }
 .sit-panel .bb__inspfoot .bx-btn--neutral {
   background: var(--int-neutral-bg);
   border-color: var(--int-neutral-border);

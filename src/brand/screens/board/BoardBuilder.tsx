@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, History as PastIcon, Keyboard, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Redo2, ShieldAlert, Trash2, Undo2, Users, type LucideIcon } from 'lucide-react'
+import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, History as PastIcon, Keyboard, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Redo2, ShieldAlert, Trash2, Undo2, Users, Wrench, type LucideIcon } from 'lucide-react'
 
 import { Button, Modal, Tip } from '../../kit'
 import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
@@ -9,6 +9,7 @@ import { checksView, withChecks, type CheckContext } from '../../create/describe
 import { guardSignIns } from '../../draft-checks'
 import { commitToast, committed, differsFromLive, hasUnsavedChanges, openForEditing, type CommitIntent, type RuleSet } from '../../policy-draft'
 import { useBrand, useNameLookup } from '../../store'
+import { playCue } from '../../sound'
 import { TemplateSheet } from '../../create/TemplateSheet'
 import { ReviewDialog } from '../builder-dialogs'
 import { CommandBar, type Cmd } from '../command-bar'
@@ -58,6 +59,8 @@ import {
 import { Inspector } from './Inspector'
 import { CheckBarViews, PolicyCheck, type CheckKept, type CheckPanel } from './PolicyCheck'
 import { ReadAsTextPanel } from './ReadAsTextPanel'
+import { FixesPanel } from './FixesPanel'
+import { applyConflictFixes, type FixItem } from '../sign-in-tests/conflict-fix'
 import { CHECK_PANEL_NARROW, CHECK_PANEL_WIDE, PEOPLE_AND_BREAK_IN, checkViews, type BoardOpen, type CheckView } from './test-mode'
 import { nextPart, patchRule as patchOne, ruleAt, type Part, type Selection } from './model'
 import { copyName } from './parts'
@@ -308,6 +311,11 @@ export function BoardBuilder({
   const [guardOpen, setGuardOpen] = useState(false)
   /* A rule shown on the chain from that page, behind it. */
   const [flash, setFlash] = useState<{ id: string; key: number } | null>(null)
+  /* The rules a fix from Access checks added this visit: their cards say New (conflict-fix.ts, 6 Oct 2026). */
+  const [fixedNew, setFixedNew] = useState<string[]>([])
+  /* Every fix of that run, in the Fixes panel (FixesPanel.tsx, 7 Oct 2026): the list for this visit, and whether it is open. */
+  const [fixList, setFixList] = useState<FixItem[] | null>(null)
+  const [fixesOpen, setFixesOpen] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [cmd, setCmd] = useState(false)
   const [keys, setKeys] = useState(false)
@@ -557,6 +565,8 @@ export function BoardBuilder({
   /* Check access takes the board first: `T` closes the panel as × does (`describeOpen`, above). */
   /* Read as text gives the column up to either of them. */
   const readOpen = reading && !testOn && !describeOpen
+  /* The Fixes panel takes the column as Read as text does; Check access and Describe it take it back while they are open. */
+  const fixesShown = fixesOpen && !!fixList && !testOn && !describeOpen && !readOpen
   /* What the reader matches against: this tenant's own names. */
   const describeTenant = useMemo<DescribeTenant>(
     () => ({ apps: store.apps, groups: store.groups, users: store.users, zones: store.zones, fingerprints: store.fingerprints, methods: store.methods, policies: store.policies, scenarios: store.scenarios }),
@@ -625,6 +635,8 @@ export function BoardBuilder({
     const facts = saveFacts(latest)
     store.saveDraft(saved.id, { rules: draft.rules, fallback: draft.fallback, checks: draft.checks })
     afterSave({ ...latest, ...facts })
+    /* New marks a fix not saved yet. */
+    setFixedNew([])
     store.showToast('Draft saved')
     return true
   }
@@ -1140,6 +1152,7 @@ export function BoardBuilder({
   const openRead = () => {
     if (describing) finishDescribe(true)
     if (testOn) leaveTest()
+    setFixesOpen(false)
     setReading(true)
   }
   const toggleRead = () => (readOpen ? closeRead() : openRead())
@@ -1190,7 +1203,7 @@ export function BoardBuilder({
   const arrived = useRef<string | null>(null)
   const arrival = useRef<() => void>(() => {})
   arrival.current = () => {
-    if (arriveFix && saved && features.breakInTest) landArrival(arriveFix)
+    if (arriveFix && saved && ('conflicts' in arriveFix || features.breakInTest)) landArrival(arriveFix)
   }
   const fixKey = arrivalKey(policyId, arriveFix)
   useEffect(() => {
@@ -1666,13 +1679,16 @@ export function BoardBuilder({
        agree about the record from the moment it is saved. The store stamps
        lastModified only when something besides the stamp changed. */
     store.savePolicy(next)
+    /* Save and turn on: the policy goes live, with its own chime (sound.ts). */
+    if (next.status === 'active' && saved.status !== 'active') playCue('publish')
     const h = historyOf(next)
     histNow.current = h
     setHist(h)
     afterSave(next)
     setReview(false)
-    /* "From your text" stays on a card until the policy is saved. */
+    /* "From your text" stays on a card until the policy is saved, and a fix's New with it. */
     setSources({})
+    setFixedNew([])
     /* Draft → Monitoring goes through Save first (owner, 25 Sep 2026): a draft
        leaves draft only by being saved, so what is monitored is what was just
        on screen. The first save leaves it off, and the toast offers the one
@@ -1764,6 +1780,12 @@ export function BoardBuilder({
      access — the route came from inside it — gives the chain back first, as
      Open rule does: the change is read there. */
   const landArrival = (fix: ArriveFix) => {
+    /* A Why finding's Fix brings the run's whole list: the Fixes panel opens on it, whatever the one pressed does. */
+    if ('conflicts' in fix) {
+      setFixList(fix.conflicts)
+      setReading(false)
+      setFixesOpen(true)
+    }
     const base = present.id === saved.id ? draft : openForEditing(saved)
     const out = landFix(base, fix, env, { accepted: store.breakInAccepted[saved.id], policies: store.policies })
     if ('none' in out) {
@@ -1772,11 +1794,21 @@ export function BoardBuilder({
     }
     commitDraft(out.draft)
     offerUndo(out.toast)
+    if (out.reveal !== 'fallback' && !base.rules.some((r) => r.id === out.reveal)) setFixedNew((f) => [...f, out.reveal])
     if (out.draft.rules.length === 0) setScratch(true)
     if (testOn) leaveTest()
     select(out.select)
     setFlash({ id: out.reveal, key: Date.now() })
     focusSoon(out.reveal === 'fallback' ? () => document.getElementById('bb-terminal-title') : byId(`bb-rule-${out.reveal}-title`))
+  }
+  /* Apply all, in the Fixes panel: the open ones in one edit, one Undo. */
+  const applyAllFixes = () => {
+    if (!fixList) return
+    const out = applyConflictFixes(draft, fixList.map((f) => f.fix), store.policies)
+    if (out.count === 0) return
+    commitDraft(out.next)
+    offerUndo(out.count === 1 ? 'Fix applied' : `${out.count} fixes applied`)
+    setFixedNew((f) => [...f, ...out.added])
   }
 
   return (
@@ -1836,7 +1868,7 @@ export function BoardBuilder({
          under Check access is only hidden (check-access.css). */
       /* Describe it opens its own leading track and keeps the right one
          closed (V4 §4.1): the inspector never stands beside it. */
-      className={`bb ${testOn ? 'is-checking' : ''} ${describeOpen ? 'is-left-open' : ''} ${(testOn ? checkPanel !== null : panelShown || readOpen) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}`}
+      className={`bb ${testOn ? 'is-checking' : ''} ${describeOpen ? 'is-left-open' : ''} ${(testOn ? checkPanel !== null : panelShown || readOpen || fixesShown) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}`}
       style={{ '--bb-insp': `${colW}px` } as React.CSSProperties}
     >
       {/* Describe it, on the left in its own track (V4 §4.1). The selection
@@ -1926,6 +1958,7 @@ export function BoardBuilder({
            it was left, zoom and all, for the way back. */
         fitKey={describeOpen ? 'describe' : 'edit'}
         flash={flash}
+        fresh={fixedNew}
         resolve={resolve}
         onSelect={select}
         expandedOf={expandedOf}
@@ -2003,7 +2036,7 @@ export function BoardBuilder({
 
       {/* The inspector's alone: Check access's panels take the page's two
           widths from their own button, and no grip. */}
-      {!testOn && (panelShown || readOpen) && (
+      {!testOn && (panelShown || readOpen || fixesShown) && (
         <div
           className="bb__grip"
           role="separator"
@@ -2052,6 +2085,7 @@ export function BoardBuilder({
           kept={checkKept}
           onBack={backFromCheck}
           onApplyFix={applyPanelFix}
+          onFixes={(list, pressed) => landArrival({ conflicts: list, pressed })}
           focusBar={focusTestButton}
         />
       )}
@@ -2068,9 +2102,31 @@ export function BoardBuilder({
           card and the text stays; the rule's editor waits until it closes. */}
       {readOpen && <ReadAsTextPanel saved={saved} draft={draft} onClose={closeRead} onHover={setReadHover} onPick={pickFromText} />}
 
+      {/* Every fix of an Access checks run (FixesPanel.tsx), in the same slot; shut, a door brings it back for the visit. */}
+      {fixesShown && fixList && (
+        <FixesPanel
+          items={fixList}
+          draft={draft}
+          policies={store.policies}
+          onApply={(i) => landArrival({ conflicts: fixList, pressed: i })}
+          onApplyAll={applyAllFixes}
+          onBack={() => store.go({ name: 'sign-in-tests' })}
+          onClose={() => setFixesOpen(false)}
+        />
+      )}
+      {fixList && !fixesOpen && !testOn && !describeOpen && (
+        <button type="button" className="bdsc-door bfix-door" onClick={() => {
+            setReading(false)
+            setFixesOpen(true)
+          }}>
+          <Wrench size={14} strokeWidth={2} aria-hidden />
+          Fixes
+        </button>
+      )}
+
       {/* Not under Check access, whose panels take the track: the selection
           waits, and the editor is back as Check access shuts. */}
-      {!testOn && !describeOpen && !readOpen && panelAlive && (
+      {!testOn && !describeOpen && !readOpen && !fixesShown && panelAlive && (
         <Inspector
           leaving={panelLeaving}
           draft={draft}

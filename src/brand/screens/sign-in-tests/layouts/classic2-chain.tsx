@@ -21,6 +21,7 @@ import {
   PanelRight,
   PenLine,
   RotateCcw,
+  Search,
   ShieldCheck,
   SkipForward,
   Split,
@@ -49,12 +50,16 @@ import {
   metaWords,
   outcomeHead,
   ruleHead,
+  ruleRowState,
+  rulesWalked,
+  rowEvidence,
   signInHead,
   type CardKey,
   type HeadMeta,
   type MetaMark,
   type OutcomeTone,
   type OutcomeView,
+  type PolicyRow,
   type PolicySectionKey,
 } from './classic2-model'
 import { GlideCtx, useGlide, type Glide } from './classic2-glide'
@@ -62,7 +67,7 @@ import type { ChainFold, ChainRun } from './classic2-run'
 import { IdentityChips, type ChipFold } from './shared/IdentityChips'
 import { identityChips, rowFacts, rowState, type IdentityChip } from './shared/sign-in-row'
 import type { RunLayoutProps } from './types'
-import { DENIAL_REASONS } from '../phase'
+import { DENIAL_REASONS, ROW_EVIDENCE } from '../phase'
 import { GRANT_ENDED } from '../temp-access'
 import { PEEK_FALLBACK, targetLabel, type InspectTarget } from '../inspect-model'
 import { objectsOfRule, peekNames } from '../peek-model'
@@ -203,13 +208,17 @@ export function Classic2Chain({ run, data, fold, animate, snap, orientation = 'v
       {first}
       {(k !== 'sign-in' || signInCard) && (
         <>
-          <Link order={orderOf(k)} shown={links} />
-          <Classic2Card card={k} run={run} data={data} open={fold.open[k]} onFold={() => fold.fold(k)} snap={snap} animate={animate} topRow={topRow} lit={lit === k} order={orderOf(k)} why={k === 'outcome' ? why : null} />
+          <Link order={orderOf(k)} shown={links} ink={ink} tone={data.outcome.tone} />
+          <Classic2Card card={k} run={run} data={data} open={fold.open[k]} onFold={() => fold.fold(k)} snap={snap} animate={animate} topRow={topRow} lit={lit === k} order={orderOf(k)} why={k === 'policy' ? why : null} />
         </>
       )}
     </motion.div>
   )
   const across = orientation === 'horizontal'
+  /* The connectors' ink (owner, 6 Oct 2026: "blue for progress, and at the end based on outcome, and then greyed out"):
+     blue while the engine travels the chain, the outcome's once it lands — flowing down from the first — then grey. A
+     chain drawn settled (a Skip, a view switched after the run) is grey from the start. */
+  const ink: LinkInk = !data.landed ? 'run' : snap ? 'rest' : 'landed'
   /* The glide's last box is the last one on screen: its landing is the move's end (a switch mid-run has fewer). */
   const last = Math.max(0, ...shown.filter((k) => k !== 'sign-in' || signInCard).map(orderOf))
   const moving = useMemo(() => (glide ? { ...glide, last } : null), [glide, last])
@@ -242,12 +251,18 @@ function StartNode({ children }: { children: ReactNode }) {
 /* A connector, as the builder draws it between two cards (classic2.css turns it on its side across). It moves as a piece
    with its card — a headline arriving over the chain carries it down with the rest — and while the chain changes shape
    it is faded, out at the start and back once the cards have landed: a line is never seen bending. */
-function Link({ order, shown }: { order: number; shown: boolean }) {
+type LinkInk = 'run' | 'landed' | 'rest'
+
+function Link({ order, shown, ink, tone }: { order: number; shown: boolean; ink: LinkInk; tone: OutcomeTone }) {
   const { piece, on } = useGlide(order)
-  if (!on) return <div className="bb__link rl-c2__link" aria-hidden />
+  const className = `bb__link rl-c2__link is-${ink} is-out-${tone}`
+  /* Its place down the chain: the outcome's ink reaches each connector a beat after the one above it. */
+  const style = { '--rl-c2-link-i': order } as CSSProperties
+  if (!on) return <div className={className} style={style} aria-hidden />
   return (
     <motion.div
-      className="bb__link rl-c2__link"
+      className={className}
+      style={style}
       aria-hidden
       {...piece}
       initial={false}
@@ -307,6 +322,7 @@ export function Classic2Card({ card, run, data, open, onFold, snap, animate, top
         animate={animate}
         follow={data.working === 'policy'}
         onOpen={canOpen && done ? onOpenPolicy : undefined}
+        why={done ? why : null}
         {...pressed}
       />
     )
@@ -344,7 +360,6 @@ export function Classic2Card({ card, run, data, open, onFold, snap, animate, top
       follow={running}
       onOpen={done && opens ? () => (opens.ruleId ? onOpenRule(opens.policyId, opens.ruleId) : onOpenPolicy(opens.policyId)) : undefined}
       inspects={!!run.onInspect}
-      why={deciding ? null : why}
       {...pressed}
     />
   )
@@ -562,6 +577,23 @@ function Mark({ mark, pop }: { mark: RowMark | null | undefined; pop: boolean })
       </motion.span>
       <span className="u-sr-only">{mark.status === 'pass' ? 'Held' : mark.status === 'fail' ? 'Did not hold' : 'Can’t tell'}</span>
     </>
+  )
+}
+
+/* What the sign-in showed on the row, beside its mark (ROW_EVIDENCE): it sharpens in as the engine reads the row, the
+   brief's own blur, so the ✓ or ✕ that follows answers something on screen. */
+function Evidence({ text, animate }: { text: string | null | undefined; animate: boolean }) {
+  if (!text) return null
+  return (
+    <motion.span
+      className="rl-c2__ev"
+      title={text}
+      initial={animate ? { opacity: 0, filter: 'blur(3px)' } : false}
+      animate={{ opacity: 1, filter: 'blur(0px)', transitionEnd: { filter: 'none' } }}
+      transition={animate ? { duration: 0.22, ease: EASE_OUT } : { duration: 0 }}
+    >
+      {text}
+    </motion.span>
   )
 }
 
@@ -797,6 +829,21 @@ export function ChipSwitch({ chips, onPick, lit = false, refit = '' }: { chips: 
    application's policies in the builder's section-and-line pattern —
    applies, also covers, skipped, not reached — one quiet line each, in the
    order the engine asks them. */
+/* The way to the why, under a card's head, folded or not (owner, 6 Oct 2026: "move it to the folded card", then "move
+   Review conflict here — anything policy related should be in this card only"): on the Policies card, in line with
+   its title — an unseen copy of the tile holds its column — and a press on it is the link's, never the card's fold. */
+function WhyUnder({ why }: { why: ChainWhy }) {
+  return (
+    <div className="rl-c2__under rl-c2__whyunder" onClick={(e) => e.stopPropagation()}>
+      <span className="bb__idx rl-c2__idx rl-c2__whyspace" aria-hidden />
+      <button type="button" className="rl-c2__why" aria-expanded={why.open} aria-controls={why.open ? why.id : undefined} onClick={why.onPress}>
+        {why.label}
+        <ChevronRight size={12} strokeWidth={2.2} aria-hidden />
+      </button>
+    </div>
+  )
+}
+
 function PolicyCard({
   head,
   sections,
@@ -807,6 +854,7 @@ function PolicyCard({
   animate,
   follow,
   onOpen,
+  why = null,
   lit,
   onPress,
   order,
@@ -821,10 +869,13 @@ function PolicyCard({
   follow: boolean
   /** A policy's name pressed opens it in the page's panel (inspect-model.ts). */
   onOpen?: (policyId: string) => void
+  /** The way to the why in the page's right-hand panel (`ChainWhy`): on this card, where the policies are. */
+  why?: ChainWhy | null
 } & Pressed) {
   return (
     <Card
       card="policy"
+      under={why ? <WhyUnder why={why} /> : undefined}
       className={head.kind === 'finding' ? 'is-reading' : ''}
       lit={lit}
       onPress={onPress}
@@ -844,6 +895,9 @@ function PolicyCard({
       snap={snap}
       follow={follow}
       body={
+        head.kind === 'finding' ? (
+          <PolicySearch rows={sections.flatMap((sec) => sec.rows).sort((a, b) => a.order - b.order)} appName={appName} animate={animate} />
+        ) : (
         <div className="bb__if">
           {sections.map((sec) => (
             <Section key={sec.key} icon={SECTION_ICON[sec.key]} kw={sec.kw} className="rl-c2__rows">
@@ -871,8 +925,49 @@ function PolicyCard({
             </Section>
           ))}
         </div>
+        )
       }
     />
+  )
+}
+
+/* The policies, read as a search while the engine looks for the one that applies (owner, 6 Oct 2026: "think of it
+   as a search form for all the policies — add the four, then start running to see which one matches; take some time
+   to select the policy"): a search box naming the application, a caret blinking in it; the policies on it arriving
+   one under another, in the order they are asked; the band of the one being asked walking down them; each row saying
+   what it came to as it settles, the one that applies ticked. Once found, the card is its sections again. */
+function PolicySearch({ rows, appName, animate }: { rows: readonly (PolicyRow & { say: string })[]; appName: string; animate: boolean }) {
+  return (
+    <div className="rl-c2__search">
+      <div className="rl-c2__searchbar" aria-hidden>
+        <Search size={13} strokeWidth={2.2} />
+        <span className="rl-c2__searchq">Policies on {appName}</span>
+        <span className="rl-c2__caret" />
+      </div>
+      <ul className="rl-c2__plist" aria-label={`Policies on ${appName}, in the order they are asked`}>
+        {rows.map((r, i) => (
+          <motion.li
+            key={r.id}
+            className={`bb__ifrow rl-c2__prow is-${r.standing}${r.conflict ? ' is-conflict' : ''}`}
+            initial={animate ? { opacity: 0, height: 0 } : false}
+            animate={{ opacity: 1, height: 'auto' }}
+            transition={animate ? { height: { duration: FOLD_S, ease: EASE_OPEN, delay: 0.12 * i }, opacity: { duration: 0.2, ease: EASE_OUT, delay: 0.12 * i + 0.06 } } : { duration: 0 }}
+          >
+            <span className="rl-c2__n">{r.order}</span>
+            <span className="rl-c2__pname" title={r.name}>
+              {r.name}
+            </span>
+            {r.words && (
+              <motion.span className="rl-c2__say" initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: animate ? ARRIVE_S : 0, ease: EASE_OUT }}>
+                {r.words}
+              </motion.span>
+            )}
+            {r.standing === 'working' && <Mark mark={{ status: 'pass', working: true }} pop={false} />}
+            {r.standing === 'applies' && <Mark mark={{ status: 'pass', working: false }} pop={animate} />}
+          </motion.li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -973,7 +1068,7 @@ function PassedRuleCard({
       body={
         <>
           {r ? (
-            <RuleList plan={plan} current={r.id} rules={rules} fallback={fallback} s={s} settled={state !== 'reading' && state !== 'waiting'} animate={animate} resolve={resolve} onDetails={onDetails} />
+            <RuleList plan={plan} current={r.id} rules={rules} fallback={fallback} s={s} animate={animate} resolve={resolve} onDetails={onDetails} />
           ) : (
             <div className="bb__if">
               <div className="bb__ifrow">
@@ -992,36 +1087,45 @@ function PassedRuleCard({
    that matches or passes should be open"). The rule the engine is on, or that decided, is open by default; the others
    are a line — its number, its name, how it fared — and a press opens the builder's own rule body under it, with the
    ✓ and ✕ of the rows that were read (none on a rule never reached, which was not asked). A press again folds it.
-   While the engine is still reading, only the rule it is on is drawn: the rest would give the answer away. */
-/* `possible` is the rule the definite reading walks on to after one it cannot tell: "If not", the canvas's own word
-   (PolicyStack.tsx) and the details panel's. An ended temporary access grant is off in the run, but it was not switched
-   off — it ran out (6 Oct 2026), and says so. */
-const RULE_WORDS: Record<string, string> = { match: 'Matches', 'no-match': 'Not matched', unknown: 'Can’t tell', possible: 'If not', off: 'Switched off', 'not-reached': 'Not reached' }
+   While the engine walks, a rule arrives as it is reached and says where the walk is — Reading, then Not matched or
+   Matches (classic2-model.ts `ruleRowState`, 6 Oct 2026: "it should feel more real"); the rules it never reaches join
+   once the walk is over. `possible` reads "If not", the canvas's own word; an ended temporary access grant is off in the
+   run, but it ran out rather than being switched off, and says so (GRANT_ENDED). */
 
-function RuleList({ plan, current, rules, fallback, s, settled, animate, resolve, onDetails }: { plan: RunLayoutProps['plan']; current: string; rules: readonly Rule[]; fallback: Rule | null; s: number; settled: boolean; animate: boolean; resolve: NameLookup; onDetails?: (ruleId: string) => void }) {
+function RuleList({ plan, current, rules, fallback, s, animate, resolve, onDetails }: { plan: RunLayoutProps['plan']; current: string; rules: readonly Rule[]; fallback: Rule | null; s: number; animate: boolean; resolve: NameLookup; onDetails?: (ruleId: string) => void }) {
   /* What the admin opened or folded by hand; the rest follows the rule that is on. */
   const [manual, setManual] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const uid = useId()
-  const listed = settled ? plan.rules : plan.rules.filter((r) => r.id === current)
+  /* The rules the walk has reached, each in its word for where the walk is (classic2-model.ts `rulesWalked`,
+     `ruleRowState`): a rule the engine has not read is not on the card yet, and none says how it fared before it is read. */
+  const listed = rulesWalked(plan, s)
+  const walked = listed === plan.rules
   const toggle = (id: string, now: boolean) =>
     setManual((cur) => {
       const next = new Map(cur)
       next.set(id, !now)
       return next
     })
+  /* A row arrives as the walk reaches it, and a body opens and folds, with the card's own body's move (`Card`). */
+  const rowIn = animate ? { initial: { height: 0, opacity: 0 }, animate: { height: 'auto', opacity: 1 }, transition: { height: { duration: FOLD_S, ease: EASE_OPEN }, opacity: { duration: 0.2, delay: 0.06, ease: EASE_OUT } } } : { initial: false as const }
   return (
     <ul className="rl-c2__rules" aria-label="Rules in this policy">
-      {listed.map((r) => {
+      {listed.map((r, i) => {
         const terminal = r.index === null
         const rule = terminal ? (fallback ?? fallbackRule(r.decision)) : (rules.find((x) => x.id === r.id) ?? null)
         const open = manual.get(r.id) ?? r.id === current
-        const ended = r.state === 'off' && !!rule?.tempAccess && rule.enabled !== false
-        const word = ended ? GRANT_ENDED : (RULE_WORDS[r.state] ?? '')
-        const why = r.state === 'no-match' && r.failing !== null ? (r.checks[r.failing]?.word ?? '') : ''
-        const marks = rule && r.visited && !terminal ? ruleMarks(r, leaves(rule.when).map((k) => k.id), s) : null
+        const row = ruleRowState(r, s, walked)
+        const ended = row.tone === 'off' && !!rule?.tempAccess && rule.enabled !== false
+        const word = ended ? GRANT_ENDED : row.word
+        const why = row.tone === 'no-match' && r.failing !== null ? (r.checks[r.failing]?.word ?? '') : ''
+        const ids = rule ? leaves(rule.when).map((k) => k.id) : []
+        const marks = rule && r.visited && !terminal ? ruleMarks(r, ids, s) : null
+        const said = ROW_EVIDENCE && rule && r.visited && !terminal ? rowEvidence(r, ids, s) : null
         const bodyId = `${uid}-${r.id}`
+        /* The rules never reached arrive together once the walk is over, a beat apart. */
+        const late = animate && walked && row.tone === 'not-reached' ? { transition: { ...rowIn.transition, delay: 0.04 * i } } : null
         return (
-          <li key={r.id} className={`rl-c2__rule is-${r.state}${open ? ' is-open' : ''}`}>
+          <motion.li key={r.id} className={`rl-c2__rule is-${row.tone}${open ? ' is-open' : ''}${row.tone === 'match' ? ` is-d-${TONE[r.decision]}${animate ? ' is-hit' : ''}` : ''}`} {...rowIn} {...late}>
             <div className="rl-c2__rulerow">
             <button type="button" className="rl-c2__rulehead" aria-expanded={open} aria-controls={bodyId} onClick={() => toggle(r.id, open)}>
               <span className="rl-c2__rulen">{terminal ? <Asterisk size={12} strokeWidth={2.2} aria-hidden /> : (r.index ?? 0) + 1}</span>
@@ -1038,13 +1142,36 @@ function RuleList({ plan, current, rules, fallback, s, settled, animate, resolve
               </button>
             )}
             </div>
-            {open && rule && (
-              <div id={bodyId} className="rl-c2__rulebody">
-                <IfBlock rule={rule} resolve={resolve} terminal={terminal} mark={marks ? (row) => <Mark mark={row === 'who' ? marks.who : marks.conds[row]} pop={animate} /> : undefined} />
-                {onDetails && !terminal && <RuleUses rule={rule} />}
-              </div>
-            )}
-          </li>
+            <AnimatePresence initial={false}>
+              {open && rule && (
+                <motion.div
+                  key="body"
+                  id={bodyId}
+                  className="rl-c2__rulebody"
+                  initial={animate ? { height: 0, opacity: 0 } : false}
+                  animate={{ height: 'auto', opacity: 1, transition: animate ? { height: { duration: FOLD_S, ease: EASE_OPEN }, opacity: { duration: 0.18, delay: 0.04, ease: EASE_OUT } } : { duration: 0 } }}
+                  exit={{ height: 0, opacity: 0, transition: animate ? { height: { duration: FOLD_S - 0.02, ease: EASE_IN_OUT }, opacity: { duration: 0.12 } } : { duration: 0 } }}
+                >
+                  <IfBlock
+                    rule={rule}
+                    resolve={resolve}
+                    terminal={terminal}
+                    mark={
+                      marks
+                        ? (k) => (
+                            <>
+                              <Evidence text={said ? (k === 'who' ? said.who : said.conds[k]) : null} animate={animate} />
+                              <Mark mark={k === 'who' ? marks.who : marks.conds[k]} pop={animate} />
+                            </>
+                          )
+                        : undefined
+                    }
+                  />
+                  {onDetails && !terminal && <RuleUses rule={rule} />}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.li>
         )
       })}
     </ul>
@@ -1078,10 +1205,7 @@ function RuleUses({ rule }: { rule: Rule }) {
    Rule 2". The body: `then` — the decision's chip and what the person is
    asked for, the builder's then-row (or the Deny's message; when it depends,
    each answer it could be); `decided by` — the policy and the rule, which
-   opens it. Where the page hands it (`why`, Focus on the page), the body's
-   last line is the way to the why in the page's right-hand panel — at the
-   keywords' edge, after everything the card itself says, so it reads as the
-   card's next step rather than as part of who decided. */
+   opens it. The way to the why is the Policies card's now (`WhyUnder`). */
 function OutcomeCard({
   plan,
   view,
@@ -1091,7 +1215,6 @@ function OutcomeCard({
   follow,
   onOpen,
   inspects = false,
-  why = null,
   lit,
   onPress,
   order,
@@ -1105,8 +1228,6 @@ function OutcomeCard({
   onOpen?: () => void
   /** Decided by opens in the page's panel: its mark says Details. */
   inspects?: boolean
-  /** The way to the why in the page's right-hand panel (`ChainWhy`); absent, the body ends at who decided. */
-  why?: ChainWhy | null
 } & Pressed) {
   const Icon = OUT_ICON[view.tone]
   const head = outcomeHead(plan, view)
@@ -1202,21 +1323,6 @@ function OutcomeCard({
             </div>
           )}
         </div>
-      }
-      /* The way to the why sits under the head, folded or not (owner, 6 Oct 2026: "move it to the folded card"):
-         Focus folds every card once a run lands, and a link only in the body was one press too deep and, at 1440 × 900,
-         under the canvas bar. In line with the title — an unseen copy of the tile holds its column — and a press on it
-         is the link's, never the card's fold. */
-      under={
-        why && (
-          <div className="rl-c2__under rl-c2__whyunder" onClick={(e) => e.stopPropagation()}>
-            <span className="bb__idx rl-c2__idx rl-c2__whyspace" aria-hidden />
-            <button type="button" className="rl-c2__why" aria-expanded={why.open} aria-controls={why.open ? why.id : undefined} onClick={why.onPress}>
-              {why.label}
-              <ChevronRight size={12} strokeWidth={2.2} aria-hidden />
-            </button>
-          </div>
-        )
       }
     />
   )

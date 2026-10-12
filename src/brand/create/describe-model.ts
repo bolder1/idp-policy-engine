@@ -85,7 +85,7 @@ export interface Outcome {
 export type ZoneScope = 'both' | 'ip' | 'location'
 export type WhereAnswer = { mode: 'anywhere' } | { mode: 'only' | 'split' | 'not'; zoneId: string; scope: ZoneScope }
 /* `days` is a weekday condition with no window — "on weekdays" — which the
-   console writes as Day of week alone. */
+   console writes as Sign-in days alone. */
 export type WhenAnswer =
   | { mode: 'any' }
   | { mode: 'between'; from: string; to: string; days: string[]; timeZone: string }

@@ -382,7 +382,7 @@
 .tpanel-dist__seg.is-1fa,
 .tpanel-legend__key.is-1fa { background: var(--fb-positive-dot); }
 .tpanel-dist__seg.is-2fa,
-.tpanel-legend__key.is-2fa { background: var(--fb-notice-dot); }
+.tpanel-legend__key.is-2fa { background: var(--fb-positive-strong-dot); }
 .tpanel-dist__seg.is-deny,
 .tpanel-legend__key.is-deny { background: var(--fb-negative-dot); }
 .tpanel-dist__seg.is-unknown,
@@ -453,6 +453,16 @@
   font-size: var(--fs-xs);
 }
 .tpanel-tile[aria-pressed='true'] .tpanel-tile__label { color: var(--accent-strong); }
+/* The week, a card per decision (DockPast.tsx, 6 Oct 2026): its count, its words, and a line of its decision's colour
+   along its top — each card the list's filter. */
+.tpanel-dcards { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: var(--space-3); }
+.tpanel-dcard { border-top: var(--bw-thick) solid var(--tpanel-dcard-ink, var(--border-strong)); }
+/* The tile's hover and pressed borders would grey the decision's line just as the card is used. */
+.tpanel-dcard:hover,
+.tpanel-dcard[aria-pressed='true'] { border-top-color: var(--tpanel-dcard-ink, var(--border-strong)); }
+.tpanel-dcard.is-1fa { --tpanel-dcard-ink: var(--fb-positive-dot); }
+.tpanel-dcard.is-2fa { --tpanel-dcard-ink: var(--fb-positive-strong-dot); }
+.tpanel-dcard.is-deny { --tpanel-dcard-ink: var(--fb-negative-dot); }
 
 /* The list's one header, over the second line's two badge columns. */
 .tpanel-head {

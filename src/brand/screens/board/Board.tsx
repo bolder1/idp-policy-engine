@@ -124,6 +124,7 @@ export function Board({
   aside,
   flash = null,
   sources,
+  fresh,
   traced,
   highlight,
   onHoverLast,
@@ -189,6 +190,8 @@ export function Board({
      the last row, as `flash` names it. `onHoverLast` is the last row under
      the pointer, so the panel can bold its answer as a rule card's does. */
   sources?: Readonly<Record<string, string>>
+  /** Rules a fix from Access checks added: each card says New. */
+  fresh?: readonly string[]
   traced?: readonly string[]
   /** Test mode: the card a hovered row in the test panel lands on, read by each card itself. */
   highlight?: CardHighlight
@@ -970,6 +973,7 @@ export function Board({
                       onDelete={() => onDelete(ri)}
                       onGrip={onGrip(ri)}
                       flash={flashing === r.id}
+                      fresh={fresh?.includes(r.id)}
                       source={sources?.[r.id]}
                       traced={traced?.includes(r.id)}
                       highlight={highlight}

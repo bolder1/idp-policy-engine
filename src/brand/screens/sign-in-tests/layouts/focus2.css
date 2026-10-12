@@ -229,3 +229,7 @@
   }
   .rl-f2 .rl-f2__face.is-full .rl-focus__cneed::before { transform: scaleX(1); transition: none; }
 }
+
+/* The browser's scroll anchoring moved the view on its own as a rule list grew and shrank and as the cards folded — three
+   jerks a run (6 Oct 2026). The view is the camera's alone. */
+.rl-f2 .rstage__scroll { overflow-anchor: none; }

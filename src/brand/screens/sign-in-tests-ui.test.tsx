@@ -1094,7 +1094,8 @@ describe('Sign-in tests — the run on the canvas (§14.3)', () => {
     expect(door).toContain("start(f, 'edit', { prev: session.form, ran: covered })")
     expect(pageSrc).toContain('onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}')
     expect(pageSrc).toContain("toCanvas(() => start(first, 'full', { askSaveFor, prev, ran: covered }))")
-    /* Changes not run yet: in the facts the application's rules read, or the picks; said in the foot and on Edit sign-in. */
+    /* Changes not run yet: in the facts the application's rules read, or the picks; said on Edit sign-in (the foot's line was removed 7 Oct 2026). */
+    expect(panelSrc).not.toContain('Changes not run yet')
     expect(pageSrc).toContain('const unrun = unrunOf(tryPage, session.form, rows)')
     expect(pageSrc).toContain('unrun={unrun}')
     expect(pageSrc).toMatch(/const start = [\s\S]*?session\.load\(f\)/)

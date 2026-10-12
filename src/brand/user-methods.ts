@@ -63,6 +63,9 @@ export interface EnrolShape {
   placeholder?: string
   /** Shown instead of a form when there is nothing to fill in. */
   note?: string
+  /** How SETTING UP differs from signing in with it: 'scan' registers the device by scanning one QR (no passcode to type
+      back); 'unavailable' means the admin has not configured it and the person is told to ask. */
+  setup?: 'scan' | 'unavailable'
 }
 
 /* Keyed by the catalogue id in methods.ts, so the two stay joined by id rather
@@ -95,12 +98,14 @@ const SHAPES: Record<string, EnrolShape> = {
   'google-auth': { kind: 'authenticator' },
   'ms-auth': { kind: 'authenticator' },
   authy: { kind: 'authenticator' },
-  'mo-otp': { kind: 'authenticator' },
-  'mo-qr': { kind: 'authenticator' },
+  /* The live end-user page (login.xecurify.com, read 7 Oct 2026): miniOrange OTP, Push and QR Verify are registered by
+     scanning one QR in the miniOrange Authenticator app — no passcode to type back. */
+  'mo-otp': { kind: 'authenticator', setup: 'scan' },
+  'mo-qr': { kind: 'authenticator', setup: 'scan' },
 
   // --- Push: the app has to be registered to a device -----------------------
-  'mo-push': { kind: 'push-app' },
-  'ms-push': { kind: 'push-app' },
+  'mo-push': { kind: 'push-app', setup: 'scan' },
+  'ms-push': { kind: 'push-app', setup: 'unavailable', note: 'MFA configuration not provided by the administrator. Please contact your administrator to configure this MFA.' },
 
   // --- Hardware -------------------------------------------------------------
   yubikey: { kind: 'token', label: 'Token serial', placeholder: 'Tap the token to fill this' },
@@ -129,15 +134,33 @@ const SHAPES: Record<string, EnrolShape> = {
 
 export const enrolShapeFor = (methodId: string): EnrolShape => SHAPES[methodId] ?? { kind: 'none' }
 
+/* --- What comes from the person's profile ---------------------------------------
+   SMS, call and email are not set up in the methods: they send to the phone and the email on the person's profile
+   (owner, 7 Oct 2026: "they are not configurable, they come from the user dashboard — whatever they have will be
+   reflected here"). The profile page is not built yet, so these are dummy values; an empty one is how the "not on your
+   profile" state is shown (the alternate email). */
+export type ProfileField = 'phone' | 'email' | 'altEmail'
+export const PROFILE: Record<ProfileField, string> = { phone: '+1 415 555 0142', email: 'priya@mo.com', altEmail: '' }
+export const PROFILE_LABEL: Record<ProfileField, string> = { phone: 'Phone', email: 'Email', altEmail: 'Alternate email' }
+const PROFILE_FIELDS: Partial<Record<EnrolKind, ProfileField[]>> = { phone: ['phone'], email: ['email'], 'alt-email': ['altEmail'], 'phone-and-email': ['phone', 'email'] }
+/** The profile fields a method sends to; null for a method that is not read off the profile. */
+export const profileFieldsFor = (methodId: string): ProfileField[] | null => PROFILE_FIELDS[enrolShapeFor(methodId).kind] ?? null
+/** Every field the method needs is on the profile. */
+export const profileHas = (methodId: string): boolean => (profileFieldsFor(methodId) ?? []).every((k) => !!PROFILE[k])
+
 /** The preset half of the Security Questions form. The live page offers two of
     these plus one question of your own. */
 export const SECURITY_QUESTIONS = [
-  'What was the name of your first school?',
-  'What was the model of your first car?',
-  'In what city were you born?',
-  "What is your mother's maiden name?",
-  'What was the name of your first pet?',
-  'What street did you grow up on?',
+  'What is your first company name?',
+  'What was your childhood nickname?',
+  'In what city did you meet your spouse/significant other?',
+  'What is the name of your favorite childhood friend?',
+  'What school did you attend for sixth grade?',
+  'In what city or town was your first job?',
+  'What is your favourite sport?',
+  'Who is your favourite sports player?',
+  "What is your grandmother's maiden name?",
+  "What was your first vehicle's registration number?",
 ]
 
 /* --- The person's own state --------------------------------------------------
@@ -181,6 +204,7 @@ export const SEED_ENROLMENT: UserEnrolment = {
 /** Ready to use: enrolled, nothing to set up, or a token the admin assigned to this person. */
 export function readyFor(methodId: string, e: Pick<UserEnrolment, 'configured'>, heldTokens = 0): boolean {
   const kind = enrolShapeFor(methodId).kind
+  if (profileFieldsFor(methodId)) return profileHas(methodId)
   return e.configured.includes(methodId) || kind === 'none' || (kind === 'assigned' && heldTokens > 0)
 }
 
@@ -216,7 +240,9 @@ export function questionPlan(total: number): { presets: number; custom: number }
 export type EnrolIssue = { field: string; message: string }
 
 /** The first thing wrong with a form, or null when it can be saved. Blank fields are "missing" rather than wrong: `message` is empty for those, and Save is simply off. */
-export function enrolIssue(kind: EnrolKind, draft: Record<string, string>, questions = 3): EnrolIssue | null {
+export function enrolIssue(kind: EnrolKind, draft: Record<string, string>, questions = 3, setup?: EnrolShape['setup']): EnrolIssue | null {
+  /* Registered by scanning, or not configured by the admin: nothing is typed on this side. */
+  if (setup) return null
   const v = (k: string) => (draft[k] ?? '').trim()
   const blank = (field: string): EnrolIssue => ({ field, message: '' })
   const email = (k: string): EnrolIssue | null =>
@@ -236,6 +262,8 @@ export function enrolIssue(kind: EnrolKind, draft: Record<string, string>, quest
       return v('serial') ? null : blank('serial')
     case 'authenticator':
       return v('code').length === 6 ? null : blank('code')
+    case 'passkey':
+      return v('device') ? null : blank('device')
     case 'questions': {
       const { presets, custom } = questionPlan(questions)
       const asked: string[] = []

@@ -216,6 +216,7 @@ describe('the links between the dock, the row and the brief', () => {
     expect(rowLitOf('outcome', C.plan, C.model.decisive)).toBeNull()
   })
   it('says the sentence plainly for the narrator', () => {
-    expect(spokenOf(C.model)).toMatch(/^Maya Iyer gets into AWS Console on one factor: .+\.( .+)?$/)
+    /* Each named thing says what it is (6 Oct 2026): the app, the policy, the group, the profile. */
+    expect(spokenOf(C.model)).toMatch(/^Maya Iyer gets into the AWS Console app on one factor: the AWS for engineering teams policy applies through the Engineering group, .+ the Compliant devices profile\.( .+)?$/)
   })
 })

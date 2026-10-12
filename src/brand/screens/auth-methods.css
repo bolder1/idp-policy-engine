@@ -1032,8 +1032,133 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
   color: var(--text-tertiary);
 }
 
-.bmu__foot { display: flex; align-items: center; gap: 8px; }
+.bmu__foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 720px) {
   .bmu__pair { grid-template-columns: minmax(0, 1fr); }
   .bmu__scan { flex-direction: column; }}
+
+/* --- What moved (tour/methods-tour.ts, 7 Oct 2026) ----------------------------
+   The announcement sits between the head and the tabs: a white card with a
+   hairline (owner, same day: "make the card white with a border outline and
+   only keep the heading blue with the icon"), the four points stacked one a
+   line in the body's grey, and the tour at its right edge, centred on the
+   block. A setting that moved says where it was beside its label, quiet: it
+   answers a returning admin, and a new one reads past it.
+
+   Its own box, not a `.bx-callout`: the rebrand takes every callout's border
+   away ("a tint, no box"), and this one is the white card with the line.
+   The top row holds still as the points open: the mark and the row keep to
+   the top, and the tour button is in the row, never centred on the card. */
+.bm8__news {
+  display: flex; align-items: flex-start; gap: var(--space-5);
+  margin: calc(-1 * var(--space-4)) 0 var(--space-6); padding: var(--space-5) var(--space-6);
+  background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg);
+  color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.55;
+}
+.bm8__news > .bx-callout__mark { align-self: flex-start; margin-top: 3px; color: var(--fb-info-fg); }
+.bm8__news strong { color: var(--fb-info-fg); font-weight: var(--fw-semibold); }
+.bm8__newsbody { flex: 1; min-width: 0; }
+/* Shut by default (owner, 7 Oct 2026): the title and one line, Read more at its end; the four points open under them. */
+.bm8__newshead { display: flex; align-items: center; gap: var(--space-5); }
+.bm8__newstext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bm8__newsline { color: var(--text-secondary); }
+.bm8__newsmore-toggle {
+  display: inline-flex; align-items: center; gap: var(--space-1); margin-left: var(--space-3);
+  color: var(--text-link); font-weight: var(--fw-medium);
+}
+.bm8__newsmore-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
+.bm8__newsmore-toggle:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--focus-halo); }
+.bm8__newshead > .bx-btn { flex: none; }
+.bm8__newsmore { overflow: hidden; }
+.bm8__newslist { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0 0; padding-left: var(--space-6); }
+.bm8__newslist li::marker { color: var(--text-muted); }
+
+@media (max-width: 720px) {
+  .bm8__newshead { flex-wrap: wrap; }
+}
+.bm8__was { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-muted); }
+
+/* A person's family of one, its form open: the slider is the method's own page — no card around it, each question and
+   its answer on a row of their own. */
+.bm8__list.is-bare { border: 0; background: none; box-shadow: none; }
+.bmu__form--bare { margin: 0; padding: 0; border: 0; gap: var(--space-4); }
+.bmu__form--bare .bmu__pair { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+
+/* What the profile holds for a panel's methods, read only (user-config.tsx `ProfileFacts`). */
+.bmu__profile { margin: 0 0 var(--space-5); padding: var(--space-5); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.bmu__profilehead { margin: 0 0 var(--space-3); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bmu__profilegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-4); margin: 0; }
+.bmu__profilegrid dt { font-size: var(--fs-xs); color: var(--text-secondary); }
+.bmu__profilegrid dd { margin: 2px 0 0; font-size: var(--fs-md); color: var(--text-primary); overflow-wrap: anywhere; }
+.bmu__profilegrid dd.is-empty { color: var(--text-tertiary); }
+
+/* The setup steps of the apps, tokens and passkeys, as the live end-user page numbers them (user-config.tsx `Steps`). */
+.bmu__steps { display: grid; gap: var(--space-5); margin: 0; padding: 0; list-style: none; }
+.bmu__step { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.bmu__stepn { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-full); background: var(--surface-sunken); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bmu__stepbody { display: grid; gap: var(--space-3); min-width: 0; }
+.bmu__stores { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.bmu__secret { display: grid; gap: var(--space-2); align-content: start; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bmu__secret code { font-family: var(--font-mono); font-size: var(--fs-md); letter-spacing: 0.08em; color: var(--text-primary); }
+.bmu__pkgroup { display: grid; gap: var(--space-3); }
+.bmu__pkgroup h4 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.bmu__pkopts { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.bmu__pkopt { padding: 6px 12px; border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised); font: inherit; font-size: var(--fs-sm); color: var(--text-primary); cursor: pointer; }
+.bmu__pkopt:hover { background: var(--surface-sunken); }
+.bmu__pkopt.is-on { border-color: var(--blue, var(--accent)); background: var(--blue-soft, var(--surface-sunken)); }
+.bmu__pkopt:focus-visible { outline: var(--bw-thick) solid var(--focus-ring); outline-offset: 1px; }
+
+/* Security Questions, bare: a question and its answer sit close, and each set
+   is ruled off from the next, so the list reads as sets, not six fields in a
+   row (owner, 9 Oct 2026). */
+.bmu__form--bare { gap: var(--space-6); }
+.bmu__form--bare .bmu__pair { gap: var(--space-2); }
+.bmu__form--bare .bmu__pair + .bmu__pair { padding-top: var(--space-6); border-top: var(--bw-thin) solid var(--border-subtle); }
+
+/* The enrolment steps, one line each (owner, 9 Oct 2026): a short title, with
+   the step's control on the same line, and only the QR step taller. */
+.bmu__steps { gap: var(--space-6); }
+.bmu__stepbody { gap: var(--space-4); }
+.bmu__steprow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5); min-height: 24px; }
+.bmu__steptitle { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bmu__scan { align-items: center; gap: var(--space-6); }
+.bmu__qr { width: 96px; height: 96px; }
+.bmu__or { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bmu__secret { gap: var(--space-2); justify-items: start; }
+.bmu__secret code { font-size: var(--fs-md); }
+.bmu__code { width: 120px; font-family: var(--font-mono); letter-spacing: 0.18em; }
+.bmu__code--wide { width: 200px; letter-spacing: normal; }
+
+/* --- Authenticator setup, 9 Oct: a stepper with a connector, QR and key as one block, six code boxes. */
+.bmu__step { position: relative; }
+.bmu__step:not(:last-child)::before {
+  content: ''; position: absolute; left: 11.5px; top: 30px; bottom: calc(-1 * var(--space-6) + 6px);
+  width: var(--bw-thin); background: var(--border-default);
+}
+.bmu__stepn { background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); font-size: var(--fs-xs); }
+.bmu__steptitle { font-size: var(--fs-md); }
+.bmu__scan {
+  align-items: stretch; gap: 0; width: fit-content; max-width: 100%;
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-raised); overflow: hidden;
+}
+.bmu__scan .bmu__qr { width: 120px; height: 120px; margin: var(--space-4); border: 0; background: var(--surface-sunken); }
+.bmu__secret {
+  display: grid; align-content: center; gap: var(--space-2); padding: var(--space-4) var(--space-5);
+  border-left: var(--bw-thin) solid var(--border-subtle); background: var(--surface-sunken);
+}
+.bmu__secretlabel { font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bmu__secretrow { display: flex; align-items: center; gap: var(--space-2); }
+.bmu__secret code { font-family: var(--font-mono); font-size: var(--fs-md); letter-spacing: 0.06em; word-spacing: 0.3em; color: var(--text-primary); white-space: nowrap; }
+.bmu__codes { display: flex; gap: var(--space-2); }
+.bmu__codes .bmu__codebox:nth-child(3) { margin-right: var(--space-3); }
+.bmu__codebox {
+  width: 40px; height: 44px; padding: 0; text-align: center;
+  font-family: var(--font-mono); font-size: var(--fs-lg); color: var(--text-primary);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised);
+}
+.bmu__codebox:focus-visible { outline: var(--bw-thick) solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent-soft-border); }
+@media (max-width: 640px) {
+  .bmu__scan { flex-direction: column; width: 100%; }
+  .bmu__secret { border-left: 0; border-top: var(--bw-thin) solid var(--border-subtle); }
+}

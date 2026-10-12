@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { ArrowLeft, ArrowRight, Swords, X } from 'lucide-react'
 
 import { Button } from '../kit'
+import { playCue } from '../sound'
 import { measureAnchor, place, type Rect } from './spotlight'
 import { TourHero } from './TourHero'
 import { STOPS, markTourSeen } from './tour-stops'
@@ -122,8 +123,10 @@ export function Tour({
     }
   }, [open, measure, i])
 
+  /* Finishing it, and only finishing it, earns the little celebration (sound.ts); leaving early is silent. */
   const next = useCallback(() => {
     if (last) {
+      playCue('celebrate')
       markTourSeen()
       onClose()
       onFinish()

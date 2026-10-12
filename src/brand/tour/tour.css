@@ -213,3 +213,24 @@
   font-size: var(--fs-md); color: var(--text-tertiary);
 }
 .btr__nextguide strong { font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* --- What moved (MethodsTour.tsx) ----------------------------------------------
+   The builder tour's card, narrower and without the hero band, and one line
+   more: where the thing it lights used to be, quiet, between the heading and
+   the sentence about how it works now. */
+.bmv__card { width: 360px; overflow: visible; }
+/* The beak sits outside the card, so the card cannot clip; the foot rounds its own corners instead. */
+.bmv__card .btr__foot { border-radius: 0 0 var(--radius-xl) var(--radius-xl); }
+.btr__body .bmv__was { margin: 0 0 var(--space-3); font-size: var(--fs-xs); color: var(--text-muted); }
+/* The part to click, until it is clicked (MethodsTour.tsx): a thicker ring than the spotlight's, in the
+   selection colour, with a soft halo. It only breathes — Motion animates its opacity. */
+.bmv__hint {
+  position: absolute; border-radius: var(--radius-md); pointer-events: none;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 7px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+/* The task, done: what the reader just caused, in the positive tone, under the sentence. */
+.btr__body .bmv__done { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fb-positive-fg); }
+/* Under or over a lit element too wide to sit beside: the beak on the card's top or bottom edge, near its
+   start, where the card lines up with the element (MethodsTour.tsx `placeAround`). */
+.bmv__card.is-below .btr__beak { top: -7px; left: 28px; border-right: none; border-bottom: none; }
+.bmv__card.is-above .btr__beak { bottom: -7px; left: 28px; border-left: none; border-top: none; }

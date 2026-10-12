@@ -256,12 +256,16 @@ describe('Done, and the toast’s Undo', () => {
 describe('the panel, before the first message', () => {
   const out = panel(emptyDescribe(), bodyOf(blankPolicy('Untitled policy', [])))
 
-  it('opens on one question, a quiet pen, and the four examples as a group of buttons', () => {
-    expect(out).toContain('<span class="bdsc__glyph" aria-hidden="true"><svg')
-    expect(out).toContain('lucide-pen-line')
-    expect(out).toContain('<p class="bdsc__prompt">What should this policy do?</p>')
-    const group = /<div class="bdsc__examples" role="group" aria-label="Examples">([\s\S]*?)<\/div>/.exec(out)?.[1] ?? ''
-    expect(all(group, /<button type="button" class="bdsc__example"[^>]*>([\s\S]*?)<\/button>/g)).toEqual(EXAMPLES.map((e) => e.text))
+  it('opens on three short questions: applications, what happens, who (Everyone), with the rest under Additional actions (owner, 9 Oct 2026)', () => {
+    expect(out).toContain('class="bdsq"')
+    expect(text(out)).toContain('Applications')
+    expect(text(out)).toContain('Ask for 2FA Password only Block')
+    expect(out).toMatch(/aria-pressed="true"[^>]*>Ask for 2FA</)
+    expect(text(out)).toContain('Everyone')
+    expect(text(out)).toContain('Additional actions')
+    /* The menu is closed until it is opened, and Add rule waits for an application. */
+    expect(out).not.toContain('role="menu"')
+    expect(out).toMatch(/<button[^>]*disabled=""[^>]*>[^<]*(<[^>]*>)*Add rule/)
     /* Nothing read yet: no reply, no change line, no follow-ups. */
     expect(text(out)).not.toContain('Understood')
     expect(out).not.toContain('bdsc__change')

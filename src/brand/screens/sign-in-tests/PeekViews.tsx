@@ -2,7 +2,7 @@ import { type ReactNode } from 'react'
 import { Asterisk, Check, Gauge, Layers, MonitorSmartphone, Network, Webhook, type LucideIcon } from 'lucide-react'
 
 import { Face } from '../../faces'
-import { StatusPill } from '../../kit'
+import { StatusPill, Tip } from '../../kit'
 import { AppLogo } from '../../logos/AppLogo'
 import { useBrand } from '../../store'
 import type { EngineRun } from './engine-run'
@@ -68,6 +68,33 @@ export function KindMark({ target, small = false }: { target: InspectTarget; sma
 }
 
 /** One fact on the overview card: a quiet label over its value. A long value takes the card's full width. */
+/* A count, and under the pointer or the focus the names it counts (owner, 6 Oct 2026: "when I hover, I should see
+   the items inside — users, groups or applications"): "3 groups" lists them, a heading a kind. Nothing to list, the
+   words alone. */
+export function CountTip({ label, lists }: { label: string; lists: readonly { kind: string; names: readonly string[] }[] }) {
+  const shown = lists.filter((l) => l.names.length > 0)
+  if (shown.length === 0) return <>{label}</>
+  return (
+    <Tip
+      width={280}
+      text={
+        <span className="insp__tiplist">
+          {shown.map((l) => (
+            <span key={l.kind} className="insp__tipgroup">
+              <b>{l.kind}</b>
+              <span>{l.names.join(', ')}</span>
+            </span>
+          ))}
+        </span>
+      }
+    >
+      <span className="insp__count" tabIndex={0}>
+        {label}
+      </span>
+    </Tip>
+  )
+}
+
 export interface HeroFact {
   label: string
   value: ReactNode

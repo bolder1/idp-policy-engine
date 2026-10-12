@@ -25,11 +25,6 @@ import { NOTE_STYLES, examplesOf, factsOf, useNoteStyle, type Example, type Note
      Classic       the note as it was: a card, "What you can add", the zone's
                    kind of places in monospace (India, Maharashtra, Pune)
      Sticky note   a paper note taped to the page, that unrolls once
-     Clipboard     a sheet clipped to a board (FigJam's clipboard widget); the
-                   clip snaps once as it lands
-     Pointer       a tinted tip with a notch pointing at the list it is about
-                   (Flodesk's notched tip, Turo's field tips, the connectors in
-                   Zoho and ClickUp, Plane's mint sticky)
 
    What made the old note read as the admin's own entries was two things
    together: the examples were set in the monospace of a typed value, one per
@@ -92,8 +87,6 @@ export function ZoneNote({
   const props = { half, rollOut, onRolled }
   if (style === 'blue') return <BlueNote half={half} />
   if (style === 'sticky') return <StickyNote {...props} />
-  if (style === 'clip') return <Clipboard {...props} />
-  if (style === 'pointer') return <PointerNote {...props} />
   return half === 'net' ? <AcceptsNote /> : <PlacesNote />
 }
 
@@ -221,83 +214,6 @@ function StickyNote({ half, rollOut, onRolled }: NoteProps) {
           {f}
         </p>
       ))}
-    </motion.div>
-  )
-}
-
-/* Clipboard. A sheet on a board, held by a clip at the top edge. The board
-   drops in; as it lands, the clip snaps shut on the sheet. The clip is
-   drawing, so it is hidden from assistive tech. */
-function Clipboard({ half, rollOut, onRolled }: NoteProps) {
-  const reduce = useReducedMotion()
-  const still = !!reduce || !rollOut
-  const facts = factsOf(half)
-  return (
-    <motion.div
-      className="bz7n-clip"
-      initial={still ? false : { opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: EASE }}
-    >
-      <motion.span
-        className="bz7n-clip__clip"
-        aria-hidden
-        animate={still ? { scaleY: 1 } : { scaleY: [1, 0.78, 1] }}
-        transition={{ delay: 0.26, duration: 0.18, times: [0, 0.4, 1] }}
-        onAnimationComplete={onRolled}
-      />
-      <div className="bz7n-clip__sheet">
-        <h3 className="bz7n-clip__head">Examples</h3>
-        <ul className="bz7n-clip__list">
-          {examplesOf(half).map((e) => (
-            <li key={e.text}>
-              <Said e={e} glossClass="bz7n-clip__gloss" />
-            </li>
-          ))}
-        </ul>
-        {facts.length > 0 && (
-          <div className="bz7n-clip__facts">
-            {facts.map((f) => (
-              <p key={f}>{f}</p>
-            ))}
-          </div>
-        )}
-      </div>
-    </motion.div>
-  )
-}
-
-/* Pointer. A tinted tip with a notch on its left edge pointing at the list it
-   is about — on its top edge where the note drops below the list, so it
-   points up at it. It grows out of the notch, once. Teal, from the
-   categorical set: not the brand, and not a status. */
-function PointerNote({ half, rollOut, onRolled }: NoteProps) {
-  const reduce = useReducedMotion()
-  const still = !!reduce || !rollOut
-  const facts = factsOf(half)
-  return (
-    <motion.div
-      className="bz7n-point"
-      initial={still ? false : { opacity: 0, scale: 0.92, x: -6 }}
-      animate={{ opacity: 1, scale: 1, x: 0 }}
-      transition={{ duration: 0.32, ease: EASE, opacity: { duration: 0.16 } }}
-      onAnimationComplete={onRolled}
-    >
-      <h3 className="bz7n-point__head">Examples</h3>
-      <ul className="bz7n-point__list">
-        {examplesOf(half).map((e) => (
-          <li key={e.text}>
-            <Said e={e} glossClass="bz7n-point__gloss" />
-          </li>
-        ))}
-      </ul>
-      {facts.length > 0 && (
-        <div className="bz7n-point__facts">
-          {facts.map((f) => (
-            <p key={f}>{f}</p>
-          ))}
-        </div>
-      )}
     </motion.div>
   )
 }

@@ -51,6 +51,7 @@ import { screenOffered } from '../edition-screens'
 import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
 import { ACCESS_CHECK } from './sign-in-tests/names'
 import { DENIAL_REASONS } from './sign-in-tests/phase'
+import { PolicyDetailsDrawer } from './policy-details-drawer'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -122,6 +123,8 @@ export function Policies() {
   /* The row dialogs. `dialog` keeps the policy while the dialog animates out,
      including after a delete has removed it from the store. */
   const [dialog, setDialog] = useState<RowDialog | null>(null)
+  /* The policy whose details are in the slider (policy-details-drawer.tsx); kept while it slides out. */
+  const [details, setDetails] = useState<{ id: string; open: boolean } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const openDialog = (kind: RowDialog['kind'], policy: Policy) => {
     setDialog({ kind, policy })
@@ -477,6 +480,7 @@ export function Policies() {
                       showExposure={showExposure}
                       monitor={store.features.monitorMode}
                       trySignIn={store.features.trySignIn}
+                      onOpen={() => setDetails({ id: p.id, open: true })}
                       onAction={(a) => act(p, a)}
                     />
                   ))}
@@ -506,7 +510,7 @@ export function Policies() {
                   tile: <ShieldCheck size={18} strokeWidth={1.8} />,
                   tileClass: 'bpol__tile',
                   badge: <PolicyMarks policy={p} />,
-                  onOpen: () => act(p, 'edit'),
+                  onOpen: () => setDetails({ id: p.id, open: true }),
                   facts: [
                     { label: 'Apps', value: <PolicyApps policy={p} onAssign={() => act(p, 'assign')} /> },
                     { label: 'Status', value: <StatusPill status={p.status} /> },
@@ -536,7 +540,7 @@ export function Policies() {
           open={dialogOpen}
           name={current.name}
           noun="policy"
-          detail={deleteDetail(current, store.policies, store.apps) ?? undefined}
+          detail={deleteDetail(current, store.policies, store.apps, store.users, store.groups) ?? undefined}
           onCancel={closeDialog}
           onConfirm={() => {
             markLeaving(current.id)
@@ -572,6 +576,9 @@ export function Policies() {
         <ReadAsTextDrawer key={current.id} open={dialogOpen} policy={current} onClose={closeDialog} />
       )}
       {statusChange.dialog}
+      {details && store.policies.some((p) => p.id === details.id) && (
+        <PolicyDetailsDrawer open={details.open} policyId={details.id} onClose={() => setDetails({ ...details, open: false })} />
+      )}
     </div>
   )
 }
@@ -669,11 +676,14 @@ function PolicyRow({
   showExposure,
   monitor,
   trySignIn,
+  onOpen,
   onAction,
 }: {
   policy: Policy
   gauntlet?: GauntletResult
   showExposure: boolean
+  /** The name's press: its details, in the slider. */
+  onOpen: () => void
   /** The edition has the Monitoring status, so the menu offers Monitor. */
   monitor: boolean
   /** The edition has Try a sign-in, so the menu offers it. */
@@ -693,7 +703,7 @@ function PolicyRow({
           <span className="blist__tile bpol__tile" aria-hidden>
             <ShieldCheck size={18} strokeWidth={1.8} />
           </span>
-          <button type="button" className="btable__link" onClick={() => onAction('edit')}>
+          <button type="button" className="btable__link" onClick={onOpen}>
             {policy.name}
           </button>
           <PolicyMarks policy={policy} />

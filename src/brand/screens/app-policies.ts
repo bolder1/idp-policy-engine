@@ -1,4 +1,9 @@
-import { coversEveryApp, enforces, type App, type Policy } from '../data'
+import { coversEveryApp, enforces, type App, type Group, type Policy, type User } from '../data'
+import { listNames } from '../rule-who'
+/* A cycle, and a harmless one: app-standing reads `policiesForApp` from here
+   and `summarise` and the delete lines below read `appStanding` from there,
+   all inside function bodies, never while either module is still loading. */
+import { appStanding, deciderChanges, type StandRow } from './app-standing'
 
 /* -----------------------------------------------------------------------------
    What protects an application, and what attaching one more would mean.
@@ -36,7 +41,7 @@ export function decidesFor(p: Policy): boolean {
    application's list and imply it had been attached to each one. It is the
    fall-through, and it belongs in `Protection.fallback` where it can be said
    once, as what happens when nothing above matched. */
-export function policiesForApp(appId: string, policies: Policy[]): Policy[] {
+export function policiesForApp(appId: string, policies: readonly Policy[]): Policy[] {
   return policies.filter((p) => !p.isSystem && p.appIds.includes(appId))
 }
 
@@ -49,7 +54,7 @@ export interface Protection {
   fallback: Policy | null
 }
 
-export function protectionOf(appId: string, policies: Policy[]): Protection {
+export function protectionOf(appId: string, policies: readonly Policy[]): Protection {
   const own = policiesForApp(appId, policies)
   return {
     own,
@@ -91,6 +96,12 @@ export function whyNotDeciding(p: Policy): string | null {
   return null
 }
 
+/** "No rules", "1 rule", "4 rules" — the rules a policy has written, its last row not counted. */
+export function rulesLabel(p: Pick<Policy, 'rules'>): string {
+  const n = p.rules.length
+  return n === 0 ? 'No rules' : `${n} rule${n === 1 ? '' : 's'}`
+}
+
 /* Names in a sentence: "Box", "Box and Slack", "Box and 3 other applications".
    Empty for none. `plural` names the rest, which is always two or more. */
 export function listPhrase(names: string[], plural = 'applications'): string {
@@ -100,34 +111,58 @@ export function listPhrase(names: string[], plural = 'applications'): string {
   return `${names[0]} and ${names.length - 1} other ${plural}`
 }
 
+/* Whether the policy decides for somebody on this app: its row on the app
+   page, read from the engine (`appStanding`). Not `decidesFor`: a live policy
+   with no rules decides by its last row, and a live one shadowed for everyone
+   it names decides nothing. */
+const decidesOn = (appId: string, policy: Policy, policies: readonly Policy[], users: readonly User[]) =>
+  appStanding(appId, policies, users).rows.some((r) => r.policy.id === policy.id && r.state === 'decides')
+
 /* The applications only this policy decides, in the policy's own order.
 
    Take this policy away (delete it, or turn it off) and these fall through to
-   the tenant default. An app another deciding policy also covers is not on the
-   list: that policy still decides it. */
-export function decidedOnlyBy(policy: Policy, policies: Policy[]): string[] {
-  if (policy.isSystem || !decidesFor(policy)) return []
+   the tenant default: everybody it decides for there — each group, person or
+   everyone else, people in two groups too — goes to the tenant default, by the
+   same moves the Remove dialog lists (`deciderChanges`). An app where somebody
+   it decides for goes to another policy instead is not on the list: that
+   policy still decides there. `users` and `groups` are the directory; without
+   them only everyone else is asked about. */
+export function decidedOnlyBy(policy: Policy, policies: readonly Policy[], users: readonly User[] = [], groups: readonly Group[] = []): string[] {
+  if (policy.isSystem) return []
+  const fallback = policies.find(coversEveryApp) ?? null
+  const without = policies.filter((p) => p.id !== policy.id)
   return policy.appIds.filter((appId) => {
-    const d = protectionOf(appId, policies).decides
-    return d.length === 1 && d[0].id === policy.id
+    if (!decidesOn(appId, policy, policies, users)) return false
+    const moves = deciderChanges(appId, policies, without, users, groups).filter((m) => m.from?.id === policy.id)
+    return moves.length > 0 && moves.every((m) => m.to?.id === fallback?.id)
   })
 }
 
 /* The one line the delete confirmation says about a policy.
 
-   "Protects" only for a policy that decides sign-ins. A draft or an inactive
-   policy is assigned to its apps and protects nothing. Null when there is
-   nothing worth saying (a draft with no applications). */
-export function deleteDetail(policy: Policy, policies: Policy[], apps: App[]): string | null {
+   "Protects" only the applications where it decides for somebody — the
+   numbered rows on each app page, so this line and that page agree. A draft,
+   an inactive policy, or a live one shadowed everywhere is assigned to its
+   apps and protects nothing. Null when there is nothing worth saying (a draft
+   with no applications). Pass the directory (`users`, `groups`): a policy for
+   named people decides for nobody without it. */
+export function deleteDetail(
+  policy: Policy,
+  policies: readonly Policy[],
+  apps: readonly App[],
+  users: readonly User[] = [],
+  groups: readonly Group[] = [],
+): string | null {
   const named = apps.filter((a) => policy.appIds.includes(a.id))
   if (named.length === 0) return null
-  const names = listPhrase(named.map((a) => a.name))
-  if (!decidesFor(policy)) return `Assigned to ${names}. It decides no sign-ins.`
-  const alone = decidedOnlyBy(policy, policies)
+  const deciding = named.filter((a) => decidesOn(a.id, policy, policies, users))
+  if (deciding.length === 0) return `Assigned to ${listPhrase(named.map((a) => a.name))}. It decides no sign-ins.`
+  const names = listPhrase(deciding.map((a) => a.name))
+  const alone = decidedOnlyBy(policy, policies, users, groups)
   const fallback = policies.find(coversEveryApp)
   if (alone.length === 0 || !fallback) return `Protects ${names}.`
-  if (alone.length === named.length) return `Protects ${names}. Sign-ins there will use the ${fallback.name}.`
-  const aloneNames = listPhrase(named.filter((a) => alone.includes(a.id)).map((a) => a.name))
+  if (alone.length === deciding.length) return `Protects ${names}. Sign-ins there will use the ${fallback.name}.`
+  const aloneNames = listPhrase(deciding.filter((a) => alone.includes(a.id)).map((a) => a.name))
   return `Protects ${names}. Sign-ins to ${aloneNames} will use the ${fallback.name}.`
 }
 
@@ -236,6 +271,28 @@ export interface AppSummary {
   title?: string
 }
 
+/* The one word for a lone policy that decides nothing: its status word, the
+   one the policies list shows, or "Never decides" for a policy that is on and
+   shadowed, or is not an app access policy at all. "Off" is not a status, and
+   a draft was never on. */
+const OFF_WORD: Record<Exclude<StandRow['state'], 'decides'>, string> = {
+  draft: 'Draft',
+  inactive: 'Inactive',
+  monitor: 'Monitoring',
+  never: 'Never decides',
+  'not-app-access': 'Never decides',
+}
+
+/* Why that lone row decides nothing, for the cell's title. */
+function offWhy(row: StandRow): string | undefined {
+  if (row.state === 'not-app-access') return 'Not an app access policy.'
+  if (row.state === 'never') {
+    const winners = [...new Set(row.lostTo.map((l) => l.to.name))]
+    return winners.length > 0 ? `${listNames(winners, 2)} decides instead.` : undefined
+  }
+  return whyNotDeciding(row.policy) ?? undefined
+}
+
 /* The list cell — what protects this app, without opening anything.
 
    A count alone would be the wrong reading. Three policies of which one is
@@ -244,10 +301,17 @@ export interface AppSummary {
    own coverage. So the count and the shortfall are two separate strings, and
    the tone carries whether anything is outstanding — which is the same
    argument the authentication-methods summary makes for its own collapsed
-   rows. */
-export function summarise(appId: string, policies: Policy[]): AppSummary {
-  const own = policiesForApp(appId, policies)
-  const decides = own.filter(decidesFor)
+   rows.
+
+   Read from `appStanding`, so "deciding" is the engine's answer: a live
+   policy shadowed for everyone it names counts as not deciding, and a live
+   policy with no rules decides, by its last row. `users` lets a policy bound
+   to named people be asked about them; without it those people are not
+   asked. */
+export function summarise(appId: string, policies: readonly Policy[], users: readonly User[] = []): AppSummary {
+  const { rows } = appStanding(appId, policies, users)
+  const own = rows.map((r) => r.policy)
+  const decides = rows.filter((r) => r.n !== null)
 
   if (own.length === 0) {
     return {
@@ -262,21 +326,21 @@ export function summarise(appId: string, policies: Policy[]): AppSummary {
   }
 
   const label = `${own.length} polic${own.length === 1 ? 'y' : 'ies'}`
+  /* Every row without a number, the shadowed ones too. */
   const behind = own.length - decides.length
 
   if (decides.length === 0) {
-    /* One policy: its own status word, the one the policies list shows. "Off"
-       is not a status, and a draft was never on. */
-    const only = own[0]
-    const word =
-      only.status === 'draft' ? 'Draft' : only.status === 'inactive' ? 'Inactive' : only.status === 'monitor' ? 'Monitoring' : 'No rule on'
+    /* Several, none deciding: words, not "2 not deciding" beside "2
+       policies" — a number says itself once. */
+    const only = rows[0]
+    const word = only.state === 'decides' ? null : OFF_WORD[only.state]
     return {
       own: own.length,
       decides: 0,
       label,
       tag: own.length === 1 ? word : 'None deciding',
       tone: 'off',
-      title: own.length === 1 ? whyNotDeciding(only) ?? undefined : 'None of these policies decides sign-ins.',
+      title: own.length === 1 ? offWhy(only) : 'None of these policies decides sign-ins.',
     }
   }
 

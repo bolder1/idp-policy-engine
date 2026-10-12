@@ -28,6 +28,7 @@ import {
   card,
   cond,
   conditionType,
+  splitPick,
   pruneScopes,
   type AccessDecision,
   type Condition,
@@ -736,7 +737,8 @@ function ConditionRow({
              merges — so retyping a scoped zone into a Country left the field
              behind, invisible on screen and still reaching `ckey`. */
           const next = conditionType(typeId)
-          onPatch({ typeId, operator: next.operators[0], values: [], scopes: undefined, key: undefined, tz: undefined })
+          const pick = splitPick(typeId)
+          onPatch({ typeId: pick.typeId, operator: next.operators[0], values: [], scopes: undefined, key: pick.key, tz: undefined })
         }}
         onOperator={(operator) => onPatch({ operator })}
         onValues={(values) => onPatch({ values })}

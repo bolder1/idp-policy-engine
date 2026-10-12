@@ -248,3 +248,70 @@
 
 .bapr__confirm { display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--fs-base); line-height: 1.55; color: var(--text-body); }
 .bapr__confirm em { font-style: normal; font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* --- An application's own page (ApplicationPage.tsx) ----------------------
+
+   The head is a zone's (`.bz7__back`, `.bz7__pagehead`, zones-final.css) with
+   the application's logo in front of the name. `.bapp__bar`, `.bapp__via` and
+   the `.bapp__facts` rail stood here: the page's own heading row, the "Through"
+   pill and Basic as a list of facts. The bar is `PageBar` now, the column says
+   "Deciding policy", and Basic is a form. */
+
+/* The tabs sit right under the name they belong to, as a device profile's do
+   (device-fingerprint-v2.css): the page grid's 16px is the gap, and the head's
+   own margin would have doubled it. */
+.bapp > .bz7__pagehead { margin-bottom: 0; }
+.bapp__tabs { margin: var(--space-2) 0 0; }
+
+/* The logo before the name, kept its size; the name takes what is left. Level
+   with the rename field's input while it is open, as the pills are. */
+.bapp__logo { flex: none; display: inline-flex; }
+.bz7__titleline.is-renaming > .bapp__logo { margin-top: calc((var(--ctl-height-lg) - 28px) / 2); }
+/* A logo, a name, a pencil and two pills do not fit a phone's line: the pills go under. */
+.bapp .bz7__titleline { flex-wrap: wrap; row-gap: var(--space-3); }
+
+.bapp__panel { display: flex; flex-direction: column; min-width: 0; }
+.bapp__panel:focus-visible { outline: none; }
+/* The Users and Groups tabs page to the window, and their pager is the page's
+   last row as on every paged page: the panel takes the rows the page has left
+   and the pager goes to its end — Display tokens' arrangement (screens.css).
+   Four rows: the way back, the head, the tabs, the panel. */
+.bpage.bapp:has(.bapp__panel .blist__pager) { grid-template-rows: auto auto auto 1fr; }
+.bapp__panel > .blist__pager { margin-top: auto; }
+
+/* Basic: the App secret's field, its copy and Regenerate on one line. */
+.bapp__secret { display: flex; align-items: center; gap: var(--space-3); }
+.bapp__secret .bmc__secret { flex: 1 1 auto; min-width: 0; }
+.bapp__secret .bx-btn { flex: none; }
+
+/* --- Add existing policy (AddExistingPolicy.tsx) --------------------------- */
+
+.bapp__add { display: flex; flex-direction: column; gap: var(--space-7); }
+
+/* What the picked policy is, and where it would land: label over value. */
+.bapp__preview { margin: 0; display: flex; flex-direction: column; gap: var(--space-5); }
+.bapp__preview > div { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bapp__preview dt { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bapp__preview dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+}
+
+/* --- Taking a policy off (AppProtection.tsx `RemoveDialog`) -----------------
+
+   Who moves, and the policy they move to, one row each: the group or person
+   with its face, then the policy. */
+.bapp__moves { margin: var(--space-3) 0 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.bapp__moves > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-5);
+}
+.bapp__moves dt { display: flex; align-items: center; gap: var(--space-3); min-width: 0; font-size: var(--fs-md); color: var(--text-tertiary); }
+.bapp__moves dd { margin: 0; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }

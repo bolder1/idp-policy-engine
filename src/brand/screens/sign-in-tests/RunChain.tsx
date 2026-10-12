@@ -1,6 +1,6 @@
-import { AnimatePresence, motion } from 'motion/react'
-import { useMemo, type ReactNode } from 'react'
-import { ArrowUpRight, ChevronsDownUp, ChevronsUpDown, TriangleAlert } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { ArrowUpRight, ChevronsDownUp, ChevronsUpDown, TriangleAlert, Wrench } from 'lucide-react'
 
 import type { Rule } from '../../data'
 import { leaves } from '../../predicate'
@@ -155,7 +155,56 @@ export function FoldButton({
    the why (`why`, the model's reason) it says the whole of it, the fix on a
    line of its own: "Not used: Naming Thomas Byrne does not move a rule up.
    Rule 1 matched first, and the first rule that matches decides". */
-export function RuleConflictNotice({ c, person, onOpen, why = '' }: { c: RuleConflict; person: string; onOpen?: () => void; why?: string }) {
+/** A finding's fix as one press (conflict-fix.ts): its words are the fix; it opens the policy with it in the draft. */
+export interface FixPress {
+  label: string
+  title: string
+  onApply: () => void
+}
+
+/* The fix: one press that says Fix, and — under the pointer or the focus — what it will do, opening inside it (owner,
+   6 Oct 2026: "a Fix button", then "on hover add the text inside the button — no need for the whole line outside").
+   Blue, never orange: the page's one orange button is not here. Motion moves the words' width; nothing transforms. */
+export function FixButton({ apply }: { apply: FixPress }) {
+  /* Two flags: the pointer leaving must not close what the focus opened, nor a blur what the pointer holds. */
+  const [hover, setHover] = useState(false)
+  const [focus, setFocus] = useState(false)
+  const open = hover || focus
+  const still = useReducedMotion() === true
+  return (
+    <button
+      type="button"
+      className={`tj-fix${open ? ' is-open' : ''}`}
+      title={apply.title}
+      aria-label={`Fix: ${apply.label}`}
+      onClick={apply.onApply}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+    >
+      <Wrench size={13} strokeWidth={2.2} aria-hidden />
+      <span className="tj-fix__word">Fix</span>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.span
+            key="say"
+            className="tj-fix__say"
+            aria-hidden
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 'auto', opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={still ? { duration: 0 } : { duration: 0.24, ease: [0.2, 0, 0, 1] }}
+          >
+            {apply.label}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  )
+}
+
+export function RuleConflictNotice({ c, person, onOpen, why = '', apply }: { c: RuleConflict; person: string; onOpen?: () => void; why?: string; apply?: FixPress }) {
   if (c.kind === 'conflict') {
     return (
       <div className="tj-conflict" role="note">
@@ -172,7 +221,13 @@ export function RuleConflictNotice({ c, person, onOpen, why = '' }: { c: RuleCon
             </button>
           )}
         </p>
-        {why ? (
+        {apply ? (
+          <>
+            {/* The Why's card (6 Oct 2026): the problem in its head, why in one line, and the fix as the press that makes it. */}
+            <p className="tj-conflict__line">{c.notUsed}</p>
+            <FixButton apply={apply} />
+          </>
+        ) : why ? (
           <>
             <p className="tj-conflict__line">Not used: {why}</p>
             {c.fix && <p className="tj-conflict__line tj-conflict__fix">{c.fix}</p>}
@@ -202,7 +257,7 @@ export function RuleConflictNotice({ c, person, onOpen, why = '' }: { c: RuleCon
    that held marked from the resolver's trace, its notice in its foot with
    the model's reason (`why`). The notice's Open rule is its one action: the
    card itself takes no press, and its title is words, not a button. */
-export function ConflictRuleCard({ r, rule, c, resolve, person, onOpen, why = '' }: { r: EngineRule; rule: Rule; c: RuleConflict; resolve: NameLookup; person: string; onOpen?: () => void; why?: string }) {
+export function ConflictRuleCard({ r, rule, c, resolve, person, onOpen, why = '', apply }: { r: EngineRule; rule: Rule; c: RuleConflict; resolve: NameLookup; person: string; onOpen?: () => void; why?: string; apply?: FixPress }) {
   const condIds = useMemo(() => leaves(rule.when).map((x) => x.id), [rule])
   const via = r.via?.matches && (r.via.kind === 'groups' || r.via.kind === 'person') ? r.via.say : ''
   return (
@@ -216,7 +271,7 @@ export function ConflictRuleCard({ r, rule, c, resolve, person, onOpen, why = ''
       full
       via={via}
       conflict={c.kind === 'conflict'}
-      notice={<RuleConflictNotice c={c} person={person} onOpen={onOpen} why={why} />}
+      notice={<RuleConflictNotice c={c} person={person} onOpen={onOpen} why={why} apply={apply} />}
     />
   )
 }

@@ -180,7 +180,8 @@ describe('(c) Escape waits for a popup over the panel, never for a row opened in
     for (const target of [{ kind: 'policy', policyId: policy.id }, { kind: 'rule', policyId: policy.id, ruleId: policy.rules[1].id }] as InspectTarget[]) {
       const out = inspector(plan, target)
       expect(out).toContain('class="bb__insp sit-panel insp"')
-      expect(expandables(out).filter((e) => holdsEscape(e.opened))).toEqual([])
+      /* The apps list under the pointer (AppsPeek) is a real popup: it takes the Escape while open, and the page waits for it. */
+      expect(expandables(out).filter((e) => holdsEscape(e.opened) && !e.tag.includes('btable__app--peek'))).toEqual([])
     }
   })
 

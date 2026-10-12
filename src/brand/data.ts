@@ -131,9 +131,23 @@ export interface App {
      live page ("Aug 14, 2026, 14:25:51"); the values are not. Sort on
      `lastUpdatedAt` below, never on array order or `Date.parse`. */
   lastUpdated: string
+  /** The console's Description field (Basic). Absent until somebody writes one. */
+  description?: string
+  /* The console's App Secret (Basic): OIDC applications only, because a SAML
+     application signs with a certificate, not a client secret. FABRICATED: 32
+     made-up hex characters, never a real tenant's value. */
+  secret?: string
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/* Now, in the one shape the console prints ("Oct 10, 2026, 17:05:09"), for
+   whatever a save stamps: an application's Last updated, a group's Last
+   modified. Local time, as the page reads it; `lastUpdatedAt` reads it back. */
+export function consoleStamp(d: Date): string {
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${MONTHS[d.getMonth()]} ${two(d.getDate())}, ${d.getFullYear()}, ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`
+}
 
 /* Milliseconds for an app's "Last updated", read from the one format the
    console prints ("Aug 14, 2026, 14:25:51"). A strict read rather than
@@ -150,6 +164,11 @@ export interface Group {
   id: string
   name: string
   memberCount: number
+  /* The console's Created and Last modified, in its format ("Aug 14, 2026,
+     14:25:51"). FABRICATED, like `App.lastUpdated`. Absent on a group the
+     fixture never dated, and the group page then leaves the fact out. */
+  created?: string
+  lastModified?: string
 }
 
 // --- Conditions --------------------------------------------------------------
@@ -269,6 +288,24 @@ export const USER_ATTR_KEYS = [
   'employment_type',
 ] as const
 
+/* The attributes this tenant has defined for itself (seed). Listed by name in
+   the attribute menu, under their own section, so a rule picks "Clearance" the
+   way it picks "Email" — the category is a heading, never the key. */
+export const CUSTOM_ATTR_KEYS = ['clearance', 'cost_center', 'region', 'contractor_agency'] as const
+
+/** "years_of_experience" → "Years of experience". */
+export const attrLabel = (key: string): string => {
+  const s = key.replace(/_/g, ' ').trim()
+  return s ? s[0].toUpperCase() + s.slice(1) : s
+}
+
+/* One attribute menu row stands for a type AND its key: `user-attr:email`.
+   Split here, so every writer that takes a picked id can store both. */
+export const splitPick = (id: string): { typeId: string; key?: string } => {
+  const at = id.indexOf(':')
+  return at < 0 ? { typeId: id } : { typeId: id.slice(0, at), key: id.slice(at + 1) || undefined }
+}
+
 export const CONDITION_CATALOGUE: ConditionType[] = [
   /* The only way to say anything about where a request came from.
 
@@ -304,13 +341,13 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      `values[0]` to check the endpoint still exists, and a rule consulting two
      services would have to say what happens when they disagree. */
   { id: 'webhook', label: 'External hook', group: 'Library', hint: 'A yes or no from your own endpoint', operators: ['returns true', 'returns false'], valueKind: 'hook' },
-  { id: 'time', label: 'Time of day', group: 'Time', hint: 'The time of the sign-in, in a set timezone', operators: ['between', 'not between'], valueKind: 'time' },
+  { id: 'time', label: 'Sign-in hours', group: 'Time', hint: 'The time of the sign-in, in a set timezone', operators: ['between', 'not between'], valueKind: 'time' },
   /* Separate from the window, because they answer different questions and get
      asked separately: "office hours" is a time, "not at the weekend" is a day,
      and a rule usually wants one or the other rather than a single control that
      means both. The parameter sheet lists them as two rows for the same
      reason. */
-  { id: 'day', label: 'Day of week', group: 'Time', hint: 'The weekday of the sign-in', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
+  { id: 'day', label: 'Sign-in days', group: 'Time', hint: 'The weekday of the sign-in', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
   /* --- The two attribute conditions, and why there are two -------------------
 
      The sheet lists both: "Custom user attributes", with the comparison types
@@ -327,7 +364,7 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      Both carry `key`, which is the field this model did not have and the reason
      the seeded scenarios were writing `employment_type=FTE` into the VALUE. */
   { id: 'user-attr', label: 'User attribute', group: 'Attributes', hint: 'A directory field, like department or team', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text', keys: [...USER_ATTR_KEYS] },
-  { id: 'custom-attr', label: 'Custom attribute', group: 'Attributes', hint: 'A user field your organization defines', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text' },
+  { id: 'custom-attr', label: 'Custom attribute', group: 'Attributes', hint: 'A user field your organization defines', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text', keys: [...CUSTOM_ATTR_KEYS] },
   /* One risk attribute, and it is the one this console actually computes.
 
      The id is historical and the label is not: `device-risk` is the score the
@@ -387,8 +424,16 @@ export const UNKNOWN_CONDITION: ConditionType = {
   options: [],
 }
 
+/** What a condition is called on screen: an attribute by its own name
+    ("Email"), everything else by its type ("Network zone"). */
+export function conditionName(c: { typeId: string; key?: string }): string {
+  const t = conditionType(c.typeId)
+  return t.keys?.length && c.key ? attrLabel(c.key) : t.label
+}
+
 export function conditionType(id: string): ConditionType {
-  return CONDITION_CATALOGUE.find((c) => c.id === id) ?? UNKNOWN_CONDITION
+  const typeId = splitPick(id).typeId
+  return CONDITION_CATALOGUE.find((c) => c.id === typeId) ?? UNKNOWN_CONDITION
 }
 
 /* Which half of a zone a condition tests.
@@ -975,13 +1020,13 @@ export interface Template {
 export const apps: App[] = [
   { id: 'salesforce', name: 'Salesforce', protocol: 'SAML', glyph: '☁', tint: '#199fd8', type: 'SAML/WS-FED', lastUpdated: 'Aug 14, 2026, 14:25:51' },
   { id: 'workday', name: 'Workday', protocol: 'SAML', glyph: '▲', tint: '#f5a623', type: 'SAML/WS-FED', lastUpdated: 'Aug 02, 2026, 09:11:04' },
-  { id: 'github', name: 'GitHub Enterprise', protocol: 'OIDC', glyph: '◐', tint: '#24292e', type: 'OAuth/OpenID', lastUpdated: 'Jul 28, 2026, 17:40:22' },
+  { id: 'github', name: 'GitHub Enterprise', protocol: 'OIDC', glyph: '◐', tint: '#24292e', type: 'OAuth/OpenID', lastUpdated: 'Jul 28, 2026, 17:40:22', secret: '7c3e9a1f05d84b62a9e0c4f71b3d8e26' },
   { id: 'm365', name: 'Microsoft 365', protocol: 'SAML', glyph: '▦', tint: '#e14c2a', type: 'SAML/WS-FED', lastUpdated: 'Aug 21, 2026, 11:03:47' },
-  { id: 'jira', name: 'Jira', protocol: 'OIDC', glyph: '◆', tint: '#2684ff', type: 'OAuth/OpenID', lastUpdated: 'Jun 09, 2026, 08:52:19' },
+  { id: 'jira', name: 'Jira', protocol: 'OIDC', glyph: '◆', tint: '#2684ff', type: 'OAuth/OpenID', lastUpdated: 'Jun 09, 2026, 08:52:19', secret: 'b14f6d2e98a3c7051e6f4a9d2c8b7e30' },
   { id: 'slack', name: 'Slack', protocol: 'SAML', glyph: '✳', tint: '#611f69', type: 'Desktop', lastUpdated: 'Aug 30, 2026, 16:18:35' },
   { id: 'aws', name: 'AWS Console', protocol: 'SAML', glyph: '◢', tint: '#ff9900', type: 'SAML/WS-FED', lastUpdated: 'May 17, 2026, 13:07:58' },
   { id: 'zoom', name: 'Zoom', protocol: 'SAML', glyph: '▣', tint: '#2d8cff', type: 'Desktop', lastUpdated: 'Jul 03, 2026, 10:44:12' },
-  { id: 'box', name: 'Box', protocol: 'OIDC', glyph: '▢', tint: '#0061d5', type: 'Desktop', lastUpdated: 'Apr 26, 2026, 15:29:06' },
+  { id: 'box', name: 'Box', protocol: 'OIDC', glyph: '▢', tint: '#0061d5', type: 'Desktop', lastUpdated: 'Apr 26, 2026, 15:29:06', secret: '5a0d8e3c71f94b26e8c1a7d3f09b4e52' },
   { id: 'servicenow', name: 'ServiceNow', protocol: 'SAML', glyph: '◉', tint: '#62d84e', type: 'SAML/WS-FED', lastUpdated: 'Sep 01, 2026, 07:33:41' },
 
   /* --- The applications the use-case document names --------------------------
@@ -1007,16 +1052,16 @@ export const apps: App[] = [
   { id: 'google-workspace', name: 'Google Workspace', protocol: 'SAML', glyph: '◍', tint: '#4285f4', type: 'SAML/WS-FED', lastUpdated: 'Aug 25, 2026, 12:09:38' },
   { id: 'corporate-email', name: 'Corporate Email', protocol: 'SAML', glyph: '✉', tint: '#d93025', type: 'SAML/WS-FED', lastUpdated: 'Aug 29, 2026, 15:52:07' },
   { id: 'vpn-portal', name: 'VPN Portal', protocol: 'SAML', glyph: '⛨', tint: '#5b6470', type: 'SAML/WS-FED', lastUpdated: 'Aug 11, 2026, 07:14:46' },
-  { id: 'admin-console', name: 'Admin Console', protocol: 'OIDC', glyph: '⚙', tint: '#8a5cf6', type: 'OAuth/OpenID', lastUpdated: 'Sep 02, 2026, 09:30:11' },
+  { id: 'admin-console', name: 'Admin Console', protocol: 'OIDC', glyph: '⚙', tint: '#8a5cf6', type: 'OAuth/OpenID', lastUpdated: 'Sep 02, 2026, 09:30:11', secret: 'e92b4c7a1d06f835b2e9c4a70d1f6b38' },
   { id: 'payroll', name: 'Payroll System', protocol: 'SAML', glyph: '₹', tint: '#c2410c', type: 'SAML/WS-FED', lastUpdated: 'Aug 06, 2026, 16:47:29' },
-  { id: 'wiki', name: 'Internal Wiki', protocol: 'OIDC', glyph: '▨', tint: '#0891b2', type: 'OAuth/OpenID', lastUpdated: 'Jul 22, 2026, 11:35:02' },
-  { id: 'crm', name: 'Customer Database', protocol: 'OIDC', glyph: '◫', tint: '#0369a1', type: 'OAuth/OpenID', lastUpdated: 'Aug 18, 2026, 14:03:50' },
+  { id: 'wiki', name: 'Internal Wiki', protocol: 'OIDC', glyph: '▨', tint: '#0891b2', type: 'OAuth/OpenID', lastUpdated: 'Jul 22, 2026, 11:35:02', secret: '3d7f1a9c5e0b8462f1c7e3a9b5d0c248' },
+  { id: 'crm', name: 'Customer Database', protocol: 'OIDC', glyph: '◫', tint: '#0369a1', type: 'OAuth/OpenID', lastUpdated: 'Aug 18, 2026, 14:03:50', secret: '8b2e6f0a4c9d1735e8a2b6f4c0d9e371' },
   { id: 'trading', name: 'Trading Platform', protocol: 'SAML', glyph: '◭', tint: '#15803d', type: 'SAML/WS-FED', lastUpdated: 'Sep 03, 2026, 06:58:24' },
   { id: 'erp', name: 'ERP System', protocol: 'SAML', glyph: '▩', tint: '#7c3aed', type: 'SAML/WS-FED', lastUpdated: 'Aug 15, 2026, 13:26:40' },
-  { id: 'dms', name: 'Document Management', protocol: 'OIDC', glyph: '▧', tint: '#b45309', type: 'OAuth/OpenID', lastUpdated: 'Aug 31, 2026, 17:12:33' },
+  { id: 'dms', name: 'Document Management', protocol: 'OIDC', glyph: '▧', tint: '#b45309', type: 'OAuth/OpenID', lastUpdated: 'Aug 31, 2026, 17:12:33', secret: 'c06a3e8f2b5d9147a3e0c6b8f2d5a914' },
   { id: 'pam', name: 'Privileged Access Gateway', protocol: 'SAML', glyph: '⛭', tint: '#b91c1c', type: 'SAML/WS-FED', lastUpdated: 'Sep 04, 2026, 08:05:19' },
-  { id: 'monitoring', name: 'Production Monitoring', protocol: 'OIDC', glyph: '◠', tint: '#ea580c', type: 'OAuth/OpenID', lastUpdated: 'Aug 23, 2026, 20:44:57' },
-  { id: 'knowledge-base', name: 'Internal Knowledge Base', protocol: 'OIDC', glyph: '▥', tint: '#0d9488', type: 'OAuth/OpenID', lastUpdated: 'Jul 30, 2026, 09:19:15' },
+  { id: 'monitoring', name: 'Production Monitoring', protocol: 'OIDC', glyph: '◠', tint: '#ea580c', type: 'OAuth/OpenID', lastUpdated: 'Aug 23, 2026, 20:44:57', secret: '1f8c4a6e3b9d0752c4f8a1e6b3d9c057' },
+  { id: 'knowledge-base', name: 'Internal Knowledge Base', protocol: 'OIDC', glyph: '▥', tint: '#0d9488', type: 'OAuth/OpenID', lastUpdated: 'Jul 30, 2026, 09:19:15', secret: '9e5b1d3f7a2c8064b9e5d1f3a7c2e806' },
   { id: 'vault', name: 'Legal Document Vault', protocol: 'SAML', glyph: '⛁', tint: '#334155', type: 'SAML/WS-FED', lastUpdated: 'Sep 05, 2026, 11:41:08' },
 ]
 
@@ -1027,11 +1072,11 @@ export const apps: App[] = [
    Finance" — a selection that reads narrower than it is. Everyone is now a
    flag on `Audience`, so the contradiction cannot be expressed. */
 export const groups: Group[] = [
-  { id: 'finance', name: 'Finance', memberCount: 86 },
-  { id: 'engineering', name: 'Engineering', memberCount: 310 },
-  { id: 'executives', name: 'Executives', memberCount: 12 },
-  { id: 'contractors', name: 'Contractors', memberCount: 154 },
-  { id: 'it-admins', name: 'IT Admins', memberCount: 9 },
+  { id: 'finance', name: 'Finance', memberCount: 86, created: 'Jan 12, 2026, 10:04:31', lastModified: 'Aug 14, 2026, 14:25:51' },
+  { id: 'engineering', name: 'Engineering', memberCount: 310, created: 'Jan 12, 2026, 10:06:02', lastModified: 'Sep 03, 2026, 11:42:18' },
+  { id: 'executives', name: 'Executives', memberCount: 12, created: 'Jan 12, 2026, 10:07:45', lastModified: 'Jul 21, 2026, 09:15:27' },
+  { id: 'contractors', name: 'Contractors', memberCount: 154, created: 'Feb 03, 2026, 15:22:10', lastModified: 'Sep 01, 2026, 16:08:44' },
+  { id: 'it-admins', name: 'IT Admins', memberCount: 9, created: 'Jan 12, 2026, 10:02:19', lastModified: 'Aug 29, 2026, 08:51:03' },
 
   /* --- The groups the use-case document targets ------------------------------
 
@@ -1045,26 +1090,26 @@ export const groups: Group[] = [
      departmental groups are subsets of it rather than a partition — a person is
      in Employees AND Engineering, which is the shape the document's own
      multi-group collision finding (#1) depends on being possible. */
-  { id: 'employees', name: 'Employees', memberCount: 1180 },
-  { id: 'accounts', name: 'Accounts', memberCount: 34 },
-  { id: 'admin', name: 'Admin', memberCount: 6 },
-  { id: 'devops', name: 'DevOps', memberCount: 28 },
-  { id: 'end-users', name: 'End-Users', memberCount: 1042 },
-  { id: 'support', name: 'Support', memberCount: 72 },
-  { id: 'traders', name: 'Traders', memberCount: 41 },
-  { id: 'global-ops', name: 'Global-Operations', memberCount: 217 },
-  { id: 'legal', name: 'Legal-Department', memberCount: 19 },
-  { id: 'privileged', name: 'Privileged-Users', memberCount: 14 },
+  { id: 'employees', name: 'Employees', memberCount: 1180, created: 'Jan 12, 2026, 09:58:40', lastModified: 'Sep 05, 2026, 07:30:12' },
+  { id: 'accounts', name: 'Accounts', memberCount: 34, created: 'Mar 09, 2026, 13:11:56', lastModified: 'Aug 06, 2026, 16:47:29' },
+  { id: 'admin', name: 'Admin', memberCount: 6, created: 'Jan 12, 2026, 10:01:05', lastModified: 'Jun 18, 2026, 12:33:47' },
+  { id: 'devops', name: 'DevOps', memberCount: 28, created: 'Feb 17, 2026, 11:26:38', lastModified: 'Aug 23, 2026, 20:41:09' },
+  { id: 'end-users', name: 'End-Users', memberCount: 1042, created: 'Jan 12, 2026, 09:59:52', lastModified: 'Sep 02, 2026, 09:28:35' },
+  { id: 'support', name: 'Support', memberCount: 72, created: 'Mar 02, 2026, 14:40:21', lastModified: 'Jul 30, 2026, 10:12:58' },
+  { id: 'traders', name: 'Traders', memberCount: 41, created: 'Apr 07, 2026, 08:19:44', lastModified: 'Sep 03, 2026, 06:55:16' },
+  { id: 'global-ops', name: 'Global-Operations', memberCount: 217, created: 'Feb 24, 2026, 17:03:29', lastModified: 'Aug 11, 2026, 07:14:46' },
+  { id: 'legal', name: 'Legal-Department', memberCount: 19, created: 'Apr 21, 2026, 09:47:13', lastModified: 'Sep 05, 2026, 11:39:02' },
+  { id: 'privileged', name: 'Privileged-Users', memberCount: 14, created: 'Feb 03, 2026, 15:30:57', lastModified: 'Sep 04, 2026, 08:02:44' },
 
   /* Temporary by design, and the document says so: notice-period and travel
      memberships must be removed by the provisioning system on a date (finding
      #9), and a break-glass group holds two accounts on purpose so that one dead
      war-room terminal does not lock the tenant out (S16). Small counts here are
      the fixture agreeing with that, not a shortage of invention. */
-  { id: 'acquired', name: 'Acquired-Co-Employees', memberCount: 128 },
-  { id: 'notice-period', name: 'Notice-Period', memberCount: 3 },
-  { id: 'japan-travel', name: 'Japan-Travel', memberCount: 1 },
-  { id: 'break-glass', name: 'Break-Glass Accounts', memberCount: 2 },
+  { id: 'acquired', name: 'Acquired-Co-Employees', memberCount: 128, created: 'May 11, 2026, 10:25:36', lastModified: 'Aug 15, 2026, 13:21:09' },
+  { id: 'notice-period', name: 'Notice-Period', memberCount: 3, created: 'Jun 02, 2026, 16:58:22', lastModified: 'Sep 04, 2026, 17:46:31' },
+  { id: 'japan-travel', name: 'Japan-Travel', memberCount: 1, created: 'Aug 26, 2026, 12:07:50', lastModified: 'Aug 26, 2026, 12:09:14' },
+  { id: 'break-glass', name: 'Break-Glass Accounts', memberCount: 2, created: 'Jan 12, 2026, 10:10:33', lastModified: 'May 17, 2026, 13:07:58' },
 
   /* --- Two groups that are never a target ------------------------------------
 
@@ -1078,8 +1123,8 @@ export const groups: Group[] = [
      Nothing in this fixture marks them as condition-only. That is the gap, not
      an omission: the model has no way to say "this group is not an assignment
      target", so the audience picker will offer both. */
-  { id: 'on-call', name: 'On-Call', memberCount: 4 },
-  { id: 'matter-acme', name: 'Matter-Acme-Litigation', memberCount: 7 },
+  { id: 'on-call', name: 'On-Call', memberCount: 4, created: 'Mar 16, 2026, 18:35:04', lastModified: 'Sep 05, 2026, 22:00:00' },
+  { id: 'matter-acme', name: 'Matter-Acme-Litigation', memberCount: 7, created: 'Jul 08, 2026, 15:16:27', lastModified: 'Aug 31, 2026, 17:12:33' },
 ]
 
 /** Everyone the tenant claims, for the audience readout. */

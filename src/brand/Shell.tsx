@@ -26,6 +26,8 @@ import {
   Trash2,
   UserRound,
   Users,
+  Volume2,
+  VolumeX,
   X,
   XCircle,
   Zap,
@@ -41,7 +43,9 @@ import { Tip } from './kit'
 import { screenOffered } from './edition-screens'
 import { useBrand, useToast, type BrandScreen } from './store'
 import type { ToastTone } from './toast-tone'
+import { pressToastAction } from './toast-action'
 import { useTheme } from './theme-mode'
+import { playCue, playToastCue, useSoundSetting } from './sound'
 
 /* -----------------------------------------------------------------------------
    AdminShell — the live console's chrome, measured off
@@ -117,7 +121,6 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              of one question: whether this is the same device, and whether
              anything about it is suspicious. */
           { label: 'Risk signal profile', screen: { name: 'risk-signals' } },
-          { label: 'Authentication methods', screen: { name: 'methods' } },
           { label: 'External Hooks', screen: { name: 'hooks' }, tag: SHOWCASE ? undefined : 'In progress' },
         ],
       },
@@ -137,20 +140,11 @@ const NAV: { section?: string; items: NavItem[] }[] = [
         icon: Zap,
         children: [{ label: 'Inline Hook' }, { label: 'Workflows' }, { label: 'Rules' }, { label: 'Approvals' }],
       },
-      {
-        label: 'Authentication methods',
-        icon: KeyRound,
-        children: [
-          { label: 'Setup 2FA for Admin' },
-          { label: 'Alternate 2FA Login Methods' },
-          { label: '2FA Options For EndUsers' },
-          /* The live console's own way in to the Display tokens page, so it
-             opens it (15 Sep 2026). It does not light: the page says it is under
-             Policies > Authentication methods, and one place in the rail says so. */
-          { label: 'Assign Hardware Token to Users', screen: { name: 'display-tokens', tab: 'assignments' }, lights: false },
-          { label: 'Static Code Generation' },
-        ],
-      },
+      /* Its own item, where the live console keeps 2-Factor Authentication (owner, 7 Oct 2026: "move it
+         outside Policies as a specific tab and remove the other authentication methods tab"). One link: the
+         console's five 2FA pages are this one page now, and the announcement on it says so. Display tokens
+         is opened from it, so it lights there too (`UNDER_ITEM`). */
+      { label: 'Authentication methods', icon: KeyRound, screen: { name: 'methods' } },
       {
         label: 'Devices',
         icon: MonitorSmartphone,
@@ -166,8 +160,8 @@ const NAV: { section?: string; items: NavItem[] }[] = [
         label: 'Users',
         icon: UserRound,
         children: [
-          { label: 'User List' },
-          { label: 'User Roles' },
+          { label: 'User List', screen: { name: 'users' } },
+          { label: 'User Roles', screen: { name: 'user-roles' } },
           { label: 'User Profile Fields' },
           { label: 'Manage Shared Identity' },
           { label: 'Progressive Profiling' },
@@ -178,7 +172,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
         label: 'Groups',
         icon: Users,
         children: [
-          { label: 'Manage Groups' },
+          { label: 'Manage Groups', screen: { name: 'groups' } },
           { label: 'Group Custom Fields' },
           { label: 'Group Membership Custom Fields' },
           { label: 'Auto assign groups rules' },
@@ -214,8 +208,6 @@ const POLICY_SCREENS = [
   'fingerprint',
   'risk-signals',
   'hooks',
-  'methods',
-  'display-tokens',
   'sign-in-tests',
   'sign-in-activity',
 ]
@@ -244,11 +236,18 @@ const RAIL_SHUT_SCREENS = [...BUILDER_SCREENS, 'sign-in-tests']
 const UNDER_ITEM: Record<string, string[]> = {
   policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests', 'sign-in-activity'],
   methods: ['display-tokens'],
+  /* An application's own page is opened from the Apps list. */
+  applications: ['application'],
 }
 
 function isActive(current: BrandScreen, item: NavItem): boolean {
   if (item.label === 'Policies') return POLICY_SCREENS.includes(current.name)
-  return item.screen ? current.name === item.screen.name : false
+  /* A group lights when the page open is one of its children, so Users and
+     Groups show where you are the way Policies does. Not through a shortcut
+     marked `lights: false`, as the submenu does not: that page belongs to
+     another row, and a second lit row says you are in two places. */
+  if (item.children?.some((c) => c.lights !== false && c.screen?.name === current.name)) return true
+  return item.screen ? current.name === item.screen.name || !!UNDER_ITEM[item.screen.name]?.includes(current.name) : false
 }
 
 /* Below this the rail stops being a column and becomes an overlay drawer.
@@ -281,6 +280,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const main = useRef<HTMLElement>(null)
   const nav = useRef<HTMLElement>(null)
   const [theme, setTheme] = useTheme()
+  const [sound, setSound] = useSoundSetting()
   const [collapsed, setCollapsed] = useState(false)
   const narrow = useNarrow()
   /* The overlay drawer's own state, kept apart from `collapsed` on purpose.
@@ -320,6 +320,8 @@ export function Shell({ children }: { children: ReactNode }) {
   // so the rail always shows where you are.
   useEffect(() => {
     if (POLICY_SCREENS.includes(screen.name) && !BUILDER_SCREENS.includes(screen.name)) setOpen('Policies')
+    if (screen.name === 'users' || screen.name === 'user-roles') setOpen('Users')
+    if (screen.name === 'groups') setOpen('Groups')
   }, [screen.name])
 
   /* A builder is where the rules are actually written — an editing surface
@@ -470,6 +472,23 @@ export function Shell({ children }: { children: ReactNode }) {
               {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
             </button>
           </Tip>
+          {/* Sound (owner, 10 Oct 2026: short sounds with toasts and at the important steps; sound.ts). On unless
+              turned off here, and remembered. Named by what a press does, as the Mode button is — a changing name
+              with aria-pressed as well would read "Turn sound off, pressed". Turning it on plays the switch's tick,
+              so the admin hears that it works. */}
+          <Tip text={sound ? 'Turn sound off' : 'Turn sound on'}>
+            <button
+              type="button"
+              className="bshell__icon"
+              onClick={() => {
+                setSound(!sound)
+                if (!sound) playCue('toggle-on')
+              }}
+              aria-label={sound ? 'Turn sound off' : 'Turn sound on'}
+            >
+              {sound ? <Volume2 size={20} strokeWidth={1.7} /> : <VolumeX size={20} strokeWidth={1.7} />}
+            </button>
+          </Tip>
           <Tip text={`Documentation. ${NOT_BUILT}`}>
             <button type="button" className="bshell__icon is-inert" aria-label="Documentation" aria-disabled="true">
               <BookOpen size={20} strokeWidth={1.7} />
@@ -512,6 +531,8 @@ export function Shell({ children }: { children: ReactNode }) {
                     type="button"
                     className={`bshell__item ${active ? 'is-active' : ''} ${caveat ? 'is-inert' : ''}`}
                     data-rail-item={item.label}
+                    /* What moved (tour/methods-tour.ts) starts on the methods item. */
+                    data-tour={item.screen ? `rail-${item.screen.name}` : undefined}
                     onClick={() => toggle(item)}
                     aria-current={active ? 'page' : undefined}
                     aria-expanded={item.children ? expanded : undefined}
@@ -621,10 +642,23 @@ const TOAST_ICON: Record<ToastTone, LucideIcon> = {
    task performed, with an icon, and a timeline at the end of the card"): the
    kind of news as a coloured mark, the message, Undo when there is one, a
    close, and a bar along the foot in the same colour that runs out as the
-   toast's time does. */
+   toast's time does.
+
+   And a sound for it (owner, 10 Oct 2026; sound.ts): once per new toast, from
+   its kind of news, and quiet when the press that caused it made its own (a
+   switch's tick, a policy's publish chime). A toast already showing when this
+   mounts was heard where it began. */
 export function Toast() {
   const toast = useToast()
   const { dismissToast } = useBrand()
+  const heard = useRef(toast?.id)
+  /* The toast whose action last ran: each runs once (toast-action.ts). */
+  const ran = useRef<number | null>(null)
+  useEffect(() => {
+    if (!toast || heard.current === toast.id) return
+    heard.current = toast.id
+    playToastCue(toast.tone)
+  }, [toast])
   return (
     <>
       <div className="u-sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -656,7 +690,15 @@ export function Toast() {
               {toast.text}
             </span>
             {toast.action && (
-              <button type="button" className="bshell__toastact" onClick={toast.action.run}>
+              <button
+                type="button"
+                className="bshell__toastact"
+                onClick={() =>
+                  /* Once, and the toast goes as it runs. The cue before it, so
+                     a toast the action shows in turn stays quiet under it. */
+                  pressToastAction(toast, ran, dismissToast, () => playCue(toast.action?.label === 'Undo' ? 'undo' : 'info'))
+                }
+              >
                 {toast.action.label}
               </button>
             )}
@@ -731,18 +773,24 @@ export function PageHead({
           {caption && <p>{caption}</p>}
         </div>
         {preview && <div className="bpage__preview">{preview}</div>}
-        {/* Documentation is not built in this prototype, so the link is the top
-            bar's inert one — present, named, and saying so — rather than a
-            link to nowhere. */}
-        {docs && (
-          <Tip text={`Documentation. ${NOT_BUILT}`}>
-            <button type="button" className="bpage__docs" aria-disabled="true">
-              <BookOpen size={15} strokeWidth={1.8} aria-hidden />
-              Documentation
-            </button>
-          </Tip>
-        )}
+        {docs && <DocsLink />}
       </div>
     </header>
+  )
+}
+
+/* The head's Documentation link, on its own for a page whose head is not a
+   `PageHead` (an application's or a group's, which carry a logo or a face and
+   a rename pencil). Documentation is not built in this prototype, so the link
+   is the top bar's inert one — present, named, and saying so — rather than a
+   link to nowhere. */
+export function DocsLink() {
+  return (
+    <Tip text={`Documentation. ${NOT_BUILT}`}>
+      <button type="button" className="bpage__docs" aria-disabled="true">
+        <BookOpen size={15} strokeWidth={1.8} aria-hidden />
+        Documentation
+      </button>
+    </Tip>
   )
 }

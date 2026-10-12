@@ -10,7 +10,6 @@ import { DECISION_WORDS } from '../../decision-words'
 import { RULE_METHODS } from '../../methods'
 import { DAY_NAMES } from '../../create/describe-words'
 import {
-  EXAMPLES,
   TENANT_TIME_ZONE,
   audienceOfAnswers,
   branchLabel,
@@ -41,6 +40,7 @@ import { AnchoredPopover } from '../testing/AnchoredPopover'
 import { WhoPicker } from '../who-picker'
 import { answerAsk, asksOf, composerSends, corrected, followUps, skipChoice, turnView, type Ask, type BoardBody, type DescribeState, type TurnView } from './describe-session'
 import { Seg } from './Section'
+import { DescribeQuick } from './DescribeQuick'
 
 /* -----------------------------------------------------------------------------
    Describe it: the panel (V4 §4 and §4.1).
@@ -887,17 +887,7 @@ export function DescribePanel({
       <div className="bdsc__thread" ref={thread}>
         {turns.length === 0 ? (
           <div className="bdsc__empty">
-            <span className="bdsc__glyph" aria-hidden>
-              <PenLine size={18} strokeWidth={1.9} />
-            </span>
-            <p className="bdsc__prompt">What should this policy do?</p>
-            <div className="bdsc__examples" role="group" aria-label="Examples">
-              {EXAMPLES.map((ex) => (
-                <button key={ex.label} type="button" className="bdsc__example" title={ex.text} onClick={() => send(ex.text)}>
-                  <span className="bdsc__exampletext">{ex.text}</span>
-                </button>
-              ))}
-            </div>
+            <DescribeQuick tenant={tenant} onSend={send} />
           </div>
         ) : (
           <ol className="bdsc__turns">

@@ -66,6 +66,12 @@ import tutorialFigureSrc from './tour/TutorialFigure.tsx?raw'
 import boardTourSrc from './tour/board-tour.ts?raw'
 import boardTourViewSrc from './tour/BoardTour.tsx?raw'
 import boardTourArtSrc from './tour/BoardTourArt.tsx?raw'
+import applicationPageSrc from './screens/ApplicationPage.tsx?raw'
+import addExistingPolicySrc from './screens/AddExistingPolicy.tsx?raw'
+import appPeopleTabsSrc from './screens/app-people-tabs.tsx?raw'
+import userDrawerSrc from './screens/UserDrawer.tsx?raw'
+import usersPageSrc from './screens/UsersPage.tsx?raw'
+import groupsPageSrc from './screens/GroupsPage.tsx?raw'
 import { CONDITION_CATALOGUE, scenarios, templates } from './data'
 import { TYPED_DECK } from './screens/gauntlet'
 
@@ -349,6 +355,27 @@ describe('sign-in, not login', () => {
      lines. Template NAMES are left alone — "Step up on suspicious login" is
      the product's own catalogue entry (docs/v0-policy-flow.md), and product
      parity keeps the console's words. */
+  /* The application page, its Add existing policy drawer and its Users and
+     Groups tabs, the User list with its drawer, and the Groups pages (10 Oct
+     2026). They name policies, people and sign-ins on every row, so they are
+     held to both lists: sign-in, and none of the banned words. */
+  it('says sign-in and none of the banned words on the application, user and group pages', () => {
+    const PEOPLE: Record<string, string> = {
+      'ApplicationPage.tsx': applicationPageSrc,
+      'AddExistingPolicy.tsx': addExistingPolicySrc,
+      'app-people-tabs.tsx': appPeopleTabsSrc,
+      'UserDrawer.tsx': userDrawerSrc,
+      'UsersPage.tsx': usersPageSrc,
+      'GroupsPage.tsx': groupsPageSrc,
+    }
+    for (const [file, src] of Object.entries(PEOPLE)) {
+      expect(uiStrings(src, file).length, file).toBeGreaterThan(10)
+      const said = uiStrings(src, file).filter((s) => LOGIN.test(s))
+      expect(`${file}: ${said.join(' | ')}`).toBe(`${file}: `)
+      expect(`${file}: ${offences(src, file).join(' | ')}`).toBe(`${file}: `)
+    }
+  })
+
   it('says sign-in in the condition hints and the template texts', () => {
     const said = [
       ...CONDITION_CATALOGUE.map((c) => c.hint),

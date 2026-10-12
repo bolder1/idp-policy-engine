@@ -78,6 +78,77 @@ export function workingOn(plan: Pick<EngineRun, 'empty' | 'decider' | 'at' | 'st
   return null
 }
 
+// --- The rule list, as the walk reaches it -----------------------------------------------------------------
+
+/* Where the walk through the deciding policy's rules is over: the deciding step, else the outcome. */
+function walkEnd(plan: Pick<EngineRun, 'at' | 'steps'>): number {
+  const deciding = plan.steps.findIndex((k) => k.kind === 'deciding')
+  return deciding >= 0 ? deciding : plan.at.outcome
+}
+
+/* The rules of the policy that decides, as the engine has reached them at step `s` (owner, 6 Oct 2026: "it should feel
+   more real"). While it walks, only the rules it has read or is reading — a rule it has not reached is not on the card
+   yet, so the card never says how a rule fares before the engine has read it. Once the walk is over, every rule, the
+   ones never reached among them. */
+export function rulesWalked<R extends { visited: boolean; startAt: number; state: string }>(plan: Pick<EngineRun, 'at' | 'steps'> & { rules: readonly R[] }, s: number): readonly R[] {
+  const end = walkEnd(plan)
+  if (end < 0 || s >= end) return plan.rules
+  /* A rule switched off is passed over, not read, but in its own beat (focus2-pace.ts): it is on the card from then. */
+  return plan.rules.filter((r) => (r.visited || r.state === 'off') && r.startAt >= 0 && s >= r.startAt)
+}
+
+/** How a rule row reads at step `s`: the walk's own word for where it is, and the class its tone keys on. */
+export interface RuleRowState {
+  word: string
+  /** 'reading' while the engine is on it; else the answer's class (the CSS keys `is-match`, `is-no-match`, …). */
+  tone: 'reading' | 'match' | 'no-match' | 'unknown' | 'possible' | 'off' | 'not-reached' | 'waiting'
+  /** The answer is in: the failing row's word may follow it. */
+  done: boolean
+}
+
+const ROW_WORD: Record<TraceResult, RuleRowState> = {
+  waiting: { word: '', tone: 'waiting', done: false },
+  reading: { word: 'Reading', tone: 'reading', done: false },
+  matched: { word: 'Matches', tone: 'match', done: true },
+  missed: { word: 'Not matched', tone: 'no-match', done: true },
+  folded: { word: 'Not matched', tone: 'no-match', done: true },
+  unknown: { word: 'Can’t tell', tone: 'unknown', done: true },
+  possible: { word: 'If not', tone: 'possible', done: true },
+  off: { word: 'Switched off', tone: 'off', done: true },
+  'not-reached': { word: 'Not reached', tone: 'not-reached', done: true },
+}
+
+/* A row's state at step `s`, read off the trace (journey.ts `traceResult`) — never the rule's final state, which is
+   what made a row say "Matches" before the engine had read it. A rule never reached says so once the walk is over. */
+export function ruleRowState(r: Parameters<typeof traceResult>[0], s: number, walked: boolean): RuleRowState {
+  if (r.state === 'not-reached') return walked ? ROW_WORD['not-reached'] : ROW_WORD.waiting
+  return ROW_WORD[traceResult(r, s, true)]
+}
+
+/* What the sign-in showed on each row of a rule, once the engine has begun to read it (owner, 6 Oct 2026: "it should feel
+   more real"): the who row's value, and each condition's own part where the row names it among its parts, else the
+   row's — the same rows journey.ts `ruleMarks` marks. Nothing for a row the engine has not reached. */
+export function rowEvidence(
+  r: { visited: boolean; checks: readonly { category: string; key: string; value: string; subs: readonly { key: string; actual: string }[] }[]; checked: number; checkAt: readonly number[] },
+  conditionIds: readonly string[],
+  s: number,
+): { who: string | null; conds: Record<string, string> } {
+  const none = { who: null, conds: {} }
+  if (!r.visited || r.checks.length === 0) return none
+  const read = (k: number) => k >= 0 && k < r.checked && r.checkAt[k] !== undefined && s >= r.checkAt[k]
+  const whoK = r.checks.findIndex((c) => c.category === 'who')
+  const who = read(whoK) ? r.checks[whoK].value || null : null
+  const conds: Record<string, string> = {}
+  for (const id of conditionIds) {
+    const k = r.checks.findIndex((c) => c.category !== 'who' && (c.key === id || c.subs.some((sub) => sub.key === id)))
+    if (!read(k)) continue
+    const row = r.checks[k]
+    const said = row.subs.find((sub) => sub.key === id)?.actual || row.value
+    if (said) conds[id] = said
+  }
+  return { who, conds }
+}
+
 // --- The fold ---------------------------------------------------------------------------------
 
 /* Which cards are open (owner, 5 Oct 2026: "by default, all cards should be
@@ -89,6 +160,23 @@ export function workingOn(plan: Pick<EngineRun, 'empty' | 'decider' | 'at' | 'st
 export function foldOpen(cards: readonly CardKey[], landed: boolean, hand: Partial<Record<CardKey, boolean>> = {}): Record<CardKey, boolean> {
   const open: Record<CardKey, boolean> = { 'sign-in': false, policy: false, rule: false, outcome: false }
   for (const k of cards) open[k] = hand[k] ?? !landed
+  return open
+}
+
+/* The card the engine is on at step `s` while the run plays — the newest card on screen (owner's queued ask, 6 Oct 2026:
+   "card-by-card done-and-fold"): the policies while it finds the one that applies, the rule card while it walks the
+   rules, the outcome once it decides. Null before any card is on screen. */
+export function onCard(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>, s: number): CardKey | null {
+  const shown = cardsAt(plan, s).filter((k) => k !== 'sign-in')
+  return shown.at(-1) ?? null
+}
+
+/* Focus's fold: one card open at a time. The card the engine is on is open; a card it has done with folds to its head as
+   the next one opens, so the chain stays short and reads as a trail of answers; once the run lands, every card folds.
+   What the admin opened or folded by hand stands, as in `foldOpen`. */
+export function foldOne(cards: readonly CardKey[], on: CardKey | null, landed: boolean, hand: Partial<Record<CardKey, boolean>> = {}): Record<CardKey, boolean> {
+  const open: Record<CardKey, boolean> = { 'sign-in': false, policy: false, rule: false, outcome: false }
+  for (const k of cards) open[k] = hand[k] ?? (!landed && k === on)
   return open
 }
 

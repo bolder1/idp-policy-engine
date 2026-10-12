@@ -18,7 +18,7 @@ import {
 
 import { type Rule } from '../../data'
 import { FaceStack, type FaceItem } from '../../faces'
-import { RowMenu, Toggle } from '../../kit'
+import { Badge, RowMenu, Toggle } from '../../kit'
 import { ruleMenu } from './rule-menu'
 import { cardJoin, cardLetter, leafCount, topJoin } from '../../predicate'
 import { hasWho, normaliseWho, whoSummary } from '../../rule-who'
@@ -214,6 +214,7 @@ export function RuleCard({
   onHover,
   cardRef,
   flash = false,
+  fresh = false,
   source,
   traced = false,
   highlight,
@@ -250,6 +251,8 @@ export function RuleCard({
   cardRef: (el: HTMLDivElement | null) => void
   /** Shown from a guard page: an outline that fades. CSS only — this is a motion element. */
   flash?: boolean
+  /** Added by a fix from Access checks (conflict-fix.ts): a New tag beside its state, so the change is found at a glance. */
+  fresh?: boolean
   /* The words this card was written from, by Describe it — shown under the
      title until the policy is next saved (describe spec, §3.8). */
   source?: string
@@ -403,6 +406,11 @@ export function RuleCard({
               <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`} title={rule.enabled ? stateNote : undefined}>
                 {stateLabel(state, rule.enabled, unreachable)}
               </span>
+            )}
+            {fresh && (
+              <Badge tone="info" className="bb__fresh">
+                New
+              </Badge>
             )}
           </span>
           {source && (

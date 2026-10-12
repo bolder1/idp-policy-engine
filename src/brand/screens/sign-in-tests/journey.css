@@ -1201,9 +1201,7 @@ button.tj-why__grow:focus-visible { outline: var(--bw-thick) solid var(--accent)
 .tj-why__gend { display: grid; place-items: center; color: var(--text-tertiary); }
 .tj-why__none { font-size: var(--fs-xs); color: var(--text-tertiary); }
 .tj-why__list { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
-/* A rule that also applies: its card, as the policy draws it — no box round it. */
-.tj-why__rule { display: flex; flex-direction: column; min-width: 0; }
-/* Every other finding: ONE line — its mark, what it is, at most one action — and why under it. */
+/* A finding: its mark, then its card (WhyCard.tsx, `.tj-find`). */
 .tj-why__item { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: start; column-gap: var(--space-3); padding: var(--space-3) var(--space-4); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); }
 .tj-why__item.is-conflict,
 .tj-why__item.is-depends { border-color: var(--fb-notice-border); }
@@ -1211,11 +1209,6 @@ button.tj-why__grow:focus-visible { outline: var(--bw-thick) solid var(--accent)
 .tj-why__item.is-conflict .tj-why__icon,
 .tj-why__item.is-depends .tj-why__icon { color: var(--fb-notice-dot); }
 .tj-why__text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
-.tj-why__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin: 0; font-size: var(--fs-xs); line-height: 18px; }
-.tj-why__head { min-width: 0; font-weight: var(--fw-semibold); color: var(--text-primary); }
-.tj-why__item.is-conflict .tj-why__head,
-.tj-why__item.is-depends .tj-why__head { color: var(--fb-notice-fg); }
-.tj-why__would { flex: none; }
 .tj-why__detail,
 .tj-why__fix,
 .tj-why__caution { margin: 0; font-size: var(--fs-xs); line-height: 17px; }
@@ -1225,6 +1218,71 @@ button.tj-why__grow:focus-visible { outline: var(--bw-thick) solid var(--accent)
 .tj-why__ifs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin: var(--space-1) 0 0; }
 .tj-why__if { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-secondary); }
 .tj-why__act { align-self: start; }
+/* Why in one line (6 Oct 2026, "users don't want to read a lot"); the full reason in its tooltip. */
+.tj-why__detail.is-short { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* A finding's fix, written on the press that makes it (RunChain.tsx `FixButton`): blue, the page's selection colour —
+   the view's one orange button is not here. It opens the policy with the change in its draft. */
+.tj-fix {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  max-width: 100%;
+  min-height: var(--ctl-height-sm);
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  border: var(--bw-thin) solid var(--accent-soft-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 1.35;
+  color: var(--text-link);
+  text-align: left;
+  cursor: pointer;
+}
+.tj-fix > svg { flex: none; }
+.tj-fix:hover { border-color: var(--accent); }
+.tj-fix:focus-visible { outline: var(--bw-thick) solid var(--focus-ring); outline-offset: 1px; }
+/* A finding as a card (WhyCard.tsx, finding-card.ts): its heading, at most two lines, then the fix as the press and Open
+   rule beside it. */
+/* Roomier than a line of the list (6 Oct 2026, "make the card bigger"): the picture at its right, at the height of its
+   words (FindingArt.tsx). */
+.tj-find { grid-template-columns: 16px minmax(0, 1fr); column-gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-lg); }
+.tj-find.has-art { grid-template-columns: 16px minmax(0, 1fr) auto; }
+.tj-find > .tj-why__icon { grid-column: 1; grid-row: 1; padding-top: var(--space-1); }
+.tj-find > .tj-why__text { grid-column: 2; grid-row: 1; }
+.tj-find > .tj-art { grid-column: 3; grid-row: 1; align-self: center; }
+.tj-find__title { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 22px; color: var(--text-primary); }
+.tj-find__line { display: -webkit-box; overflow: hidden; margin: var(--space-2) 0 0; font-size: var(--fs-sm); line-height: 20px; color: var(--text-secondary); -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tj-find__acts { display: flex; align-items: center; gap: var(--space-4); min-width: 0; margin-top: var(--space-4); }
+.tj-find__acts > .tj-fix { margin-top: 0; }
+.tj-find__acts > .tj-why__act { flex: none; align-self: center; margin-left: auto; }
+/* The press opens on what it will do, inside itself (RunChain.tsx `FixButton`): its words clipped to the room there is. */
+.tj-fix { min-width: 0; overflow: hidden; }
+.tj-fix__word { flex: none; }
+.tj-fix__say { display: block; min-width: 0; overflow: hidden; font-weight: var(--fw-medium); text-overflow: ellipsis; white-space: nowrap; }
+.tj-fix__say::before { content: '·'; padding: 0 var(--space-2); color: var(--accent-soft-border); }
+/* A finding's picture (FindingArt.tsx): the policy that applies in the accent, the one it hides in the notice. */
+.tj-art { display: block; flex: none; overflow: visible; }
+.tj-art__card { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1.5; }
+.tj-art__card.is-win { stroke: var(--accent); }
+.tj-art__card.is-also { fill: var(--fb-notice-bg); stroke: var(--fb-notice-dot); }
+.tj-art__line { fill: var(--border-subtle); }
+.tj-art__dot { fill: var(--accent); }
+.tj-art__ring { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.tj-art__row { fill: var(--surface-sunken); stroke: var(--border-default); stroke-width: 1.5; }
+.tj-art__row.is-also { fill: var(--fb-notice-bg); stroke: var(--fb-notice-dot); }
+/* Break-in attempts, in the same card: its label is its title, the tip beside it (the section's older column and rule
+   above it are the list's, gone). */
+.tj-find.tj-why__att { display: grid; gap: 0; margin-top: var(--space-2); padding-top: var(--space-5); border-top: var(--bw-thin) solid var(--fb-notice-border); }
+.tj-find.tj-why__att.is-info { border-color: var(--border-subtle); }
+/* With a picture the text column stops short of the card's edge, so a pushed-right action floats mid-card: it follows the fix. */
+.tj-find:is(.tj-why__att, .has-art) .tj-find__acts > .tj-why__act { margin-left: 0; }
+.tj-find .tj-why__attlabel { margin: 0; }
+/* The attempts worth a look: what each did, in the conflict tone where it got in. */
+.tj-why__attword:is(.is-got-through, .is-weaker-factor, .is-less-than-asked) { color: var(--fb-notice-fg); }
 /* A policy named in a finding: a quiet link that opens it — the line's own
    words at rest, the link's colour and the ghost tint under the pointer.
    The finding's one action (the fix) stays the one blue thing on its line. */
@@ -1249,15 +1307,8 @@ button.tj-why__grow:focus-visible { outline: var(--bw-thick) solid var(--accent)
 .tj-why__covers .tj-why__name:hover { color: var(--text-link); }
 .tj-why__caud { min-width: 0; overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
 
-/* Break-in attempts on the application, the why's last section (WhyCard.tsx;
-   owner, 1 Oct 2026): its own, under a hairline where findings stand above
-   it — the findings are about this person, the attempts about the
-   application. Its label with the ⓘ, the four counts, Review attempts at
-   its end in the canvas's link style. */
-.tj-why__att { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.tj-why__att:not(:first-child) { padding-top: var(--space-4); border-top: var(--bw-thin) solid var(--border-subtle); }
+/* Break-in attempts on the application, the why's last card (WhyCard.tsx, `.tj-find.tj-why__att` above): its title with the ⓘ. */
 .tj-why__label.tj-why__attlabel { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
-.tj-why__attfoot { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
 
 /* The four counts as cells (BreakInPanel.tsx `AttemptCells`): the why's
    section and the attempts panel's head. Each its number over its word; a

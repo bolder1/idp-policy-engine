@@ -43,10 +43,20 @@ export const WOULD_WORDS: Record<AccessDecision, string> = {
   deny: 'Would deny',
 }
 
-/** The badge tone for each decision. Kit `Badge` tones, so every decision is the one pill family. */
-export const DECISION_TONE: Record<AccessDecision, 'positive' | 'notice' | 'negative'> = {
+/* Two colours for three decisions (owner, 6 Oct 2026: "for 2FA use green only — both fall under Allow, so two colours
+   only — add a different green shade to tell them apart"). An allow is green, a deny red; the amber is left to what
+   can't be told. `DECISION_TONE` is the family — a path, a band, a verdict; `DECISION_BADGE_TONE` the pill, where 2FA
+   wears the second, deeper green. */
+export const DECISION_TONE: Record<AccessDecision, 'positive' | 'negative'> = {
   '1fa': 'positive',
-  '2fa': 'notice',
+  '2fa': 'positive',
+  deny: 'negative',
+}
+
+/** The badge tone for each decision. Kit `Badge` tones, so every decision is the one pill family. */
+export const DECISION_BADGE_TONE: Record<AccessDecision, 'positive' | 'positive-strong' | 'negative'> = {
+  '1fa': 'positive',
+  '2fa': 'positive-strong',
   deny: 'negative',
 }
 

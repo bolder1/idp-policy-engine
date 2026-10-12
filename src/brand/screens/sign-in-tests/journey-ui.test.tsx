@@ -522,9 +522,10 @@ describe('the outcome, the hero of the flow (§12.4)', () => {
     expect(tryJourneySrc).toContain('changed={running ? null : changed}')
   })
 
-  it('stepped up: amber; the second factor it asks for is the rule’s then-flow and, folded, the answer’s one line', () => {
+  /* Green since 6 Oct 2026: 2FA is an allow (two colours, decision-words.ts); its badge wears the second green. */
+  it('stepped up: green; the second factor it asks for is the rule’s then-flow and, folded, the answer’s one line', () => {
     const o = journey(home)
-    expect(hero(o)).toMatch(/class="tj-hero is-notice is-open[ "]/)
+    expect(hero(o)).toMatch(/class="tj-hero is-positive is-open[ "]/)
     expect(hero(o)).toMatch(/class="tj-hero__word">Allow with 2FA</)
     expect(text(cardOf(o, planOf(home).plan.rules[1].node))).toContain('then Second factor Password miniOrange Push Signed in')
     expect(hero(journey(home, { fold: COLLAPSE }))).toMatch(/<span class="tj-hero__inline" title="Asked for miniOrange Push">Asked for miniOrange Push<\/span>/)
@@ -1196,7 +1197,7 @@ describe('the fold, drawn', () => {
     expect(stopOf(o, 'decider')).toMatch(/^<div class="bb__card is-trace tj-pnode is-policy is-decided is-folded is-foldable"/)
     expect(text(stopOf(o, 'decider'))).toBe('Developer tools — office and device checks Decides Rule 2 of 3 matched')
     for (const gone of ['tj-pstack', 'tj-rail', 'tj-rcard']) expect(o).not.toContain(gone)
-    expect(o).toMatch(/class="tj-hero is-notice is-folded is-foldable"/)
+    expect(o).toMatch(/class="tj-hero is-positive is-folded is-foldable"/)
     expect(o).toContain('class="tj-hero__inline"')
     expect(o).not.toContain('tj-hero__body')
   })
@@ -1250,7 +1251,7 @@ describe('colour: the decided path in the outcome’s colour, blue while working
     expect(rules).toMatch(/\.tj-stage\.is-path-neutral \{[^}]*--tj-path-dot: var\(--border-strong\);/)
     /* The stage says which: the outcome's (journey.ts `pathTone`). */
     expect(stageOf(journey(arun))).toContain('is-path-positive')
-    expect(stageOf(journey(home))).toContain('is-path-notice')
+    expect(stageOf(journey(home))).toContain('is-path-positive')
     expect(stageOf(journey(devon))).toContain('is-path-negative')
     expect(stageOf(journey(unstated))).toContain('is-path-notice')
   })

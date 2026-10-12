@@ -376,6 +376,17 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
     const open = bar.lastIndexOf('<button', at)
     return bar.slice(open, bar.indexOf('>', at))
   }
+  /* 6 Oct 2026: a connector carries its ink (owner: "blue for progress, and at the end based on outcome, and then greyed
+     out") — `is-run` while the engine travels, `is-landed` as the outcome reaches it, `is-rest` after — and the outcome's
+     tone as `is-out-<tone>`. A run drawn settled (these paints are `jumped`) is grey from the start, so each of its three
+     connectors is at rest and names the run's own outcome. */
+  const LINK_TONE = new Map<RunLayoutProps, string>([
+    [ALLOW, 'allow'],
+    [DENY, 'deny'],
+    [DEPENDS, 'depends'],
+    [DEFAULTED, 'allow'],
+  ])
+  const settledLink = (props: RunLayoutProps) => `class="bb__link rl-c2__link is-rest is-out-${LINK_TONE.get(props)}"`
 
   it('is Vertical by default, under a key of its own: no pair, the brief ON once a run has landed, no Back and no route', () => {
     /* Node has no window, so nothing is stored: the view reads Vertical. The brief's old remembered flag is no longer
@@ -400,7 +411,9 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
       expect(out, name).not.toContain('is-across')
       if (props !== EMPTY) {
         expect(cardsIn(out), name).toEqual(['policy', 'rule', 'outcome'])
-        expect(count(out, 'class="bb__link rl-c2__link"'), name).toBe(3)
+        /* Three connectors and no other, each at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
+        expect(count(out, 'class="bb__link'), name).toBe(3)
+        expect(count(out, settledLink(props)), name).toBe(3)
       }
       /* The same as asking for Vertical. */
       expect(out, name).toBe(wrap(props, { view: 'vertical' }))
@@ -444,7 +457,9 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
       expect(out, name).toMatch(/--rl-c2-tracks:3/)
       expect(nodeOf(out), name).toContain(props.plan.appName)
       expect(cardsIn(out), name).toEqual(['policy', 'rule', 'outcome'])
-      expect(count(out, 'class="bb__link rl-c2__link"'), name).toBe(3)
+      /* The same three connectors as down the canvas, at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
+      expect(count(out, 'class="bb__link'), name).toBe(3)
+      expect(count(out, settledLink(props)), name).toBe(3)
       for (const gone of ['f2o__', 'rl-focus__slot', 'rl-focus__edge', 'rl-f2__band']) expect(out, `${name} ${gone}`).not.toContain(gone)
       /* The row is drawn by `initialView` alone: the bar still has no pair to press. */
       expect(side(out, 'horizontal'), name).toBeNull()
@@ -523,7 +538,7 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
   /* Three showcase sign-ins (Tom Whelan on Windows 10, Aisha Khan on a personal laptop, James Whitfield in Austin)
      say "none of its 3 rules match" while the footer says "Checked 1 policy · 3 rules · 6 checks". */
   it('keeps numbers once: with the brief on, the footer drops a count the sentence already says', () => {
-    const said = 'Tom Whelan is denied GitHub Enterprise: Developer tools applies, but none of its 3 rules match, so Nothing else matched decides.'
+    const said = 'Tom Whelan is denied the GitHub Enterprise app: the Developer tools policy applies, but none of its 3 rules match, so Nothing else matched decides.'
     expect(footerBeside('Checked 1 policy · 3 rules · 6 checks', said)).toBe('Checked 1 policy · 6 checks')
     /* "rule 3" is a name, not a count: nothing goes. */
     expect(footerBeside('Checked 1 policy · 2 rules · 3 checks', 'and rule 3 matches.')).toBe('Checked 1 policy · 2 rules · 3 checks')

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { apps, blankPolicy, coversEveryApp, policies, type Policy, type Rule } from '../data'
-import { appsAt, policiesAt, type Depth } from '../fixtures'
+import { apps, audienceOf, blankPolicy, coversEveryApp, groups, policies, users, type Policy, type Rule } from '../data'
+import { appsAt, policiesAt, showcaseTenant, tenantAt, type Depth } from '../fixtures'
 import {
   attachKind,
   attachTo,
@@ -384,9 +384,11 @@ describe('summarise', () => {
     expect(s.tone).toBe('off')
   })
 
-  it('says why one active policy with no rule turned on decides nothing', () => {
+  it('counts one live policy with no rules as deciding, by its last row', () => {
+    /* The engine picks it for everyone it governs and its last row answers
+       them, so it is protection, not "No rule on" (app-standing.ts). */
     const s = summarise('workday', [policy({ appIds: ['workday'], rules: [] })])
-    expect(s).toMatchObject({ own: 1, decides: 0, tag: 'No rule on', tone: 'off' })
+    expect(s).toMatchObject({ own: 1, decides: 1, tag: null, tone: 'on' })
   })
 
   it('names none deciding when several are attached and none decides', () => {
@@ -396,9 +398,9 @@ describe('summarise', () => {
 
   it('names the shortfall when some of several do not decide', () => {
     const list = [
-      policy({ appIds: ['workday'] }),
+      policy({ appIds: ['workday'], audience: audienceOf(['finance']) }),
       policy({ appIds: ['workday'], status: 'inactive' }),
-      policy({ appIds: ['workday'] }),
+      policy({ appIds: ['workday'], audience: audienceOf(['engineering']) }),
     ]
     expect(summarise('workday', list)).toMatchObject({
       own: 3,
@@ -409,8 +411,23 @@ describe('summarise', () => {
     })
   })
 
+  it('counts a live policy shadowed for everyone it names as not deciding', () => {
+    /* Two policies for everyone on one application: the first in the list
+       decides, and the second never does, whatever its status says. */
+    const list = [policy({ appIds: ['workday'] }), policy({ appIds: ['workday'] })]
+    expect(summarise('workday', list)).toMatchObject({ own: 2, decides: 1, tag: '1 not deciding', tone: 'part' })
+  })
+
+  it('says a lone policy that can never decide is never deciding', () => {
+    const s = summarise('workday', [policy({ appIds: ['workday'], type: 'Session' })])
+    expect(s).toMatchObject({ own: 1, decides: 0, tag: 'Never decides', tone: 'off', title: 'Not an app access policy.' })
+  })
+
   it('carries no qualification when everything attached decides', () => {
-    const s = summarise('workday', [policy({ appIds: ['workday'] }), policy({ appIds: ['workday'] })])
+    const s = summarise('workday', [
+      policy({ appIds: ['workday'], audience: audienceOf(['finance']) }),
+      policy({ appIds: ['workday'], audience: audienceOf(['engineering']) }),
+    ])
     expect(s).toMatchObject({ label: '2 policies', tag: null, tone: 'on' })
   })
 
@@ -510,6 +527,54 @@ describe('deleteDetail', () => {
 
   it('says nothing for a policy with no applications', () => {
     expect(deleteDetail(policy({ appIds: [], status: 'draft' }), [sys], apps)).toBeNull()
+  })
+
+  /* The engine's answer, as the app page numbers its rows (`appStanding`),
+     not `decidesFor`: a live policy with no rules decides by its last row, and
+     a live one shadowed for everyone it names decides nothing. */
+  it('says protects for a live policy with no rules: it decides by its last row', () => {
+    const mine = policy({ appIds: ['box'], rules: [] })
+    expect(deleteDetail(mine, [sys, mine], apps)).toBe(`Protects ${box.name}. Sign-ins there will use the Global Default Policy.`)
+  })
+
+  it('says Payroll — Application baseline protects Payroll, as the app page numbers it', () => {
+    const medium = tenantAt('medium')
+    const baseline = medium.policies.find((p) => p.id === 's9-baseline')!
+    const payroll = medium.apps.find((a) => a.id === 'payroll')!
+    expect(deleteDetail(baseline, medium.policies, medium.apps, medium.directory.people, medium.groups)).toBe(
+      `Protects ${payroll.name}. Sign-ins there will use the Global Default Policy.`,
+    )
+  })
+
+  it('says AWS production for DevOps decides no sign-ins: AWS for engineering teams decides for DevOps', () => {
+    const t = showcaseTenant()
+    const devops = t.policies.find((p) => p.name === 'AWS production for DevOps')!
+    const aws = t.apps.find((a) => a.id === 'aws')!
+    expect(deleteDetail(devops, t.policies, t.apps, t.directory.people, t.groups)).toBe(`Assigned to ${aws.name}. It decides no sign-ins.`)
+  })
+
+  it('names only the applications it decides on after "Protects"', () => {
+    /* Shadowed on Slack by a group policy higher in the list for the one group
+       it names; deciding on Box. */
+    const mine = policy({ appIds: ['box', 'slack'], audience: audienceOf(['finance']) })
+    const first = policy({ appIds: ['slack'], audience: audienceOf(['finance']) })
+    expect(deleteDetail(mine, [sys, first, mine], apps, users, groups)).toBe(
+      `Protects ${box.name}. Sign-ins there will use the Global Default Policy.`,
+    )
+  })
+})
+
+describe('decidedOnlyBy, on the showcase', () => {
+  const t = showcaseTenant()
+  const byName = (name: string) => t.policies.find((p) => p.name === name)!
+  const only = (name: string) => decidedOnlyBy(byName(name), t.policies, t.directory.people, t.groups)
+
+  it('leaves Box off for Box for engineering: Tanmay Joshi, in Design too, goes to Box for design', () => {
+    expect(only('Box for engineering')).toEqual([])
+  })
+
+  it('keeps Box for Box for design: everyone it decides for goes to the Global Default', () => {
+    expect(only('Box for design')).toEqual(['box'])
   })
 })
 

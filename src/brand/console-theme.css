@@ -133,6 +133,12 @@
   --fb-positive-border: #b6e3c6;
   --fb-positive-fg: #14663a;
   --fb-positive-dot: #128f43;
+  /* Allow with 2FA: a second, deeper green leaning teal (owner, 6 Oct 2026: "for 2FA use green only — both fall under
+     Allow, so two colours only — a different green shade to tell them apart"). The amber is the notice family's alone. */
+  --fb-positive-strong-bg: #dcf1ea;
+  --fb-positive-strong-border: #93cfbd;
+  --fb-positive-strong-fg: #0a5546;
+  --fb-positive-strong-dot: #0c7a64;
   --fb-negative-bg: #fdf0f2;
   --fb-negative-border: #f5c6ce;
   --fb-negative-fg: #a5142b;

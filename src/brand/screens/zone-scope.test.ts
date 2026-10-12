@@ -145,7 +145,7 @@ describe('the read-back tells the two halves apart', () => {
        labelled branch of `conditionSentence`. Only two attributes still reach
        it — `day` and `ml-risk` — since zone and device-profile conditions take
        the branch above, which drops the label deliberately. */
-    expect(conditionSentence(cond('day', 'is', ['Monday', 'Tuesday']))).toBe('Day of week is Monday or Tuesday')
+    expect(conditionSentence(cond('day', 'is', ['Monday', 'Tuesday']))).toBe('Sign-in days is Monday or Tuesday')
   })
 })
 

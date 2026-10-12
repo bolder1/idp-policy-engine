@@ -105,6 +105,7 @@
 .tband__strip { display: flex; gap: var(--space-1); height: 4px; }
 .tband__seg { flex-basis: 0; min-width: 2px; border-radius: var(--radius-sm); background: var(--border-default); }
 .tband__seg.is-positive { background: var(--fb-positive-border); }
+.tband__seg.is-positive-strong { background: var(--fb-positive-strong-border); }
 .tband__seg.is-notice { background: var(--fb-notice-border); }
 .tband__seg.is-negative { background: var(--fb-negative-border); }
 .tband__labels { display: flex; gap: var(--space-1); }

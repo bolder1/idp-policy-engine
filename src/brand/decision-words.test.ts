@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CANT_TELL,
   DECISION_PHRASE,
+  DECISION_BADGE_TONE,
   DECISION_TONE,
   DECISION_WORDS,
   DEVICE_FACT_WORDS,
@@ -30,7 +31,9 @@ describe('the decision vocabulary', () => {
 
   it('gives every decision a badge tone and never a grey one', () => {
     /* Grey is Can't tell's, and Can't tell is not a decision. */
-    expect(DECISION_TONE).toEqual({ '1fa': 'positive', '2fa': 'notice', deny: 'negative' })
+    /* Two colours (6 Oct 2026): an allow is green, a deny red; 2FA's badge is the second, deeper green. */
+    expect(DECISION_TONE).toEqual({ '1fa': 'positive', '2fa': 'positive', deny: 'negative' })
+    expect(DECISION_BADGE_TONE).toEqual({ '1fa': 'positive', '2fa': 'positive-strong', deny: 'negative' })
     expect(CANT_TELL).toBe("Can't tell")
   })
 

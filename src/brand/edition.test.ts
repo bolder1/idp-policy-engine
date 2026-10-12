@@ -63,7 +63,7 @@ describe('the two editions', () => {
        of now"); its checks stay on. Both are named, so the pin says
        everything the showcase shows. */
     expect(storeSrc.replace(/\s+/g, ' ')).toContain(
-      'features: SHOWCASE ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: false, draftChecks: true } : featuresOf(edition),',
+      'features: SHOWCASE ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: true, draftChecks: true } : featuresOf(edition),',
     )
     expect(storeSrc.match(/featuresOf\(/g)?.length).toBe(2)
   })

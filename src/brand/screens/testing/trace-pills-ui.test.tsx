@@ -89,7 +89,7 @@ describe('a card’s head in test mode', () => {
   it('shows the rule’s THEN in full tone only when lit, and the same words muted otherwise', () => {
     const lit = html(<RuleOutcome decision="2fa" lit />)
     const muted = html(<RuleOutcome decision="2fa" lit={false} />)
-    expect(lit).toContain('bx-badge--notice')
+    expect(lit).toContain('bx-badge--positive-strong')
     expect(muted).toContain('bx-badge--neutral')
     expect(muted).toContain('bx-decision-badge')
     expect(text(lit)).toBe('Allow with 2FA')

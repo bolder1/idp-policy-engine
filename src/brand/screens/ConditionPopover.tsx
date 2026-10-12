@@ -12,7 +12,10 @@ import {
   Equal,
   EqualNot,
   Fingerprint,
+  Building2,
+  CalendarClock,
   Globe,
+  Laptop,
   Layers,
   ListX,
   type LucideIcon,
@@ -21,8 +24,10 @@ import {
   MapPinX,
   MonitorSmartphone,
   Network,
+  Plug,
   Search,
   ShieldCheck,
+  ShieldAlert,
   ShieldX,
   TextSearch,
   UnfoldHorizontal,
@@ -95,6 +100,7 @@ import {
   type ConditionType,
   type Zone,
   type ZoneScope,
+  attrLabel,
 } from '../data'
 
 import './condition-popover.css'
@@ -153,6 +159,13 @@ export interface ValueOption {
      where everything is the same family is a colour that distinguishes
      nothing. */
   tone?: string
+  /* The family a row belongs to, drawn as a pill under its name — the way a
+     Jira field list says "Select list" under each field (owner, 9 Oct 2026).
+     Only the attribute menu sets it. `tone` colours the pill's mark, per
+     family, so every "User attribute" pill is the same pill. */
+  kind?: { label: string; icon: LucideIcon; tone: string }
+  /** Said on hover and matched by the search, not drawn. */
+  tip?: string
   /* Shown, and not choosable.
 
      Only one thing uses it today — the ML risk row, which is listed so the
@@ -377,6 +390,11 @@ export function ConditionPopover({
   stacked?: boolean
 }) {
   const t = conditionType(c.typeId)
+  /* An attribute condition is named by its attribute — "Email", not "User
+     attribute" — and the menu row it came from is `typeId:key`. */
+  const keyed = !!t.keys?.length && !!c.key
+  const pickedWhat = keyed ? `${c.typeId}:${c.key}` : c.typeId
+  const whatLabel = keyed ? attrLabel(c.key!) : t.label
   /* `'op'`, not `'what'`.
 
      A row is only ever added by choosing an attribute in the catalogue dialog —
@@ -493,8 +511,10 @@ export function ConditionPopover({
      setting on the comparison. A known field is a list and cannot be
      misspelled; a tenant's own is typed, because a list cannot hold a key this
      product has never heard of. */
+  /* The attribute is chosen in the menu itself now; a key row is only left
+     for an older condition that never named one. */
   const keyRow =
-    t.valueKind !== 'text' ? null : t.keys?.length ? (
+    t.valueKind !== 'text' || keyed ? null : t.keys?.length ? (
       <Picker
         label="Which attribute"
         width="fill"
@@ -576,10 +596,10 @@ export function ConditionPopover({
           icon={conditionIcon(t.id, t.group)}
           tone={conditionTone(t.id, t.group)}
           open={open === 'what'}
-          label={`Change what is checked. Currently ${t.label}.`}
+          label={`Change what is checked. Currently ${whatLabel}.`}
           onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
         >
-          {t.label}
+          {whatLabel}
         </Field>
 
         <Field
@@ -625,10 +645,10 @@ export function ConditionPopover({
         ref={whatRef}
         kind="what"
         open={open === 'what'}
-        label={`Change what is checked. Currently ${t.label}.`}
+        label={`Change what is checked. Currently ${whatLabel}.`}
         onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
       >
-        {t.label}
+        {whatLabel}
       </Seg>
 
       <Seg
@@ -693,12 +713,10 @@ export function ConditionPopover({
           watch={`${open}:${c.typeId}:${c.operator}:${values.join(',')}:${JSON.stringify(c.scopes ?? {})}`}
         >
           {open === 'what' && (
-            <OptionList
-              /* No search: nine rows are all on screen, and a search over them
-                 can only ever hide eight. See `attributeOptions`. */
-              items={attributeOptions()}
-              picked={[c.typeId]}
-              single
+            <AttributeMenu
+              /* Searchable since every user and custom attribute is a row of
+                 its own (9 Oct 2026). See `attributeOptions`. */
+              picked={[pickedWhat]}
               menu={stacked}
               /* Progressive, and only forwards. Choosing an attribute opens the
                  operators; choosing an operator opens the values. It does not
@@ -709,7 +727,7 @@ export function ConditionPopover({
                 /* The attribute it already is: keep it, as a select does. A
                    retype rebuilds the condition from nothing, so re-choosing the
                    same row wiped its operator and every value. */
-                if (id === c.typeId) {
+                if (id === pickedWhat) {
                   setOpen(null)
                   whatRef.current?.focus()
                   return
@@ -802,25 +820,175 @@ function Holder({
 /* `InlineCard` stood here — every inspector menu as a titled card in the flow
    under the row. Replaced by the dropdown above (21 Sep 2026). */
 
-/* The attribute menu's rows: every condition a rule can ask, with the family's
-   glyph. `WHEN_CONDITIONS` and not the catalogue: `group` and `user` stay in
-   the catalogue only to label leftover conditions — people are the rule's
-   `who`. No `meta` line: it restated the first word of the row above it. The
-   tone is per attribute (`tones.ts`), not per group, so the three Library rows
-   do not share one colour. */
-function attributeOptions(): ValueOption[] {
-  return WHEN_CONDITIONS.map((x) => ({
-    value: x.id,
-    label: x.label,
-    /* What the attribute is, in a line (owner, 22 Sep 2026: "the user should
-       understand what these attributes are"). Under the name rather than on a
-       hover tip, so the list can be read and compared at a glance. */
-    meta: x.hint,
-    note: x.soon ? 'Coming soon' : undefined,
-    icon: conditionIcon(x.id, x.group),
-    tone: conditionTone(x.id, x.group),
-    disabled: x.soon,
-  }))
+/* The attribute menu's rows: every condition a rule can ask, by its own name,
+   with its family as a pill underneath. `WHEN_CONDITIONS` and not the
+   catalogue: `group` and `user` stay in the catalogue only to label leftover
+   conditions — people are the rule's `who`.
+
+   User and custom attributes are FAMILIES, not rows (owner, 9 Oct 2026): a
+   rule picks "Email" or "Clearance" itself, never "User attribute" and then
+   which one. Each key is a row of its own, valued `typeId:key`, and the
+   family is the pill under it rather than a heading over a run of rows — the
+   list reads as one list, and a search for "region" still says where Region
+   comes from.
+
+   The row keeps its own mark in front (the attribute's glyph, `tones.ts`);
+   the pill's mark is the FAMILY's, so the two never draw the same glyph twice
+   on one row. A family says where the value comes from — the request's
+   location, the device, your own endpoint, the clock, the directory, your
+   organization's own fields, the risk engine — rather than one word for all
+   of the first five (owner, 9 Oct 2026: "give these a better name").
+   "Location" is Entra's word for the same thing: its Locations condition
+   holds both IP ranges and countries, as a zone does. "Access time" is the
+   live console's "Time Based Access Restriction", and its two rows are named
+   for the sign-in they read — "Sign-in hours", "Sign-in days" — the way a
+   directory admin already knows logon hours (owner, 9 Oct 2026: IdP names
+   for the family and both rows).
+
+   Order (owner, 9 Oct 2026): what the request comes from first — location,
+   device, your endpoint, then the risk read from them — then when, then who
+   the user is. `MENU_ORDER` sorts the menu only; the catalogue keeps its own
+   order for every other list.
+
+   The one-line hint (22 Sep 2026) moved to the row's tooltip when the pill
+   took its place under the name; the search still matches it. */
+const KINDS = {
+  location: { label: 'Location', icon: MapPin, tone: 'info' },
+  device: { label: 'Device', icon: Laptop, tone: 'accent' },
+  integration: { label: 'Integration', icon: Plug, tone: 'magenta' },
+  time: { label: 'Access time', icon: CalendarClock, tone: 'notice' },
+  user: { label: 'User attribute', icon: UserRound, tone: 'lime' },
+  custom: { label: 'Custom attribute', icon: Building2, tone: 'lime' },
+  risk: { label: 'Risk', icon: ShieldAlert, tone: 'positive' },
+} satisfies Record<string, NonNullable<ValueOption['kind']>>
+
+/* No pill on the three library rows (owner, 9 Oct 2026): each is its own
+   family, so a pill under it only restated its name. `null` = no pill. */
+const KIND_OF: Record<string, NonNullable<ValueOption['kind']> | null> = {
+  zone: null,
+  fingerprint: null,
+  webhook: null,
+  time: KINDS.time,
+  day: KINDS.time,
+  'user-attr': KINDS.user,
+  'custom-attr': KINDS.custom,
+  'device-risk': KINDS.risk,
+  'ml-risk': KINDS.risk,
+}
+
+/* A condition added to the catalogue later gets its group as its family until
+   somebody names one, rather than no pill. */
+const kindOf = (id: string, group: string): ValueOption['kind'] =>
+  id in KIND_OF ? (KIND_OF[id] ?? undefined) : { label: group, icon: conditionIcon(id, group), tone: conditionTone(id, group) }
+
+const MENU_ORDER = ['zone', 'fingerprint', 'webhook', 'device-risk', 'ml-risk', 'time', 'day', 'user-attr', 'custom-attr']
+const menuRank = (id: string) => {
+  const i = MENU_ORDER.indexOf(id)
+  return i < 0 ? MENU_ORDER.length : i
+}
+
+/* --- v2 of the menu (owner, 9 Oct 2026) -------------------------------------
+   v1 draws no pill on the three library rows; v2 gives them one, "Sub
+   policies": a zone, a device profile and a hook are each a policy object of
+   their own that a rule points at. A preview switch in the menu flips between
+   them; `ATTR_MENU_SWITCH` hides it and pins the stored version. */
+/* Owner, 9 Oct 2026: "go with v2". Off = no switch, v2 pinned. */
+export const ATTR_MENU_SWITCH = false
+const ATTR_MENU_KEY = 'idp.attrMenu'
+const ATTR_MENU_EVENT = 'idp:attr-menu'
+type AttrMenuVersion = 'v1' | 'v2'
+const SUB_POLICIES: NonNullable<ValueOption['kind']> = { label: 'Sub policies', icon: Layers, tone: 'neutral' }
+
+const readAttrMenu = (): AttrMenuVersion => {
+  try {
+    return localStorage.getItem(ATTR_MENU_KEY) === 'v2' ? 'v2' : 'v1'
+  } catch {
+    return 'v1'
+  }
+}
+
+function useAttrMenuVersion(): [AttrMenuVersion, (v: AttrMenuVersion) => void] {
+  const [v, setV] = useState<AttrMenuVersion>(readAttrMenu)
+  useEffect(() => {
+    const on = () => setV(readAttrMenu())
+    window.addEventListener(ATTR_MENU_EVENT, on)
+    return () => window.removeEventListener(ATTR_MENU_EVENT, on)
+  }, [])
+  const set = (next: AttrMenuVersion) => {
+    try {
+      localStorage.setItem(ATTR_MENU_KEY, next)
+    } catch {
+      /* Private window: the switch still works for this menu. */
+    }
+    setV(next)
+    window.dispatchEvent(new Event(ATTR_MENU_EVENT))
+  }
+  return [v, set]
+}
+
+function AttrMenuSwitch({ value, onChange }: { value: AttrMenuVersion; onChange: (v: AttrMenuVersion) => void }) {
+  if (!ATTR_MENU_SWITCH) return null
+  const all: AttrMenuVersion[] = ['v1', 'v2']
+  return (
+    <div className="cp__zscope cp__attrver">
+      <span className="cp__zscope__label" aria-hidden>
+        Version
+      </span>
+      <div className="cp__zscope__opts" role="radiogroup" aria-label="Menu version">
+        {all.map((id, i) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={id === value}
+            tabIndex={id === value ? 0 : -1}
+            className={id === value ? 'is-on' : ''}
+            onClick={() => onChange(id)}
+            onKeyDown={(e) => {
+              const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
+              if (!d) return
+              e.preventDefault()
+              onChange(all[(i + d + all.length) % all.length])
+            }}
+          >
+            {id.toUpperCase()}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The attribute menu: the version switch over the searchable list. */
+function AttributeMenu({ picked, menu, onPick }: { picked: string[]; menu?: boolean; onPick: (v: string) => void }) {
+  const [stored, setVersion] = useAttrMenuVersion()
+  const version: AttrMenuVersion = ATTR_MENU_SWITCH ? stored : 'v2'
+  return (
+    <>
+      <AttrMenuSwitch value={version} onChange={setVersion} />
+      <OptionList key={version} items={attributeOptions(version)} searchLabel="Search attributes" picked={picked} single menu={menu} onPick={onPick} />
+    </>
+  )
+}
+
+function attributeOptions(version: AttrMenuVersion = 'v1'): ValueOption[] {
+  return [...WHEN_CONDITIONS].sort((a, b) => menuRank(a.id) - menuRank(b.id)).flatMap((x): ValueOption[] => {
+    const kind = version === 'v2' && KIND_OF[x.id] === null ? SUB_POLICIES : kindOf(x.id, x.group)
+    const tone = conditionTone(x.id, x.group)
+    const icon = conditionIcon(x.id, x.group)
+    return x.keys?.length
+      ? x.keys.map((k) => ({ value: `${x.id}:${k}`, label: attrLabel(k), icon, kind, tone, tip: x.hint }))
+      : [{
+          value: x.id,
+          label: x.label,
+          icon,
+          kind,
+          tone,
+          tip: x.hint,
+          note: x.soon ? 'Coming soon' : undefined,
+          disabled: x.soon,
+        }]
+  })
 }
 
 /* --- A condition that is about to exist ---------------------------------------------
@@ -896,7 +1064,7 @@ export function ConditionDraft({
             whatRef.current?.focus()
           }}
         >
-          <OptionList items={attributeOptions()} picked={[]} single menu onPick={onPick} />
+          <AttributeMenu picked={[]} menu onPick={onPick} />
         </Pop>
       )}
     </>
@@ -1168,7 +1336,7 @@ function OptionList({
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase()
     if (!n) return items
-    return items.filter((o) => `${o.label} ${o.meta ?? ''} ${o.note ?? ''}`.toLowerCase().includes(n))
+    return items.filter((o) => `${o.label} ${o.meta ?? ''} ${o.note ?? ''} ${o.kind?.label ?? ''} ${o.tip ?? ''}`.toLowerCase().includes(n))
   }, [items, q])
 
   /* No "3 of 24" under the list: the rows are the count. */
@@ -1333,6 +1501,7 @@ function List({
               aria-selected={single ? on : undefined}
               aria-checked={single ? undefined : on}
               disabled={o.disabled}
+              title={o.tip}
               onClick={() => onPick(o.value)}
               /* The kit menu's contract: the pointer moves the focus, so the
                  highlight is on one row — never a focused row and a hovered one. */
@@ -1349,6 +1518,12 @@ function List({
               <span>
                 <strong>{o.label}</strong>
                 {o.meta && <em>{o.meta}</em>}
+                {o.kind && (
+                  <span className={`bx-badge bx-badge--neutral cp__mkind is-tone-${o.kind.tone}`}>
+                    <o.kind.icon size={12} strokeWidth={2} aria-hidden />
+                    {o.kind.label}
+                  </span>
+                )}
               </span>
               {o.note && <i className="cp__msoon">{o.note}</i>}
               {single && on && <Check className="cp__mcheck" size={14} strokeWidth={2.4} aria-hidden />}

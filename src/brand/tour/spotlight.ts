@@ -61,8 +61,13 @@ export const GAP = 18
    centres its card and carries on. `board-tour.test.ts` is what catches an
    anchor that was renamed away for good. */
 export function measureAnchor(anchor: string | undefined, pad = ANCHOR_PAD): Rect | null {
-  if (!anchor || typeof document === 'undefined') return null
-  const el = document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`)
+  return anchor ? measureSelector(`[data-tour="${anchor}"]`, pad) : null
+}
+
+/** The same, for any selector — a drawer a stop opened is named by its title, not by a `data-tour`. */
+export function measureSelector(selector: string, pad = ANCHOR_PAD): Rect | null {
+  if (typeof document === 'undefined') return null
+  const el = document.querySelector<HTMLElement>(selector)
   if (!el) return null
   const r = el.getBoundingClientRect()
   /* A zero box is an element that is in the DOM and not laid out — mid-exit, or

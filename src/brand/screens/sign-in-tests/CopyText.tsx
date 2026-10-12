@@ -1,9 +1,12 @@
 import { Check, Copy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-/* Copy plain text to the clipboard, "Copied" for a moment. The Why's Copy summary
-   (why-summary.ts) and the activity drawer's (activity.ts). With no clipboard
-   (an insecure page) it copies through a hidden field. */
+import { playCue } from '../../sound'
+
+/* Copy plain text to the clipboard, "Copied" for a moment, and the smallest
+   tick (sound.ts). The Why's Copy summary (why-summary.ts) and the activity
+   drawer's (activity.ts). With no clipboard (an insecure page) it copies
+   through a hidden field. */
 export function CopyText({ text, label = 'Copy summary', className = 'bb__act tj-why__copy' }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false)
   useEffect(() => {
@@ -11,10 +14,14 @@ export function CopyText({ text, label = 'Copy summary', className = 'bb__act tj
     const t = window.setTimeout(() => setDone(false), 1600)
     return () => window.clearTimeout(t)
   }, [done])
+  const copied = () => {
+    setDone(true)
+    playCue('copy')
+  }
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text)
-      setDone(true)
+      copied()
     } catch {
       const ta = document.createElement('textarea')
       ta.value = text
@@ -25,7 +32,7 @@ export function CopyText({ text, label = 'Copy summary', className = 'bb__act tj
       ta.select()
       try {
         document.execCommand('copy')
-        setDone(true)
+        copied()
       } catch {
         /* Nothing more to try. */
       }

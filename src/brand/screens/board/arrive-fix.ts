@@ -4,6 +4,7 @@ import { fixOnArrival } from '../break-in-app'
 import type { Accepted } from '../break-in-model'
 import type { SimEnv } from '../simulate'
 import { ruleAt, type Selection } from './model'
+import { applyConflictFix, fixDone, type ConflictFix } from '../sign-in-tests/conflict-fix'
 
 /* -----------------------------------------------------------------------------
    The builder's end of "Fix in policy ↗".
@@ -34,7 +35,7 @@ export type ArriveFix = NonNullable<Extract<BrandScreen, { name: 'board' }>['fix
 
 /** What one arrival is called: null when the route carries no fix. */
 export const arrivalKey = (policyId: string, fix: ArriveFix | undefined): string | null =>
-  fix ? `${policyId}|${fix.card}|${fix.app}` : null
+  !fix ? null : 'conflicts' in fix ? `${policyId}|${fix.pressed}|${JSON.stringify(fix.conflicts.map((c) => c.fix))}` : `${policyId}|${fix.card}|${fix.app}`
 
 /* True the first time a key is seen, and never again for it while it stands.
    A null key — a route with no fix — forgets the last one. */
@@ -60,6 +61,11 @@ export type FixLanding =
    Condition, the part a fix rewrites and the one the route's `rule` opens
    on. */
 export function landFix(draft: Policy, fix: ArriveFix, env: SimEnv, opts: { accepted?: Accepted; policies?: readonly Policy[] } = {}): FixLanding {
+  /* A Why finding's Fix (conflict-fix.ts): the one pressed, of the run's list. */
+  if ('conflicts' in fix) {
+    const pressed = fix.conflicts[fix.pressed]
+    return pressed ? landConflict(draft, pressed.fix, opts.policies ?? []) : { none: 'The fix no longer fits this policy' }
+  }
   const out = fixOnArrival(draft, fix.card, fix.app, env, opts)
   if ('none' in out) return { none: out.none }
   return {
@@ -68,4 +74,12 @@ export function landFix(draft: Policy, fix: ArriveFix, env: SimEnv, opts: { acce
     select: out.ruleRef === 'fallback' ? { kind: 'fallback' } : ruleAt(out.ruleRef, 'when'),
     reveal: out.ruleRef,
   }
+}
+
+/* One fix of the list — the move or the new rule — on this draft; a fix already in it is said, never made twice. */
+export function landConflict(draft: Policy, fix: ConflictFix, policies: readonly Policy[]): FixLanding {
+  if (fixDone(draft, fix)) return { none: 'Already in the draft' }
+  const done = applyConflictFix(draft, fix, policies)
+  if (!done) return { none: 'The fix no longer fits this policy' }
+  return { draft: done.next, toast: done.toast, select: ruleAt(done.ruleId, 'when'), reveal: done.ruleId }
 }

@@ -97,3 +97,17 @@ export const RISK_SIGNALS_NOTE: ProfileNote = {
   ],
   foot: 'A signal switched off is not collected at all. Only the mobile SDKs report these.',
 }
+
+/* An application's Basic tab (ApplicationPage.tsx), beside an OIDC
+   application's form: the one field there that needs a word about what it
+   does. A SAML application has no secret, and no panel. Engineering to confirm
+   the wording. */
+export const APP_BASIC_NOTE: ProfileNote = {
+  title: 'Basic details',
+  terms: [
+    {
+      term: 'App secret',
+      note: 'The client secret this application signs in with. A regenerated secret replaces the old one when you save.',
+    },
+  ],
+}

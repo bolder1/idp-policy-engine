@@ -26,7 +26,10 @@ import {
   forRun,
   initialTryPage,
   issueToken,
+  emptyDraft,
   newSignInPage,
+  resetPage,
+  resettable,
   nowIn,
   peopleTryForm,
   personPick,
@@ -621,6 +624,13 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
 
   /* "Run as Finance only" (§13.3): the picks become that group alone, and its member runs at once. */
   const pickPerson = (value: string, now = false) => patch({ personId: personPick(value, users).personId }, 'person', now, [value])
+  /* Reset (TryPanel's foot): the check as a first visit finds it, and the Identity field to start again from. */
+  const resetCheck = () => {
+    setTryPage((pg) => resetPage(pg, emptyDraft(todayIn(), nowIn())))
+    setLoaded(null)
+    setSubmitted(false)
+    focusRow('person')
+  }
   /* The Identity field's picks: the panel's, and nothing runs (only Run runs). */
   const pickIdentities = (next: readonly IdentityValue[]) => {
     setTryPage((pg) => withIdentities(pg, next, users))
@@ -869,6 +879,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
               wide={wide}
               onToggleWidth={() => setWide((w) => !w)}
               onClose={() => closePanel(true)}
+              onReset={resettable(tryPage, { appId: null }) ? resetCheck : undefined}
             />
           )}
           {/* The why and the attempts: one panel, keyed the same, its content swapped in place. */}

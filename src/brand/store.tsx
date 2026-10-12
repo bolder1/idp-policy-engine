@@ -11,6 +11,8 @@ import {
 } from 'react'
 
 import {
+  consoleStamp,
+  memberGroupIds,
   newId,
   reidRule,
   templates as seedTemplates,
@@ -53,6 +55,7 @@ import type { AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
 import type { BreakInAcceptance } from './screens/break-in-model'
+import type { FixItem } from './screens/sign-in-tests/conflict-fix'
 import type { NameLookup } from './screens/predicate-prose'
 import { toastDuration, toastTone, type ToastTone } from './toast-tone'
 
@@ -81,8 +84,20 @@ export type BrandScreen =
      M4 retired them. `rule` selects a rule on arrival — its id, or
      'fallback' for the last row. `fix` is Access checks' "Fix in policy": a
      break-in card and the application it was played on, fixed in the draft
-     on arrival (break-in-app.ts `fixOnArrival`, 1 Oct 2026). */
-  | { name: 'board'; policyId: string; open?: 'try' | 'person' | 'saved' | 'break-in'; rule?: string; fix?: { card: string; app: string } }
+     on arrival (break-in-app.ts `fixOnArrival`, 1 Oct 2026) — or a Why finding's fix, its Apply (conflict-fix.ts,
+     6 Oct 2026): every fix of that run, the one pressed applied on arrival (7 Oct 2026). */
+  | {
+      name: 'board'
+      policyId: string
+      open?: 'try' | 'person' | 'saved' | 'break-in'
+      rule?: string
+      fix?: { card: string; app: string } | { conflicts: FixItem[]; pressed: number }
+      /* Opened from an application's page (New policy, Edit policy, Add a
+         copy): the bar's way back names that application and returns to its
+         Policies tab. A navigation inside the board that drops it falls back
+         to Policies. */
+      from?: { appId: string }
+    }
   /* The tenant's Sign-in tests (Policy testing V4, §3): the tester, the saved
      sign-ins, people and runs for every policy at once. A policy's board keeps
      only its own; its test panel links here, carrying the tab. */
@@ -140,6 +155,27 @@ export type BrandScreen =
      catalogue is an ambiguity worth not compounding. The misleading name stays
      confined to the one place it already is. */
   | { name: 'applications' }
+  /* One application's own page: Basic, Policies, Users and Groups. Opened from the Apps list.
+
+     The route owns the tab, so a link can land on one. `group` filters the
+     Users tab to one group (a Groups-tab count). `flash` is the policy the
+     board just came back from, lit and focused in the list. `from` is the
+     group page this was opened from, which the back link then names. */
+  | {
+      name: 'application'
+      appId: string
+      tab?: 'basic' | 'policies' | 'users' | 'groups'
+      group?: string
+      flash?: string
+      from?: { groupId: string }
+    }
+  /* Manage > Users > User List, and User Roles. `role` filters the list to one role (a User roles link). */
+  | { name: 'users'; role?: string }
+  | { name: 'user-roles' }
+  /* Manage > Groups > Manage Groups; `groupId` opens one group's page, on
+     `tab`. `from` is the application page it was opened from, which the back
+     link then names. */
+  | { name: 'groups'; groupId?: string; tab?: 'basic' | 'assignment' | 'applications'; from?: { appId: string } }
   /* End-user only: the app launcher the person lands on. The real product's
      end-user site has exactly two places — this and Setup 2FA — which is why
      it has a top bar and no rail to put one in. */
@@ -340,7 +376,18 @@ export interface BrandStore {
   leaveStay: () => void
 
   appById: (id: string) => App
+  /** Replaces the application with this id, stamping Last updated now. An unknown id changes nothing. */
+  saveApp: (app: App) => void
   groupById: (id: string) => Group
+  /** Replaces the group with this id, stamping Last modified now. An unknown id changes nothing. */
+  saveGroup: (g: Group) => void
+  /* Puts people in a group, or takes them out, and returns their records as
+     they were, for Undo (`restoreUsers`). Only the people it changed come
+     back. Taking somebody out of their first group promotes their next one,
+     or leaves them in none. */
+  setMembership: (userIds: readonly string[], groupId: string, member: boolean) => User[]
+  /** Writes these records back over the people with the same ids — `setMembership`'s Undo. */
+  restoreUsers: (prev: readonly User[]) => void
   /* Returns undefined for an unknown id, deliberately — no `?? users[0]`.
 
      `groupById` below falls back to the first group, which is why a stale group
@@ -465,8 +512,9 @@ export interface BrandStore {
   updateZone: (z: Zone) => void
   removeZone: (id: string) => void
   deletePolicy: (id: string) => void
-  /** Copies a policy as a draft with fresh rule ids, named "X (copy)", "X (copy 2)"… within 50 characters. Returns the copy's id; `policyById` finds it at once. */
-  duplicatePolicy: (id: string) => string | null
+  /** Copies a policy as a draft with fresh rule ids, named "X (copy)", "X (copy 2)"… within 50 characters. Returns the copy's id; `policyById` finds it at once.
+      `appIds` gives the copy those applications instead of the original's (an application page's "Add a copy"). */
+  duplicatePolicy: (id: string, opts?: { appIds?: string[] }) => string | null
   /** Templates the board offers: the ones Xecurify ships and the ones this tenant saved. Reset per persona. */
   scenarios: Scenario[]
   /** Adds at the top. Returns the stored id. */
@@ -521,6 +569,26 @@ function freeId<T extends { id: string }>(all: readonly T[], item: T, prefix: st
 }
 
 const MISSING_TINT = '#94a3b8'
+
+/* A person put in a group: it becomes their first group when they have none,
+   one of their others when they have one. The same record when they are in it
+   already, so `setMembership` can tell who changed. */
+function joinGroup(u: User, groupId: string): User {
+  if (memberGroupIds(u).includes(groupId)) return u
+  if (!u.groupId) return { ...u, groupId }
+  return { ...u, alsoGroupIds: [...(u.alsoGroupIds ?? []), groupId] }
+}
+
+/* A person taken out of a group. Out of their first group, their next one
+   moves up (`groupId` is what a picker files them under), or they are left in
+   none — `''`, which `memberGroupIds` reads as no group. */
+function leaveGroup(u: User, groupId: string): User {
+  if (!memberGroupIds(u).includes(groupId)) return u
+  const { alsoGroupIds = [], ...rest } = u
+  const others = alsoGroupIds.filter((id) => id !== groupId)
+  const first = u.groupId === groupId ? (others.shift() ?? '') : u.groupId
+  return others.length > 0 ? { ...rest, groupId: first, alsoGroupIds: others } : { ...rest, groupId: first }
+}
 
 export function BrandProvider({ children }: { children: ReactNode }) {
   /* The tenant the console opens on. The showcase build loads the presentation
@@ -671,7 +739,15 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
   const [apps, setApps] = useState<App[]>(() => seed.apps)
   const [groups, setGroups] = useState<Group[]>(() => seed.groups)
-  const [directory, setDirectory] = useState(() => seed.directory)
+  const [directory, setDirectoryState] = useState(() => seed.directory)
+  /* The latest directory, ahead of the next render, as `tokensRef` above:
+     `setMembership` returns the records it replaced, so two calls in one
+     handler must each start from the other's result. */
+  const directoryRef = useRef(directory)
+  const setDirectory = useCallback((next: Tenant['directory']) => {
+    directoryRef.current = next
+    setDirectoryState(next)
+  }, [])
   /* `lite`, and nothing on screen changes it.
 
      It was `'full'` — everything this prototype argues for, switchable from a
@@ -749,7 +825,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         { canSave: false },
       )
     },
-    [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setScreen],
+    [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setScreen, setDirectory],
   )
 
   /* With an action the toast stays six seconds rather than about three: long
@@ -776,11 +852,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       /* The showcase pin (showcase.ts): lite, plus the tenant-wide testing
          page and the Break-in test the owner is comparing (25 Sep 2026). The
          one place any feature is pinned, so the store is where to look.
-         Describe it is hidden for now (owner, 30 Sep 2026: "hide this, not
-         needed as of now") — the chooser card, the canvas door and the
-         palette entry all go with the flag; its checks stay on. */
+         Describe it was hidden on 30 Sep 2026 ("hide this, not needed as of
+         now") and is back on (owner, 9 Oct 2026: the third start option) —
+         the chooser card, the canvas door and the palette entry go with the
+         flag; its checks stay on. */
       features: SHOWCASE
-        ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: false, draftChecks: true }
+        ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: true, draftChecks: true }
         : featuresOf(edition),
       setEdition,
       persona,
@@ -859,8 +936,33 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       appById: (id) =>
         apps.find((a) => a.id === id) ??
         apps[0] ?? { id, name: id, protocol: 'SAML', glyph: '?', tint: MISSING_TINT, type: 'Desktop', lastUpdated: '' },
+      /* Stamped here, not by the caller: one writer of Last updated, as
+         `savePolicy` is the one writer of a policy's. */
+      saveApp: (app) => setApps((all) => all.map((a) => (a.id === app.id ? { ...app, lastUpdated: consoleStamp(new Date()) } : a))),
       groupById: (id) => groups.find((g) => g.id === id) ?? groups[0] ?? { id, name: id, memberCount: 0 },
+      saveGroup: (g) => setGroups((all) => all.map((x) => (x.id === g.id ? { ...g, lastModified: consoleStamp(new Date()) } : x))),
       userById: (id) => directory.people.find((u) => u.id === id),
+      /* From the ref, so a second call in the same handler starts from the
+         first one's result. `memberCount` is left alone: it is the stated size
+         the Who picker counts with, and the directory is a sample of it. */
+      setMembership: (userIds, groupId, member) => {
+        const dir = directoryRef.current
+        const prev: User[] = []
+        const people = dir.people.map((u) => {
+          if (!userIds.includes(u.id)) return u
+          const next = member ? joinGroup(u, groupId) : leaveGroup(u, groupId)
+          if (next !== u) prev.push(u)
+          return next
+        })
+        if (prev.length > 0) setDirectory({ ...dir, people })
+        return prev
+      },
+      restoreUsers: (prev) => {
+        if (prev.length === 0) return
+        const dir = directoryRef.current
+        const was = new Map(prev.map((u) => [u.id, u]))
+        setDirectory({ ...dir, people: dir.people.map((u) => was.get(u.id) ?? u) })
+      },
       // Reads live state, not the seed — otherwise a deleted or renamed zone
       // keeps resolving everywhere it is referenced. The ref, so a zone added
       // earlier in the same handler resolves too.
@@ -1035,7 +1137,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
          is one), and every rule gets new ids so editing one policy never edits
          the other. The name is one no other policy has, within the 50-character
          limit the details page enforces. */
-      duplicatePolicy: (id) => {
+      duplicatePolicy: (id, opts) => {
         const all = policiesRef.current
         const src = all.find((p) => p.id === id)
         if (!src || src.isSystem) return null
@@ -1043,6 +1145,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         const name = uniqueName(src.name, all.map((p) => p.name), 50)
         const copy: Policy = {
           ...from,
+          /* An application page copies a shared policy onto itself alone, so
+             editing the copy changes that application and nothing else. */
+          ...(opts?.appIds ? { appIds: [...opts.appIds] } : null),
           id: newId('p', all.map((p) => p.id), name),
           name,
           status: 'draft',
@@ -1074,7 +1179,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
       registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast,
       gauntletOverrides, breakInAccepted, changeLog, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
-      setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns,
+      setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setDirectory,
       policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef,
     ],
   )

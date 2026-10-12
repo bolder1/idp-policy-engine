@@ -5,14 +5,13 @@ import { Check } from 'lucide-react'
 import { Button, SearchBox } from '../../kit'
 import { NoMatches } from '../../empty'
 import { enforces } from '../../data'
-import { guardSignIns } from '../../draft-checks'
 import { AppLogo } from '../../logos/AppLogo'
-import { useBrand, useNameLookup } from '../../store'
-import { afterPaint, guardOpens, isStale, overridePatch, patchSignIns, tryRunGuard, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from '../guard'
+import { useBrand } from '../../store'
+import type { ReadyFix } from '../guard'
 import { GuardDrawer } from '../guard-page'
 import { detailsChanges } from '../policy-details-review'
-import { useSimEnv } from '../sim-env'
 import { portalRoot } from '../status-options'
+import { useAppsGuard } from './apps-guard'
 
 /* -----------------------------------------------------------------------------
    The applications a sign-in arrives from — the start node's pane.
@@ -32,21 +31,12 @@ import { portalRoot } from '../status-options'
    Before saving: applications) — a new application is sign-ins it starts
    deciding, a removed one is sign-ins it hands to another policy. A clean
    result saves in the same press; the page opens only when a Must pass or
-   Protected sign-in newly fails, or somebody is newly let in.
+   Protected sign-in newly fails, or somebody is newly let in. The checks
+   themselves are apps-guard.ts, which an application's own page runs too.
    -------------------------------------------------------------------------- */
-
-/* Before saving, as it last ran, and the applications it read. */
-interface AppsGuard {
-  result: GuardResult | 'error'
-  stamp: GuardStamp
-  run: number
-  appIds: string[]
-}
 
 export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a save: the board closes the pane. */ onSaved?: () => void }) {
   const store = useBrand()
-  const env = useSimEnv()
-  const resolve = useNameLookup()
   const saved = store.policyById(policyId)
   const [picked, setPicked] = useState<string[]>(saved?.appIds ?? [])
   const [q, setQ] = useState('')
@@ -54,9 +44,7 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
     const on = new Set(saved?.appIds ?? [])
     return [...store.apps.filter((a) => on.has(a.id)), ...store.apps.filter((a) => !on.has(a.id))].map((a) => a.id)
   })
-  const [checking, setChecking] = useState(false)
-  const [guard, setGuard] = useState<AppsGuard | null>(null)
-  const [guardOpen, setGuardOpen] = useState(false)
+  const appsGuard = useAppsGuard()
   /* Undo on a ready fix's toast. It runs after later renders, so it reads the
      pane as it is then, not as it was when the fix was made (below). */
   const undoFix = useRef<(back: string[], fixed: string[]) => void>(() => {})
@@ -108,37 +96,10 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
     onSaved?.()
   }
 
-  /* --- Before saving: applications ---------------------------------------------- */
-  const guards = store.features.beforeTurningOn && enforces(saved) && saved.type === 'App Access'
-  const stampNow = (): GuardStamp => ({ policies: store.policies, zones: store.zones, fingerprints: store.fingerprints, riskScale: store.riskScale })
-  const inputFor = (ids: string[], signIns = store.savedSignIns): GuardInput => ({
-    kind: 'apps',
-    before: saved,
-    after: { ...saved, appIds: ids, status: diffOf(ids).becomesDraft ? 'draft' : saved.status },
-    changedFrom: null,
-    policies: store.policies,
-    env,
-    apps: store.apps,
-    /* The policy's own checks too, as stored (describe spec, §5.5). */
-    savedSignIns: guardSignIns(signIns, saved, store.users, store.apps, store.features.draftChecks),
-    adminId: store.account.id,
-    breakIn: store.features.breakInTest ? (store.breakInAccepted[saved.id] ?? {}) : null,
-    resolve,
-  })
-  const hold = (ids: string[], result: GuardResult | 'error', run: number) => setGuard({ result, stamp: stampNow(), run, appIds: ids })
-
+  /* --- Before saving: applications (apps-guard.ts) ------------------------------ */
   const save = () => {
-    if (!guards) return commitApps(picked)
-    if (checking) return
-    setChecking(true)
-    const ids = picked
-    afterPaint(() => {
-      const result = tryRunGuard(inputFor(ids))
-      setChecking(false)
-      if (result !== 'error' && !guardOpens(result)) return commitApps(ids)
-      hold(ids, result, 0)
-      setGuardOpen(true)
-    })
+    if (!appsGuard.guards(saved)) return commitApps(picked)
+    appsGuard.check(saved, picked, commitApps)
   }
 
   /* A ready fix here keeps or leaves out one application. It changes the
@@ -149,12 +110,12 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
     const back = picked
     setPicked(ids)
     if (diffOf(ids).changes.length === 0) {
-      setGuardOpen(false)
+      appsGuard.close()
       store.showToast('Nothing left to save')
       return
     }
     store.showToast(`${f.label}. Not saved yet.`, { label: 'Undo', run: () => undoFix.current(back, ids) })
-    hold(ids, tryRunGuard(inputFor(ids)), (guard?.run ?? 0) + 1)
+    appsGuard.rerun(ids)
   }
   undoFix.current = (back, fixed) => {
     if (!alive.current) return
@@ -163,15 +124,11 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
       return
     }
     setPicked(back)
-    if (guardOpen) hold(back, tryRunGuard(inputFor(back)), (guard?.run ?? 0) + 1)
+    if (appsGuard.open) appsGuard.rerun(back)
     store.showToast('Restored')
   }
-  const expectInstead = (c: SignInCheck, reason: string) => {
-    const patch = overridePatch(c, reason, store.account.name, new Date().toISOString())
-    if (!patch || !guard) return
-    store.updateSavedSignIn(c.signIn.id, patch)
-    hold(guard.appIds, tryRunGuard(inputFor(guard.appIds, patchSignIns(store.savedSignIns, c.signIn.id, patch))), guard.run + 1)
-  }
+  /* The ticks are the page's subject here: stale when they moved, and Run again reads them. */
+  const page = appsGuard.page({ primaryLabel: 'Save applications', onConfirm: commitApps, current: picked, onApplyFix: applyFix })
 
   return (
     <div className="bb__apps">
@@ -222,37 +179,16 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
           variant="brand"
           size="sm"
           block
-          disabled={!dirty || checking}
-          busy={checking}
+          disabled={!dirty || appsGuard.checking}
+          busy={appsGuard.checking}
           title={dirty ? undefined : 'No changes to save'}
           onClick={save}
         >
-          {checking ? 'Checking…' : 'Save applications'}
+          {appsGuard.checking ? 'Checking…' : 'Save applications'}
         </Button>
       </div>
 
-      {guard &&
-        createPortal(
-          <GuardDrawer
-            open={guardOpen}
-            kind="apps"
-            policyName={saved.name}
-            result={guard.result}
-            run={guard.run}
-            primaryLabel="Save applications"
-            appChanges={diffOf(guard.appIds).rows}
-            onConfirm={() => {
-              setGuardOpen(false)
-              commitApps(guard.appIds)
-            }}
-            onClose={() => setGuardOpen(false)}
-            stale={guardOpen && (isStale(guard.stamp, stampNow()) || guard.appIds !== picked)}
-            onRerun={() => hold(picked, tryRunGuard(inputFor(picked)), guard.run + 1)}
-            onApplyFix={applyFix}
-            onOverride={expectInstead}
-          />,
-          portalRoot(),
-        )}
+      {page && createPortal(<GuardDrawer {...page} />, portalRoot())}
     </div>
   )
 }

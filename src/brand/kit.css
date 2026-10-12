@@ -464,6 +464,7 @@ html[data-theme='dark'] {
 .bx-badge--neutral { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); border-color: var(--fb-neutral-border); }
 .bx-badge--brand { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent-soft-border); }
 .bx-badge--positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); border-color: var(--fb-positive-border); }
+.bx-badge--positive-strong { background: var(--fb-positive-strong-bg); color: var(--fb-positive-strong-fg); border-color: var(--fb-positive-strong-border); }
 .bx-badge--negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--fb-negative-border); }
 .bx-badge--notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
 .bx-badge--info { background: var(--fb-info-bg); color: var(--fb-info-fg); border-color: var(--fb-info-border); }
@@ -519,6 +520,7 @@ html[data-theme='dark'] {
 }
 .bx-decision--sm { font-size: var(--pill-fs); padding: 0 var(--space-3); }
 .bx-decision--positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); border-color: var(--fb-positive-border); }
+.bx-decision--positive-strong { background: var(--fb-positive-strong-bg); color: var(--fb-positive-strong-fg); border-color: var(--fb-positive-strong-border); }
 .bx-decision--negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--fb-negative-border); }
 .bx-decision--notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
 
@@ -847,7 +849,9 @@ html[data-theme='dark'] {
    first line of text rather than with the top of the box — 16px of glyph beside
    a 1.55-leading line sits low without it. */
 .bx-callout__mark { flex: none; margin-top: 1px; }
-.bx-callout strong { display: block; margin-bottom: 2px; }
+/* The title only. It read `.bx-callout strong`, which also broke every bold
+   word in the body onto a line of its own ("stays on / Slack / . Edits…"). */
+.bx-callout > div > strong { display: block; margin-bottom: 2px; }
 .bx-callout--info { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bx-callout--notice { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
 .bx-callout--negative { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }

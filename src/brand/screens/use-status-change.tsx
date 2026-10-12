@@ -6,6 +6,7 @@ import { appsOf, enforces, type App, type Policy, type PolicyStatus } from '../d
 import { guardSignIns } from '../draft-checks'
 import { commitToast, lastSaved, monitorBlocker, published, sameRules, turnOnBlocker, type RuleSet } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
+import { playCue } from '../sound'
 import { listPhrase } from './app-policies'
 import { diagnose } from './diagnostics'
 import { GuardDrawer, type GuardVersion } from './guard-page'
@@ -156,10 +157,12 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
 
   /* Writes the switch and says so. `from` is the status it was asked from, so
      Undo goes back to what the admin saw rather than to whatever a second
-     switch left. */
+     switch left. A policy going live has its own chime (sound.ts), which the
+     toast under it does not repeat. */
   const commit = (policy: Policy, target: StatusTarget) => {
     options.onChange?.(policy, target)
     store.setPolicyStatus(policy.id, target)
+    if (target === 'active') playCue('publish')
     const { text, undo } = statusToast(policy.name, policy.status, target)
     store.showToast(text, undo ? { label: 'Undo', run: () => store.setPolicyStatus(policy.id, undo) } : undefined)
   }
@@ -455,6 +458,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
             : { ...withRules(stored, g.edits), status: 'active' }
         options.onChange?.(stored, 'active')
         store.savePolicy(next)
+        playCue('publish')
         store.showToast(commitToast(stored, next))
         return
       }

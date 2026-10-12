@@ -16,6 +16,8 @@ import {
   cardIssues,
   forRun,
   initialTryPage,
+  resetPage,
+  resettable,
   issueToken,
   nowIn,
   personPick,
@@ -34,6 +36,7 @@ import {
 } from '../sign-in-tests/sign-in-card'
 import { TryJourney } from '../sign-in-tests/TryJourney'
 import { SavedPanel, TryPanel, WhyPanel } from '../sign-in-tests/TryPanel'
+import { FixHere, type FixItem } from '../sign-in-tests/conflict-fix'
 import { useSimEnv } from '../sim-env'
 import { boundariesOf } from '../testing/boundaries'
 import { DockPast } from '../testing/DockPast'
@@ -161,11 +164,13 @@ export interface PolicyCheckProps {
   onBack: (rule?: string) => void
   /** A Break-in fix, onto the draft with Undo (the Break-in test, hidden). */
   onApplyFix: (next: Policy, toast: string) => void
+  /** A Why finding's Fix on this policy: the run's fixes, into the builder's Fixes panel, the one pressed applied. */
+  onFixes: (list: FixItem[], pressed: number) => void
   /** Where the focus goes as the sign-in's panel shuts with nothing on the canvas to take it: the bar's Check access. */
   focusBar: () => void
 }
 
-export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth, kept, onBack, onApplyFix, focusBar }: PolicyCheckProps) {
+export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth, kept, onBack, onApplyFix, onFixes, focusBar }: PolicyCheckProps) {
   const { go, policies, zones, fingerprints, savedSignIns, users, apps, account } = useBrand()
   const lib = useMemo(() => ({ zones, fingerprints }), [zones, fingerprints])
   const session = useTestingSession()
@@ -173,8 +178,14 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   const reduced = useReducedMotion() === true
   const stage = useRef<HTMLDivElement | null>(null)
 
+  /* Nobody yet, on the policy's first application, its facts at their defaults: where a visit with no sign-in
+     starts, and where Reset puts the panel back. */
+  const blankOf = (today: string, time: string) => {
+    const blank = { ...initialTryPage(1, today, time).draft, appId: firstCheckApp(draft, apps) }
+    return withDefaults(blank, rowsRead(policies, draft, blank.appId, lib), [], today, time)
+  }
   /* Where the visit starts: as it was left — or the policy's sign-in, played
-     as Check access opens — or nobody yet, on the policy's first application. */
+     as Check access opens — or the blank form. */
   const [start] = useState<CheckKept>(() => {
     if (kept.current) return kept.current
     const today = todayIn()
@@ -182,8 +193,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     const base = initialTryPage(1, today, time)
     const stored = session.boardForms[saved.id]
     if (stored) return { page: { ...tryingPage(base, onPolicyApps(stored, draft, apps)), played: 0 }, runId: 1, loaded: null, zoom: 1 }
-    const blank = { ...base.draft, appId: firstCheckApp(draft, apps) }
-    return { page: { ...base, draft: withDefaults(blank, rowsRead(policies, draft, blank.appId, lib), [], today, time) }, runId: 1, loaded: null, zoom: 1 }
+    return { page: { ...base, draft: blankOf(today, time) }, runId: 1, loaded: null, zoom: 1 }
   })
   const [page, setPage] = useState<TryPage>(start.page)
   const onPage = useCallback((next: (p: TryPage) => TryPage) => setPage(next), [])
@@ -428,6 +438,14 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     tryWhole(f, { name: sv.name, form: f, expected: sv.expected })
   }
 
+  /* Reset (TryPanel's foot): the blank form, the canvas empty, and the Identity field to start again from. */
+  const resetCheck = () => {
+    setPage((p) => resetPage(p, blankOf(todayIn(), nowIn())))
+    setLoaded(null)
+    setSubmitted(false)
+    focusRow('person')
+  }
+
   // --- Open policy, Open rule ---
 
   /* This policy: back to its builder (on the rule). Another: its builder, in Check access, with this sign-in — the page's road. */
@@ -462,37 +480,41 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   const closeView = () => closePanel(true)
   /* The why, in the panel: the answer's Review conflict, the policy's count. */
   const why = useMemo(() => ({ open: panel === 'why', slot: whySlot, onOpen: (o: boolean) => onPanel(o ? 'why' : null) }), [panel, whySlot, onPanel])
+  /* The Why's Fix on this policy is made here, in this draft (conflict-fix.ts `FixHere`); on another, it opens that one. */
+  const fixHere = useMemo(() => ({ policyId: saved.id, onFixes, form: ran }), [saved.id, onFixes, ran])
 
   return (
     <>
       <div ref={stage} className="sit__stage bbchk">
-        <TryJourney
-          page={page}
-          onPage={onPage}
-          asGroup={asGroup}
-          zoom={zoom}
-          onZoom={setZoom}
-          onNode={() => openForm(() => focusRow('person', true))}
-          onAdd={(f) => openForm(() => focusRow(tokenOfField(f), true))}
-          onAskSave={() => openForm(() => setSaveOpen(true))}
-          onSaved={SAVED_SIGN_INS && mySaved.some((s) => !s.generated) ? () => onPanel('saved') : undefined}
-          focusRun={focusRun}
-          panel={panel === 'form' || panel === 'saved' ? panel : null}
-          why={why}
-          onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}
-          onTryForm={(f) => begin(f, 'full', { draft: f, touched: [], identities: picksOf(f) })}
-          onGrant={grantAccess}
-          grantFor={saved.id}
-          onPickIdentity={showPick}
-          loaded={loaded}
-          policy={pair}
-          run={run}
-          onOpenPolicy={openPolicy}
-          onOpenRule={openRule}
-          onEdit={editSignIn}
-          editing={panel === 'form'}
-          unrun={unrun}
-        />
+        <FixHere.Provider value={fixHere}>
+          <TryJourney
+            page={page}
+            onPage={onPage}
+            asGroup={asGroup}
+            zoom={zoom}
+            onZoom={setZoom}
+            onNode={() => openForm(() => focusRow('person', true))}
+            onAdd={(f) => openForm(() => focusRow(tokenOfField(f), true))}
+            onAskSave={() => openForm(() => setSaveOpen(true))}
+            onSaved={SAVED_SIGN_INS && mySaved.some((s) => !s.generated) ? () => onPanel('saved') : undefined}
+            focusRun={focusRun}
+            panel={panel === 'form' || panel === 'saved' ? panel : null}
+            why={why}
+            onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}
+            onTryForm={(f) => begin(f, 'full', { draft: f, touched: [], identities: picksOf(f) })}
+            onGrant={grantAccess}
+            grantFor={saved.id}
+            onPickIdentity={showPick}
+            loaded={loaded}
+            policy={pair}
+            run={run}
+            onOpenPolicy={openPolicy}
+            onOpenRule={openRule}
+            onEdit={editSignIn}
+            editing={panel === 'form'}
+            unrun={unrun}
+          />
+        </FixHere.Provider>
       </div>
       <AnimatePresence initial={false}>
         {panel === 'form' && (
@@ -520,6 +542,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
             wide={wide}
             onToggleWidth={onToggleWidth}
             onClose={() => closePanel(true)}
+            onReset={resettable(page, { appId: firstCheckApp(draft, apps) }) ? resetCheck : undefined}
             scope={scope}
           />
         )}

@@ -125,6 +125,19 @@ export function newSignInPage(p: TryPage, runId: number, today: string, time: st
   return { ...p, mode: 'form', played: runId, replay: false, draft: emptyDraft(today, time), touched: [], prev: null, askSaveFor: runId + 1, identities: [], ran: undefined }
 }
 
+/* Reset, at the foot of the panel (owner, 7 Oct 2026: "it should have a reset option to reset the form"): the
+   check as a first visit finds it — nobody, no application, the default facts, no picks, and the canvas
+   empty. Not the form alone: with a run still on the canvas the panel names every empty field as a problem,
+   so a form emptied under a run would open on a wall of them. `blank` is the host's empty form (the
+   builder's starts on its policy's first application). */
+export function resetPage(p: TryPage, blank: SignInForm): TryPage {
+  return { ...p, mode: 'form', replay: false, draft: blank, touched: [], prev: null, askSaveFor: null, identities: [], ran: undefined }
+}
+
+/** Whether there is anything for Reset to take away: a run on the canvas, a pick, an application, or a fact changed. */
+export const resettable = (p: Pick<TryPage, 'mode' | 'identities' | 'touched' | 'draft'>, blank: Pick<SignInForm, 'appId'>): boolean =>
+  p.mode === 'journey' || p.identities.length > 0 || p.touched.length > 0 || p.draft.appId !== blank.appId
+
 /* A People row's Try: the People tab's own sentence — the one every cell on
    that tab was judged by — with that person and application, less the facts
    no rule on the application reads. Not the last Try's sign-in: a cell that

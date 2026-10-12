@@ -1,16 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useId, useRef } from 'react'
-import { ArrowLeft, ShieldPlus } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ArrowLeft, Pencil, ShieldPlus, Unlink } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, Modal, StatusPill, TipDot } from '../kit'
+import { Badge, Button, Callout, Drawer, Modal, RowMenu, StatusPill, TipDot, type MenuItem } from '../kit'
 import { EmptyState } from '../empty'
-import { Picker, type PickerOption } from '../picker'
+import { Picker } from '../picker'
 import { AppLogo } from '../logos/AppLogo'
+import { Face } from '../faces'
+import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
-import { appsLabel, appsOf, blankPolicy, nameTaken, type Policy } from '../data'
+import { appsOf, blankPolicy, nameTaken, type Policy } from '../data'
+import { DECISION_WORDS } from '../decision-words'
 import { ApplicationFixed } from './scope-fields'
-import { attachKind, attachTo, attachableTo, decidesFor, detachFrom, orderOf, protectionOf, whyNotDeciding } from './app-policies'
-import { attachNote, existingHint, remainingApps, removeCopy, removeToast } from './applications-model'
+import { attachKind, attachTo, attachableTo, detachFrom, rulesLabel } from './app-policies'
+import { appStanding, deciderChanges, keyName, rowTip, visibleMoves, whoLabel, type Key, type StandRow } from './app-standing'
+import { addToApp, attachNote, existingHint, removeCopy, removeFromApp } from './applications-model'
+import { useAppsGuard } from './board/apps-guard'
+import { GuardDrawer } from './guard-page'
+import { policyOption } from './policy-option'
+import { fallbackOf } from './simulate'
+import { portalRoot } from './status-options'
 
 /* -----------------------------------------------------------------------------
    What protects one application, and the form for adding to it.
@@ -21,10 +31,16 @@ import { attachNote, existingHint, remainingApps, removeCopy, removeToast } from
    preselected.
 
    The panel stays open after every write, so you watch the list you are
-   changing.
+   changing. Its numbers and tips are the engine's (app-standing.ts), the same
+   ones the application's own page shows.
 
    Naming a new policy is a page pushed inside this panel, with Back, not a
    centred dialog over it.
+
+   Attaching an existing policy and taking one off run Before saving:
+   applications first (board/apps-guard.ts), the same checks the application's
+   own page and the builder run — this is a third way to make the same change,
+   and a live policy put on or taken off here moves the same sign-ins.
    -------------------------------------------------------------------------- */
 
 export function AppProtection({
@@ -43,13 +59,16 @@ export function AppProtection({
 }) {
   const store = useBrand()
   const uid = useId()
+  const appsGuard = useAppsGuard()
 
   const [choice, setChoice] = useState<'new' | 'existing' | null>(null)
   const [pickId, setPickId] = useState<string | null>(null)
   const [tried, setTried] = useState(false)
   const [gone, setGone] = useState(false)
   const [removing, setRemoving] = useState<Policy | null>(null)
-  const [flash, setFlash] = useState<string | null>(null)
+  /* The row an attach from this form just put on. An object, so attaching the
+     same policy again after taking it off is a new flash and moves focus again. */
+  const [flash, setFlash] = useState<{ id: string } | null>(null)
   /** The pushed "Name your policy" page is showing. */
   const [naming, setNaming] = useState(false)
   const [newName, setNewName] = useState('')
@@ -68,6 +87,12 @@ export function AppProtection({
     setFlash(null)
     setNaming(false)
     setNewName('')
+    /* And the checks' page with it. Its state outlives the panel (this
+       component stays mounted, closed), so a page left open would otherwise
+       come up over the next application's panel. */
+    appsGuard.close()
+    // On a change of subject only: `appsGuard` is a new object every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appId])
 
   /* And after the caller created a policy from this form: the choice has been
@@ -84,6 +109,19 @@ export function AppProtection({
     return () => cancelAnimationFrame(id)
   }, [justAdded])
 
+  /* The same after an attach from this form, however it was written: at once,
+     on a clean check, or from the checks' page. The button that asked is
+     disabled by then (nothing is picked), so the checks' page handing focus
+     back to it as it closes would leave focus on the page behind. A frame
+     later, after that hand-back, focus goes to the new row. */
+  useEffect(() => {
+    if (!flash) return
+    const id = requestAnimationFrame(() =>
+      body.current?.querySelector<HTMLElement>(`[data-policy-id="${CSS.escape(flash.id)}"]`)?.focus(),
+    )
+    return () => cancelAnimationFrame(id)
+  }, [flash])
+
   /* The name field takes focus when its page is pushed. After the drawer's own
      focus, which lands on the panel when it opens. */
   useEffect(() => {
@@ -96,13 +134,32 @@ export function AppProtection({
      placeholder, so a stale id would render this panel for the wrong app. */
   const app = appId ? store.apps.find((a) => a.id === appId) : undefined
 
-  const { own, decides, fallback } = protectionOf(app?.id ?? '', store.policies)
-  const numbers = orderOf(own)
+  const standing = useMemo(() => appStanding(app?.id ?? '', store.policies, store.users), [app?.id, store.policies, store.users])
+  const { rows, fallback, everyoneElse } = standing
   const options = app ? attachableTo(app.id, store.policies) : []
   const none = options.length === 0
   const otherPolicies = store.policies.filter((p) => !p.isSystem).length
   const picked = pickId ? (store.policyById(pickId) ?? null) : null
   const alsoOn = picked && app ? attachKind(picked, app.id) === 'also' : false
+
+  /* The write itself, once the checks (if any) let it through. Re-read at the
+     moment of the write (inside `addToApp`) rather than trusting the object
+     the options were built from. */
+  const putOn = (policyId: string) => {
+    if (!app) return
+    if (!addToApp(store, policyId, app, store.apps)) {
+      setGone(true)
+      setPickId(null)
+      return
+    }
+    setChoice(null)
+    setPickId(null)
+    setTried(false)
+    setFlash({ id: policyId })
+  }
+  const takeOff = (policyId: string) => {
+    if (app) removeFromApp(store, policyId, app)
+  }
 
   function submit() {
     if (!app) return
@@ -112,33 +169,25 @@ export function AppProtection({
       setNaming(true)
       return
     }
-    if (!pickId) return
+    if (!pickId || appsGuard.checking) return
 
-    /* Re-read at click time rather than trusting the object the options were
-       built from. `savePolicy` replaces the whole record by id, so writing a
-       spread of a stale render would revert fields edited elsewhere. */
+    /* A policy that decides sign-ins runs the checks first, as the app page's
+       Add existing does: a clean result writes in the same press, and the page
+       opens over this panel only when a Must pass or Protected sign-in newly
+       fails, or somebody is newly let in. Keep editing comes back to the pick.
+       A draft, or a policy that is off or monitoring, is written at once. */
     const live = store.policyById(pickId)
-    if (!live) {
-      setGone(true)
-      setPickId(null)
-      return
-    }
-
-    store.savePolicy(attachTo(live, app.id, store.apps))
-    store.showToast(`${live.name} added to ${app.name}.`)
-    setChoice(null)
-    setPickId(null)
-    setTried(false)
-    setFlash(live.id)
+    if (!live || live.isSystem || !appsGuard.guards(live)) return putOn(pickId)
+    appsGuard.check(live, attachTo(live, app.id, store.apps).appIds, () => putOn(pickId))
   }
 
-  function remove(p: Policy) {
-    const live = store.policyById(p.id)
-    if (live && app) {
-      store.savePolicy(detachFrom(live, app.id))
-      store.showToast(removeToast(live.name, app.name, remainingApps(live, app.id), live.status === 'draft'))
-    }
-    setRemoving(null)
+  /* Taking a policy off: the same checks, on the applications it keeps. */
+  const detach = (policyId: string) => {
+    if (!app) return
+    const live = store.policyById(policyId)
+    if (!live || live.isSystem) return
+    if (!appsGuard.guards(live)) return takeOff(policyId)
+    appsGuard.check(live, detachFrom(live, app.id).appIds, () => takeOff(policyId))
   }
 
   if (!app) return null
@@ -167,7 +216,9 @@ export function AppProtection({
           ? 'Pick a policy to attach.'
           : gone
             ? ''
-            : attachNote(picked, app.name)
+            : /* With the attach applied, so a live policy another one shadows
+                 here says it never decides rather than "takes effect". */
+              attachNote(picked, app.name, { appId: app.id, policies: store.policies, users: store.users, apps: store.apps })
 
   const primary =
     choice === 'new'
@@ -177,6 +228,30 @@ export function AppProtection({
         : picked
           ? `Attach to ${app.name}`
           : 'Attach policy'
+
+  /* The row menu here: the builder, and taking the policy off. Status changes
+     and the details slider are the application page's. */
+  const menu: MenuItem[] = [
+    { id: 'edit', label: 'Edit policy', icon: Pencil },
+    { id: 'remove', label: `Remove from ${app.name}`, icon: Unlink, danger: true, divide: true },
+  ]
+  const onMenu = (p: Policy) => (id: string) => {
+    if (id === 'edit') store.go({ name: 'board', policyId: p.id })
+    if (id === 'remove') setRemoving(p)
+  }
+
+  /* The checks' page names its write by the applications it read: with this
+     one, the add, in the words of the button that asked for it; without it,
+     the removal. */
+  const held = appsGuard.held ? store.policyById(appsGuard.held.policyId) : undefined
+  const guardPage = appsGuard.page({
+    primaryLabel: appsGuard.held?.appIds.includes(app.id)
+      ? held && attachKind(held, app.id) === 'also'
+        ? `Also protect ${app.name}`
+        : `Attach to ${app.name}`
+      : `Remove from ${app.name}`,
+    onConfirm: (ids, p) => (ids.includes(app.id) ? putOn(p.id) : takeOff(p.id)),
+  })
 
   return (
     <>
@@ -224,8 +299,17 @@ export function AppProtection({
               <Button variant="ghost" onClick={onClose}>
                 Close
               </Button>
-              <Button variant="brand" disabled={choice === null || (choice === 'existing' && !pickId)} onClick={submit}>
-                {primary}
+              {/* Busy, not disabled, while the checks run: a disabled button
+                  drops focus to the page, and the checks' page hands focus back
+                  to this one when Keep editing closes it. A second press
+                  meanwhile does nothing (`submit`). */}
+              <Button
+                variant="brand"
+                disabled={choice === null || (choice === 'existing' && !pickId)}
+                busy={appsGuard.checking}
+                onClick={submit}
+              >
+                {appsGuard.checking ? 'Checking…' : primary}
               </Button>
             </>
           )
@@ -272,23 +356,22 @@ export function AppProtection({
             <>
               {/* Only the case the list can't show on its own: policies are attached
                   and none of them decides. */}
-              {own.length > 0 && decides.length === 0 && (
+              {rows.length > 0 && rows.every((r) => r.n === null) && (
                 /* Notice, not red: red is kept for destructive actions. */
                 <Callout
                   tone="notice"
-                  title={own.length === 1 ? `The policy on ${app.name} decides nothing.` : `None of the policies on ${app.name} decides anything.`}
+                  title={rows.length === 1 ? `The policy on ${app.name} decides nothing.` : `None of the policies on ${app.name} decides anything.`}
                 >
-                  {fallback ? `Sign-ins fall through to ${fallback.name}.` : 'Sign-ins fall through to the tenant default.'}
+                  {everyoneElse ? `Sign-ins fall through to ${everyoneElse.name}.` : 'Sign-ins fall through to the tenant default.'}
                 </Callout>
               )}
 
               <section className="bapr__list">
                 <header className="bapr__listhead">
                   <h3>Policies on this application</h3>
-                  <p>Checked top to bottom. The first match decides.</p>
                 </header>
 
-                {own.length === 0 ? (
+                {rows.length === 0 ? (
                   <EmptyState
                     compact
                     icon={ShieldPlus}
@@ -310,14 +393,16 @@ export function AppProtection({
                   />
                 ) : (
                   <ol className="bapr__stack">
-                    {own.map((p, i) => (
+                    {rows.map((row) => (
                       <PolicyRow
-                        key={p.id}
-                        policy={p}
-                        n={numbers[i]}
-                        fresh={flash === p.id || justAdded === p.id}
-                        onOpen={() => store.go({ name: 'board', policyId: p.id })}
-                        onRemove={() => setRemoving(p)}
+                        key={row.policy.id}
+                        row={row}
+                        tip={rowTip(row, store.groups, store.users)}
+                        who={whoLabel(row.policy, store.groups, store.users)}
+                        fresh={flash?.id === row.policy.id || justAdded === row.policy.id}
+                        onOpen={() => store.go({ name: 'board', policyId: row.policy.id })}
+                        menu={menu}
+                        onSelect={onMenu(row.policy)}
                       />
                     ))}
                   </ol>
@@ -325,21 +410,7 @@ export function AppProtection({
 
                 {/* Always shown, because it is what decides the sign-in when nothing
                     above does. */}
-                {fallback && (
-                  <div className="bapr__fall">
-                    <span className="bapr__n bapr__n--fall" aria-hidden>
-                      ⌄
-                    </span>
-                    <div className="bapr__body">
-                      <span className="bapr__namerow">
-                        <strong>{fallback.name}</strong>
-                        <TipDot text="Decides when no policy above matches." label={`About ${fallback.name}`} />
-                      </span>
-                    </div>
-                    <Badge tone="system">System</Badge>
-                    <StatusPill status={fallback.status} />
-                  </div>
-                )}
+                {fallback && <FallbackRow fallback={fallback} everyoneElse={everyoneElse} />}
               </section>
 
               <fieldset className="bapr__form">
@@ -375,11 +446,8 @@ export function AppProtection({
 
                 {choice === 'existing' && (
                   <div className="bapr__pick">
-                    {gone && (
-                      <Callout tone="negative" title="That policy no longer exists.">
-                        It may have been deleted since this panel was opened.
-                      </Callout>
-                    )}
+                    {/* Title only: what happened is the whole of it. */}
+                    {gone && <Callout tone="notice" title="That policy no longer exists.">{null}</Callout>}
 
                     <Picker
                       label="Policy to attach"
@@ -391,7 +459,7 @@ export function AppProtection({
                       /* Only after a submit was attempted. */
                       invalid={tried && !pickId}
                       value={pickId}
-                      options={options.map((p) => toOption(p, store))}
+                      options={options.map((p) => policyOption(p, app, store))}
                       onChange={(v) => {
                         setPickId(v)
                         setGone(false)
@@ -412,64 +480,107 @@ export function AppProtection({
       <RemoveDialog
         policy={removing}
         app={app}
-        own={own}
         onCancel={() => setRemoving(null)}
-        onConfirm={() => removing && remove(removing)}
+        onConfirm={() => {
+          if (removing) detach(removing.id)
+          setRemoving(null)
+        }}
       />
+      {/* Portalled to the app root, after this panel, so it opens over it. It
+          joins the dialog stack last (dialog-chrome.ts): Escape and Keep editing
+          close it alone, Tab stays inside it, and focus goes back to the button
+          that asked for the change. */}
+      {guardPage && createPortal(<GuardDrawer {...guardPage} />, portalRoot())}
     </>
   )
 }
 
-function PolicyRow({
-  policy,
-  n,
+/* One policy on an application, as the engine ranks it.
+
+   The number is earned: a row the engine never picks takes "—", and a row
+   between two live ones does not push the one below it down. The meta says
+   who it is for, how many rules it has, and what its last row does — "Nothing
+   else matched" is the console's name for that row — so a policy with no
+   rules reads as deciding by that row rather than as broken. */
+export function PolicyRow({
+  row,
+  tip,
+  who,
   fresh,
   onOpen,
-  onRemove,
+  menu,
+  onSelect,
 }: {
-  policy: Policy
-  /** Null when this policy decides nothing — an em dash, not a number. */
-  n: number | null
+  row: StandRow
+  /** Why it decides for fewer than it names, or not at all (`rowTip`). Null for none. */
+  tip: string | null
+  /** Who it is for (`whoLabel`). */
+  who: string
   fresh: boolean
   onOpen: () => void
-  onRemove: () => void
+  menu: MenuItem[]
+  onSelect: (id: string) => void
 }) {
-  const empty = policy.rules.length === 0
-  /* Why it has no number, in a tip beside the name. The status pill already
-     says Draft or Inactive; the tip says what that means here. */
-  const why = empty ? 'No rules yet. Open it to add rules.' : decidesFor(policy) ? null : whyNotDeciding(policy)
-
+  const p = row.policy
   return (
-    <li className={`bapr__row ${n === null ? 'is-off' : ''} ${fresh ? 'is-new' : ''}`}>
-      {/* Earned, not positional: a policy that decides nothing takes no number. */}
+    <li className={`bapr__row ${row.n === null ? 'is-off' : ''} ${fresh ? 'is-new' : ''}`}>
       <span className="bapr__n" aria-hidden>
-        {n ?? '—'}
+        {row.n ?? '—'}
       </span>
       <div className="bapr__body">
         <span className="bapr__namerow">
-          <button type="button" className="bapr__name" data-policy-id={policy.id} onClick={onOpen}>
-            {policy.name}
+          <button type="button" className="bapr__name" data-policy-id={p.id} onClick={onOpen}>
+            {p.name}
           </button>
-          {why && <TipDot text={why} label={`Why ${policy.name} decides nothing`} />}
+          {tip && <TipDot text={tip} label={`About ${p.name}`} />}
+          {p.pendingDraft && <ChangeState unsaved={false} draft />}
         </span>
         <span className="bapr__meta">
-          <Badge tone="info">{policy.type}</Badge>
-          <span className="u-muted">{empty ? 'No rules' : `${policy.rules.length} rule${policy.rules.length === 1 ? '' : 's'}`}</span>
-          <StatusPill status={policy.status} />
+          <span className="u-muted">
+            {who} · {rulesLabel(p)} · Nothing else matched: {DECISION_WORDS[fallbackOf(p)]}
+          </span>
+          <StatusPill status={p.status} />
         </span>
       </div>
       {/* No "Turn on" here. Publishing belongs to the builder, with the rules
           in view. */}
-      <Button size="sm" variant="ghost" onClick={onRemove}>
-        Remove
-      </Button>
+      <RowMenu label={`Actions for ${p.name}`} items={menu} onSelect={onSelect} />
     </li>
+  )
+}
+
+/* The tenant default, under every application's list: the ⌄ row, never
+   numbered and never a menu — it cannot come off an application it was never
+   put on. Its tip says whether anybody reaches it here: a live policy for
+   everyone above it decides for everyone no group policy covers. */
+export function FallbackRow({ fallback, everyoneElse }: { fallback: Policy; everyoneElse: Policy | null }) {
+  const reached = !everyoneElse || everyoneElse.id === fallback.id
+  return (
+    <div className="bapr__fall">
+      <span className="bapr__n bapr__n--fall" aria-hidden>
+        ⌄
+      </span>
+      <div className="bapr__body">
+        <span className="bapr__namerow">
+          <strong>{fallback.name}</strong>
+          <TipDot
+            text={reached ? 'Decides for people no policy above covers.' : `Not reached. Everyone uses ${everyoneElse.name}.`}
+            label={`About ${fallback.name}`}
+          />
+        </span>
+        <span className="bapr__meta">
+          Everyone else · {rulesLabel(fallback)} · Nothing else matched: {DECISION_WORDS[fallbackOf(fallback)]}
+        </span>
+      </div>
+      <Badge tone="system">System</Badge>
+      <StatusPill status={fallback.status} />
+    </div>
   )
 }
 
 /* Attaching adds; the policy keeps its other applications. Info, not a
    warning: nothing is at stake, there is something to know. */
-function AlsoNote({ picked }: { picked: Policy }) {
+export function AlsoNote({ picked }: { picked: Policy }) {
   const store = useBrand()
   const on = appsOf(picked, store.apps)
   if (on.length === 0) return null
@@ -482,25 +593,46 @@ function AlsoNote({ picked }: { picked: Policy }) {
   )
 }
 
-function RemoveDialog({
+const keyId = (k: Key) => (k.kind === 'everyone' ? 'everyone' : `${k.kind}:${k.id}`)
+
+/* Taking a policy off an application, when it decides for somebody there.
+
+   What happens to the policy is one sentence (`removeCopy`). What happens to
+   sign-ins is a list, read from the engine: each group, person or everyone
+   else this policy decides for, and the policy that decides for them once it
+   has gone (`deciderChanges`) — "Engineering → Global Default Policy" on Box,
+   not "the next policy down", which would be Box for design and wrong.
+
+   A person in two groups is a row of their own when they go somewhere their
+   groups' rows do not say (Tanmay Joshi → Box for design), drawn with a
+   person's face. A group no policy on the app names moves exactly as everyone
+   else does, so its row would repeat Everyone's: `visibleMoves` drops it, and
+   the list names the groups the app's Groups tab names. */
+export function RemoveDialog({
   policy,
   app,
-  own,
   onCancel,
   onConfirm,
 }: {
   policy: Policy | null
   app: { id: string; name: string }
-  own: Policy[]
   onCancel: () => void
   onConfirm: () => void
 }) {
-  const copy = policy ? removeCopy(policy, app, own) : null
+  const store = useBrand()
+  const moves = useMemo(() => {
+    if (!policy) return []
+    const after = store.policies.map((p) => (p.id === policy.id && !p.isSystem ? detachFrom(p, app.id) : p))
+    const changes = deciderChanges(app.id, store.policies, after, store.users, store.groups)
+    return visibleMoves(changes, app.id, store.policies, after).filter((m) => m.from?.id === policy.id)
+  }, [policy, app.id, store.policies, store.users, store.groups])
+  const copy = policy ? removeCopy(policy, app) : null
+
   return (
     <Modal
       open={!!policy}
       onClose={onCancel}
-      title={`Remove this policy from ${app.name}?`}
+      title={`Remove ${policy?.name ?? 'this policy'} from ${app.name}?`}
       width={480}
       footer={
         <>
@@ -516,32 +648,27 @@ function RemoveDialog({
       {copy && (
         <div className="bapr__confirm">
           <p>{copy.policy}</p>
-          <p>{copy.signIns}</p>
+          {moves.length > 0 && (
+            <div>
+              <span className="u-label">Sign-ins move to</span>
+              <dl className="bapp__moves">
+                {moves.map((m) => {
+                  const name = keyName(m.key, store.groups, store.users)
+                  return (
+                    <div key={keyId(m.key)}>
+                      <dt>
+                        {m.key.kind !== 'everyone' && <Face kind={m.key.kind} name={name} size="sm" decorative />}
+                        {name}
+                      </dt>
+                      <dd>{m.to?.name ?? 'No policy'}</dd>
+                    </div>
+                  )
+                })}
+              </dl>
+            </div>
+          )}
         </div>
       )}
     </Modal>
   )
-}
-
-/* The words the pills use, not the enum. */
-const STATUS_WORD: Record<Policy['status'], string> = {
-  draft: 'Draft',
-  active: 'Active',
-  monitor: 'Monitoring',
-  inactive: 'Inactive',
-  'always-on': 'Always on',
-}
-
-function toOption(p: Policy, store: ReturnType<typeof useBrand>): PickerOption {
-  const named = appsOf(p, store.apps)
-  const on = named[0] ?? null
-  const rules = `${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`
-  const status = STATUS_WORD[p.status]
-  return {
-    value: p.id,
-    label: p.name,
-    meta: on ? `${appsLabel(named)}, ${rules}, ${status}` : `${p.type}, ${rules}, ${status}`,
-    art: on ? <AppLogo appId={on.id} name={on.name} size={16} /> : undefined,
-    group: on ? 'On other applications' : 'No applications yet',
-  }
 }

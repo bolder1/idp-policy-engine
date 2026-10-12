@@ -159,7 +159,7 @@ export function ImpactArenaDialog({
             )}
           </div>
 
-          <div className="bia__time" role="group" aria-label="Time of day">
+          <div className="bia__time" role="group" aria-label="Sign-in hours">
             {SWEEP_TIMES.map((t, i) => (
               <button
                 key={t.label}

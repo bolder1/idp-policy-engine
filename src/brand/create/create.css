@@ -192,7 +192,7 @@
   white-space: nowrap;
 }
 .bgcard__mdec.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bgcard__mdec.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bgcard__mdec.is-mfa { background: var(--fb-positive-strong-bg); color: var(--fb-positive-strong-fg); }
 .bgcard__mdec.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 
 /* "+3 more rules": the rules it stands for, as a deck. White like them,
@@ -902,7 +902,7 @@
 .bgcard__tag.is-count { background: var(--surface-inset); color: var(--text-muted); }
 /* The strictest outcome, in the product's three reserved decision hues. */
 .bgcard__tag.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bgcard__tag.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bgcard__tag.is-mfa { background: var(--fb-positive-strong-bg); color: var(--fb-positive-strong-fg); }
 .bgcard__tag.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 .bgcard__tag.is-none { background: var(--surface-inset); color: var(--text-muted); }
 

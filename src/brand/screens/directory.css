@@ -1,0 +1,92 @@
+/* -----------------------------------------------------------------------------
+   The directory: the User list, User roles, the Groups list and one group's
+   page (UsersPage.tsx, GroupsPage.tsx), and the user cell and the user
+   details slider an application's Users tab shares with them
+   (app-people-tabs.tsx, UserDrawer.tsx).
+
+   Built from what the console already draws — the table, the bar, the line
+   tabs, the zone page's head, the Display tokens page's ticks — so what is
+   here is only the user cell, the group page's furniture, and the row heights
+   the pager divides by. Two prefixes, checked against the tree before they
+   were chosen: `busr` for people, `bgrp` for groups. Loaded from main.tsx
+   after applications.css, for the cascade reason written there.
+   -------------------------------------------------------------------------- */
+
+/* --- A person in a row ------------------------------------------------------------
+   The email, which opens their details, over their name: the console files
+   people by email, and a name alone is ambiguous in a directory of thousands. */
+
+.busr__who { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.busr__who > .btable__link { overflow: hidden; text-overflow: ellipsis; }
+.busr__sub {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+
+/* Rows paged at PEOPLE_ROW_H (sign-in-tests/library.ts), so the stylesheet sets
+   the same number the pager divides by — as library.css does for the Access
+   checks People table. A row that holds a person's two lines, and the group
+   tables paged at the same height. */
+.btable tbody tr:has(.busr__who) > td,
+.btable.bdir__table tbody td { height: 56px; }
+
+/* --- The user details slider: the applications a person signs in to -------------
+   The inspector's quiet rows (inspect.css `.insp__list`, `.insp__item`): the
+   application over the policy deciding for them. Only what that list does not
+   already do — a long policy name clips on one line rather than wrapping the
+   row taller than its neighbours. */
+
+.busr__apps .insp__itemtext > .u-muted {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-sm);
+}
+
+/* --- One group's page -------------------------------------------------------------- */
+
+/* The line tabs under the zone head, spaced exactly as the application page's
+   (`.bapp > .bz7__pagehead`, `.bapp__tabs`), so the two pages read as one
+   kind: the page grid's gap is the only space around the tabs. */
+.bgrp--page > .bz7__pagehead { margin-bottom: 0; }
+.bgrp__tabs { margin: var(--space-2) 0 0; }
+
+/* The face beside the name keeps level with the rename field, which is taller
+   than the heading it replaces (see `.bz7__titleline.is-renaming` in
+   zones-final.css). */
+.bgrp .bz7__titleline > .bx-face { flex: none; }
+.bgrp .bz7__titleline.is-renaming > .bx-face { margin-top: var(--space-4); }
+
+/* Back link, head, tabs, then the tab's panel taking the rest of the window,
+   with its pager at the panel's end — the Display tokens page's shape
+   (screens.css, the pager at the bottom of the page). */
+.bpage.bgrp--page:has(.bgrp__panel > .blist__pager) { grid-template-rows: auto auto auto 1fr; }
+.bgrp__panel { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.bgrp__panel > .btoolbar { margin-bottom: 0; }
+.bgrp__panel > .blist__pager { margin-top: auto; }
+
+/* Created and Last modified: label over value, side by side. */
+.bgrp__facts { display: flex; flex-wrap: wrap; gap: var(--space-5) var(--space-9); margin: 0; }
+.bgrp__facts > div { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.bgrp__facts dt { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bgrp__facts dd { margin: 0; font-size: var(--fs-md); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+/* A labelled section of the Basic tab: the label, then what it holds. */
+.bgrp__section { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+
+/* Select all over the members table: lined up with the row ticks, which sit
+   inside the table's first cell rather than a list row's padding. */
+.bgrp__panel > .bdt__selbar { padding: 0 calc(var(--table-cell-x) + var(--bw-thin)); }
+/* The tick column takes only the tick. */
+.bgrp__colcheck { width: 1px; }
+.btable td.bgrp__check { padding-right: 0; }
+/* A ticked row, the Display tokens page's shade — the sticky Actions cell too,
+   which paints its own ground so the table can scroll under it. */
+.bgrp__members tbody tr.is-selected,
+.bgrp__members tbody tr.is-selected td.btable__actions { background: var(--surface-sunken); }
+
+/* The deciding policy, and the tip beside it. */
+.bgrp__decider { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+/* "Sign-ins change on": a label over the applications it names, in the Assign
+   users slider and the Unassign dialog. */
+.bgrp__effect { display: flex; flex-direction: column; gap: var(--space-2); }
+.bgrp__effect p { margin: 0; font-size: var(--fs-md); color: var(--text-primary); }

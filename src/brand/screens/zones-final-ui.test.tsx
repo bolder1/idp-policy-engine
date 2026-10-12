@@ -54,10 +54,10 @@ describe('the zone page head', () => {
     expect(head).not.toMatch(/<p>/)
   })
 
-  it('carries the Note style switch with its five versions, in the preview slot', () => {
+  it('carries the Note style switch with its three versions, in the preview slot', () => {
     expect(head).toContain('class="bpage__preview"')
-    expect(text(head)).toContain('Note style Classic Blue Sticky note Clipboard Pointer')
-    expect(head.match(/aria-pressed="(true|false)"/g)).toHaveLength(5)
+    expect(text(head)).toContain('Note style Blue Classic Sticky note')
+    expect(head.match(/aria-pressed="(true|false)"/g)).toHaveLength(3)
   })
 })
 
@@ -116,7 +116,7 @@ describe('Locations: My current location', () => {
 
 /* The stylesheet without its comments, which name what went. */
 const cssRules = zonesCss.replace(/\/\*[\s\S]*?\*\//g, '')
-const PAPER: NoteStyle[] = ['sticky', 'clip', 'pointer']
+const PAPER: NoteStyle[] = ['sticky']
 const NEW = ['Japan', 'California', 'Toronto', 'Within 50 km of Berlin']
 const note = (half: 'net' | 'place', style: NoteStyle, rollOut = false) =>
   html(<ZoneNote half={half} style={style} rollOut={rollOut} />)
@@ -138,32 +138,31 @@ describe('the Blue note (owner, 5 Oct 2026)', () => {
 })
 
 describe('the Note style switch', () => {
-  it('offers Classic, Blue, the sticky note, the clipboard and the pointer, in that order, Classic first', () => {
-    expect(NOTE_STYLES.map((s) => s.label)).toEqual(['Classic', 'Blue', 'Sticky note', 'Clipboard', 'Pointer'])
-    expect(NOTE_STYLES.map((s) => s.value)).toEqual(['classic', 'blue', ...PAPER])
+  it('offers Blue, Classic and the sticky note, in that order, Blue first', () => {
+    expect(NOTE_STYLES.map((s) => s.label)).toEqual(['Blue', 'Classic', 'Sticky note'])
+    expect(NOTE_STYLES.map((s) => s.value)).toEqual(['blue', 'classic', ...PAPER])
   })
 
-  it('keeps a stored sticky note, and puts the withdrawn versions, and anything else, on Classic', () => {
+  it('keeps a stored sticky note, and puts the withdrawn versions, and anything else, on Blue', () => {
     expect(parseNoteStyle('sticky')).toBe('sticky')
-    expect(parseNoteStyle('clip')).toBe('clip')
-    expect(parseNoteStyle('pointer')).toBe('pointer')
     /* Withdrawn on 1 Oct 2026, then 2 Oct 2026, then never a version at all. */
-    for (const gone of ['colours', 'rows', 'tip', 'pile', 'card', 'nonsense', '', null, undefined])
-      expect(parseNoteStyle(gone)).toBe('classic')
+    for (const gone of ['colours', 'rows', 'tip', 'pile', 'card', 'clip', 'pointer', 'nonsense', '', null, undefined])
+      expect(parseNoteStyle(gone)).toBe('blue')
   })
 
-  it('draws one pressed segment among five, and it is Classic', () => {
+  it('draws one pressed segment among three, and it is Blue', () => {
     const out = html(<NoteStyleSwitch />)
-    expect(out.match(/aria-pressed="(true|false)"/g)).toHaveLength(5)
+    expect(out.match(/aria-pressed="(true|false)"/g)).toHaveLength(3)
     expect(out.match(/aria-pressed="true"/g)).toHaveLength(1)
-    expect(out).toMatch(/aria-pressed="true"[^>]*>Classic</)
+    expect(out).toMatch(/aria-pressed="true"[^>]*>Blue</)
     expect(out).toContain('aria-label="Note style"')
   })
 })
 
 describe('Classic: the note as it was', () => {
-  it('is the page’s note until another is picked', () => {
-    expect(page()).toContain('<div class="bz7__side"><h3 class="bz7__sidehead">')
+  it('is not the page’s default: the Blue card is, until another is picked (owner, 9 Oct 2026)', () => {
+    expect(page()).toContain('class="bz7n-blue"')
+    expect(page()).not.toContain('<div class="bz7__side"><h3 class="bz7__sidehead">')
     expect(text(page())).toContain('What you can add')
   })
 
@@ -230,39 +229,8 @@ describe('the paper notes', () => {
   })
 
   it('read "Japan, a country" to a screen reader, the sticky note too', () => {
-    for (const s of PAPER.filter((v) => v !== 'sticky'))
-      expect(note('place', s)).toMatch(/<strong>Japan<\/strong><span class="u-sr-only">, <\/span><span class="bz7n-[a-z]+__gloss">a country<\/span>/)
     /* It read "Japana country" (browser pass, 2 Oct 2026). */
     expect(note('place', 'sticky')).toContain('<strong>Japan</strong><span class="u-sr-only">, </span><span>a country</span>')
-  })
-
-  it('hang the clipboard’s clip as drawing, hidden from assistive tech, over a sheet', () => {
-    const out = note('place', 'clip')
-    expect(out).toMatch(
-      /^<div class="bz7n-clip"[^>]*><span class="bz7n-clip__clip" aria-hidden="true"[^>]*><\/span><div class="bz7n-clip__sheet"><h3 class="bz7n-clip__head">Examples<\/h3><ul class="bz7n-clip__list">/,
-    )
-    /* The rule and the two facts on Locations; on IP networks, neither. */
-    expect(out).toMatch(/<\/ul><div class="bz7n-clip__facts"><p>/)
-    expect(/<div class="bz7n-clip__facts">([\s\S]*?)<\/div>/.exec(out)?.[1].match(/<p>/g)).toHaveLength(2)
-    expect(note('net', 'clip')).not.toContain('bz7n-clip__facts')
-    expect(cssRules).toMatch(/\.bz7n-clip__facts \{[^}]*border-top: var\(--bw-thin\) solid var\(--border-subtle\);/)
-  })
-
-  it('point the pointer’s notch from its own paper, and rule off the facts', () => {
-    const out = note('place', 'pointer')
-    expect(out).toMatch(/^<div class="bz7n-point"[^>]*><h3 class="bz7n-point__head">Examples<\/h3><ul class="bz7n-point__list">/)
-    expect(out).toMatch(/<\/ul><div class="bz7n-point__facts"><p>/)
-    expect(note('net', 'pointer')).not.toContain('bz7n-point__facts')
-    expect(cssRules).toMatch(/\.bz7n-point::before \{[^}]*background: inherit;[^}]*clip-path: polygon\(100% 0, 0 50%, 100% 100%\);/)
-    /* Where the aside drops below the list, the notch is on the top edge. */
-    expect(cssRules).toMatch(/@media \(max-width: 1120px\) \{[^@]*\.bz7n-point::before \{[^}]*clip-path: polygon\(0 100%, 50% 0, 100% 100%\);/)
-    expect(cssRules).toMatch(
-      /\.bz7n-point__facts \{[^}]*border-top: var\(--bw-thin\) solid color-mix\(in srgb, var\(--tint-teal-fg\) 22%, transparent\);/,
-    )
-  })
-
-  it('never tilt the clipboard or the pointer', () => {
-    for (const s of ['clip', 'pointer'] as const) expect(note('place', s)).not.toMatch(/rotate/)
   })
 
   it('keep the sticky note as it was built, its label a heading now', () => {
@@ -278,8 +246,6 @@ describe('the paper notes and motion', () => {
   /* What a first showing draws before motion runs, per version. */
   const FIRST: Record<string, RegExp> = {
     sticky: /clip-path:inset\(-12% -6% 100% -6%\)/,
-    clip: /class="bz7n-clip" style="opacity:0;transform:translateY\(-10px\)"/,
-    pointer: /class="bz7n-point" style="opacity:0;transform:translateX\(-6px\) scale\(0\.92\)"/,
   }
 
   it('arrive with motion on a first showing', () => {
@@ -301,8 +267,6 @@ describe('the paper notes and motion', () => {
     const still = (s: NoteStyle) => note('place', s)
     expect(still('sticky')).toMatch(/clip-path:inset\(-12% -6% -12% -6%\)/)
     expect(still('sticky')).toMatch(/transform:rotate\(-1deg\)/)
-    expect(still('clip')).toMatch(/class="bz7n-clip" style="opacity:1;transform:none"/)
-    expect(still('pointer')).toMatch(/class="bz7n-point" style="opacity:1;transform:none"/)
   })
 
   it('arrive once per tab and version on the page, not on every switch back', () => {
@@ -315,7 +279,7 @@ describe('the paper notes and motion', () => {
     /* Every rule whose subject is the element itself, in or out of a media
        query — not its children, and not its ::before. `transform-origin` is
        allowed: motion reads it and never writes it. */
-    const MOVED = ['bz7n-sticky', 'bz7n-clip', 'bz7n-clip__clip', 'bz7n-point']
+    const MOVED = ['bz7n-sticky']
     const rules = [...cssRules.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }))
     for (const cls of MOVED) {
       const own = rules.filter((r) =>
@@ -327,8 +291,6 @@ describe('the paper notes and motion', () => {
       expect(own.length, cls).toBeGreaterThan(0)
       for (const r of own) expect(r.body, `${cls}: ${r.sel}`).not.toMatch(/\btransform\s*:|transition|rotate|\b(scale|translate)\s*:/)
     }
-    /* Centred decoration is centred by auto margins, never a translate. */
-    expect(zonesCss).toMatch(/\.bz7n-clip__clip \{[^}]*left: 0; right: 0; margin-inline: auto;/)
     expect(zonesCss).not.toMatch(/translateX\(-50%\)/)
   })
 })

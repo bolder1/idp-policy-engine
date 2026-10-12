@@ -1,5 +1,5 @@
 import type { AccessDecision } from './data'
-import { CANT_TELL, DECISION_TONE, DECISION_WORDS, decisionsOr } from './decision-words'
+import { CANT_TELL, DECISION_BADGE_TONE, DECISION_WORDS, decisionsOr } from './decision-words'
 import { Badge } from './kit'
 
 /* A decision, as the testing surfaces show one: the kit's own badge, in the
@@ -15,7 +15,7 @@ import { Badge } from './kit'
    decision. */
 export function DecisionBadge({ decision, className }: { decision: AccessDecision; className?: string }) {
   return (
-    <Badge tone={DECISION_TONE[decision]} className={`bx-decision-badge${className ? ` ${className}` : ''}`}>
+    <Badge tone={DECISION_BADGE_TONE[decision]} className={`bx-decision-badge${className ? ` ${className}` : ''}`}>
       {DECISION_WORDS[decision]}
     </Badge>
   )

@@ -39,6 +39,7 @@ import { ChangeList, ChangeSection, type ChangeItem } from './change-list'
 import { groupSections, reviewItemName, reviewSave, sectionsOpen, type KindBlock, type ReviewLine } from './review-rows'
 import { useReviewView, type ReviewView } from './review-view'
 import { SHOWCASE } from './showcase'
+import { playCue, switchTick } from './sound'
 
 /* -----------------------------------------------------------------------------
    Brand kit — the primitives from IDP · 2 Core.
@@ -671,7 +672,7 @@ export function Badge({
 }: {
   children: ReactNode
   className?: string
-  tone?: 'neutral' | 'brand' | 'positive' | 'negative' | 'notice' | 'info' | 'accent' | 'lime' | 'magenta' | 'system'
+  tone?: 'neutral' | 'brand' | 'positive' | 'positive-strong' | 'negative' | 'notice' | 'info' | 'accent' | 'lime' | 'magenta' | 'system'
 }) {
   /* The label is its own element rather than a bare text node because
      text-overflow does not reach an anonymous flex item — the badge stays a
@@ -694,7 +695,8 @@ export function DecisionChip({
   decision: AccessDecision
   size?: 'sm' | 'md'
 }) {
-  const tone = decision === 'deny' ? 'negative' : decision === '2fa' ? 'notice' : 'positive'
+  /* 2FA is an allow: the second green (decision-words.ts `DECISION_BADGE_TONE`), never the notice amber. */
+  const tone = decision === 'deny' ? 'negative' : decision === '2fa' ? 'positive-strong' : 'positive'
   const label = decision === 'deny' ? 'Deny' : decision === '2fa' ? 'MFA' : 'Allow'
   /* No dot. The chip is already tinted, bordered and named — see the note on
      `.bx-decision` in kit.css for why a fourth signal was removed rather than
@@ -744,7 +746,11 @@ const TOGGLE_TRAVEL = { sm: 14, md: 20, lg: 22 } as const
    This one translates the knob by a fixed distance. No measurement, nothing to
    disagree with, and the inset is big enough that the knob is visibly inside
    the track at both ends. The off state keeps a border so it reads as a control
-   rather than a grey blob — Linear, Plain and Pinterest all do the same. */
+   rather than a grey blob — Linear, Plain and Pinterest all do the same.
+
+   A press ticks (sound.ts): up for on, down for off. Only a press — a switch
+   that is drawn on or off, or moved by something else, is silent — and only
+   once the switch moves. */
 export function Toggle({
   checked,
   onChange,
@@ -758,6 +764,20 @@ export function Toggle({
   disabled?: boolean
   size?: 'sm' | 'md' | 'lg'
 }) {
+  /* The press asks; the tick waits for the answer. A change can be refused
+     (the only ready method stays on, and a toast says so) or held for a
+     confirm, and a tick at the press said "done" over a switch that had not
+     moved, then claimed the press's window over the toast that said why. So
+     the press notes what it asked for, and the tick plays when `checked`
+     arrives there in the same turn — in a layout effect, which runs before the
+     toast's passive one, so a success toast stays quiet under the tick. A
+     refusal, or a change a confirm makes later, is heard through its toast. */
+  const asked = useRef<boolean | null>(null)
+  useLayoutEffect(() => {
+    const cue = switchTick(asked.current, checked)
+    asked.current = null
+    if (cue) playCue(cue)
+  }, [checked])
   return (
     <button
       type="button"
@@ -765,7 +785,16 @@ export function Toggle({
       aria-checked={checked}
       aria-label={label}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onClick={() => {
+        const want = !checked
+        asked.current = want
+        onChange(want)
+        /* Past this turn the press has had its answer: a later move (a
+           confirm, an Undo) is not this press's. */
+        window.setTimeout(() => {
+          if (asked.current === want) asked.current = null
+        }, 0)
+      }}
       className={`bx-toggle bx-toggle--${size} ${checked ? 'is-on' : ''}`}
     >
       <motion.span
@@ -931,7 +960,7 @@ const CALLOUT_ICON = {
   positive: CheckCircle2,
 } as const
 
-function CalloutIcon({ tone }: { tone: keyof typeof CALLOUT_ICON }) {
+export function CalloutIcon({ tone }: { tone: keyof typeof CALLOUT_ICON }) {
   const Icon = CALLOUT_ICON[tone]
   return <Icon className="bx-callout__mark" size={16} strokeWidth={2} aria-hidden />
 }

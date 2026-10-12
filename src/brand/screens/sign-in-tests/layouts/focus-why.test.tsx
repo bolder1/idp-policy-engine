@@ -35,9 +35,12 @@ import journeyRaw from '../EngineJourney.tsx?raw'
    answer opened it: Focus — the one view the owner presents — never read the
    page's `why`. These pin the way in and what it opens:
 
-     · the outcome card's body ends in one quiet link, only where the page
-       hands its why, only once the run is done, and only when the why has
-       something to say — by the column's own rule (EngineJourney.tsx);
+     · the Policies card carries one quiet link under its head, only where the
+       page hands its why, only once the run is done, and only when the why
+       has something to say — by the column's own rule (EngineJourney.tsx).
+       6 Oct 2026: it was the outcome card's; the owner moved Review conflict
+       to the Policies card ("anything policy related should be in this card
+       only", classic2-chain.tsx `WhyUnder`), and the outcome has none;
      · its words say what the why holds: a way in for a refusal that has one,
        the conflict for a conflict, else the plain why;
      · open, the why is WhyCard whole, handed what the column hands it, and
@@ -47,7 +50,7 @@ import journeyRaw from '../EngineJourney.tsx?raw'
 
    A server render runs no effect and has no DOM to portal into, so the link and
    the why are drawn by a small host that does what Focus2Layout does with them
-   (the outcome card open, the why beside it rather than in a panel), and how
+   (the chain's cards, the why beside them rather than in a panel), and how
    Focus2Layout portals the why is pinned from its source — as why-ui.test.tsx
    pins the column's.
    -------------------------------------------------------------------------- */
@@ -114,30 +117,38 @@ const DEFAULTED = propsOf('Kavya Menon', 'HRMS')
 const OUTCOME_OPEN: ChainFold = { open: { 'sign-in': false, policy: false, rule: false, outcome: true }, anyOpen: true, fold: noop, set: noop, foldAll: noop }
 /** Every card folded, as Focus leaves them once a run lands. */
 const ALL_FOLDED: ChainFold = { open: { 'sign-in': false, policy: false, rule: false, outcome: false }, anyOpen: false, fold: noop, set: noop, foldAll: noop }
+/** Every card folded but the Policies card, where the link is (6 Oct 2026). */
+const POLICY_OPEN: ChainFold = { open: { 'sign-in': false, policy: true, rule: false, outcome: false }, anyOpen: true, fold: noop, set: noop, foldAll: noop }
 
-/* What Focus2Layout does with the two: the link on its chain's outcome, and the why — here beside the chain, there in the
-   page's panel body. `done` is Focus's `whyDone`. */
-function Host({ run, done = true, folded = false }: { run: RunLayoutProps; done?: boolean; folded?: boolean }) {
+/* What Focus2Layout does with the two: the link on its chain's Policies card (6 Oct 2026: it was the outcome's), and the
+   why — here beside the chain, there in the page's panel body. `done` is Focus's `whyDone`. */
+function Host({ run, done = true, fold = OUTCOME_OPEN }: { run: RunLayoutProps; done?: boolean; fold?: ChainFold }) {
   const root = useRef<HTMLDivElement | null>(null)
   const fw = useFocusWhy(run, done, root)
   const data = useChainRun(run)
   return (
     <div ref={root}>
       <div className="rl-c2">
-        <Classic2Chain run={run} data={data} fold={folded ? ALL_FOLDED : OUTCOME_OPEN} animate={false} snap start={<span className="test-start" />} signInCard={false} why={fw.link} />
+        <Classic2Chain run={run} data={data} fold={fold} animate={false} snap start={<span className="test-start" />} signInCard={false} why={fw.link} />
       </div>
       <aside className="test-panel">{fw.card}</aside>
     </div>
   )
 }
-const host = (run: RunLayoutProps, done = true, folded = false) =>
+const host = (run: RunLayoutProps, done = true, fold: ChainFold = OUTCOME_OPEN) =>
   renderToStaticMarkup(
     <BrandProvider>
       <TestingSessionProvider>
-        <Host run={run} done={done} folded={folded} />
+        <Host run={run} done={done} fold={fold} />
       </TestingSessionProvider>
     </BrandProvider>,
   )
+/** One card of the chain, from its head to the next card's. */
+const cardOf = (html: string, card: string) => {
+  const at = html.indexOf(`data-card="${card}"`)
+  const next = html.indexOf('data-card="', at + 1)
+  return at < 0 ? '' : html.slice(at, next < 0 ? undefined : next)
+}
 const focus = (run: RunLayoutProps) =>
   renderToStaticMarkup(
     <BrandProvider>
@@ -163,7 +174,7 @@ const barSrc = plain(barRaw)
 const hostSrc = plain(hostRaw)
 const journeySrc = plain(journeyRaw)
 
-describe('the way in: one quiet link at the foot of the outcome card', () => {
+describe('the way in: one quiet link under the Policies card’s head', () => {
   it('is on, as a named flag', () => {
     expect(WHY_IN_FOCUS).toBe(true)
   })
@@ -182,10 +193,12 @@ describe('the way in: one quiet link at the foot of the outcome card', () => {
     expect(panelOf(host({ ...DENY, ...pageWhy(true) }, false))).not.toContain('tj-why')
   })
 
-  it('sits under the outcome’s head, folded or not — never in the head’s own buttons, never only in the body (owner, 6 Oct 2026)', () => {
-    for (const folded of [true, false]) {
-      const out = host({ ...DENY, ...pageWhy(false) }, true, folded)
-      const card = out.slice(out.indexOf('data-card="outcome"'))
+  /* 6 Oct 2026: the owner moved Review conflict from the outcome to the Policies card ("anything policy related should
+     be in this card only"): the same link, under that card's head, and none on the outcome or the rule. */
+  it('sits under the Policies card’s head, folded or not — never in the head’s own buttons, never only in the body, never on the outcome (owner, 6 Oct 2026)', () => {
+    for (const [folded, fold] of [[true, ALL_FOLDED], [false, POLICY_OPEN]] as const) {
+      const out = host({ ...DENY, ...pageWhy(false) }, true, fold)
+      const card = cardOf(out, 'policy')
       const head = card.slice(0, card.indexOf('rl-c2__whyunder'))
       expect(card, `folded ${folded}`).toContain('rl-c2__whyunder')
       /* Not a head action: the head's own row ends before it. */
@@ -194,8 +207,13 @@ describe('the way in: one quiet link at the foot of the outcome card', () => {
       expect(card).toMatch(/class="rl-c2__under rl-c2__whyunder"><span class="bb__idx rl-c2__idx rl-c2__whyspace" aria-hidden="true"><\/span><button type="button" class="rl-c2__why"/)
       if (!folded) {
         const body = card.slice(card.indexOf('class="bb__tbody"'))
+        expect(card).toContain('class="bb__tbody"')
         expect(body).not.toContain('rl-c2__why')
       }
+      /* The one link: not on the outcome, not on the rule. */
+      expect(out.split('class="rl-c2__why"').length - 1, `folded ${folded}`).toBe(1)
+      expect(cardOf(out, 'outcome'), `folded ${folded}`).not.toContain('rl-c2__why')
+      expect(cardOf(out, 'rule'), `folded ${folded}`).not.toContain('rl-c2__why')
     }
   })
 
@@ -303,9 +321,16 @@ describe('nowhere else', () => {
     expect(barSrc).not.toMatch(/WhyCard|useFocusWhy|\bwhy=\{|\b(?:props|run)\.why\b|\bonWhy\b|Review conflict|how to get in/i)
     const barCall = layoutSrc.slice(layoutSrc.indexOf('<Focus2CanvasBar'), layoutSrc.indexOf('/>', layoutSrc.indexOf('<Focus2CanvasBar')))
     expect(barCall).not.toMatch(/why/i)
-    /* The chain hands the link to the outcome alone, and the outcome draws it in its body. */
-    expect(chainSrc).toContain("why={k === 'outcome' ? why : null}")
-    expect(chainSrc).toContain('why={deciding ? null : why}')
+    /* 6 Oct 2026: the chain hands the link to the Policies card alone (it was the outcome's), only once the run is
+       done, and the card draws it under its head; the outcome is handed none. */
+    expect(chainSrc).toContain("why={k === 'policy' ? why : null}")
+    const policyCall = chainSrc.slice(chainSrc.indexOf('<PolicyCard'), chainSrc.indexOf('/>', chainSrc.indexOf('<PolicyCard')))
+    expect(policyCall).toContain('why={done ? why : null}')
+    expect(chainSrc).toContain('under={why ? <WhyUnder why={why} /> : undefined}')
+    expect(chainSrc.split('<WhyUnder').length - 1).toBe(1)
+    const outcomeCall = chainSrc.slice(chainSrc.indexOf('<OutcomeCard'), chainSrc.indexOf('/>', chainSrc.indexOf('<OutcomeCard')))
+    expect(outcomeCall).toContain('view={deciding ? DECIDING : outcome}')
+    expect(outcomeCall).not.toMatch(/\bwhy\b/)
   })
 
   it('ClassicV2Layout hands its chain no why: the link is Focus’s alone', () => {

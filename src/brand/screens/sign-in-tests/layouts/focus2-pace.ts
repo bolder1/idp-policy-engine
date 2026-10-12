@@ -200,39 +200,43 @@ export const landedAt = (plan: EngineRun, p: number): boolean => p >= plan.steps
 
    'compact' is 0: a rule folds as it recedes, inside the next beat's move,
    so it is not a beat of its own and needs no time. */
+/* 6 Oct 2026 ("start working on the animation … it should feel more real"): the run measured 14.5 s to settle, with
+   1.7 s of nothing at the find, 2.5 s at the Then and 1.4 s before a rule's first check. Each step now carries what is
+   drawn on it — the row being asked, the rule handed on, the outcome deciding — so the holds that only waited are
+   shorter, and the run reads in about 8.5 s to the answer. */
 const PRESENT_MS: Record<StepKind, number> = {
   fill: 460,
-  collapse: 280,
-  find: 400,
-  scan: 420,
-  found: 520,
-  decides: 420,
+  collapse: 200,
+  find: 700,
+  scan: 700,
+  found: 600,
+  decides: 600,
   expand: 300,
-  rule: 320,
-  check: 360,
-  checked: 380,
-  'rule-end': 360,
-  compact: 0,
-  deciding: 520,
-  outcome: 1400,
+  rule: 220,
+  check: 300,
+  checked: 300,
+  'rule-end': 300,
+  compact: 260,
+  deciding: 600,
+  outcome: 1000,
   done: 0,
 }
 
 /** A conflict is named on its own step and held, whatever its kind says: the finding has to be read before the answer lands. */
-export const NOTICE_MS = 2000
+export const NOTICE_MS = 1400
 /** The last step before a beat boundary is held this much longer: it carries the finding that ended the beat. */
-export const READ_HOLD = 800
+export const READ_HOLD = 300
 /** The cap shrinks the read holds this far and no further. */
-export const READ_HOLD_MIN = 400
+export const READ_HOLD_MIN = 150
 /** Then it shrinks the rows this far and no further. */
-export const CHECK_MIN = 280
-export const CHECKED_MIN = 300
+export const CHECK_MIN = 200
+export const CHECKED_MIN = 220
 /** The whole presentation, at most. */
-export const PRESENT_CAP_MS = 16000
+export const PRESENT_CAP_MS = 11500
 /** The least a beat is held, so it can be read. The outcome has none: its build is 1400 ms and the answer then stays. */
-export const BEAT_MIN: Record<BeatKind, number> = { sign: 1600, policies: 1200, covers: 1200, rule: 1200, then: 900, outcome: 0 }
+export const BEAT_MIN: Record<BeatKind, number> = { sign: 800, policies: 1600, covers: 900, rule: 800, then: 600, outcome: 0 }
 /** A rule switched off says only that: its header and an "Off" chip. */
-export const OFF_RULE_MIN = 700
+export const OFF_RULE_MIN = 500
 /** A re-run started by an edit presents at this share: the admin has just watched the same run. */
 export const EDIT_PRESENT_SHARE = 0.7
 /** It is one when the engine ran it at this share of the full pace or less (`EDIT_SHARE` is 0.6, so an edit re-run is). */

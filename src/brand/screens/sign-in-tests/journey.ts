@@ -798,6 +798,9 @@ export interface WhyItem {
   head: string
   /** Why, in plain words; '' when the line says it. */
   detail: string
+  /** The why in one line ("Not used — AWS for engineering teams comes first"), where the model has one; the card shows
+      it and keeps `detail` for its tooltip (owner, 6 Oct 2026: "users don't want to read a lot"). */
+  short?: string
   /** What the admin can do; '' when nothing needs doing. */
   fix: string
   /** The fix loosens access. */
@@ -874,9 +877,10 @@ export function whyItems(plan: Pick<EngineRun, 'conflicts' | 'rules'>): WhyItem[
     if (RULE_KINDS.includes(f.kind)) {
       const rc = c.conflicts.find((x) => x.ruleId === f.target.ruleId) ?? null
       const drawn = rc !== null && plan.rules.some((r) => r.id === rc.ruleId)
-      return drawn ? { ...base, icon: 'rule', rule: rc, action: openRule } : { ...base, icon: 'rule', action: openRule }
+      const short = rc?.notUsed
+      return drawn ? { ...base, icon: 'rule', rule: rc, short, action: openRule } : { ...base, icon: 'rule', short, action: openRule }
     }
-    if (f.kind === 'exception') return { ...base, icon: 'exception', action: openRule }
+    if (f.kind === 'exception') return { ...base, icon: 'exception', short: f.why.split('. ')[1] ?? f.why, action: openRule }
     if (POLICY_KINDS.includes(f.kind)) {
       const p = c.policies.find((x) => x.policyId === f.target.policyId)
       if (!p) return { ...base, action: openFix ?? openPolicy }
@@ -886,6 +890,7 @@ export function whyItems(plan: Pick<EngineRun, 'conflicts' | 'rules'>): WhyItem[
         head: `also covers ${person}${p.via.say ? ` · ${p.via.say}` : ''}`,
         link: { policyId: p.policyId, label: p.policyName },
         detail: `Not used: ${p.why}`,
+        short: p.notUsed,
         would: { decision: p.status === 'decided' ? p.decision : null, possible: p.possible },
         action: openFix,
       }
@@ -932,6 +937,8 @@ export interface GroupRowView {
   source: string
   /** The person's own row: the answer on screen. */
   current: boolean
+  /** A group alone that gets the person's answer (the same policy and rule): the why marks it and leaves the person's row out. */
+  follows: boolean
 }
 
 const capital = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
@@ -963,5 +970,6 @@ export function eachGroupRows(plan: Pick<EngineRun, 'asEachGroup'>): GroupRowVie
     words: r.words,
     source: r.kind === 'person' && g.why ? capital(g.why) : where(r),
     current: r.kind === 'person',
+    follows: r.kind === 'group' && r.same,
   }))
 }

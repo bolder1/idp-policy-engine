@@ -60,6 +60,7 @@ export function DockPast({
   version,
   onLoad,
   onHighlight,
+  summary = 'cards',
 }: {
   draft: Pick<Policy, 'id' | 'appIds' | 'audience'>
   /** This policy's applications (`policyApps`): where the week's sign-ins are modelled. */
@@ -67,6 +68,9 @@ export function DockPast({
   version: { substitute: Policy; label: string; tip: string } | null
   onLoad: (form: SignInForm) => void
   onHighlight?: (target: string | 'fallback' | null) => void
+  /* Over the list (owner, 6 Oct 2026): with nothing to compare, the week as a card per decision — each one the list's
+     filter — in place of the bar ("add cards here"); 'none' is the list alone, the policy details slider's ("remove"). */
+  summary?: 'cards' | 'none'
 }) {
   const { policies, zones } = useBrand()
   const env = useSimEnv()
@@ -78,7 +82,12 @@ export function DockPast({
   /* The tile pressed, or — until one is — the first with anything in it. */
   const [picked, setPicked] = useState<PastFilter | null>(null)
   const filter = report.compared ? (picked ?? pastDefaultFilter(report)) : null
-  const rows = filter ? pastRowsOf(report.rows, filter) : report.rows
+  /* One side: a decision's card pressed shows its sign-ins alone; pressed again, all of them. */
+  const [picks, setDecided] = useState<DistSegment['key'] | null>(null)
+  /* A card the week no longer has (an edit saved since) filters nothing. */
+  const decided = picks && report.today.some((s) => s.key === picks) ? picks : null
+  const byFilter = filter ? pastRowsOf(report.rows, filter) : report.rows
+  const rows = !report.compared && decided ? byFilter.filter((r) => keyOf(r.today) === decided) : byFilter
   /* A row hovered as the tab goes — another tab, the rule editor — never sends its mouseleave. */
   useEffect(() => () => onHighlight?.(null), [onHighlight])
 
@@ -96,6 +105,7 @@ export function DockPast({
   return (
     <div className="tpanel-view">
       <div className="tpanel-scroll">
+        {summary !== 'none' && (
         <div className="tpanel-past__top">
           <p className="tpanel-past__head">
             <Badge tone="neutral">Sample</Badge>
@@ -105,11 +115,22 @@ export function DockPast({
               label="About the sample"
             />
           </p>
-          <div className="tpanel-dist" role="group" aria-label="Decisions over the week">
-            <DistBar label={cols.left} segments={report.today} reduced={reduced} />
-            {report.compared && <DistBar label={cols.right} segments={report.edits} reduced={reduced} />}
-            <Legend segments={[...report.today, ...report.edits]} />
-          </div>
+          {report.compared ? (
+            <div className="tpanel-dist" role="group" aria-label="Decisions over the week">
+              <DistBar label={cols.left} segments={report.today} reduced={reduced} />
+              <DistBar label={cols.right} segments={report.edits} reduced={reduced} />
+              <Legend segments={[...report.today, ...report.edits]} />
+            </div>
+          ) : (
+            <div className="tpanel-tiles tpanel-dcards" role="group" aria-label="Show">
+              {report.today.map((s) => (
+                <button key={s.key} type="button" className={`tpanel-tile tpanel-dcard is-${s.key}`} aria-pressed={decided === s.key} onClick={() => setDecided(decided === s.key ? null : s.key)}>
+                  <span className="tpanel-tile__n">{formatCount(s.count)}</span>
+                  <span className="tpanel-tile__label">{s.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {report.compared && (
             <div className="tpanel-tiles" role="group" aria-label="Show">
               {report.tiles.map((t) => (
@@ -121,6 +142,7 @@ export function DockPast({
             </div>
           )}
         </div>
+        )}
 
         {rows.length === 0 && filter ? (
           <p className="tpanel-past__none">{PAST_EMPTY[filter]}</p>
@@ -196,6 +218,9 @@ export function DockPast({
 /* One side of the week as a bar: a segment per decision, in its tone, as wide
    as its share. The widths are motion's — they ease to the new shares when an
    edit moves them — on segments nothing else animates. */
+/** A sign-in's answer as the week's segments key it: its decision, or can't tell. */
+const keyOf = (res: PastRow['today']): DistSegment['key'] => (res.status === 'decided' && res.decision ? res.decision : 'unknown')
+
 function DistBar({ label, segments, reduced }: { label: string; segments: DistSegment[]; reduced: boolean }) {
   const said = segments.map((s) => `${s.label} ${Math.round(s.share * 100)}%`).join(', ')
   return (

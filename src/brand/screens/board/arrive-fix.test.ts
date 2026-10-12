@@ -7,7 +7,8 @@ import { runBreakInOnApp } from '../break-in-app'
 import { acceptanceFor } from '../break-in-model'
 import { canUndo, commit, historyOf, undo, type History } from '../history'
 import { envOf } from '../tenant-resolver'
-import { arrivalKey, firstArrival, landFix, type ArriveFix } from './arrive-fix'
+import { arrivalKey, firstArrival, landConflict, landFix, type ArriveFix } from './arrive-fix'
+import { applyConflictFixes, fixDone, fixSaidOn, type ConflictFix, type FixItem } from '../sign-in-tests/conflict-fix'
 import appRaw from '../../BrandApp.tsx?raw'
 import builderRaw from './BoardBuilder.tsx?raw'
 import pageRaw from './BoardPage.tsx?raw'
@@ -133,6 +134,53 @@ describe('a fix that does not fit', () => {
   })
 })
 
+/* A Why finding's Fix brings the run's whole list (7 Oct 2026, owner: "can I take this whole fix thing inside the
+   builder?"): the one pressed lands as any fix does, the rest wait in the Fixes panel, and what each is now is read
+   off the draft — so a second press never makes it twice, and Undo opens it again. */
+describe('a run’s fixes, together', () => {
+  const eng = t.policies.find((p) => !p.isSystem && p.rules.length >= 3)!
+  const [r1, r2, r3] = eng.rules
+  const move: ConflictFix = { kind: 'move', policyId: eng.id, ruleId: r3.id, above: r2.id }
+  const add: ConflictFix = { kind: 'add', policyId: eng.id, above: r1.id, userIds: ['u-maya'], groupIds: [], label: 'Maya Iyer', copy: { policyId: eng.id, ruleId: r3.id }, decision: '2fa' }
+  const list: FixItem[] = [move, add].map((fix, i) => ({ fix, title: `Finding ${i + 1}`, line: 'Its line.' }))
+
+  it('lands the one pressed, and says so the second time rather than making it twice', () => {
+    const seen = { current: null as string | null }
+    const clean = historyOf(openForEditing(eng))
+    const first = arriveOn(clean, seen, eng.id, { conflicts: list, pressed: 1 })
+    expect(first.toasts).toEqual(['Rule added for Maya Iyer as rule 1'])
+    expect(first.h.present.rules[0]).toMatchObject({ name: 'For Maya Iyer', decision: '2fa', who: { userIds: ['u-maya'], groupIds: [] } })
+    expect(fixDone(first.h.present, add)).toBe(true)
+    expect(landConflict(first.h.present, add, t.policies)).toEqual({ none: 'Already in the draft' })
+    /* Undo opens it again. */
+    expect(fixDone(undo(first.h).present, add)).toBe(false)
+  })
+
+  it('a move already made is Applied, not "no longer fits"; the words number the rules as the draft has them', () => {
+    expect(fixSaidOn(move, eng)).toBe('Move rule 3 above rule 2')
+    const moved = landConflict(openForEditing(eng), move, t.policies)
+    if ('none' in moved) throw new Error(moved.none)
+    expect(moved.draft.rules.map((r) => r.id).slice(0, 3)).toEqual([r1.id, r3.id, r2.id])
+    expect(landConflict(moved.draft, move, t.policies)).toEqual({ none: 'Already in the draft' })
+    const added = landConflict(moved.draft, add, t.policies)
+    if ('none' in added) throw new Error(added.none)
+    expect(fixSaidOn(move, added.draft)).toBe('Move rule 3 above rule 4')
+  })
+
+  it('Apply all makes only what is open, in one edit; again, nothing', () => {
+    const half = landConflict(openForEditing(eng), move, t.policies)
+    if ('none' in half) throw new Error(half.none)
+    const all = applyConflictFixes(half.draft, [move, add], t.policies)
+    expect(all.count).toBe(1)
+    expect(all.added).toEqual([all.next.rules[0].id])
+    expect(applyConflictFixes(all.next, [move, add], t.policies).count).toBe(0)
+  })
+
+  it('is keyed by the one pressed and the list', () => {
+    expect(arrivalKey(eng.id, { conflicts: list, pressed: 0 })).not.toBe(arrivalKey(eng.id, { conflicts: list, pressed: 1 }))
+  })
+})
+
 describe('the route', () => {
   it('carries the fix from the screen to the builder, and lands on the board rather than Check access', () => {
     expect(appSrc).toContain('<BoardPage policyId={screen.policyId} open={screen.open} rule={screen.rule} fix={screen.fix} />')
@@ -148,7 +196,7 @@ describe('the builder’s join', () => {
     expect(builderSrc).toContain('const fixKey = arrivalKey(policyId, arriveFix)')
     expect(builderSrc).toContain('if (firstArrival(arrived, fixKey)) arrival.current()\n  }, [fixKey])')
     /* Only where the policy exists and the edition has the Break-in test. */
-    expect(builderSrc).toContain('if (arriveFix && saved && features.breakInTest) landArrival(arriveFix)')
+    expect(builderSrc).toContain("if (arriveFix && saved && ('conflicts' in arriveFix || features.breakInTest)) landArrival(arriveFix)")
   })
 
   it('commits the fix as every ready fix is, offers Undo, and selects and shows the card', () => {

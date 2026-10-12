@@ -65,7 +65,7 @@ const COND_ICON: Record<string, LucideIcon> = {
   fingerprint: MonitorSmartphone,
   webhook: Webhook,
   time: Clock,
-  /* Not a clock. "Time of day" and "Day of week" sit next to each other and are
+  /* Not a clock. "Sign-in hours" and "Sign-in days" sit next to each other and are
      the pair most easily mistaken for one another; two clocks made the list
      read as one attribute drawn twice. */
   day: CalendarDays,

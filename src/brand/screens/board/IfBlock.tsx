@@ -3,7 +3,7 @@ import { ArrowRight, Braces, Split, Users } from 'lucide-react'
 
 import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
 import { FaceStack, type FaceItem } from '../../faces'
-import { conditionType, zoneScopeOf, type Condition, type Rule } from '../../data'
+import { conditionName, conditionType, zoneScopeOf, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
@@ -228,14 +228,14 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
      line, which is the one most likely to push the values off it. */
   const shared = uniform ? halves[0] : undefined
   const scope = shared === 'ip' ? 'on the network only' : shared === 'location' ? 'by location only' : ''
-  const head = t.label.length + ATTR + c.operator.length + OP + (scope ? scope.length + OP : 0)
+  const head = conditionName(c).length + ATTR + c.operator.length + OP + (scope ? scope.length + OP : 0)
   const n = valuesShown(chips, head)
   const shown = chips.slice(0, n)
   const rest = chips.length - n
   return (
     <>
       <IfChip tone={tone} variant="attr" icon={<Ico size={11} strokeWidth={2.2} />} title={t.group}>
-        {t.label}
+        {conditionName(c)}
       </IfChip>
       <IfKw tone="op">{c.operator}</IfKw>
       {/* As many names as the line holds, then how many more.

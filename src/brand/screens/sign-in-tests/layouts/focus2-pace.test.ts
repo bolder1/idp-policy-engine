@@ -99,21 +99,25 @@ const bare = (tl: PresentedTimeline): Beat[] => tl.beats.map((b) => b.beat)
 
 /* The owner's ms table, repeated here on purpose: a test that read the
    module's own numbers would pass whatever they were changed to. */
+/* The presented table, 6 Oct 2026 (focus2-pace.ts PRESENT_MS: each step now carries what is drawn on it, so the holds
+   that only waited are shorter). */
+/* 7 Oct 2026: the Policies card searches the stack while the engine finds the policy (PolicySearch), so the find, each
+   row asked and the one found are held long enough to see the search: find 700, scan 700, found 600. */
 const TABLE: Record<string, number> = {
   fill: 460,
-  collapse: 280,
-  find: 400,
-  scan: 420,
-  found: 520,
-  decides: 420,
+  collapse: 200,
+  find: 700,
+  scan: 700,
+  found: 600,
+  decides: 600,
   expand: 300,
-  rule: 320,
-  check: 360,
-  checked: 380,
-  'rule-end': 360,
-  compact: 0,
-  deciding: 520,
-  outcome: 1400,
+  rule: 220,
+  check: 300,
+  checked: 300,
+  'rule-end': 300,
+  compact: 260,
+  deciding: 600,
+  outcome: 1000,
   done: 0,
 }
 
@@ -235,11 +239,16 @@ describe('presentTimeline: a pace a person can read', () => {
      reaches the 16 s cap exactly, which is the cap doing its job. The owner
      judges the pace in the browser; these are here so that a change to the
      table cannot move them quietly. */
-  it('the totals: Maya 12.4 s, Devon Deny 16 s at the cap, Kavya 11 s', () => {
-    expect(msOf(MAYA).total).toBe(12400)
-    expect(msOf(DENY).total).toBe(16000)
-    expect(msOf(KAVYA).total).toBe(10960)
-    expect(msOf(CONFLICT).total).toBe(12760)
+  /* 6 Oct 2026: the owner asked for a run that feels real rather than slow. Each step now draws what happens on it,
+     so the holds that only waited went: Maya from 12.4 s to 8.55 s, Devon from the 16 s cap to the new 10.5 s one. */
+  /* 7 Oct 2026: the Policies card shows its search while the engine finds the policy (find 700, scan 700, found 600,
+     and the Policies beat at least 1600), and the cap went to 11.5 s: Maya 9.7 s, Devon still exactly at the cap,
+     Kavya 8.42 s, the conflict 9.72 s. */
+  it('the totals: Maya 9.7 s, Devon Deny 11.5 s at the cap, Kavya 8.42 s', () => {
+    expect(msOf(MAYA).total).toBe(9700)
+    expect(msOf(DENY).total).toBe(11500)
+    expect(msOf(KAVYA).total).toBe(8420)
+    expect(msOf(CONFLICT).total).toBe(9720)
   })
 
   it('every run is slower than the engine ran it, which is the whole point', () => {
@@ -250,7 +259,7 @@ describe('presentTimeline: a pace a person can read', () => {
     }
   })
 
-  it('no presentation is longer than 16 s', () => {
+  it('no presentation is longer than the cap', () => {
     for (const { name, plan } of EVERY) {
       expect(msOf(plan).total, name).toBeLessThanOrEqual(PRESENT_CAP_MS)
       expect(msOf(plan).over, name).toBe(0)
@@ -266,20 +275,19 @@ describe('presentTimeline: a pace a person can read', () => {
     })
   })
 
-  it('the step the story hands over on carries the +800 ms read hold: the finding that ended the beat can be read', () => {
+  it('the step the story hands over on carries the read hold: the finding that ended the beat can be read', () => {
     const tl = msOf(MAYA)
     expect(tl.shrunk).toBe(false)
     for (const span of tl.beats.slice(0, -1)) {
-      /* The sign-in is the one exception on this run, and only because its
-         1600 ms floor is higher than its step plus the hold. */
-      if (span.beat.kind === 'sign') continue
       const at = span.beat.to
-      expect(tl.dur[at] - TABLE[MAYA.steps[at].kind], `${span.beat.label} hand-over (${MAYA.steps[at].kind})`).toBe(READ_HOLD)
+      const hold = tl.dur[at] - TABLE[MAYA.steps[at].kind]
+      /* The hold, or more where the beat was topped up to its floor on that same step. */
+      if (span.dur === BEAT_MIN[span.beat.kind]) expect(hold, `${span.beat.label} hand-over (${MAYA.steps[at].kind})`).toBeGreaterThanOrEqual(READ_HOLD)
+      else expect(hold, `${span.beat.label} hand-over (${MAYA.steps[at].kind})`).toBe(READ_HOLD)
     }
-    /* A rule folds as it recedes, so its own step is 0 ms and the hold is all
-       there is: 800 ms to read what ended it. */
+    /* A rule folds as it recedes, drawn now (6 Oct 2026): its own step and the hold. */
     expect(MAYA.steps[tl.beats[3].beat.to].kind).toBe('compact')
-    expect(tl.dur[tl.beats[3].beat.to]).toBe(READ_HOLD)
+    expect(tl.dur[tl.beats[3].beat.to]).toBeGreaterThanOrEqual(TABLE.compact + READ_HOLD)
   })
 
   it('every beat is held long enough to read, and none of them drags', () => {
@@ -295,10 +303,16 @@ describe('presentTimeline: a pace a person can read', () => {
   })
 
   it('a beat the engine raced through is topped up to its floor, on the step whose result is already on screen', () => {
-    const tl = msOf(KAVYA)
-    /* find (400) plus the read hold (800) is 1200, under the sign-in's 1600. */
-    expect(tl.beats[0].dur).toBe(BEAT_MIN.sign)
-    expect(tl.dur[tl.beats[0].beat.to]).toBe(BEAT_MIN.sign)
+    /* 7 Oct 2026: the sign-in no longer needs it (find 700 plus the 300 read hold is 1000, over its 800). Maya's
+       Policies beat does: one policy asked, its scan (700) plus the read hold (300) is 1000, under the Policies' 1600. */
+    const tl = msOf(MAYA)
+    const span = tl.beats[1]
+    expect(span.beat.kind).toBe('policies')
+    expect(span.beat.to).toBe(span.beat.from)
+    expect(MAYA.steps[span.beat.to].kind).toBe('scan')
+    expect(TABLE.scan + READ_HOLD).toBeLessThan(BEAT_MIN.policies)
+    expect(span.dur).toBe(BEAT_MIN.policies)
+    expect(tl.dur[span.beat.to]).toBe(BEAT_MIN.policies)
   })
 
   it('a conflict holds 2000 ms on the Then, where the finding is', () => {
@@ -335,10 +349,18 @@ describe('presentTimeline: a pace a person can read', () => {
     }
   })
 
-  it('the sign-in is held the same whether the card folds into the run or not', () => {
+  /* 7 Oct 2026: both used to sit on the sign-in's floor, which made them equal. With the find at 700 neither does
+     (find plus the read hold is 1000, over the 800), so the fold is drawn on its own step and adds that step only. */
+  it('the sign-in is read for the same time whether the card folds into the run or not; the fold adds only its own step', () => {
     const run = planOf('Maya Iyer', 'AWS Console', { intro: 'collapse' })
     expect(run.steps[0].kind).toBe('collapse')
-    expect(msOf(run).beats[0].dur).toBe(msOf(MAYA).beats[0].dur)
+    const folded = msOf(run)
+    const plain = msOf(MAYA)
+    expect(run.steps[folded.beats[0].beat.to].kind).toBe('find')
+    expect(folded.dur[folded.beats[0].beat.to]).toBe(plain.dur[plain.beats[0].beat.to])
+    expect(folded.dur[0]).toBe(TABLE.collapse)
+    expect(folded.beats[0].dur).toBe(plain.beats[0].dur + TABLE.collapse)
+    expect(folded.total).toBe(plain.total + TABLE.collapse)
   })
 
   it('an edit re-run presents at 0.7 ×', () => {
@@ -390,7 +412,7 @@ function longRun(plan: EngineRun, times: number): EngineRun {
   return { ...plan, rules: [...plan.rules.filter((r) => r.visited), ...extra], steps, landing: 0, at: { ...plan.at, outcome, done: outcome + 1 } }
 }
 
-describe('the 16 s cap and the order things are shrunk in', () => {
+describe('the cap and the order things are shrunk in', () => {
   const tl = msOf(DENY)
   const edges = new Set(bare(tl).map((b) => b.to))
 
@@ -404,24 +426,28 @@ describe('the 16 s cap and the order things are shrunk in', () => {
     for (const plan of [MAYA, KAVYA, CONFLICT]) expect(msOf(plan).shrunk).toBe(false)
   })
 
-  it('the read holds go first, towards 400 ms and never below', () => {
+  it('the read holds go first, towards their floor and never below', () => {
     for (const span of tl.beats.slice(0, -1)) {
-      if (span.beat.kind === 'sign') continue
+      /* A beat held at its own floor keeps what the floor gave it. */
+      if (span.beat.kind === 'sign' || span.dur === BEAT_MIN[span.beat.kind]) continue
       const hold = tl.dur[span.beat.to] - TABLE[DENY.steps[span.beat.to].kind]
       expect(hold, `${span.beat.label} hand-over`).toBeGreaterThanOrEqual(READ_HOLD_MIN)
       expect(hold, `${span.beat.label} hand-over`).toBeLessThan(READ_HOLD)
     }
   })
 
-  it('and the rows after them, never below 280 and 300 ms: the order is holds first, not both at once', () => {
+  it('and the rows after them, never below their floors: the order is holds first, not both at once', () => {
     const rows = DENY.steps.map((st, i) => ({ st, i })).filter(({ st, i }) => !edges.has(i) && (st.kind === 'check' || st.kind === 'checked'))
     expect(rows.length).toBeGreaterThan(4)
     for (const { st, i } of rows) {
       expect(tl.dur[i], `${i}:${st.kind}`).toBeGreaterThanOrEqual(st.kind === 'check' ? CHECK_MIN : CHECKED_MIN)
       expect(tl.dur[i], `${i}:${st.kind}`).toBeLessThanOrEqual(TABLE[st.kind])
     }
-    /* Devon's read holds alone cover its overflow, so its rows are whole. */
-    expect(rows.every(({ st, i }) => tl.dur[i] === TABLE[st.kind])).toBe(true)
+    /* Devon's read holds go to their floor first; only then are its rows cut. */
+    for (const span of tl.beats.slice(0, -1)) {
+      if (span.beat.kind === 'sign' || span.dur === BEAT_MIN[span.beat.kind]) continue
+      expect(tl.dur[span.beat.to] - TABLE[DENY.steps[span.beat.to].kind], span.beat.label).toBe(READ_HOLD_MIN)
+    }
   })
 
   it('a long run shrinks its rows too, each to its own floor', () => {

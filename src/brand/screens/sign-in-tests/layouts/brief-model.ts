@@ -189,17 +189,29 @@ export function decisiveOf(plan: Pick<EngineRun, 'rules' | 'landing'>): Decisive
   return null
 }
 
-/** The check, said as the sign-in's finding: "the Windows 11 laptop meets Compliant devices". */
+/* The kind word after a name, so each thing in the sentence says what it is (owner, 6 Oct 2026: "it is hard to locate
+   the policy for this group — add each item's name next to it"): "the AWS for engineering teams policy", "the
+   Engineering group", "the AWS Console app". Nothing where the name already ends in it ("Global Default Policy"). */
+export function kindAfter(name: string, kind: string): string {
+  return new RegExp(`\\b${kind}s?$`, 'i').test(name.trim()) ? '' : ` ${kind}`
+}
+
+/** The check, said as the sign-in's finding: "the Windows 11 laptop meets the Compliant devices profile". */
 export function checkWords(c: CheckRow, mid = true): string {
   if (c.missing) return `${mid ? 'the ' : ''}${c.word.toLowerCase()} is not stated`
   const line = c.line || c.say || `${c.word} · ${c.value}`
-  return c.category === 'device' && mid ? `the ${line}` : line
+  /* A device is held to device profiles: said as one, as the policy and the group are. */
+  const said =
+    c.category === 'device'
+      ? line.replace(/^(.*? (?:meets|does not meet) )(.+)$/, (_, head: string, core: string) => `${head}the ${core}${core.includes(' and ') ? ' profiles' : kindAfter(core, 'profile')}`)
+      : line
+  return c.category === 'device' && mid ? `the ${said}` : said
 }
 
-/** "through Engineering", "by name", "for everyone"; '' when it does not say. */
+/** "through the Engineering group", "by name", "for everyone"; '' when it does not say. */
 export function viaWords(via: Via | null | undefined): string {
   if (!via || !via.matches) return ''
-  if (via.kind === 'groups' && via.label) return `through ${via.label}`
+  if (via.kind === 'groups' && via.label) return `through the ${via.label}${via.groups.length > 1 ? ' groups' : kindAfter(via.label, 'group')}`
   if (via.kind === 'person') return 'by name'
   if (via.kind === 'everyone') return 'to everyone'
   return ''
@@ -246,6 +258,9 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
     inp.name ? splitBy(text, [{ text: inp.name, entity: 'person', glyph: { kind: 'face', name: inp.name } }]) : splitBy(text, whoPicks({ groups: inp.groups }, true))
   const appSegs = (): Seg[] => [{ text: inp.app, entity: 'app', glyph: inp.appId ? { kind: 'logo', appId: inp.appId, name: inp.app } : undefined }]
   const marked = (text: string, glyph: Glyph): Seg[] => [{ text, glyph }]
+  /* What each named thing is, after its name: "the AWS Console app", "the … policy". */
+  const appKind = kindAfter(inp.app, 'app')
+  const policyKind = (name: string) => kindAfter(name, 'policy')
 
   const cites: CiteId[] = ['who']
   if (plan.policies.length > 0) cites.push('policy')
@@ -269,27 +284,31 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
     t(inp.person, 0, { cite: 'who', segs: whoSegs(inp.person) })
     t(' ', atOut)
     t('is denied', atOut, { cite: 'outcome', answer: true, segs: marked('is denied', { kind: 'outcome', decision: 'deny' }) })
-    t(' ', 0)
+    t(' the ', atOut)
     t(inp.app, 0, { segs: appSegs() })
+    t(appKind, 0)
   } else if (decided) {
     const said = decided === '1fa' ? 'on one factor' : inp.second ? `with 2FA (${inp.second})` : 'with 2FA'
     t(inp.person, 0, { cite: 'who', segs: whoSegs(inp.person) })
-    t(' gets into ', atOut)
+    t(' gets into the ', atOut)
     t(inp.app, 0, { segs: appSegs() })
+    t(appKind, 0)
     t(' ', atOut)
     t(said, atOut, { cite: 'outcome', answer: true, segs: marked(said, { kind: 'outcome', decision: decided }) })
   } else if (o.status === 'depends') {
     const needs = o.view.needs.map((n) => n.toLowerCase())
     const said = needs.length > 0 ? `depends on the ${needs.join(' and the ')}` : 'depends on a fact not stated'
     t(inp.person, 0, { cite: 'who', segs: whoSegs(inp.person) })
-    t(' on ', 0)
+    t(' on the ', 0)
     t(inp.app, 0, { segs: appSegs() })
+    t(appKind, 0)
     t(' ', atOut)
     t(said, atOut, { cite: 'outcome', answer: true, segs: marked(said, { kind: 'outcome', decision: 'depends' }) })
   } else {
     t(inp.person, 0, { cite: 'who', segs: whoSegs(inp.person) })
-    t(' on ', 0)
+    t(' on the ', 0)
     t(inp.app, 0, { segs: appSegs() })
+    t(appKind, 0)
     t(': ', atOut)
     t(o.view.line || 'no policy decides', atOut, { cite: 'outcome', answer: true })
     t('.', atOut)
@@ -299,17 +318,17 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
   /* Then the policy, and how it covers them. */
   if (decider) {
     if (decider.isGlobalDefault && plan.policies.length > 1) {
-      t(': no policy on ', atPol)
+      t(': no policy on the ', atPol)
       t(inp.app, atPol, { segs: appSegs() })
-      t(' ', atPol)
+      t(`${appKind} `, atPol)
       t(`covers ${inp.first}`, atPol, { cite: 'who', segs: inp.name ? splitBy(`covers ${inp.first}`, [{ text: inp.first, entity: 'person', glyph: { kind: 'face', name: inp.name } }]) : undefined })
       t(', so the ', atPol)
       t(decider.name, atPol, { cite: 'policy', segs: marked(decider.name, { kind: 'policy' }) })
-      t(' applies', atPol)
+      t(`${policyKind(decider.name)} applies`, atPol)
     } else {
-      t(': ', atPol)
+      t(': the ', atPol)
       t(decider.name, atPol, { cite: 'policy', segs: marked(decider.name, { kind: 'policy' }) })
-      t(' applies', atPol)
+      t(`${policyKind(decider.name)} applies`, atPol)
       const v = decider.isGlobalDefault ? '' : viaWords(inp.via)
       if (v) {
         const named = inp.via?.groups.map((g): Seg => ({ text: g.name, entity: 'group', glyph: { kind: 'group' } })) ?? []
@@ -357,10 +376,26 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
   const f = plan.conflicts?.findings.find((x) => x.tone === 'conflict')
   if (f && f.line) {
     const cite: CiteId = f.target.ruleId ? 'rule' : 'policy'
-    after.push({ key: 'a0', text: f.line, segs: splitBy(f.line, whoPicks({ groups: inp.groups }, false)), at: atOut, cite: cites.includes(cite) ? cite : undefined, notice: true })
+    const line = kindedLine(f.line, inp.groups ?? [], decider?.name)
+    after.push({ key: 'a0', text: line, segs: splitBy(line, whoPicks({ groups: inp.groups }, false)), at: atOut, cite: cites.includes(cite) ? cite : undefined, notice: true })
     after.push({ key: 'a1', text: '.', at: atOut })
   }
   return { parts, after, cites, num, decisive, tone, cardAt, provenAt }
+}
+
+/* The conflict's line (conflicts.ts) with its groups and its policy said as what they are: "Maya Iyer is in the
+   Engineering and Finance groups — the AWS for engineering teams policy applies first". Only where the words are the
+   person's own groups and the deciding policy's own name; anything else is left as conflicts.ts said it. */
+export function kindedLine(line: string, groups: readonly string[], decider?: string): string {
+  let out = line
+  const m = out.match(/ is in (.+?) — /)
+  if (m) {
+    const named = m[1].split(/, | and /)
+    if (named.every((n) => groups.includes(n))) out = out.replace(m[0], ` is in the ${m[1]}${named.length > 1 ? ' groups' : kindAfter(m[1], 'group')} — `)
+  }
+  const tail = `— ${decider} applies first`
+  if (decider && out.endsWith(tail)) out = `${out.slice(0, -tail.length)}— the ${decider}${kindAfter(decider, 'policy')} applies first`
+  return out
 }
 
 /** What the engine is working on at step `s`, as a part: blue there, and only there. */

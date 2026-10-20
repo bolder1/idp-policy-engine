@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { ArrowLeft, Download, FileBadge, FileText, Plus, Replace, Trash2, Upload, X } from 'lucide-react'
 
 import { EmptyState } from '../empty'
-import { Button, Callout, Drawer, IconButton, RowMenu, TipDot, type MenuItem } from '../kit'
+import { Button, Drawer, IconButton, Note, RowMenu, TipDot, type MenuItem } from '../kit'
 import {
   ALIAS_MAX,
   aliasIssue,
@@ -625,8 +625,8 @@ export function CaChainDrawer({
         </>
       )}
 
-      {/* The live dialog's note, in its info banner. */}
-      <Callout tone="info">{supportNote(plan.ready.length > 1)}</Callout>
+      {/* The live dialog's note, in the kit's `Note` (16 Oct 2026); its heading names what the sentence asks. */}
+      <Note title="Next step">{supportNote(plan.ready.length > 1)}</Note>
     </div>
   )
 

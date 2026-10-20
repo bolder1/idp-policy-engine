@@ -50,7 +50,9 @@ import { UserDrawer } from './UserDrawer'
    cannot disagree. Its tip names the app's other policies that name them,
    with each one's status: the shadowed policy and the draft are what an admin
    comes here to find. The name opens the policy's details slider; the board
-   it opens from there comes back to this application.
+   it opens from there comes back to this application. On Users a second line
+   under the name says how that policy reaches the person (13 Oct 2026,
+   `reachOf`): through which of their groups, by name, or for everyone.
 
    Counts are the directory's members, never a group's stated `memberCount`,
    which is the Who picker's (owner question G3).
@@ -76,10 +78,27 @@ function SortHead<K extends string>({ sort, onSort, k, label }: { sort: Sort<K>;
 
 /* The Deciding policy cell: the policy's name, opening its details, and the
    tip naming the others when there are any. "—" when nothing decides, which
-   only a tenant without a default policy can show. */
-function DeciderCell({ policy, also, who, onOpen }: { policy: Policy | null; also: Policy[]; who: string; onOpen: (id: string) => void }) {
+   only a tenant without a default policy can show.
+
+   On Users, `reach` is a second, muted line saying how that policy reaches the
+   person ("Through Engineering", "By name", "For everyone": `reachOf`). It
+   stacks the way the User column's email and name do (directory.css
+   `.busr__who`), so the row keeps the two-line height the pager divides by. */
+function DeciderCell({
+  policy,
+  also,
+  who,
+  reach,
+  onOpen,
+}: {
+  policy: Policy | null
+  also: Policy[]
+  who: string
+  reach?: string | null
+  onOpen: (id: string) => void
+}) {
   const tip = alsoTip(also)
-  return (
+  const name = (
     <span className="btable__marks">
       {policy ? (
         <button type="button" className="btable__link" onClick={() => onOpen(policy.id)}>
@@ -89,6 +108,13 @@ function DeciderCell({ policy, also, who, onOpen }: { policy: Policy | null; als
         <span className="u-muted">—</span>
       )}
       {tip && <TipDot text={tip} label={`Other policies naming ${who}`} />}
+    </span>
+  )
+  if (!reach) return name
+  return (
+    <span className="busr__who">
+      {name}
+      <span className="busr__sub">{reach}</span>
     </span>
   )
 }
@@ -106,9 +132,18 @@ function useDetails(appId: string) {
   return { open: (id: string) => setDetails({ id, open: true }), drawer }
 }
 
+/* `saving` on both tabs: the application page's SaveBar is open (a Basic,
+   Advanced, Sign-in options or Attributes draft has changes). Neither tab has a
+   primary yet; when one comes (spec §6, waiting on the owner's G1) it renders
+   secondary while this is true, as the Policies tab's New policy does, so the
+   page never shows two orange buttons. Accepted now so the page can pass it. */
+interface TabSaving {
+  saving?: boolean
+}
+
 // --- Users ---------------------------------------------------------------------------
 
-export function AppUsersTab({ appId, group }: { appId: string; group?: string }) {
+export function AppUsersTab({ appId, group, policy: routePolicy }: { appId: string; group?: string; policy?: string } & TabSaving) {
   const store = useBrand()
   const session = useTestingSession()
   const [query, setQuery] = useState('')
@@ -120,7 +155,13 @@ export function AppUsersTab({ appId, group }: { appId: string; group?: string })
     setSeenGroup(group)
     setGroupF(group ?? 'all')
   }
-  const [policyPick, setPolicyPick] = useState<PolicyFilter>('all')
+  /* The route's policy, the same way: the Policies tab's "{n} people" lands here with its policy picked. */
+  const [policyPick, setPolicyPick] = useState<PolicyFilter>(routePolicy ?? 'all')
+  const [seenPolicy, setSeenPolicy] = useState(routePolicy)
+  if (seenPolicy !== routePolicy) {
+    setSeenPolicy(routePolicy)
+    setPolicyPick(routePolicy ?? 'all')
+  }
   const [sort, setSort] = useState<Sort<UserSortKey>>({ key: 'user', dir: 1 })
   const [person, setPerson] = useState<string | null>(null)
   const details = useDetails(appId)
@@ -188,7 +229,7 @@ export function AppUsersTab({ appId, group }: { appId: string; group?: string })
                 </tr>
               </thead>
               <tbody ref={paged.listRef}>
-                {paged.pageRows.map(({ user, groups, decider, also }) => (
+                {paged.pageRows.map(({ user, groups, decider, reach, also }) => (
                   <tr key={user.id}>
                     <td>
                       <div className="btable__primary">
@@ -205,7 +246,7 @@ export function AppUsersTab({ appId, group }: { appId: string; group?: string })
                     </td>
                     <td className="u-muted">{groups}</td>
                     <td>
-                      <DeciderCell policy={decider} also={also} who={user.name} onOpen={details.open} />
+                      <DeciderCell policy={decider} also={also} who={user.name} reach={reach} onOpen={details.open} />
                     </td>
                     <td className="btable__actions">
                       <RowMenu
@@ -232,7 +273,7 @@ export function AppUsersTab({ appId, group }: { appId: string; group?: string })
 
 // --- Groups ----------------------------------------------------------------------------
 
-export function AppGroupsTab({ appId, onShowUsers }: { appId: string; onShowUsers: (groupId: string | null) => void }) {
+export function AppGroupsTab({ appId, onShowUsers }: { appId: string; onShowUsers: (groupId: string | null) => void } & TabSaving) {
   const store = useBrand()
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort<GroupSortKey>>({ key: 'group', dir: 1 })

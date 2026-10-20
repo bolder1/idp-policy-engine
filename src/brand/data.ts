@@ -10,6 +10,8 @@
 
 /* Type only, as saved-sign-ins.ts imports from here: no module cycle at run time. */
 import type { DraftCheck } from './draft-checks'
+import type { AppSetup } from './app-setup'
+import type { PostAction, PostSetup } from './post-sign-in'
 
 export type PolicyType = 'App Access' | 'Session' | 'Account Management'
 
@@ -137,6 +139,16 @@ export interface App {
      application signs with a certificate, not a client secret. FABRICATED: 32
      made-up hex characters, never a real tenant's value. */
   secret?: string
+  /* Basic's protocol fields, Advanced, Sign-in options and Attributes, as an
+     application added from the catalogue holds them (app-setup.ts). Absent on
+     the seed applications, which predate it: `setupOf` gives them made-up
+     values, so their pages never read as unfinished. */
+  setup?: AppSetup
+  /** The catalogue entry it was added from (app-catalog.ts), when it was. */
+  catalogId?: string
+  /* When it was added (ms), set by `addApp`. An application added now has no
+     sign-ins yet, so the modelled week of sign-in activity leaves it out. */
+  addedAt?: number
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -187,8 +199,19 @@ export interface ConditionType {
       attribute dropdown. */
   hint: string
   operators: string[]
-  /** Where the value comes from: a library object, a fixed list, a clock, typed. */
-  valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'range' | 'time' | 'text'
+  /** Where the value comes from: a library object, a fixed list, a clock, typed. `number` is typed with `unit` after it. */
+  valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'range' | 'time' | 'text' | 'number'
+  /** What a `number` counts, said after the field and the value: "hours", "records". */
+  unit?: string
+  /* Which policy type asks it (post-sign-in.ts, 13 Oct 2026). `post`: only a
+     post sign-in policy's If offers it — the session, the device and network
+     as they change in it, the event's own details. `sign-in`: only a sign-in
+     policy's — the risk scores read when somebody signs in. Absent: both. */
+  phase?: 'post' | 'sign-in'
+  /* Its name on a post sign-in policy, where the one the catalogue gives it
+     names the sign-in: "Sign-in hours" there is the time of the EVENT. */
+  postLabel?: string
+  postHint?: string
   options?: string[]
   /* The attribute names this condition offers, when its subject is a field
      rather than the type itself. `user-attr` has a list; `custom-attr` has
@@ -341,13 +364,13 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      `values[0]` to check the endpoint still exists, and a rule consulting two
      services would have to say what happens when they disagree. */
   { id: 'webhook', label: 'External hook', group: 'Library', hint: 'A yes or no from your own endpoint', operators: ['returns true', 'returns false'], valueKind: 'hook' },
-  { id: 'time', label: 'Sign-in hours', group: 'Time', hint: 'The time of the sign-in, in a set timezone', operators: ['between', 'not between'], valueKind: 'time' },
+  { id: 'time', label: 'Sign-in hours', group: 'Time', hint: 'The time of the sign-in, in a set timezone', operators: ['between', 'not between'], valueKind: 'time', postLabel: 'Event hours', postHint: 'The time of the event, in a set timezone' },
   /* Separate from the window, because they answer different questions and get
      asked separately: "office hours" is a time, "not at the weekend" is a day,
      and a rule usually wants one or the other rather than a single control that
      means both. The parameter sheet lists them as two rows for the same
      reason. */
-  { id: 'day', label: 'Sign-in days', group: 'Time', hint: 'The weekday of the sign-in', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
+  { id: 'day', label: 'Sign-in days', group: 'Time', hint: 'The weekday of the sign-in', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], postLabel: 'Event days', postHint: 'The weekday of the event' },
   /* --- The two attribute conditions, and why there are two -------------------
 
      The sheet lists both: "Custom user attributes", with the comparison types
@@ -372,14 +395,44 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      weighs them, handed to the evaluator on the env as `riskScale`. Keeping it
      is what keeps that screen reachable — a weighting page no condition can
      read is configuration nothing consults. */
-  { id: 'device-risk', label: 'Device risk score', group: 'Risk', hint: 'How risky the device looks, from its signals', operators: ['above', 'below'], valueKind: 'range' },
+  /* Sign-in only, with ML risk below: both are read once, as somebody signs
+     in. A post sign-in policy asks User risk and Risk detection instead, which
+     change during the session. */
+  { id: 'device-risk', label: 'Device risk score', group: 'Risk', hint: 'How risky the device looks, from its signals', operators: ['above', 'below'], valueKind: 'range', phase: 'sign-in' },
   /* Not built. Listed because the risk section is going to have two rows and
      saying so now is cheaper than explaining a new one later.
 
      `evalCond` still has a working case for it, deliberately. If this becomes
      real it is a flag flip, not a re-implementation — and a coming-soon row
      that would return "undecided" the day it shipped is worse than no row. */
-  { id: 'ml-risk', label: 'ML risk score', group: 'Risk', hint: 'A risk level predicted by machine learning', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], soon: true },
+  { id: 'ml-risk', label: 'ML risk score', group: 'Risk', hint: 'A risk level predicted by machine learning', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], soon: true, phase: 'sign-in' },
+  /* --- A post sign-in policy's own (post-sign-in.ts, 13 Oct 2026) ----------
+
+     Asked of an event during the session, so only a post sign-in policy's If
+     offers them (`phase: 'post'`). Four families: the session itself, the
+     device and the network as they change in it, the risk raised about the
+     person, and the event's own details — which only events that carry them
+     can answer (`EventDetail` in post-sign-in.ts). A number is typed, with
+     what it counts after it; a list is ticked. The ones a sign-in policy has
+     too — Network zone, Device profile, External hook, the time and day,
+     user and custom attributes — are the entries above, and Who is the
+     rule's own. */
+  { id: 'session-age', label: 'Session age', group: 'Session', hint: 'How long since the person signed in', operators: ['above', 'below'], valueKind: 'number', unit: 'hours', phase: 'post' },
+  { id: 'idle-time', label: 'Idle time', group: 'Session', hint: 'How long the session has had no activity', operators: ['above', 'below'], valueKind: 'number', unit: 'minutes', phase: 'post' },
+  { id: 'mfa-age', label: 'Time since last second factor', group: 'Session', hint: 'How long since a second factor was passed', operators: ['above', 'below'], valueKind: 'number', unit: 'minutes', phase: 'post' },
+  { id: 'device-compliance', label: 'Device compliance', group: 'Device', hint: 'The device’s compliance, as last reported', operators: ['is', 'is not'], valueKind: 'list', options: ['Compliant', 'Not compliant'], phase: 'post' },
+  { id: 'device-managed', label: 'Managed device', group: 'Device', hint: 'Whether the device is under management', operators: ['is', 'is not'], valueKind: 'list', options: ['Managed', 'Not managed'], phase: 'post' },
+  { id: 'device-changed', label: 'Device changed in the session', group: 'Device', hint: 'Another device is using the session', operators: ['is', 'is not'], valueKind: 'list', options: ['Yes', 'No'], phase: 'post' },
+  { id: 'ip-changed', label: 'IP changed in the session', group: 'Network', hint: 'The session moved to another IP address', operators: ['is', 'is not'], valueKind: 'list', options: ['Any new IP', 'New IP outside the zones'], phase: 'post' },
+  { id: 'impossible-travel', label: 'Impossible travel', group: 'Network', hint: 'Two places too far apart for the time between', operators: ['is', 'is not'], valueKind: 'list', options: ['Yes', 'No'], phase: 'post' },
+  { id: 'anonymous', label: 'Anonymous network', group: 'Network', hint: 'Tor, a VPN, a proxy or a data centre', operators: ['is', 'is not'], valueKind: 'list', options: ['Tor', 'VPN', 'Proxy', 'Data centre'], phase: 'post' },
+  { id: 'user-risk', label: 'User risk', group: 'Risk', hint: 'The person’s risk level, as last assessed', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], phase: 'post' },
+  { id: 'risk-detection', label: 'Risk detection', group: 'Risk', hint: 'A risk finding raised in the session', operators: ['is', 'is not'], valueKind: 'list', options: ['Breached credential', 'Brute force', 'Suspicious app access'], phase: 'post' },
+  { id: 'records', label: 'Record count', group: 'Event', hint: 'How many records the event touches', operators: ['above', 'below'], valueKind: 'number', unit: 'records', phase: 'post' },
+  { id: 'label', label: 'File label', group: 'Event', hint: 'The sensitivity label on the file', operators: ['is', 'is not'], valueKind: 'list', options: ['Public', 'Internal', 'Confidential', 'Restricted'], phase: 'post' },
+  { id: 'destination', label: 'Destination', group: 'Event', hint: 'Whether the data stays inside the organization', operators: ['is', 'is not'], valueKind: 'list', options: ['External', 'Internal'], phase: 'post' },
+  { id: 'amount', label: 'Amount', group: 'Event', hint: 'The amount of money the event changes', operators: ['above', 'below'], valueKind: 'number', unit: 'USD', phase: 'post' },
+  { id: 'volume', label: 'Volume', group: 'Event', hint: 'How many of these events, in 10 minutes', operators: ['above', 'below'], valueKind: 'number', unit: 'in 10 minutes', phase: 'post' },
   /* Legacy only: never offered, never written. See `who` above and `Rule.who`. */
   { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group', who: true },
   { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user', who: true },
@@ -394,7 +447,19 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
    components in a list of twenty-four. Four rows do not scatter. The order
    below is the order they are read in — where from, when, on what, how risky —
    and it is short enough to be the whole answer. */
-export const WHEN_CONDITIONS = CONDITION_CATALOGUE.filter((c) => !c.who)
+/* A sign-in policy's: the post sign-in conditions are never offered on one
+   (and the trail builder, which only builds sign-in policies, reads this). */
+export const WHEN_CONDITIONS = CONDITION_CATALOGUE.filter((c) => !c.who && c.phase !== 'post')
+
+/* A post sign-in policy's If (post-sign-in.ts, 13 Oct 2026): its own
+   conditions and the shared ones, never the sign-in-only risk scores. */
+export const POST_WHEN_CONDITIONS = CONDITION_CATALOGUE.filter((c) => !c.who && c.phase !== 'sign-in')
+
+/** What a rule's If offers, by the type of policy it is in. */
+export const whenConditionsFor = (post: boolean): ConditionType[] => (post ? POST_WHEN_CONDITIONS : WHEN_CONDITIONS)
+
+/** An attribute's name where it is asked: its post sign-in name on a post sign-in policy, when it has one. */
+export const typeLabel = (t: Pick<ConditionType, 'label' | 'postLabel'>, post = false): string => (post && t.postLabel) || t.label
 
 /** Addable right now. `soon` rows are drawn from `WHEN_CONDITIONS` and refused. */
 export const isOfferable = (c: ConditionType) => !c.who && !c.soon
@@ -426,9 +491,9 @@ export const UNKNOWN_CONDITION: ConditionType = {
 
 /** What a condition is called on screen: an attribute by its own name
     ("Email"), everything else by its type ("Network zone"). */
-export function conditionName(c: { typeId: string; key?: string }): string {
+export function conditionName(c: { typeId: string; key?: string }, post = false): string {
   const t = conditionType(c.typeId)
-  return t.keys?.length && c.key ? attrLabel(c.key) : t.label
+  return t.keys?.length && c.key ? attrLabel(c.key) : typeLabel(t, post)
 }
 
 export function conditionType(id: string): ConditionType {
@@ -667,6 +732,12 @@ export interface Rule {
   who?: RuleWho
   when: Predicate
   decision: AccessDecision
+  /* A post sign-in policy's Then (post-sign-in.ts, 13 Oct 2026): Allow, Deny,
+     Step up, Terminate session or Block device. Read only on `type:
+     'Session'`, where `decision` and the factor fields below are not. Absent
+     until the admin chooses it, and a rule without one keeps the policy a
+     draft. */
+  action?: PostAction
   firstFactor: 'Password' | 'Any' | 'Specific'
   /** Which method, when firstFactor is 'Specific'. */
   firstFactorMethod?: string
@@ -868,6 +939,12 @@ export interface Policy {
      A policy whose status is `draft` never carries one — it has nothing live to
      protect, so saving a draft writes straight into it. */
   pendingDraft?: PolicyDraft
+  /* A post sign-in policy's applications and their events (post-sign-in.ts),
+     on `type: 'Session'` only, linked from the application's page. Its rules
+     are `rules` and `fallback`, built on the board like a sign-in policy's,
+     with `Rule.action` as each one's Then; the sign-in engine never reads
+     them. */
+  session?: PostSetup
   /* The sign-ins Describe it tried this policy with, kept when it was saved,
      so the checks before turning it on read them again (draft-checks.ts). A
      policy nobody described has none. Not rules: `same` in policy-draft.ts
@@ -1849,8 +1926,8 @@ export const policies: Policy[] = [
     id: 'sc1-os-compliance',
     name: 'Device OS Compliance — allow or deny',
     type: 'App Access',
-    appIds: ['corporate-email'],
-    status: 'active',
+    appIds: [], // detached from corporate-email: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '2 hours ago',
     modifiedBy: 'Priya Sharma',
     audience: EVERYONE,
@@ -1886,8 +1963,8 @@ export const policies: Policy[] = [
     id: 'sc2-device-integrity',
     name: 'Untrusted device — rooted, jailbroken or tampered',
     type: 'App Access',
-    appIds: ['pam'],
-    status: 'active',
+    appIds: [], // detached from pam: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '4 hours ago',
     modifiedBy: 'Ravi Menon',
     audience: audienceOf(['privileged', 'it-admins']),
@@ -1955,8 +2032,8 @@ export const policies: Policy[] = [
     id: 'sc4-client-version',
     name: 'Minimum miniOrange Authenticator and Agent version',
     type: 'App Access',
-    appIds: ['monitoring'],
-    status: 'active',
+    appIds: [], // detached from monitoring: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: 'Yesterday',
     modifiedBy: 'Jaspreet T.',
     audience: audienceOf(['engineering', 'devops']),
@@ -1992,8 +2069,8 @@ export const policies: Policy[] = [
     id: 'sc5-risk-factors',
     name: 'Risk-tiered verification — stronger factors as risk rises',
     type: 'App Access',
-    appIds: ['crm'],
-    status: 'active',
+    appIds: [], // detached from crm: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '3 hours ago',
     modifiedBy: 'Ravi Menon',
     audience: EVERYONE,
@@ -2046,8 +2123,8 @@ export const policies: Policy[] = [
     id: 'sc6-device-compliance',
     name: 'Device compliance — OS, integrity, lock and client together',
     type: 'App Access',
-    appIds: ['vault'],
-    status: 'active',
+    appIds: [], // detached from vault: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '5 hours ago',
     modifiedBy: 'Priya Sharma',
     audience: audienceOf(['legal', 'executives']),
@@ -2098,9 +2175,9 @@ export const policies: Policy[] = [
     id: 'sc7-browser-floor',
     name: 'Outdated browser enforcement',
     type: 'App Access',
-    appIds: ['wiki'],
+    appIds: [], // detached from wiki: one sign-in policy per application (owner, 14 Oct 2026)
     /* Active. Seeded Active, not Monitoring: Monitoring is reached by switching (owner, 25 Sep 2026). */
-    status: 'active',
+    status: 'draft', // no application left, so a draft
     lastModified: '2 days ago',
     modifiedBy: 'Jaspreet T.',
     audience: EVERYONE,
@@ -2165,8 +2242,8 @@ export const policies: Policy[] = [
     id: 'sc8-trading-posture',
     name: 'Trading Platform — full posture ladder',
     type: 'App Access',
-    appIds: ['trading'],
-    status: 'active',
+    appIds: [], // detached from trading: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '1 hour ago',
     modifiedBy: 'Ravi Menon',
     audience: audienceOf(['traders']),
@@ -2245,8 +2322,8 @@ export const policies: Policy[] = [
     name: 'Contractor devices — compliance gate before access',
     type: 'App Access',
     /* Not `dms`: that app already has its own policy (M&A Integration). */
-    appIds: ['jira'],
-    status: 'active',
+    appIds: [], // detached from jira: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '8 hours ago',
     modifiedBy: 'Jaspreet T.',
     audience: audienceOf(['contractors']),
@@ -2541,19 +2618,25 @@ export const policies: Policy[] = [
 
   // --- Scenario 5, appended to `policies` in data.ts ---
 
-  /* Policy A — Admin */
+  /* Scenario 5, one policy. It was four (Admin, DevOps, End users, baseline) on
+     the one application; an application has at most one sign-in policy
+     (owner, 14 Oct 2026), so the three audiences became rules with their own
+     Who and the baseline's deny became the fallback. Audience is everyone,
+     because the baseline was. Each Who is its old policy's audience, most
+     specific first, so each group meets the same rule as before. */
   {
-    id: 's5-admin',
-    name: 'Workspace — Admin, office only',
+    id: 's5-workspace',
+    name: 'Workspace access',
     type: 'App Access',
     appIds: ['google-workspace'],
-    audience: audienceOf(['admin']),
+    audience: EVERYONE,
     status: 'active',
     lastModified: '3 hours ago',
     modifiedBy: 'Mehak Garg',
     rules: [
       rule({
-        name: 'Office only',
+        name: 'Admin, office only',
+        who: { groupIds: ['admin'], userIds: [] },
         when: when(card(cond('zone', 'in zone', ['office-cidr'], 'ip'))),
         decision: '2fa',
         firstFactor: 'Password',
@@ -2561,28 +2644,9 @@ export const policies: Policy[] = [
         secondFactorMethods: ['Google Authenticator', 'miniOrange OTP'],
         matchEstimate: 9,
       }),
-    ],
-    fallback: rule({
-      name: 'Default rule',
-      when: anySignIn(),
-      decision: 'deny',
-      matchEstimate: 0,
-    }),
-  },
-
-  /* Policy B — DevOps */
-  {
-    id: 's5-devops',
-    name: 'Workspace — DevOps, office network and office device',
-    type: 'App Access',
-    appIds: ['google-workspace'],
-    audience: audienceOf(['devops']),
-    status: 'active',
-    lastModified: '3 hours ago',
-    modifiedBy: 'Mehak Garg',
-    rules: [
       rule({
-        name: 'Office IP and office device',
+        name: 'DevOps, office IP and office device',
+        who: { groupIds: ['devops'], userIds: [] },
         when: when(
           card(
             cond('zone', 'in zone', ['office-cidr'], 'ip'),
@@ -2598,25 +2662,9 @@ export const policies: Policy[] = [
         secondFactorMethods: ['miniOrange Push'],
         matchEstimate: 268,
       }),
-    ],
-    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
-  },
-
-  /* Policy C — End-Users */
-  {
-    id: 's5-endusers',
-    name: 'Workspace — End users, office network',
-    type: 'App Access',
-    appIds: ['google-workspace'],
-    /* 'End-Users' has no group. EVERYONE is the only available expression and it
-       is WIDER than the scenario: it also covers it-admins and engineering. */
-    audience: audienceOf(['end-users']),
-    status: 'active',
-    lastModified: '3 hours ago',
-    modifiedBy: 'Mehak Garg',
-    rules: [
       rule({
-        name: 'Office IP',
+        name: 'End users, office IP',
+        who: { groupIds: ['end-users'], userIds: [] },
         when: when(card(cond('zone', 'in zone', ['office-cidr'], 'ip'))),
         decision: '1fa',
         firstFactor: 'Password',
@@ -2624,20 +2672,7 @@ export const policies: Policy[] = [
         matchEstimate: 921,
       }),
     ],
-    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
-  },
-
-  /* Application Baseline Policy */
-  {
-    id: 's5-baseline',
-    name: 'Workspace — Application baseline',
-    type: 'App Access',
-    appIds: ['google-workspace'],
-    audience: EVERYONE,
-    status: 'active',
-    lastModified: '3 hours ago',
-    modifiedBy: 'Mehak Garg',
-    rules: [],
+    // Every source policy fell back to deny, so the merged one does too.
     fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
   },
 
@@ -2777,18 +2812,15 @@ export const policies: Policy[] = [
 
   // --- Scenario 9, appended to `policies` in data.ts ---
 
-  /* Finance Policy */
+  /* Payroll, one policy: Finance and the baseline merged. Audience is everyone
+     (the baseline's); the Finance office rule carries the finance group as its
+     Who; the baseline's deny stays as the fallback (both were deny). */
   {
     id: 's9-finance',
-    name: 'Payroll — Finance',
+    name: 'Payroll access',
     type: 'App Access',
     appIds: ['payroll'],
-    /* The scenario's claim is "no separate user-to-Policy assignment is required".
-       But `inAudience` (simulate.ts:384) short-circuits ABOVE the rules, so a
-       rule naming someone outside the audience never runs. Mehak Garg is in
-       `executives`, so she must be added to the audience by name — which IS a
-       user-to-policy assignment, the exact thing the scenario says it avoids. */
-    audience: audienceOf(['finance']),
+    audience: EVERYONE,
     status: 'active',
     lastModified: '4 days ago',
     modifiedBy: 'Mehak Garg',
@@ -2813,6 +2845,7 @@ export const policies: Policy[] = [
       }),
       rule({
         name: 'Finance office access',
+        who: { groupIds: ['finance'], userIds: [] },
         when: when(card(cond('zone', 'in zone', ['office-cidr'], 'ip'))),
         decision: '2fa',
         firstFactor: 'Password',
@@ -2821,20 +2854,6 @@ export const policies: Policy[] = [
         matchEstimate: 74,
       }),
     ],
-    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 12 }),
-  },
-
-  /* Application Baseline Policy */
-  {
-    id: 's9-baseline',
-    name: 'Payroll — Application baseline',
-    type: 'App Access',
-    appIds: ['payroll'],
-    audience: EVERYONE,
-    status: 'active',
-    lastModified: '4 days ago',
-    modifiedBy: 'Mehak Garg',
-    rules: [],
     fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 1154 }),
   },
 
@@ -2955,8 +2974,8 @@ export const policies: Policy[] = [
     id: 'japan-travel',
     name: 'Japan Travel Exception',
     type: 'App Access',
-    appIds: ['salesforce'],
-    status: 'active',
+    appIds: [], // detached from salesforce: one sign-in policy per application (owner, 14 Oct 2026); uc3-country-allowlist stays
+    status: 'draft', // no application left, so a draft
     lastModified: 'Yesterday',
     modifiedBy: 'Mehak Garg',
     /* Scenario targets a temporary `Japan-Travel` group. Does not exist.
@@ -3206,8 +3225,8 @@ export const policies: Policy[] = [
     id: 's10-aws-posture',
     name: 'Production Cloud Console — Device Posture',
     type: 'App Access',
-    appIds: ['aws'],
-    status: 'active',
+    appIds: [], // detached from aws: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '6 hours ago',
     modifiedBy: 'Ravi Menon',
     // Doc target is `DevOps`. No such group in the fixtures — `engineering` is the
@@ -3691,8 +3710,8 @@ export const policies: Policy[] = [
     id: 'uc4-registered-devices',
     name: 'Code repository — trusted device required',
     type: 'App Access',
-    appIds: ['github'],
-    status: 'active',
+    appIds: [], // detached from github: one sign-in policy per application (owner, 14 Oct 2026)
+    status: 'draft', // no application left, so a draft
     lastModified: '4 days ago',
     modifiedBy: 'Mehak Garg',
     audience: audienceOf(['engineering']),

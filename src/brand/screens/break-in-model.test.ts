@@ -289,13 +289,8 @@ describe('which policy it runs on', () => {
       'sc-device-compliance',
       'sc-dev-tools',
       'sc-aws-engineering',
-      'sc-aws-finance',
-      'sc-aws-devops',
       'sc-slack-everyone',
-      'sc-slack-engineering',
-      'sc-code-review-finance',
       'sc-box-engineering',
-      'sc-box-design',
     ])
     expect(t.policies.some((p) => p.isSystem && ids.includes(p.id))).toBe(false)
   })

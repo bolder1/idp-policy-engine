@@ -5,9 +5,7 @@ import {
   Check,
   CirclePlus,
   Cpu,
-  Download,
   FileSpreadsheet,
-  Info,
   Lock,
   Minus,
   Monitor,
@@ -21,8 +19,8 @@ import {
   Upload,
 } from 'lucide-react'
 
-import { Badge, Button, Callout, IconButton, MenuButton, NumberStepper, SearchBox, Tip, TipDot, TipMark, Toggle } from '../kit'
-import { useBrand } from '../store'
+import { Badge, Button, IconButton, MenuButton, Note, NumberStepper, SearchBox, Tip, TipDot, TipMark, Toggle } from '../kit'
+import { AgentPrerequisites } from './agent-download'
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
 import {
@@ -984,15 +982,15 @@ function ChosenRow({
    need to add dynamic values here".
 
    A "You can also check" catalogue, an Add on every row, stood under the panel.
-   Removed 15 Sep 2026: the list's Edit button opens the same catalogue. */
+   Removed 15 Sep 2026: the list's Edit button opens the same catalogue.
+
+   The kit's `Note` since 16 Oct 2026 (owner: "whatever content we have on the
+   right can be static, no accordion"): the one heading in the info blue, the
+   lines, terms and foot under it, nothing to open and nothing to press. */
 export function SidePanel({ note }: { note: ProfileNote }) {
   return (
     <aside className="bz7__aside" aria-label="About this step">
-      <div className="bz7__side">
-        <h3 className="bz7__sidehead">
-          <Info size={14} strokeWidth={2} aria-hidden />
-          {note.title}
-        </h3>
+      <Note title={note.title} className="bz7__side">
         {note.lines && note.lines.length > 0 && (
           <ul className="bfp2__sumlines">
             {note.lines.map((l) => (
@@ -1011,7 +1009,7 @@ export function SidePanel({ note }: { note: ProfileNote }) {
           </ul>
         )}
         {note.foot && <p className="bz7__sidep">{note.foot}</p>}
-      </div>
+      </Note>
     </aside>
   )
 }
@@ -1266,32 +1264,13 @@ function EnrolField({
    Basic details tab alike: it is the cost of the answer just given, so it sits
    under the answer rather than further down beside the registration questions.
 
-   The download is the prototype's: there is no installer to hand over, so the
-   press is acknowledged the way the console acknowledges any other act. */
+   Not the kit's `Note`: the section is its own layout, `AgentPrerequisites`
+   in agent-download.tsx (owner, 16 Oct 2026: "I don't like the card layout,
+   we can do better for this section only"). This wrapper only places it. */
 export function AgentBanner() {
-  const store = useBrand()
   return (
     <div className="bfp2__agent">
-      <Callout tone="info" title="Prerequisites for enabling agent-based device restriction">
-        <ul className="bfp2__agentlist">
-          <li>All end users must install the Device Agent on their devices before accessing the application.</li>
-          <li>
-            Users without the Device Agent will be unable to log in and will see the following message: “Please
-            install the miniOrange Device Agent on your device and try again.”
-          </li>
-          <li>
-            The Device Agent is currently supported on Windows devices only. Use the link below to download the agent.
-          </li>
-        </ul>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={Download}
-          onClick={() => store.showToast('Device Agent download started')}
-        >
-          Download agent
-        </Button>
-      </Callout>
+      <AgentPrerequisites />
     </div>
   )
 }

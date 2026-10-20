@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../../fixtures'
+import { splitAws } from './conflict-fixture'
 import { BrandProvider } from '../../../store'
 import { columnView, runColumns, type ColumnSpec } from '../../board/try-sign-in'
 import { envOf } from '../../tenant-resolver'
@@ -54,24 +55,26 @@ import css from './classic2.css?raw'
 
 const TODAY = '2026-10-05'
 const t = showcaseTenant()
+/* One policy per application in the showcase (14 Oct 2026); the old AWS pair these cards are read over is rebuilt (conflict-fixture.ts). */
+const POLICIES = splitAws(t.policies)
 const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const AS_IT_STANDS: ColumnSpec = { id: 'live', label: 'As the tenant stands', tip: 'Every policy as saved' }
 const noop = () => {}
 
 function asRun(f: SignInForm): SignInForm {
-  const rows = rowsRead(t.policies, null, f.appId, lib)
+  const rows = rowsRead(POLICIES, null, f.appId, lib)
   return forRun(withDefaults(f, rows, [], TODAY, '09:30'), rows)
 }
 const signIn = (personId: string, appId: string, extra: Partial<SignInForm> = {}): SignInForm => asRun({ ...emptyDraft(TODAY, '09:30'), ...extra, personId, appId })
 
 function planOf(form: SignInForm) {
-  const rows = rowsRead(t.policies, null, form.appId, lib)
+  const rows = rowsRead(POLICIES, null, form.appId, lib)
   const { facts } = factsOf(form, t.zones)
-  const cols = runColumns([AS_IT_STANDS], t.policies, facts, env)
+  const cols = runColumns([AS_IT_STANDS], POLICIES, facts, env)
   const res = cols[0].resolution
   const ctx = { people: t.directory.people, apps: t.apps, zones: t.zones, rows }
-  return { rows, cols, res, plan: engineRun({ res, policies: t.policies, form, facts, env, ctx, intro: 'collapse' }) }
+  return { rows, cols, res, plan: engineRun({ res, policies: POLICIES, form, facts, env, ctx, intro: 'collapse' }) }
 }
 
 /** The run at a step: the first, mid-run, settled (landed), or any step `n` while it plays. */
@@ -92,8 +95,8 @@ function propsFor(form: SignInForm, at: 'first' | 'mid' | 'settled' | number): R
     asGroup: null,
     start: <div className="test-start" />,
     answer: <div className="test-answer" />,
-    screens: screensOf(res, { policies: t.policies, methods: t.methods, defaultMethodId: undefined, person: t.directory.people.find((p) => p.id === form.personId) ?? null }),
-    columns: cols.map((c) => columnView(c, '', t.policies, (id) => t.apps.find((a) => a.id === id)?.name ?? id)),
+    screens: screensOf(res, { policies: POLICIES, methods: t.methods, defaultMethodId: undefined, person: t.directory.people.find((p) => p.id === form.personId) ?? null }),
+    columns: cols.map((c) => columnView(c, '', POLICIES, (id) => t.apps.find((a) => a.id === id)?.name ?? id)),
     changed: null,
     expected: null,
     weaker: null,
@@ -192,7 +195,6 @@ describe('Classic v2: four of the builder’s cards (classic2-model.ts)', () => 
     expect(rows.map((r) => [r.name, r.standing, r.words])).toEqual([
       ['AWS for engineering teams', 'applies', 'Applies · via Engineering'],
       ['AWS billing for Finance', 'also', ALSO_WORDS],
-      ['AWS production for DevOps', 'other', 'Not reached'],
       ['Global Default Policy', 'other', 'Not reached'],
     ])
     expect(rows[1].conflict).toBe(true)
@@ -231,7 +233,7 @@ describe('Classic v2: four of the builder’s cards (classic2-model.ts)', () => 
   })
 
   it('reads the sign-in’s stated facts in form order, each as a builder condition row: [attribute] is [value]', () => {
-    const rows = rowsRead(t.policies, null, 'aws', lib)
+    const rows = rowsRead(POLICIES, null, 'aws', lib)
     expect(factRows(rowFacts(maya, rows, { zones: t.zones })).map((f) => [f.attr, f.op, f.value, f.cond])).toEqual([
       ['Network zone', 'is', 'Office network', 'zone'],
       ['Device profile', 'is', 'Windows 11 laptop · registered', 'fingerprint'],
@@ -251,7 +253,7 @@ describe('Classic v2: four of the builder’s cards (classic2-model.ts)', () => 
     ]
     expect(heads.map((h) => h.kicker)).toEqual(['Sign-in', 'Policies', 'Rule 2 of 3', 'Outcome'])
     expect(heads.map((h) => h.title)).toEqual(['Maya Iyer', 'AWS for engineering teams', 'Engineers on a compliant device', 'Allow on 1 factor'])
-    expect(heads.map((h) => metaWords(h.meta))).toEqual(['2 sign-in conditions', 'Policy 1 of 4 applies · via Engineering', 'Matches · Then Allow on 1 factor', 'Decided by Rule 2'])
+    expect(heads.map((h) => metaWords(h.meta))).toEqual(['2 sign-in conditions', 'Policy 1 of 3 applies · via Engineering', 'Matches · Then Allow on 1 factor', 'Decided by Rule 2'])
     expect(heads.map((h) => h.meta?.mark ?? null)).toEqual([null, 'check', 'check', null])
     /* The rule's answer is in its decision's colour; the policy's ✓ in the positive one. */
     expect([heads[1].meta?.tone, heads[2].meta?.tone, heads[2].meta?.then]).toEqual(['ok', 'decision', '1fa'])
@@ -348,7 +350,8 @@ describe('Classic v2 draws every showcase sign-in (ClassicV2Layout.tsx)', () => 
     const { kickers, titles, metas } = headsIn(out)
     expect(kickers).toEqual(['Sign-in', 'Policies', 'Rule 2 of 3', 'Outcome'])
     expect(titles).toEqual(['Maya Iyer → AWS Console', 'AWS for engineering teams', 'Engineers on a compliant device', 'Allow on 1 factor'])
-    expect(metas).toEqual(['2 sign-in conditions', 'Policy 1 of 4 applies · via Engineering', 'Matches · Then Allow on 1 factor', 'Decided by Rule 2'])
+    /* The sentence's group comes from the store's own policy (the merged one, whose audience adds Finance); the count and names from the rebuilt pair. */
+    expect(metas).toEqual(['2 sign-in conditions', 'Policy 1 of 3 applies · via Engineering and Finance', 'Matches · Then Allow on 1 factor', 'Decided by Rule 2'])
     /* The sign-in's tile is her face, its title the application with its logo; the policy's tile the layers mark. */
     const sign = cardHtml(out, 'sign-in')
     expect(sign).toMatch(/class="bb__idx rl-c2__idx is-face"[^>]*><span class="bx-face is-user/)

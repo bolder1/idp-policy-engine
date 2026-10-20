@@ -42,6 +42,11 @@ const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ 
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
 const Applications = lazy(() => import('./screens/Applications').then((m) => ({ default: m.Applications })))
 const ApplicationPage = lazy(() => import('./screens/ApplicationPage').then((m) => ({ default: m.ApplicationPage })))
+/* The unsaved application is the application page in its "new" mode (spec
+   APP-CREATE-AND-ACCESS.md §3.2: one form for create and edit), so it comes
+   out of the same chunk. */
+const NewApplicationPage = lazy(() => import('./screens/ApplicationPage').then((m) => ({ default: m.NewApplicationPage })))
+const AppCatalog = lazy(() => import('./screens/AppCatalog').then((m) => ({ default: m.AppCatalog })))
 const UsersPage = lazy(() => import('./screens/UsersPage').then((m) => ({ default: m.UsersPage })))
 const UserRolesPage = lazy(() => import('./screens/UsersPage').then((m) => ({ default: m.UserRolesPage })))
 const GroupsPage = lazy(() => import('./screens/GroupsPage').then((m) => ({ default: m.GroupsPage })))
@@ -64,6 +69,7 @@ const warm = () => {
   void import('./screens/PolicyDetails')
   void import('./screens/Applications')
   void import('./screens/ApplicationPage')
+  void import('./screens/AppCatalog')
   void import('./screens/UsersPage')
   void import('./screens/GroupsPage')
   void import('./screens/SignInTests')
@@ -113,9 +119,16 @@ function ScreenBody() {
        starts the page again (its tab, its draft, its filters) rather than
        showing the last one's state against the new one. */
     case 'application': {
-      const { appId, tab, group, flash, from } = screen
-      return <ApplicationPage key={appId} appId={appId} tab={tab} group={group} flash={flash} from={from} />
+      const { appId, tab, group, policy, flash, from, open } = screen
+      return <ApplicationPage key={appId} appId={appId} tab={tab} group={group} policy={policy} flash={flash} from={from} open={open} />
     }
+    /* Add application: the catalogue until an entry is picked, then that
+       entry's unsaved application. Keyed on the entry, so Back to the
+       catalogue and another pick starts a fresh form rather than the last
+       one's answers against a different application. */
+    case 'application-new':
+      return screen.catalogId ? <NewApplicationPage key={screen.catalogId} catalogId={screen.catalogId} /> : <AppCatalog />
+
     case 'users':
       return <UsersPage role={screen.role} />
     case 'user-roles':
@@ -153,8 +166,11 @@ function ScreenBody() {
       return <DisplayTokensPage tab={screen.tab ?? 'assignments'} />
     case 'sign-in-tests':
       return <SignInTests tab={screen.tab} />
-    case 'sign-in-activity':
-      return <SignInActivity />
+    /* Keyed on its way in, so an application's View all lands narrowed even from the page itself. */
+    case 'sign-in-activity': {
+      const { appId, view, q, from } = screen
+      return <SignInActivity key={`${appId ?? ''}|${view ?? ''}|${q ?? ''}`} appId={appId} view={view} q={q} from={from} />
+    }
   }
 }
 

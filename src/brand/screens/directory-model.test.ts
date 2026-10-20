@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { memberGroupIds, type User } from '../data'
+import { audienceOf, memberGroupIds, type User } from '../data'
 import { showcaseTenant } from '../fixtures'
 import { appsChangedByMembership, appsNaming } from './app-standing'
 import {
@@ -114,8 +114,8 @@ describe('membershipAfter', () => {
   })
 
   it('tells which applications a change moves, through the engine', () => {
-    /* A designer put in Engineering: Box for engineering is higher than Box
-       for design, and Slack has a policy for Engineering above Everyone's. */
+    /* A designer put in Engineering: Box access has a rule for Engineers, and
+       Slack access has one for Engineers above Everyone else's. */
     const into = appsChangedByMembership(t.apps, t.policies, people, membershipAfter(people, ['u-des-1'], 'engineering', true))
     expect(into.map((a) => a.id)).toEqual(expect.arrayContaining(['box', 'slack']))
     /* Somebody already in the group moves nothing. */
@@ -124,23 +124,30 @@ describe('membershipAfter', () => {
 })
 
 describe('a group on its applications', () => {
-  it('lists DevOps on AWS, decided by the engineering policy, and says the DevOps one is also named there', () => {
-    const rows = groupAppRows('devops', appsNaming('devops', t.apps, t.policies), t.policies)
+  it('lists DevOps on AWS, decided by AWS access, and says a second policy for DevOps is also named there', () => {
+    /* One application has one policy in the showcase; the second one is built from it. */
+    const awsPolicy = t.policies.find((p) => p.id === 'sc-aws-engineering')!
+    const prod = { ...awsPolicy, id: 'p-aws-prod', name: 'AWS production for DevOps', audience: audienceOf(['devops']) }
+    const list = [...t.policies, prod]
+    const rows = groupAppRows('devops', appsNaming('devops', t.apps, list), list)
     const aws = rows.find((r) => r.app.id === 'aws')!
-    expect(aws.decider?.name).toBe('AWS for engineering teams')
+    expect(aws.decider?.name).toBe('AWS access')
     /* A sentence, as the application's Users and Groups tabs say it (`alsoTip`). */
     expect(aws.tip).toBe('Also named in AWS production for DevOps (Active).')
   })
 
   it('names a draft that names the group without deciding for it', () => {
-    const github = groupAppRows('finance', appsNaming('finance', t.apps, t.policies), t.policies).find((r) => r.app.id === 'github')!
+    const tools = t.policies.find((p) => p.id === 'sc-dev-tools')!
+    const draft = { ...tools, id: 'p-code-review', name: 'Code review for Finance', status: 'draft' as const, audience: audienceOf(['finance']) }
+    const list = [...t.policies, draft]
+    const github = groupAppRows('finance', appsNaming('finance', t.apps, list), list).find((r) => r.app.id === 'github')!
     expect(github.decider?.name).not.toBe('Code review for Finance')
     expect(github.tip).toContain('Code review for Finance (Draft)')
   })
 
   it('has no tip where only the decider names the group', () => {
     const box = groupAppRows('design', appsNaming('design', t.apps, t.policies), t.policies).find((r) => r.app.id === 'box')!
-    expect(box.decider?.name).toBe('Box for design')
+    expect(box.decider?.name).toBe('Box access')
     expect(box.tip).toBeNull()
     expect(namedInTip('box', 'design', t.policies, box.decider)).toBeNull()
   })

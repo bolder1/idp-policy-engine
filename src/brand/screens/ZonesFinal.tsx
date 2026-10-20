@@ -799,8 +799,8 @@ export function ZoneDetail({
         {/* No action trail on the right. Rename is the pencil above; Duplicate,
             Used by and Delete are questions about a zone on the list, and live
             in its row menu there. What sits here is PREVIEW furniture, in the
-            slot `PageHead` gives it: the side note's four versions (1 and 2
-            Oct 2026).
+            slot `PageHead` gives it: the side note's two versions (1 Oct to
+            16 Oct 2026).
             Shown in the showcase build too, because it is a decision still
             open; it goes once the owner picks — see zone-notes.tsx. */}
         <div className="bpage__preview">
@@ -1103,9 +1103,10 @@ const QUICK: { label: string; value: string; hint: string }[] = [
 
 /* `AcceptsNote` and `PlacesNote` stood here: "What you can add", one example
    per line in monospace — India, Maharashtra, Pune, Within 25 km of Pune. They
-   are in zone-notes.tsx now, unchanged, as the Classic version of `ZoneNote`
-   (owner, 1 Oct 2026: "have the old one as a classic as we used to have"),
-   beside the paper versions behind the head's Note style switch. */
+   moved to zone-notes.tsx as the Classic version of `ZoneNote` (owner, 1 Oct
+   2026: "have the old one as a classic as we used to have"), and on 16 Oct
+   2026 Classic and Blue became the kit's one `Note` there, beside the sticky
+   note behind the head's Note style switch. */
 
 /* Focus the item now at `index` in a section's list, or the one before it, or
    the section's add control. Used after a remove takes the focused row away.

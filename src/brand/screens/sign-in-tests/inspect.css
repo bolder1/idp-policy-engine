@@ -172,3 +172,6 @@
 
 /* The foot: the one way out, where the form panel keeps Run. */
 .insp__foot { justify-content: flex-end; }
+/* An audience: its faces, then the count; the names are under the pointer. */
+.insp__trail { display: inline-flex; align-items: center; gap: var(--space-3); text-decoration: none; }
+.insp__trail:hover { color: var(--text-link); }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CONDITION_CATALOGUE,
+  POST_WHEN_CONDITIONS,
   UNKNOWN_CONDITION,
   WHEN_CONDITIONS,
   conditionType,
@@ -116,9 +117,11 @@ describe('the condition catalogue', () => {
       expect(WHEN_CONDITIONS.some((c) => c.id === t), `${t} must not be offered`).toBe(false)
     }
     // And between them they account for the whole catalogue: nothing is in it
-    // for no reason, and nothing has been quietly orphaned.
-    const accounted = new Set([...WHEN_CONDITIONS.map((c) => c.id), ...WHO_TYPES])
+    // for no reason, and nothing has been quietly orphaned. A post sign-in
+    // policy's own attributes are offered on its If (13 Oct 2026).
+    const accounted = new Set([...WHEN_CONDITIONS.map((c) => c.id), ...POST_WHEN_CONDITIONS.map((c) => c.id), ...WHO_TYPES])
     expect(CONDITION_CATALOGUE.filter((c) => !accounted.has(c.id))).toEqual([])
+    for (const t of WHO_TYPES) expect(POST_WHEN_CONDITIONS.some((c) => c.id === t), `${t} must not be offered`).toBe(false)
   })
 
   it('resolves an id it does not know to a sentinel, never to the first row', () => {

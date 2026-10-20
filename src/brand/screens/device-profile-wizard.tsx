@@ -24,6 +24,7 @@ import {
   type FingerprintProfile,
   type ProfileMode,
 } from '../fingerprint'
+import { footerEdge } from '../footer-edge'
 import { LIST_COLUMNS, checkName, kindChoices, reachChoices, versionError } from './device-profile-choices'
 import {
   AgentBanner,
@@ -467,7 +468,7 @@ export function DeviceProfileWizard({
   )
 
   const footer = (
-    <div className="bx-savebar bdpw__foot">
+    <div className="bx-savebar bdpw__foot" ref={footerEdge}>
       <Button variant="ghost" onClick={cancel}>
         Cancel
       </Button>

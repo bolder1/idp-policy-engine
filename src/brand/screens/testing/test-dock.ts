@@ -144,6 +144,16 @@ export function policyApps<A extends Pick<App, 'id'>>(draft: Pick<Policy, 'appId
   return apps.filter((a) => draft.appIds.includes(a.id))
 }
 
+/* The applications the modelled week of sign-ins runs on: every one but an
+   application added this session (`App.addedAt`), which nobody has signed in
+   to yet (spec APP-CREATE-AND-ACCESS.md §5). Past sign-ins (`pastReport`'s
+   callers), Sign-in activity and the Blocked list all read through this, so the
+   three never disagree about a new application. Saved sign-ins and People are
+   not: a sign-in can be stated or saved on an application nobody has used. */
+export function appsWithSignIns<A extends Pick<App, 'addedAt'>>(apps: readonly A[]): A[] {
+  return apps.filter((a) => a.addedAt === undefined)
+}
+
 /* "A, B or C": the applications as one phrase. More than three is the first
    two and a count — a list the width of the panel says less than that. */
 export function appsPhrase(apps: readonly Pick<App, 'name'>[]): string {

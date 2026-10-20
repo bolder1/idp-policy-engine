@@ -1,10 +1,10 @@
 import { useState, type ComponentProps } from 'react'
 
-import type { Policy } from '../../data'
+import type { Audience, Policy } from '../../data'
 import { guardSignIns } from '../../draft-checks'
 import type { SavedSignIn } from '../../saved-sign-ins'
 import { useBrand, useNameLookup } from '../../store'
-import { engineDecides } from '../app-standing'
+import { audienceLabel, engineDecides } from '../app-standing'
 import { afterPaint, guardOpens, isStale, overridePatch, patchSignIns, tryRunGuard, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from '../guard'
 import type { GuardDrawer } from '../guard-page'
 import { detailsChanges } from '../policy-details-review'
@@ -39,13 +39,16 @@ export interface AppsGuardRun {
   stamp: GuardStamp
   run: number
   appIds: string[]
+  /* The audience it read, when the change carries one (the start node's pane,
+     13 Oct 2026): the page's write then stores it with the applications. */
+  audience?: Audience
 }
 
 export interface AppsGuardPage {
   /** "Save applications", "Add to Box", "Remove from Box". */
   primaryLabel: string
-  /** The write, once the page is confirmed: the applications it read, and the policy as stored now. */
-  onConfirm: (appIds: string[], policy: Policy) => void
+  /** The write, once the page is confirmed: the applications it read, the policy as stored now, and the audience it read when the change carried one. */
+  onConfirm: (appIds: string[], policy: Policy, audience?: Audience) => void
   /* The ticks as they stand, where the caller has ticks: the page is stale
      when they are not the ones it read, and Run again reads them. */
   current?: string[]
@@ -62,7 +65,8 @@ export function useAppsGuard() {
   const [open, setOpen] = useState(false)
 
   const appName = (id: string) => store.appById(id).name
-  const changesOf = (p: Policy, ids: string[]) => detailsChanges(p, { name: p.name, appIds: ids }, appName)
+  const whoSaid = (a: Audience) => audienceLabel(a, store.groups, store.users)
+  const changesOf = (p: Policy, ids: string[], audience?: Audience) => detailsChanges(p, { name: p.name, appIds: ids, audience }, appName, whoSaid)
   /* The page's policy as stored now. Gone, and there is no page to show. */
   const stored = held ? store.policyById(held.policyId) : undefined
 
@@ -70,10 +74,10 @@ export function useAppsGuard() {
   const guards = (p: Policy) => store.features.beforeTurningOn && engineDecides(p)
 
   const stampNow = (): GuardStamp => ({ policies: store.policies, zones: store.zones, fingerprints: store.fingerprints, riskScale: store.riskScale })
-  const inputFor = (p: Policy, ids: string[], signIns: readonly SavedSignIn[] = store.savedSignIns): GuardInput => ({
+  const inputFor = (p: Policy, ids: string[], signIns: readonly SavedSignIn[] = store.savedSignIns, audience?: Audience): GuardInput => ({
     kind: 'apps',
     before: p,
-    after: { ...p, appIds: ids, status: changesOf(p, ids).becomesDraft ? 'draft' : p.status },
+    after: { ...p, appIds: ids, ...(audience ? { audience } : {}), status: changesOf(p, ids, audience).becomesDraft ? 'draft' : p.status },
     changedFrom: null,
     policies: store.policies,
     env,
@@ -84,19 +88,19 @@ export function useAppsGuard() {
     breakIn: store.features.breakInTest ? (store.breakInAccepted[p.id] ?? {}) : null,
     resolve,
   })
-  const hold = (p: Policy, ids: string[], result: GuardResult | 'error', run: number) =>
-    setHeld({ policyId: p.id, result, stamp: stampNow(), run, appIds: ids })
+  const hold = (p: Policy, ids: string[], result: GuardResult | 'error', run: number, audience?: Audience) =>
+    setHeld({ policyId: p.id, result, stamp: stampNow(), run, appIds: ids, ...(audience ? { audience } : {}) })
 
   /* Runs the checks on `ids` once "Checking…" has painted. A clean result
      commits in the same press; anything else holds the result and opens the page. */
-  const check = (p: Policy, ids: string[], commit: (ids: string[]) => void) => {
+  const check = (p: Policy, ids: string[], commit: (ids: string[], audience?: Audience) => void, audience?: Audience) => {
     if (checking) return
     setChecking(true)
     afterPaint(() => {
-      const result = tryRunGuard(inputFor(p, ids))
+      const result = tryRunGuard(inputFor(p, ids, store.savedSignIns, audience))
       setChecking(false)
-      if (result !== 'error' && !guardOpens(result)) return commit(ids)
-      hold(p, ids, result, 0)
+      if (result !== 'error' && !guardOpens(result)) return commit(ids, audience)
+      hold(p, ids, result, 0, audience)
       setOpen(true)
     })
   }
@@ -104,7 +108,7 @@ export function useAppsGuard() {
   /** The checks again, on `ids`, for the page that is held. */
   const rerun = (ids: string[], signIns?: readonly SavedSignIn[]) => {
     if (!held || !stored) return
-    hold(stored, ids, tryRunGuard(inputFor(stored, ids, signIns)), held.run + 1)
+    hold(stored, ids, tryRunGuard(inputFor(stored, ids, signIns, held.audience)), held.run + 1, held.audience)
   }
 
   const close = () => setOpen(false)
@@ -122,7 +126,7 @@ export function useAppsGuard() {
   const applyFix = (f: ReadyFix) => {
     if (!stored) return
     const ids = f.policy.appIds
-    if (changesOf(stored, ids).changes.length === 0) {
+    if (changesOf(stored, ids, held?.audience).changes.length === 0) {
       setOpen(false)
       store.showToast('Nothing left to save')
       return
@@ -140,10 +144,10 @@ export function useAppsGuard() {
       result: held.result,
       run: held.run,
       primaryLabel: o.primaryLabel,
-      appChanges: changesOf(stored, held.appIds).rows,
+      appChanges: changesOf(stored, held.appIds, held.audience).rows,
       onConfirm: () => {
         setOpen(false)
-        o.onConfirm(held.appIds, stored)
+        o.onConfirm(held.appIds, stored, held.audience)
       },
       onClose: close,
       stale: open && (isStale(held.stamp, stampNow()) || (o.current !== undefined && held.appIds !== o.current)),

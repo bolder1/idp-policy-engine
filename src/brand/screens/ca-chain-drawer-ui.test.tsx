@@ -80,7 +80,7 @@ describe('the CA chains slider', () => {
 
 /* The add page, as the live dialog sets it (owner, 1 Oct 2026: "fix this, we
    have 2 options"): Alias, then Certificate file, both required, before any
-   file is in; the note in the info banner. Read from the source: the add page
+   file is in; the note in the kit's Note. Read from the source: the add page
    is a second page the static render does not reach. */
 describe('Add CA chain', () => {
   it('opens on the live dialog’s two fields, Alias over Certificate file', () => {
@@ -96,9 +96,11 @@ describe('Add CA chain', () => {
     expect(form.slice(0, form.indexOf('bm8__cafield'))).toMatch(/Alias[\s\S]*?title="Required"[\s\S]*?Certificate file[\s\S]*?title="Required"/)
   })
 
-  it('gives the first file chosen the alias typed before it, and the support note the info banner', () => {
+  it('gives the first file chosen the alias typed before it, and the support note the kit’s Note', () => {
     expect(drawerSrc).toContain('if (first >= 0) rows[first] = { ...rows[first], alias: typed }')
-    expect(drawerSrc).toContain('<Callout tone="info">{supportNote(plan.ready.length > 1)}</Callout>')
+    /* The one note (owner, 16 Oct 2026): a short heading over the live dialog's sentence, static. */
+    expect(drawerSrc).toContain('<Note title="Next step">{supportNote(plan.ready.length > 1)}</Note>')
+    expect(drawerSrc).not.toContain('<Callout')
     expect(drawerSrc).not.toContain('Choose files or drop them here')
   })
 })

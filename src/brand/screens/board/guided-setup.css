@@ -1,0 +1,371 @@
+/* -----------------------------------------------------------------------------
+   Guided setup (GuidedSetup.tsx; docs/specs/GUIDED-SETUP.md, 19 Oct 2026).
+
+   A floating panel like the inspector and like Describe it's was: inset from
+   the region's edges, its own border, radius and lift. On the left it takes
+   `.bb`'s leading track (400 px); on the right, the inspector's track (the
+   inspector closed); beside the rule panel, the leading track with the
+   inspector in its own. It enters by opacity and the separate `translate`
+   property on this plain aside — nothing here is a motion element, and nothing
+   here transforms anything.
+
+   Grey throughout. Decision colour belongs to the result's lines and to the
+   decision pickers — the New rule form's What happens row, its choices and
+   its sentence; a selected rule's What happens and Everyone else, the same
+   choices compact — each picked choice tinted in its own decision tone, never
+   the selection blue; the history's marks are grey. Blue is for the context
+   chip. The one orange on the board stays on Save policy — Add rule and
+   Change who are ink. Under reduced motion everything is its final state at
+   once.
+   -------------------------------------------------------------------------- */
+
+/* --- The tracks (board.css's grid) ---------------------------------------------------- */
+
+.bb.is-guided-left,
+.bb.is-guided-beside { --bb-left: 400px; }
+/* Left or right, the canvas is the panel's output: no insert points, switches, menus or grips — only the fold, which
+   changes nothing. Beside the rule panel it is editable, as the rule panel is. */
+.bb.is-guided-locked .bb__link__add,
+.bb.is-guided-locked .bb__link__hint,
+.bb.is-guided-locked .bb__acts > :not(.bb__fold__btn),
+.bb.is-guided-locked .bb__idx__grip { display: none; }
+.bb.is-guided-locked .bb__idx { pointer-events: none; }
+/* No rule to add while it is locked, so the empty chain's connector is a connector, not an invitation (and the one
+   orange stays on Save policy). */
+.bb.is-guided-locked .bb__link.is-invite:not(.is-dead)::before { background: var(--bb-link); }
+
+/* --- The panel ------------------------------------------------------------------------- */
+
+.bgs {
+  grid-column: 1; grid-row: 1;
+  position: relative; z-index: 4;
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0;
+  margin: var(--space-5) 0 var(--space-5) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-mid);
+  background: var(--surface-raised);
+  overflow: hidden;
+  animation: bgs-in var(--dur-normal) var(--ease-standard) both;
+}
+.bgs.is-right {
+  grid-column: 3;
+  margin: var(--space-5) var(--space-5) var(--space-5) 0;
+  animation-name: bgs-in-right;
+}
+@keyframes bgs-in {
+  from { opacity: 0; translate: -16px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes bgs-in-right {
+  from { opacity: 0; translate: 16px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* --- Header ------------------------------------------------------------------------------- */
+
+.bgs__bar {
+  flex: none;
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 48px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bgs__mark { flex: none; color: var(--text-secondary); }
+.bgs__title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bgs__barend { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* --- Context: what the next action applies to ---------------------------------------- */
+
+.bgs__context { flex: none; padding: var(--space-4) var(--space-6) 0; }
+/* The one pill family (console-theme.css, the --pill- tokens): its radius, type and line; the × sits inside its padding. */
+.bgs__ctx {
+  display: inline-flex; align-items: center; gap: var(--pill-gap);
+  max-width: 100%; padding: var(--pill-py) var(--space-2) var(--pill-py) var(--pill-px);
+  border-radius: var(--pill-radius);
+  background: var(--tint-blue-bg); color: var(--tint-blue-fg);
+  font-size: var(--fs-xs); font-weight: var(--pill-fw); line-height: var(--pill-line);
+}
+.bgs__ctx.is-new { padding-right: var(--pill-px); background: var(--surface-sunken); color: var(--text-secondary); }
+.bgs__ctxname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bgs__ctxx {
+  flex: none; display: grid; place-items: center; width: var(--pill-line); height: var(--pill-line);
+  border-radius: var(--pill-radius); color: inherit;
+}
+.bgs__ctxx:hover { background: var(--surface-raised); }
+.bgs__ctxx:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* --- Result and history: the only scroller --------------------------------------------- */
+
+/* It takes what the docked Next card leaves (a basis of nothing), never under 128 px — room for the latest lines and Undo, and the New rule card whole at 900 px tall; past that the card scrolls in itself. */
+.bgs__scroll {
+  flex: 1 1 0; min-height: 128px;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--space-5) var(--space-6);
+  display: flex; flex-direction: column; gap: var(--space-6);
+  /* A line cut by the Next card fades out rather than being sliced through: it reads as more to scroll. */
+  mask-image: linear-gradient(to bottom, var(--text-primary) calc(100% - var(--space-6)), transparent);
+}
+.bgs__result { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.bgs__fold { overflow: hidden; }
+.bgs__playhead { align-items: center; }
+.bgs__stop { margin-left: auto; }
+.bgs__found { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); vertical-align: top; }
+
+/* One plain line per decision: its mark, then the words with their logos, faces and condition icons. */
+.bgs__lines { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-4); }
+.bgs__line { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: start; column-gap: var(--space-4); row-gap: var(--space-2); }
+.bgs__said { font-size: var(--fs-md); font-weight: var(--fw-medium); line-height: 24px; color: var(--text-primary); overflow-wrap: anywhere; }
+.bgs__undo { grid-column: 2; justify-self: end; }
+.bgs__tok { display: inline-flex; align-items: center; gap: var(--space-2); vertical-align: top; max-width: 100%; }
+.bgs__tok > :first-child { flex: none; }
+/* A face's letters at the 12 px floor, on the 20 px of the marks beside it: the shared small face's are 9 (kit.css),
+   as the Identity field's chips also say (sign-in-tests.css). */
+.bgs__tok .bx-face,
+.bgf__tok .bx-face { width: 20px; height: 20px; font-size: var(--fs-xs); letter-spacing: 0; }
+.bgs__tokname { min-width: 0; }
+.bgs__condicon { color: var(--text-secondary); }
+/* History: muted lines, grey marks, no controls. */
+.bgs__history { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-5); border-top: 1px solid var(--border-subtle); }
+.bgs__lines.is-quiet { gap: var(--space-3); }
+.bgs__lines.is-quiet .bgs__line { grid-template-columns: 16px minmax(0, 1fr); column-gap: var(--space-3); }
+.bgs__lines.is-quiet .bgs__line > .bx-dmark { margin-top: 2px; }
+.bgs__lines.is-quiet .bgs__said { font-size: var(--fs-sm); font-weight: var(--fw-regular); line-height: 20px; color: var(--text-tertiary); }
+/* The latest action, taken back: said under "Undone", muted like the history. */
+.bgs__undone { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bgs__older { margin-top: var(--space-1); }
+
+/* --- A decision's mark (DecisionMark, decision-badge.tsx) ------------------------------- */
+
+.bx-dmark {
+  flex: none; box-sizing: border-box;
+  display: inline-grid; place-items: center;
+  border-radius: var(--radius-full);
+}
+.bx-dmark.is-md { width: 24px; height: 24px; }
+.bx-dmark.is-sm { width: 20px; height: 20px; }
+.bx-dmark.is-xs { width: 16px; height: 16px; }
+.bx-dmark.is-positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bx-dmark.is-positive-strong { background: var(--fb-positive-strong-bg); color: var(--fb-positive-strong-fg); }
+.bx-dmark.is-negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bx-dmark.is-muted { background: var(--surface-inset); color: var(--text-tertiary); }
+
+/* --- The Next card: one, docked, outside the scroller ---------------------------------- */
+
+.bgs__next {
+  flex: 0 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--space-6);
+  margin: 0 var(--space-4) var(--space-4);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border: 1px solid var(--border-default); border-radius: var(--radius-xl);
+  background: var(--surface-raised); box-shadow: var(--el-mid);
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+/* Nothing done yet: the card is the panel, under the context. */
+.bgs__next.is-first { margin-top: var(--space-4); }
+.bgs__next.is-busy { opacity: var(--disabled-opacity); }
+.bgs__group { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.bgs__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bgs__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bgs__row.is-end { justify-content: flex-end; }
+
+/* Quick actions: neutral chips with their family's grey icon — a suggestion is not yet a decision. */
+.bgs__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bgs__chipbtn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 28px; padding: 0 var(--space-4) 0 var(--space-3);
+  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+  background: var(--ctl-bg); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bgs__chipbtn svg { color: var(--text-secondary); }
+.bgs__chipbtn:hover { background: var(--ctl-bg-hover); border-color: var(--border-strong); }
+.bgs__chipbtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* An ink button, as Add rule is: never orange. */
+.bgs__ink {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 28px; padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  background: var(--text-primary); color: var(--surface-raised);
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bgs__ink:hover { opacity: 0.88; }
+.bgs__ink:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* Delete, confirmed in place: the one red is the confirm's own button. */
+.bgs__confirm {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.bgs__confirmq { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+
+/* More below, when the card scrolls in itself: its foot fades under the edge rather than being cut mid-word. */
+.bgs__next::after {
+  content: ''; flex: none; position: sticky; bottom: 0;
+  height: var(--space-6); margin-top: calc(-1 * var(--space-6));
+  background: linear-gradient(transparent, var(--surface-raised));
+  pointer-events: none;
+}
+
+/* --- The New rule form (GuidedRuleForm.tsx), approved 19 Oct 2026 ----------------------------------
+
+   Four sections, each one row at rest — state mark, label, value, chevron — the whole row its press, opened in
+   place one at a time; then the sentence card. The rows' presses reach a little past the card's content (the
+   negative margin), so a hovered row's grey frames its mark rather than starting at it. */
+.bgf { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.bgf__rows { display: flex; flex-direction: column; min-width: 0; margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-4)) 0; }
+/* The rules between rows keep to the card's content edges, as Everyone else's does. */
+.bgf__sec + .bgf__sec::before { content: ''; display: block; height: 1px; margin: 0 var(--space-4); background: var(--border-subtle); }
+.bgf__head {
+  box-sizing: border-box;
+  display: grid; grid-template-columns: 20px 90px minmax(0, 1fr) 14px; align-items: center; column-gap: var(--space-4);
+  width: 100%; min-height: 44px; padding: var(--space-4);
+  font: inherit; text-align: left; color: var(--text-primary);
+  background: none; border: 0; border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.bgf__head:hover:not(:disabled) { background: var(--surface-sunken); }
+.bgf__head:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ctl-border-focus); }
+/* Conditions, for a Deny: there is nothing to add to a refusal. */
+.bgf__head:disabled { cursor: default; opacity: var(--disabled-opacity); }
+
+/* The state: a grey tick once answered (colour belongs to the values), a dashed ring with a plus while empty or the
+   default. */
+.bgf__state {
+  box-sizing: border-box;
+  display: grid; place-items: center;
+  width: 20px; height: 20px;
+  border-radius: var(--radius-full);
+}
+.bgf__state.is-set { background: var(--surface-inset); border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.bgf__state.is-empty { border: 1px dashed var(--border-strong); color: var(--text-tertiary); }
+.bgf__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
+.bgf__value {
+  display: flex; align-items: center; gap: var(--space-4);
+  min-width: 0; overflow: hidden;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); line-height: 20px; color: var(--text-primary);
+  white-space: nowrap;
+}
+/* The default answer (Everyone, anywhere) and the empty prompt: said, muted. */
+.bgf__value.is-muted { font-weight: var(--fw-regular); color: var(--text-tertiary); }
+.bgf__tok { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; max-width: 100%; }
+.bgf__tok > :first-child { flex: none; }
+.bgf__tokname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Two names, or the first and "+N" (FitValue): the wrapper is no box of its own, the row's flex lays them out. */
+.bgf__fit { display: contents; }
+.bgf__plus { flex: none; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
+.bgf__chev { display: grid; place-items: center; color: var(--text-muted); }
+.bgf__sec.is-open .bgf__chev { color: var(--text-secondary); }
+/* A condition's icon in a grey square, where an application holds its logo. */
+.bgf__condart {
+  box-sizing: border-box; flex: none;
+  display: inline-grid; place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-secondary);
+}
+.bgf__condart.is-sm { width: 18px; height: 18px; }
+.bgf__condart.is-md { width: 20px; height: 20px; }
+
+/* Open: its contents under the label, clipped (the height moves) — the inset leaves room for a field's focus halo. */
+.bgf__body { overflow: hidden; }
+.bgf__bodyin { padding: var(--space-2) var(--space-4) var(--space-5) calc(var(--space-4) + 20px + var(--space-4)); }
+
+/* What happens, open: three full-width rows, each its decision's mark in colour, its name and a gloss; the one picked
+   tinted in its own decision tone with a tick — never orange, never the selection blue. */
+.bgf__choices { display: flex; flex-direction: column; gap: var(--space-3); }
+.bgf__choice {
+  box-sizing: border-box; width: 100%;
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) 16px; align-items: center; column-gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  font: inherit; text-align: left; color: var(--text-primary);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bgf__choice:hover { background: var(--surface-sunken); border-color: var(--border-default); }
+.bgf__choice:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bgf__choicetext { display: flex; flex-direction: column; min-width: 0; }
+.bgf__choicename { font-size: var(--fs-md); font-weight: var(--fw-medium); line-height: 20px; }
+.bgf__gloss { font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); }
+.bgf__choicetick { display: grid; place-items: center; }
+.bgf__choice[aria-checked="true"] { cursor: default; }
+.bgf__choice[aria-checked="true"] .bx-dmark { background: var(--surface-raised); }
+.bgf__choice[aria-checked="true"].is-positive-strong { background: var(--fb-positive-strong-bg); border-color: var(--fb-positive-strong-border); }
+.bgf__choice[aria-checked="true"].is-positive { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); }
+.bgf__choice[aria-checked="true"].is-negative { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); }
+.bgf__choice.is-positive-strong .bgf__choicetick { color: var(--fb-positive-strong-fg); }
+.bgf__choice.is-positive .bgf__choicetick { color: var(--fb-positive-fg); }
+.bgf__choice.is-negative .bgf__choicetick { color: var(--fb-negative-fg); }
+/* Compact (a selected rule's What happens, Everyone else): one line each, no gloss, the smaller mark. */
+.bgf__choices.is-compact { gap: var(--space-2); }
+.bgf__choices.is-compact .bgf__choice { grid-template-columns: 20px minmax(0, 1fr) 16px; column-gap: var(--space-4); padding: var(--space-3) var(--space-4); }
+.bgf__choices.is-compact .bgf__choicename { font-size: var(--fs-sm); }
+
+/* The sentence card: the rule in one line, its marks inline, and the ink Add rule. */
+.bgf__send {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.bgf__sentence { margin: 0; font-size: var(--fs-md); line-height: 26px; color: var(--text-secondary); overflow-wrap: anywhere; }
+/* A name in the sentence: its mark beside it, centred on the line. */
+.bgf__tok.is-said,
+.bgf__outcome { vertical-align: top; height: 26px; color: var(--text-primary); font-weight: var(--fw-medium); }
+.bgf__outcome { display: inline-flex; align-items: center; gap: var(--space-2); }
+/* The word that leads a name in ("only from", "on", "and"): the sentence's own voice, inside the name's piece. */
+.bgf__lead { color: var(--text-secondary); font-weight: var(--fw-regular); }
+.bgf__more { white-space: nowrap; color: var(--text-secondary); text-decoration: underline dotted var(--border-strong); text-underline-offset: 3px; cursor: default; }
+.bgf__gap { padding: 0 1px; border-bottom: 1px dashed var(--border-strong); color: var(--text-tertiary); }
+.bgf__go {
+  align-self: flex-end;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 32px; padding: 0 var(--space-6);
+  border: 0; border-radius: var(--radius-md);
+  font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium);
+  background: var(--text-primary); color: var(--surface-raised);
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bgf__go:hover:not(:disabled) { opacity: 0.88; }
+.bgf__go:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bgf__go:disabled { background: var(--border-default); color: var(--text-tertiary); cursor: not-allowed; }
+
+/* The chip field the form asks Applications and Conditions with (pick-combo.tsx): the Identity field's own classes
+   (sign-in-tests.css), with a logo or an icon where a face would be. */
+.pkc__art { display: inline-grid; place-items: center; flex: none; }
+.pkc__blank { border-radius: var(--radius-sm); }
+
+/* The foot: Everyone else — the policy's last row — and Add a rule. */
+.bgs__foot { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-5); border-top: 1px solid var(--border-subtle); }
+.bgs__resthead { display: flex; align-items: center; gap: var(--space-3); }
+
+/* --- Narrow ------------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  /* The panel takes the bottom row the inspector would, as Describe it's did — over board.css's one-row
+     .bb.is-insp-closed, hence the doubled class. There is no room for the rule panel beside it here. */
+  .bb.bb.is-guided { grid-template-rows: minmax(0, 1fr) 54%; }
+  .bb.is-guided .bgs { grid-column: 1; grid-row: 2; margin: 0 var(--space-5) var(--space-5); }
+  .bb.is-guided-beside .bb__insp,
+  .bb.is-guided-beside .bb__grip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bgs,
+  .bgs.is-right { animation: none; }
+  .bgs__next,
+  .bgs__chipbtn,
+  .bgs__ink,
+  .bgf__head,
+  .bgf__choice,
+  .bgf__go { transition: none; }
+}

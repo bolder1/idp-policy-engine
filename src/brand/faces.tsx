@@ -57,13 +57,24 @@ export function Face({
   )
 }
 
-/** Overlapping faces, up to `max`, then a "+N" whose hover lists the rest. Small: it sits in a row. */
-export function FaceStack({ faces, max = 5 }: { faces: FaceItem[]; max?: number }) {
+/** Overlapping faces, up to `max`, then a "+N" whose hover lists the rest. Small: it sits in a row.
+    `tips={false}`: faces printed beside their names, for the eye only — no hover, and nothing read twice. */
+export function FaceStack({ faces, max = 5, tips = true }: { faces: FaceItem[]; max?: number; tips?: boolean }) {
   const size = 'sm'
   /* One more than `max` shows the last face rather than a "+1" in its place. */
   const cut = faces.length > max + 1 ? max : faces.length
   const shown = faces.slice(0, cut)
   const rest = faces.slice(cut)
+  if (!tips) {
+    return (
+      <span className={`bx-faces is-${size}`} aria-hidden>
+        {shown.map((f) => (
+          <Face key={f.key} kind={f.kind} name={f.name} size={size} decorative />
+        ))}
+        {rest.length > 0 && <span className={`bx-face is-more is-${size}`}>+{rest.length}</span>}
+      </span>
+    )
+  }
   return (
     <span className={`bx-faces is-${size}`}>
       {shown.map((f) => (

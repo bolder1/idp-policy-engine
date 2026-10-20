@@ -45,6 +45,9 @@ export interface RunLayoutProps {
   asGroup: string | null
   /** The policies the rule cards are drawn from (a policy's draft, inside one); absent, the tenant's. */
   policies?: readonly Policy[]
+  /** Inside a policy (the builder's Check access): the one being built, which the merged Policy card is (20 Oct 2026,
+      phase.ts ONE_POLICY_CARD). Absent or null on the page. */
+  inPolicy?: string | null
 
   /* The pieces the column draws, lent whole (memoised by the host): */
   /** The sign-in as a card (SignInCard.tsx `SignInNode`): a press opens the panel on the form. */

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 
 import { fallbackRule, type Rule } from '../../../data'
+import { DecisionBadge } from '../../../decision-badge'
 import { DECISION_WORDS } from '../../../decision-words'
 import { Face } from '../../../faces'
 import { AppLogo } from '../../../logos/AppLogo'
@@ -63,6 +64,8 @@ import {
   type PolicySectionKey,
 } from './classic2-model'
 import { GlideCtx, useGlide, type Glide } from './classic2-glide'
+import { OneFoot, OneReason } from './classic2-one'
+import { oneRowBadge, oneRowWord, type OneCard } from './classic2-one-model'
 import type { ChainFold, ChainRun } from './classic2-run'
 import { IdentityChips, type ChipFold } from './shared/IdentityChips'
 import { identityChips, rowFacts, rowState, type IdentityChip } from './shared/sign-in-row'
@@ -112,10 +115,15 @@ import './classic2.css'
                   the identity chips, so the sign-in card does not repeat them
      lit          the card an answer points at, ringed where it stands
      onPress      (one card) a press on it does something other than open it
-     why          the outcome's way to the why in the page's right-hand panel:
-                  one quiet link at the foot of its body (`ChainWhy`). Only a
-                  page that draws the why there hands it — Focus, on the page;
-                  never ClassicV2Layout, and never the builder's Check access
+     why          the way to the why in the page's right-hand panel: one quiet
+                  link under the Policies card's head (`ChainWhy`). Only a page
+                  that draws the why there hands it — Focus, on the page and in
+                  the builder's Check access; never ClassicV2Layout
+     onePolicy    ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD, 20 Oct 2026):
+                  no rule card — the policy card is the Policy card, the
+                  decider's rules inside it with their outcomes, its foot the
+                  Global Default (classic2-one-model.ts); Focus's alone
+     litRow       the rule an answer points at, lit on its row (`onePolicy`)
    -------------------------------------------------------------------------- */
 
 /** Decelerating: what arrives. */
@@ -181,6 +189,10 @@ export interface Classic2ChainProps {
   zoom?: number
   /** The outcome's link to the why in the page's right-hand panel (`ChainWhy`). Absent, no link. */
   why?: ChainWhy | null
+  /** One Policy card holding the rules, no rule card (phase.ts ONE_POLICY_CARD); `data` must be `useChainRun`'s with the same option. */
+  onePolicy?: boolean
+  /** The rule an answer or the brief points at (its id), lit on its row in the Policy card (`onePolicy`). */
+  litRow?: string | null
 }
 
 /** A connector fading out as the chain starts to change shape, and back in once its nodes have landed. */
@@ -190,12 +202,12 @@ const LINK_IN = { duration: 0.2, ease: EASE_OUT }
 /* The chain: the first node, then each card on screen after its connector — top to bottom, or left to right — arriving
    as the run reaches it. Across, the row keeps a place for every card the run will draw from the start, so the nodes
    already there never move as the next arrives; the places are its grid's tracks (`--rl-c2-tracks`). */
-export function Classic2Chain({ run, data, fold, animate, snap, orientation = 'vertical', start, signInCard = true, glide = null, links = true, topRow = false, lit = null, chainRef, zoom, why = null }: Classic2ChainProps) {
+export function Classic2Chain({ run, data, fold, animate, snap, orientation = 'vertical', start, signInCard = true, glide = null, links = true, topRow = false, lit = null, chainRef, zoom, why = null, onePolicy = false, litRow = null }: Classic2ChainProps) {
   const { at, shown } = data
   /* Two cards that arrive at the same step (a Replay finds the policy at once) come in a beat apart, top to bottom. */
   const delayOf = (k: CardKey) => (animate ? shown.filter((j) => j !== k && at[j] === at[k] && shown.indexOf(j) < shown.indexOf(k)).length * STAGGER_S : 0)
   /* Each node's place in the glide's order: the first node leads, then the cards as the chain reads them. */
-  const cards = signInCard ? CARDS : CARDS.filter((k) => k !== 'sign-in')
+  const cards = (signInCard ? CARDS : CARDS.filter((k) => k !== 'sign-in')).filter((k) => !onePolicy || k !== 'rule')
   const orderOf = (k: CardKey) => cards.indexOf(k) + 1
   const arrive = (k: CardKey, first?: ReactNode) => (
     <motion.div
@@ -209,7 +221,7 @@ export function Classic2Chain({ run, data, fold, animate, snap, orientation = 'v
       {(k !== 'sign-in' || signInCard) && (
         <>
           <Link order={orderOf(k)} shown={links} ink={ink} tone={data.outcome.tone} />
-          <Classic2Card card={k} run={run} data={data} open={fold.open[k]} onFold={() => fold.fold(k)} snap={snap} animate={animate} topRow={topRow} lit={lit === k} order={orderOf(k)} why={k === 'policy' ? why : null} />
+          <Classic2Card card={k} run={run} data={data} open={fold.open[k]} onFold={() => fold.fold(k)} snap={snap} animate={animate} topRow={topRow} lit={lit === k} order={orderOf(k)} why={k === 'policy' ? why : null} litRow={litRow} />
         </>
       )}
     </motion.div>
@@ -299,19 +311,22 @@ export interface Classic2CardProps {
   order?: number
   /** (The outcome) its link to the why in the page's right-hand panel; never while it is still deciding. */
   why?: ChainWhy | null
+  /** (The merged Policy card) the rule an answer points at, lit on its row. */
+  litRow?: string | null
 }
 
 /** The outcome before it is told: no decision, no tone, nothing to open. */
 const DECIDING: OutcomeView = { tone: 'none', decision: null, title: 'Deciding', by: '', link: '', open: null, factors: [], message: null, outcomes: [], needs: [] }
 
 /** One of the four cards, on its own: the chain's, or a station of Focus's route. */
-export function Classic2Card({ card, run, data, open, onFold, snap, animate, topRow = false, lit = false, onPress, ruleAt, passed, deciding = false, opens: canOpen = true, order = 0, why = null }: Classic2CardProps) {
+export function Classic2Card({ card, run, data, open, onFold, snap, animate, topRow = false, lit = false, onPress, ruleAt, passed, deciding = false, opens: canOpen = true, order = 0, why = null, litRow = null }: Classic2CardProps) {
   const { plan, running, onOpenRule, onOpenPolicy } = run
   const { decider, done, outcome } = data
   const pressed = { lit, onPress, order }
   if (card === 'sign-in') return <SignInCard run={run} who={data.who} group={data.group} appId={data.appId} appName={data.appName} open={open} onFold={onFold} snap={snap} topRow={topRow} {...pressed} />
   if (card === 'policy')
     return (
+      <InspectCtx.Provider value={run.onInspect ?? null}>
       <PolicyCard
         head={data.policyHead}
         sections={data.sections}
@@ -323,8 +338,28 @@ export function Classic2Card({ card, run, data, open, onFold, snap, animate, top
         follow={data.working === 'policy'}
         onOpen={canOpen && done ? onOpenPolicy : undefined}
         why={done ? why : null}
+        one={
+          data.one
+            ? {
+                card: data.one,
+                plan,
+                s: run.s,
+                rules: decider?.rules ?? [],
+                fallback: decider?.fallback ?? null,
+                current: data.shownRule !== null ? (plan.rules[data.shownRule]?.id ?? null) : null,
+                resolve: data.resolve,
+                inspects: !!run.onInspect,
+                onDetails: done && decider && run.onInspect ? (ruleId: string) => onOpenRule(decider.id, ruleId) : undefined,
+                onOpenRow: canOpen && done && decider && !run.onInspect ? (ruleId: string) => onOpenRule(decider.id, ruleId) : undefined,
+                onOpenName: canOpen && done ? onOpenPolicy : undefined,
+                asGroup: data.group !== null,
+                litRow,
+              }
+            : null
+        }
         {...pressed}
       />
+      </InspectCtx.Provider>
     )
   if (card === 'rule')
     return (
@@ -360,6 +395,7 @@ export function Classic2Card({ card, run, data, open, onFold, snap, animate, top
       follow={running}
       onOpen={done && opens ? () => (opens.ruleId ? onOpenRule(opens.policyId, opens.ruleId) : onOpenPolicy(opens.policyId)) : undefined}
       inspects={!!run.onInspect}
+      meta={deciding ? undefined : data.one?.outcomeMeta}
       {...pressed}
     />
   )
@@ -412,7 +448,7 @@ function Meta({ meta, extra }: { meta: HeadMeta | null; extra?: ReactNode }) {
         </span>
       )}
       {meta && (
-        <span className="rl-c2__mt">
+        <span className="rl-c2__mt" title={meta.tip}>
           {meta.text}
           {meta.then && <b className="rl-c2__then">{DECISION_WORDS[meta.then]}</b>}
         </span>
@@ -437,6 +473,7 @@ function Card({
   titleNode,
   meta,
   acts,
+  reason,
   under,
   body,
   open,
@@ -460,6 +497,8 @@ function Card({
   titleNode?: ReactNode
   meta: ReactNode
   acts?: ReactNode
+  /** Under the head, before `under`, folded or not: the merged Policy card's why the Global Default (classic2-one.tsx `OneReason`). */
+  reason?: ReactNode
   under?: ReactNode
   body: ReactNode
   open: boolean
@@ -515,6 +554,7 @@ function Card({
           </span>
         </div>
       </motion.div>
+      {reason && on ? <motion.div {...piece}>{reason}</motion.div> : reason}
       {under && on ? <motion.div {...piece}>{under}</motion.div> : under}
       <AnimatePresence initial={false}>
         {open && (
@@ -844,6 +884,26 @@ function WhyUnder({ why }: { why: ChainWhy }) {
   )
 }
 
+/* ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD, 20 Oct 2026): what the merged card is handed beside the chain's own
+   data — the run at its step, the decider's rules as stored, the row open by default, and where a press goes: Details
+   into the page's inspector, ↗ into the builder's own rule where there is no inspector, a policy's name into the
+   inspector on the page (in the builder, only the policy being built, back to its canvas). */
+interface OneBody {
+  card: OneCard
+  plan: RunLayoutProps['plan']
+  s: number
+  rules: readonly Rule[]
+  fallback: Rule | null
+  current: string | null
+  resolve: NameLookup
+  inspects: boolean
+  onDetails?: (ruleId: string) => void
+  onOpenRow?: (ruleId: string) => void
+  onOpenName?: (policyId: string) => void
+  asGroup: boolean
+  litRow: string | null
+}
+
 function PolicyCard({
   head,
   sections,
@@ -855,6 +915,7 @@ function PolicyCard({
   follow,
   onOpen,
   why = null,
+  one = null,
   lit,
   onPress,
   order,
@@ -871,12 +932,43 @@ function PolicyCard({
   onOpen?: (policyId: string) => void
   /** The way to the why in the page's right-hand panel (`ChainWhy`): on this card, where the policies are. */
   why?: ChainWhy | null
+  /** The merged Policy card (ONE_POLICY_CARD): its head, rules and foot in place of the policies' search and sections. */
+  one?: OneBody | null
 } & Pressed) {
+  /* Merged, the card is the policy that decides: "Policy", its name, the row that decided (classic2-one-model.ts
+     `oneHead`); a line under the head when the Global Default decides, the Why under that, unchanged; the rules in its
+     body, each with its outcome, and the Global Default at the foot. The title is words: the ways in are inside the
+     card — the reason's and the foot's names, the head's Details (one for the policy, no longer one per row, 20 Oct
+     2026), the outcome's decided by (6 Oct 2026). */
+  const c = one?.card ?? null
+  const shown = c ? c.head : head
+  const title = shown.title
+  /* In the builder only the policy being built has a name to press, back to its canvas; on the page, any, into the inspector. */
+  const reasonOpen = one && c && (one.inspects || c.why.policyId === c.inPolicy) ? one.onOpenName : undefined
+  /* The policy's own details, from the card's head (owner, 20 Oct 2026: "an option to open the policy details page in the
+     main card; remove it from the inside, not needed"): one Details for the whole policy, in place of one per row. On
+     the page it opens the policy in the inspector; in the builder, only the policy being built, back to its canvas. */
+  const decider = one?.plan.decider ?? null
+  const openHead = one && c && decider && (one.inspects || decider.id === c.inPolicy) ? one.onOpenName : undefined
   return (
     <Card
       card="policy"
+      acts={
+        openHead && decider ? (
+          <button
+            type="button"
+            className="bb__act rl-c2__policydetails"
+            aria-label={one?.inspects ? `Details of ${decider.name}` : `Open ${decider.name}`}
+            title={one?.inspects ? 'Details' : 'Open in its policy'}
+            onClick={() => openHead(decider.id)}
+          >
+            {one?.inspects ? <PanelRight size={13} strokeWidth={2.2} /> : <ArrowUpRight size={13} strokeWidth={2.2} />}
+          </button>
+        ) : undefined
+      }
+      reason={one && c ? <OneReason why={c.why} appName={appName} open={reasonOpen} /> : undefined}
       under={why ? <WhyUnder why={why} /> : undefined}
-      className={head.kind === 'finding' ? 'is-reading' : ''}
+      className={(c ? c.head.reading : head.kind === 'finding') ? 'is-reading' : ''}
       lit={lit}
       onPress={onPress}
       order={order}
@@ -885,17 +977,40 @@ function PolicyCard({
           <Layers size={14} strokeWidth={2.2} />
         </span>
       }
-      kicker={head.kicker}
-      title={head.title}
-      meta={<Meta meta={head.meta} />}
+      kicker={shown.kicker}
+      title={title}
+      meta={<Meta meta={shown.meta} />}
       open={open}
       onFold={onFold}
-      what={`the policies on ${appName}`}
-      fold={['Fold this card', 'Show the policies']}
+      what={c ? `the rules of ${title}` : `the policies on ${appName}`}
+      fold={['Fold this card', c ? 'Show the rules' : 'Show the policies']}
       snap={snap}
       follow={follow}
       body={
-        head.kind === 'finding' ? (
+        one && c ? (
+          <>
+            {one.plan.decider && one.plan.rules.length > 0 ? (
+              <RuleList
+                plan={one.plan}
+                current={one.current}
+                rules={one.rules}
+                fallback={one.fallback}
+                s={one.s}
+                animate={animate}
+                resolve={one.resolve}
+                /* No Details or ↗ per row any more: the card's head holds the policy's (20 Oct 2026). */
+                one={{ asGroup: one.asGroup, litRow: one.litRow }}
+              />
+            ) : (
+              <div className="bb__if">
+                <div className="bb__ifrow">
+                  <span className="bb__ifkw is-blank">{one.plan.outcome.view.line || 'No policy decides'}</span>
+                </div>
+              </div>
+            )}
+            {c.walked && <OneFoot also={c.also} gd={c.gd} open={one.inspects ? one.onOpenName : undefined} animate={animate} />}
+          </>
+        ) : head.kind === 'finding' ? (
           <PolicySearch rows={sections.flatMap((sec) => sec.rows).sort((a, b) => a.order - b.order)} appName={appName} animate={animate} />
         ) : (
         <div className="bb__if">
@@ -1090,9 +1205,43 @@ function PassedRuleCard({
    While the engine walks, a rule arrives as it is reached and says where the walk is — Reading, then Not matched or
    Matches (classic2-model.ts `ruleRowState`, 6 Oct 2026: "it should feel more real"); the rules it never reaches join
    once the walk is over. `possible` reads "If not", the canvas's own word; an ended temporary access grant is off in the
-   run, but it ran out rather than being switched off, and says so (GRANT_ENDED). */
+   run, but it ran out rather than being switched off, and says so (GRANT_ENDED).
 
-function RuleList({ plan, current, rules, fallback, s, animate, resolve, onDetails }: { plan: RunLayoutProps['plan']; current: string; rules: readonly Rule[]; fallback: Rule | null; s: number; animate: boolean; resolve: NameLookup; onDetails?: (ruleId: string) => void }) {
+   Inside the merged Policy card (`one`, phase.ts ONE_POLICY_CARD, 20 Oct 2026) each row also says what it does — its
+   outcome badge, the app Policies tab's 1:1 change — in its tone on the row that decided and on a later rule that also
+   applies ("Also matches · not used"), grey on the rest; the row that decided says how the person got in ("Matches · via
+   Sales"); a row an answer points at is lit and opens. The merged card hands no row a Details or ↗ (20 Oct 2026): its
+   head opens the policy. Each row carries its rule's id (`data-rule-row`) for the answers to follow.
+   Without `one`, the list is exactly as it was. */
+interface RuleListOne {
+  /** A group's own run: the row that decided does not repeat the group. */
+  asGroup: boolean
+  litRow: string | null
+  /** No inspector (the builder): the row's ↗ opens that rule in its policy. */
+  onOpenRow?: (ruleId: string) => void
+}
+
+function RuleList({
+  plan,
+  current,
+  rules,
+  fallback,
+  s,
+  animate,
+  resolve,
+  onDetails,
+  one,
+}: {
+  plan: RunLayoutProps['plan']
+  current: string | null
+  rules: readonly Rule[]
+  fallback: Rule | null
+  s: number
+  animate: boolean
+  resolve: NameLookup
+  onDetails?: (ruleId: string) => void
+  one?: RuleListOne
+}) {
   /* What the admin opened or folded by hand; the rest follows the rule that is on. */
   const [manual, setManual] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const uid = useId()
@@ -1109,14 +1258,18 @@ function RuleList({ plan, current, rules, fallback, s, animate, resolve, onDetai
   /* A row arrives as the walk reaches it, and a body opens and folds, with the card's own body's move (`Card`). */
   const rowIn = animate ? { initial: { height: 0, opacity: 0 }, animate: { height: 'auto', opacity: 1 }, transition: { height: { duration: FOLD_S, ease: EASE_OPEN }, opacity: { duration: 0.2, delay: 0.06, ease: EASE_OUT } } } : { initial: false as const }
   return (
-    <ul className="rl-c2__rules" aria-label="Rules in this policy">
+    <ul className={`rl-c2__rules${one ? ' is-one' : ''}`} aria-label="Rules in this policy">
       {listed.map((r, i) => {
         const terminal = r.index === null
         const rule = terminal ? (fallback ?? fallbackRule(r.decision)) : (rules.find((x) => x.id === r.id) ?? null)
-        const open = manual.get(r.id) ?? r.id === current
+        /* A row an answer points at opens (merged card), unless the admin has opened or folded it by hand. */
+        const lit = !!one && one.litRow === r.id
+        const open = manual.get(r.id) ?? (lit || r.id === current)
         const row = ruleRowState(r, s, walked)
         const ended = row.tone === 'off' && !!rule?.tempAccess && rule.enabled !== false
-        const word = ended ? GRANT_ENDED : row.word
+        const oneWord = one ? oneRowWord(r, row, walked, one.asGroup) : null
+        const word = oneWord ? oneWord.word : ended ? GRANT_ENDED : row.word
+        const badge = one ? oneRowBadge(r, rule, row, walked) : null
         const why = row.tone === 'no-match' && r.failing !== null ? (r.checks[r.failing]?.word ?? '') : ''
         const ids = rule ? leaves(rule.when).map((k) => k.id) : []
         const marks = rule && r.visited && !terminal ? ruleMarks(r, ids, s) : null
@@ -1125,7 +1278,13 @@ function RuleList({ plan, current, rules, fallback, s, animate, resolve, onDetai
         /* The rules never reached arrive together once the walk is over, a beat apart. */
         const late = animate && walked && row.tone === 'not-reached' ? { transition: { ...rowIn.transition, delay: 0.04 * i } } : null
         return (
-          <motion.li key={r.id} className={`rl-c2__rule is-${row.tone}${open ? ' is-open' : ''}${row.tone === 'match' ? ` is-d-${TONE[r.decision]}${animate ? ' is-hit' : ''}` : ''}`} {...rowIn} {...late}>
+          <motion.li
+            key={r.id}
+            className={`rl-c2__rule is-${row.tone}${open ? ' is-open' : ''}${row.tone === 'match' ? ` is-d-${TONE[r.decision]}${animate ? ' is-hit' : ''}` : ''}${oneWord?.also ? ' is-also' : ''}${lit ? ' is-lit' : ''}`}
+            {...(one ? { 'data-rule-row': r.id } : null)}
+            {...rowIn}
+            {...late}
+          >
             <div className="rl-c2__rulerow">
             <button type="button" className="rl-c2__rulehead" aria-expanded={open} aria-controls={bodyId} onClick={() => toggle(r.id, open)}>
               <span className="rl-c2__rulen">{terminal ? <Asterisk size={12} strokeWidth={2.2} aria-hidden /> : (r.index ?? 0) + 1}</span>
@@ -1134,11 +1293,22 @@ function RuleList({ plan, current, rules, fallback, s, animate, resolve, onDetai
                 {word}
                 {why && ` · ${why}`}
               </span>
+              {badge && (
+                <>
+                  <span className="u-sr-only">, then </span>
+                  <DecisionBadge decision={badge.decision} muted={badge.muted} />
+                </>
+              )}
               {open ? <ChevronUp size={13} strokeWidth={2} aria-hidden /> : <ChevronDown size={13} strokeWidth={2} aria-hidden />}
             </button>
             {onDetails && (
               <button type="button" className="bb__act rl-c2__ruledetails" aria-label={terminal ? 'Details of the last row' : `Details of rule ${(r.index ?? 0) + 1}`} title="Details" onClick={() => onDetails(r.id)}>
                 <PanelRight size={13} strokeWidth={2.2} />
+              </button>
+            )}
+            {!onDetails && one?.onOpenRow && (
+              <button type="button" className="bb__act rl-c2__ruledetails" aria-label={terminal ? 'Open the default in its policy' : `Open rule ${(r.index ?? 0) + 1} in its policy`} title="Open in its policy" onClick={() => one.onOpenRow?.(r.id)}>
+                <ArrowUpRight size={13} strokeWidth={2.2} />
               </button>
             )}
             </div>
@@ -1167,7 +1337,9 @@ function RuleList({ plan, current, rules, fallback, s, animate, resolve, onDetai
                         : undefined
                     }
                   />
-                  {onDetails && !terminal && <RuleUses rule={rule} />}
+                  {/* What the rule leans on stays in the merged card, whose rows no longer carry Details; RuleUses draws only
+                      where the page's inspector is there to take its presses. */}
+                  {(onDetails || one) && !terminal && <RuleUses rule={rule} />}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1215,6 +1387,7 @@ function OutcomeCard({
   follow,
   onOpen,
   inspects = false,
+  meta,
   lit,
   onPress,
   order,
@@ -1228,9 +1401,13 @@ function OutcomeCard({
   onOpen?: () => void
   /** Decided by opens in the page's panel: its mark says Details. */
   inspects?: boolean
+  /** The head's third line, where the page says it otherwise (the merged Policy card's run: what the person goes
+      through, since that card already names the rule — classic2-one-model.ts `outcomeMetaOne`). Undefined, its own. */
+  meta?: HeadMeta | null
 } & Pressed) {
   const Icon = OUT_ICON[view.tone]
   const head = outcomeHead(plan, view)
+  const headMeta = meta === undefined ? head.meta : meta
   const reason = DENIAL_REASONS ? denyReasonOf(plan) : null
   return (
     <Card
@@ -1246,7 +1423,7 @@ function OutcomeCard({
       }
       kicker={head.kicker}
       title={head.title}
-      meta={<Meta meta={head.meta} />}
+      meta={<Meta meta={headMeta} />}
       open={open}
       onFold={onFold}
       what="what they get"

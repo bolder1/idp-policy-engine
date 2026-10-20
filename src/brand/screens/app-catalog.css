@@ -1,0 +1,84 @@
+/* -----------------------------------------------------------------------------
+   Choose application (AppCatalog.tsx) — the catalogue Add application opens.
+
+   `bapc`, beside the list's `bapl`, the protection panel's `bapr` and the
+   application page's `bapp`; checked against the whole tree first, and unused.
+
+   The way back and the head are the application page's (`.bz7__back`,
+   `.bz7__pagehead`, zones-final.css), and the bar is the console's `PageBar`.
+   Only the tiles and their sections are new.
+   -------------------------------------------------------------------------- */
+
+/* The search and the two dropdowns wrap under one another on a phone rather
+   than pushing the page sideways. The shared bar keeps them on one line, which
+   every page with one or two filters fits; this one has a search and two. */
+.bapc .bbar__left { flex-wrap: wrap; }
+
+/* --- Sections ------------------------------------------------------------- */
+
+.bapc__section { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+/* Featured and All apps are two lists, not two rows of one: more air between
+   them than between a heading and its own tiles. */
+.bapc__section + .bapc__section { margin-top: var(--space-6); }
+
+/* As many tiles as fit, each at least 200px; one column on a phone, where the
+   page's own gutters are the only margin. `min()` so a column narrower than a
+   tile still takes one tile rather than overflowing. */
+.bapc__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+  gap: var(--space-5);
+}
+.bapc__grid > li { display: flex; min-width: 0; }
+
+/* --- A tile ---------------------------------------------------------------
+
+   A button: the logo, then the name over the protocol caption. Hover answers
+   with the fill and one step of border, as the console's controls do (kit.css,
+   the note on input hover) — greyscale, never the brand, because choosing a
+   tile is not a selection that stays. Focus is the kit's ring, with the tile's
+   own corners kept. */
+.bapc__tile {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.bapc__tile:hover { background: var(--state-hover-bg); border-color: var(--border-default); }
+.bapc__tile:active { background: var(--surface-inset); }
+/* Two classes: the kit's ring (`.brand-root :focus-visible`) squares the
+   corners at the weight of one, and which sheet comes last is not this
+   sheet's to count on. */
+.bapc .bapc__tile:focus-visible { border-radius: var(--radius-lg); }
+@media (prefers-reduced-motion: reduce) {
+  .bapc__tile { transition: none; }
+}
+
+.bapc__logo { flex: none; display: inline-flex; }
+
+.bapc__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+/* A long name ("OAuth2/OpenID Connect") wraps inside the tile rather than
+   widening it. */
+.bapc__name {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.bapc__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-4); min-width: 0; }
+.bapc__proto { font-size: var(--fs-sm); color: var(--text-muted); }
+.bapc__meta > .bx-badge { flex: none; }

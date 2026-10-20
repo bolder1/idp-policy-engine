@@ -52,8 +52,10 @@ describe('back from the board', () => {
 
   it('is asked on every arrival at an application page, whatever its tab', () => {
     const page = pageSrc.slice(pageSrc.indexOf('function AppPage('), pageSrc.indexOf('function PoliciesTab('))
-    expect(page).toContain("if (arriveFromBoard(sentToBoard, flash, decides)) playCue('celebrate')")
-    expect(pageSrc.match(/sendToBoard\(sentToBoard, id, had\)/g)).toHaveLength(2)
-    expect(pageSrc).not.toContain('sentToBoard.get(')
+    expect(page).toContain("if (arriveFromBoard(SENT_TO_BOARD, flash, decides)) playCue('celebrate')")
+    expect(pageSrc.match(/sendToBoard\(SENT_TO_BOARD, id, had\)/g)).toHaveLength(2)
+    /* The unsaved application's New policy sends its first draft too, with nothing deciding yet. */
+    expect(pageSrc.match(/sendToBoard\(SENT_TO_BOARD, pid, false\)/g)).toHaveLength(1)
+    expect(pageSrc).not.toContain('SENT_TO_BOARD.get(')
   })
 })

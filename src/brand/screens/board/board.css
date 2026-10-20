@@ -250,6 +250,8 @@
 /* The verbs, hard right. `margin-left: auto` rather than a spacer element, so
    the row collapses correctly when the crumbs are long. */
 .bbtop__acts { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); flex: none; }
+/* Between Past sign-ins and Check access: two different things (owner, 19 Oct 2026), so a hairline. */
+.bbtop__sep { width: 1px; height: 20px; background: var(--border-subtle); flex: none; }
 /* A box for the walkthrough's last step to light. `inline-flex` rather than
    `contents`: an element with no box measures zero, and the spotlight would
    fall back to a centred card pointing at nothing. */
@@ -1076,8 +1078,12 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
   font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line);
   background: var(--fb-positive-bg); color: var(--fb-positive-fg);
 }
+/* Complete is blue, not green (owner, 19 Oct 2026): green is Allow's, and the two sat side by side on every card. */
+.bb__state.is-ready { background: var(--fb-info-bg); color: var(--fb-info-fg); }
 .bb__state.is-setup { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-.bb__state.is-warn { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+/* A warning, in magenta: red is Deny's (owner, 19 Oct 2026). It says the finding itself, so it may run long: one
+   line, ellipsised, the full text on its title. */
+.bb__state.is-warn { background: var(--fb-magenta-bg); color: var(--fb-magenta-fg); max-width: 240px; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
 .bb__state.is-off { background: var(--fb-neutral-bg); color: var(--text-tertiary); }
 /* The terminal card's `Always on` carries no modifier. It is a fact about a row
    nothing can change rather than a readiness verdict, so it takes the neutral
@@ -1272,11 +1278,9 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
   border-color: var(--border-subtle);
   background: var(--surface-raised);
   box-shadow: var(--el-low);
-  /* The tone runs down the edge rather than filling the card: this rule has a
-     decision like any other, and the edge says which without tinting a whole
-     card the way a hit state does. */
-  border-left: 3px solid var(--tone-border, var(--border-default));
 }
+/* The same card as every rule (owner, 14 Oct 2026): no coloured edge. What it decides is said by the colour of its name. */
+.bb__card.is-terminal .bb__titlebtn strong { color: var(--tone-fg, var(--text-primary)); }
 .bb__card.is-terminal:hover { border-color: var(--border-default); box-shadow: var(--el-mid); }
 /* Three sides, not four. `border-color` is a longhand for all four edges, and
    this selector outranks the `border-left: 3px solid var(--tone-border)` above
@@ -1553,7 +1557,7 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
 }
 .bb__insphead h2 { margin: 0; min-width: 0; flex: 1; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bb__insphead p { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
-/* Why the card says "Needs setup" or "Check", under the name it is about. */
+/* Why the card says "Incomplete" or "Needs review", under the name it is about. */
 .bb__findings { padding: var(--space-2) var(--space-5); border-bottom: 1px solid var(--border-subtle); }
 .bb__inspbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 /* The panel's own foot (23 Sep 2026). A row of its own under the scroll, not
@@ -1578,14 +1582,16 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
    fighting "Save policy" on the bar. One solid brand button per screen; this
    is the same act, said quieter. `--brand-text` is a rebrand token, so the
    fallback keeps it readable in the console look. */
+/* Grey slate since 19 Oct 2026 (owner: "use a grey slate button here"): the subtle orange read as a second orange
+   beside Save policy. Still a filled button, so it is plainly the panel's save, not a bare outline. */
 .bb__inspfoot .bx-btn--neutral {
-  background: var(--brand-subtle-bg);
-  border-color: var(--brand-subtle-border);
-  color: var(--brand-text, var(--brand));
+  background: var(--int-neutral-bg-active);
+  border-color: var(--int-neutral-border);
+  color: var(--text-primary);
 }
 .bb__inspfoot .bx-btn--neutral:not(:disabled):hover {
-  background: var(--brand-subtle-border);
-  border-color: var(--brand-subtle-border);
+  background: var(--int-neutral-border);
+  border-color: var(--int-neutral-border-hover);
 }
 
 /* A section: Figma's grammar — a title row you can collapse, an action on the
@@ -2147,6 +2153,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 /* The who row: same shape as `if`, above it, one notch quieter — it is the
    subject of the sentence rather than a test in it. */
 .bb__ifwho .bb__ifkw { color: var(--text-tertiary); }
+/* Everyone, as a node (owner, 19 Oct 2026): the condition chip's shape, its mark in the quiet grey. */
+.bb__ifwho__all > svg { color: var(--text-tertiary); flex: none; }
 /* "Finance, Legal and 2 more" or "Everyone except Contractors": one line,
    ellipsised, with the full list on the title. */
 .bb__ifwho__text {
@@ -2498,10 +2506,15 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   border-color: var(--bb-ring);
   box-shadow: var(--el-mid);
 }
-.bb__chain:has(.bb__card.is-selected) .bb__card:not(.is-selected):not(.is-off):not(.is-shadowed) {
+.bb__chain:has(.bb__card.is-selected) .bb__card:not(.is-selected):not(.is-off):not(.is-shadowed),
+/* The same step back on an application's Policies tab, for the card a picked sign-in or the Rule filter names
+   (ReadOnlyCanvas `framed`, 20 Oct 2026): there nothing is selected, the card is traced. */
+.insp__canvas.is-framed .bb__chain:has(.bb__card.is-traced) .bb__card:not(.is-traced):not(.is-off):not(.is-shadowed) {
   opacity: 0.72;
 }
-.bb__chain:has(.bb__card.is-selected) .bb__card:not(.is-selected):hover { opacity: 1; }
+.bb__chain:has(.bb__card.is-selected) .bb__card:not(.is-selected):hover,
+/* Its `:not()`s repeated so the hover outranks the dim it lifts. */
+.insp__canvas.is-framed .bb__chain:has(.bb__card.is-traced) .bb__card:not(.is-traced):not(.is-off):not(.is-shadowed):hover { opacity: 1; }
 /* A switched-off rule that is ALSO the one being edited.
 
    `.is-off` is 0.62 and the dim above deliberately skips it, so selecting a
@@ -2863,6 +2876,18 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__outcard__text em { font-style: normal; font-size: var(--fs-sm); line-height: 1.4; color: var(--text-tertiary); }
 .bb__outcard.is-allow { --out-fg: var(--fb-positive-fg); --out-bg: var(--fb-positive-bg); --out-border: var(--fb-positive-border); }
 .bb__outcard.is-deny { --out-fg: var(--fb-negative-fg); --out-bg: var(--fb-negative-bg); --out-border: var(--fb-negative-border); }
+/* A post sign-in policy's Step up (PostThen.tsx): it lets the event through
+   after a second factor, so it wears the second-factor tone the card has. */
+.bb__outcard.is-mfa { --out-fg: var(--fb-positive-strong-fg); --out-bg: var(--fb-positive-strong-bg); --out-border: var(--fb-positive-strong-border); }
+/* Why a post sign-in policy cannot be turned on yet, under the Then it is
+   about (post-board.ts): said once a save or a Turn on was refused. The
+   console's 12px, not the findings' 11. */
+.bb__refusal {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--fb-negative-fg);
+}
+.bb__refusal > svg { flex: none; margin-top: 1px; }
 .bb__outcard.is-on { border-color: var(--out-border); background: var(--out-bg); }
 .bb__outcard.is-on .bb__outcard__ico { background: var(--surface-raised); color: var(--out-fg); }
 /* `.bb__outcard.is-soon` and `.bb__outcard__soon` stood here: the quiet
@@ -3266,6 +3291,45 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__apps__note { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--fb-notice-fg, var(--text-secondary)); }
 
+/* A post sign-in policy's linked applications, read only (AppsPane.tsx
+   `LinkedApps`): the application's mark, its name — which opens its Post
+   sign-in tab, where links are made — and the events this policy decides
+   there. The list frame is the applications list's own. */
+.bb__linked {
+  display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bb__linked__row {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bb__linked__row:last-child { border-bottom: 0; }
+.bb__linked__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bb__linked__name {
+  align-self: flex-start; padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-link);
+  text-align: left;
+}
+.bb__linked__name:hover { text-decoration: underline; }
+.bb__linked__name:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__linked__events { font-size: var(--fs-sm); line-height: 1.45; color: var(--text-tertiary); }
+
+/* Who, then Applications, as two of the inspector's sections (13 Oct 2026).
+   The applications' lede, search and list hang off their heading against the
+   guide rule like a rule's Who does, so the section takes the room the pane
+   gave the list and the body loses its own frame padding. */
+.bb__apps__sec { flex: 1; }
+.bb__apps__sec .bb__apps__body { padding: 0; }
+.bb__apps__sec .bb__apps__lede { padding: 0; }
+/* The audience's answer when nothing narrows it: said as the answer it is. */
+.bb__aud__all {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+.bb__aud__all svg { flex: none; color: var(--text-tertiary); }
+
 /* --- The start node, as the way into that pane ---------------------------------
    The pill was a sentence; it is now also the control for the noun in it. A
    chevron at its end says it opens something, and it lights like a selected
@@ -3428,6 +3492,19 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
    card is a motion element, so the flash is an outline and nothing else — no
    transform, no scale. Under reduced motion it holds still until the class
    goes (Board clears it after the same 1.2 s). */
+/* A post sign-in card a refused Turn on is about (post-board.ts): its edge
+   in the negative tone while the reason stands. A border colour only — the
+   card is a motion element, so nothing here is a transform. The last row
+   keeps its tone down the left edge, as it does when selected. */
+.bb__card.is-refused,
+.bb__card.is-refused.is-selected { border-color: var(--fb-negative-border); }
+.bb__card.is-terminal.is-refused,
+.bb__card.is-terminal.is-refused.is-selected {
+  border-top-color: var(--fb-negative-border);
+  border-right-color: var(--fb-negative-border);
+  border-bottom-color: var(--fb-negative-border);
+}
+
 .bb__card.is-flash {
   outline: var(--bw-thick) solid var(--accent);
   outline-offset: var(--space-1);
@@ -3440,6 +3517,55 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 @media (prefers-reduced-motion: reduce) {
   .bb__card.is-flash { animation: none; }
 }
+
+/* --- Framed (ReadOnlyCanvas `framed`: an application's Policies tab, 20 Oct 2026) ---------------------------------
+
+   The chain at a glance, filling a panel of fixed height that already draws the edge (applications.css
+   `.apol__frame`) and scrolling in it. The canvas is the scroller rather than the panel, so the held gutter wears the
+   canvas's ground, not a white stripe down its side. No start pill — the page is the application — shorter
+   connectors, one line per title, and each card's outcome where its state pill was, so the padlock's footnote goes.
+   Touch scrolls it and text can be selected.
+
+   Here, before the trace, so the trace's sheet below stays the trace's alone. The slider's `.insp__canvas` rules
+   further down are untouched, and every rule here outranks them. */
+/* The gutter held on both edges, so the cards stay centred whether or not the chain overflows. */
+.bb.insp__canvas.is-framed {
+  border: 0;
+  border-radius: 0;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+  scroll-padding: var(--space-5);
+}
+/* Its wheel stays in it only while it has more to show (scroll-contain.ts): with nothing to scroll, the page scrolls. */
+.bb.insp__canvas.is-framed[data-scrolls] { overscroll-behavior: contain; }
+.insp__canvas.is-framed .bb__stage { touch-action: pan-y; user-select: text; }
+.insp__canvas.is-framed .bb__world { padding: var(--space-5); }
+.insp__canvas.is-framed .bb__start,
+.insp__canvas.is-framed .bb__start + .bb__link,
+.insp__canvas.is-framed .bb__start + div > .bb__link:first-child { display: none; }
+/* The connector keeps the table's rhythm: a row less a small button — 16px in the rebrand, 10 in the console's denser
+   look — so a chain of seven folded cards fits the panel at rest in either (the panel is drawn from the same row). */
+.insp__canvas.is-framed .bb__link { height: calc(var(--table-row-h) - var(--ctl-height-sm) - var(--space-1)); }
+/* Read only: a connector is not an insert point here, so the pointer over it does not take the brand. */
+.insp__canvas.is-framed .bb__link:not(.is-dead):hover::before { background: var(--bb-link); }
+.insp__canvas.is-framed .bb__card { cursor: pointer; }
+/* One line folded; the card opened to be read says its whole name. */
+.insp__canvas.is-framed .bb__titlebtn strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.insp__canvas.is-framed .bb__card.is-open .bb__titlebtn strong { white-space: normal; overflow-wrap: anywhere; }
+/* The number alone (RuleCard `foldOnPress`): nothing to grab, and a swipe that starts on it scrolls. */
+.insp__canvas.is-framed .bb__idx.is-still { cursor: inherit; touch-action: auto; }
+.insp__canvas.is-framed .bb__idx.is-still:hover { transform: none; }
+.insp__canvas.is-framed .bb__lockmark { display: none; }
+/* Any skin draws the fold inside the head (Centred's merge), so the trail never floats over a 16px connector. */
+.insp__canvas.is-framed .bb__cardhead { grid-template-columns: auto minmax(0, 1fr) auto; }
+.insp__canvas.is-framed .bb__cardhead > .bb__cardmeta { grid-column: 3; grid-row: 1; }
+.insp__canvas.is-framed .bb__cardhead .bb__acts { position: static; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+/* The card a picked sign-in names wears the picked row's colour — slate in the console look, blue in the rebrand,
+   never the brand — so the two read as one thing. The slider keeps its grey trace. */
+.insp__canvas.is-framed .bb__card.is-traced,
+.insp__canvas.is-framed .bb__card.is-terminal.is-traced { border-color: var(--accent); box-shadow: 0 0 0 var(--bw-thin) var(--accent); }
+.bb__said { display: inline-flex; flex: none; }
 
 /* --- The trace: a card read by a sign-in test (RuleCard.tsx `RuleTraceCard`) ---
 
@@ -3655,3 +3781,106 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .insp__canvas .bb__stage { width: auto; position: relative; inset: auto; height: auto; overflow: visible; cursor: default; }
 .insp__canvas .bb__world { position: static; transform: none !important; padding: var(--space-6); }
 .insp__canvas .bb__dock { display: none; }
+/* An application that already has another policy: said in its row, and not tickable. */
+.bb__apps__item.is-taken { cursor: not-allowed; color: var(--text-tertiary); }
+.bb__apps__item.is-taken b { font-weight: var(--fw-regular, 400); }
+
+/* Copy who from another rule: under the two rows, at the form width. */
+.bb__whocopy { margin-top: var(--space-4); }
+
+/* --- Describe it, building (BoardBuilder \`cooking\`, describe-stage.ts) ----------------------
+   While the panel plays a message out, the stage says so: a pill at its top, and the chain behind eased back and
+   softened, until the steps reach the canvas and the cards arrive. In the stage's own cell, over it. */
+.bb__cooking {
+  grid-column: 2; grid-row: 1; align-self: start; justify-self: center;
+  z-index: 5; margin-top: var(--space-7); pointer-events: none;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-full);
+  background: var(--surface-raised); box-shadow: var(--el-mid);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary);
+}
+.bb__cooking__spin {
+  width: 12px; height: 12px; box-sizing: border-box; border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-subtle); border-top-color: var(--text-secondary);
+  animation: bdst-spin 0.8s linear infinite;
+}
+.bb .bb__world { transition: opacity var(--dur-normal) var(--ease-standard), filter var(--dur-normal) var(--ease-standard); }
+.bb.is-cooking .bb__world { opacity: 0.45; filter: blur(1.5px) saturate(0.6); }
+@media (prefers-reduced-motion: reduce) {
+  .bb__cooking__spin { animation: none; }
+}
+
+/* --- Describe it, always within reach (DescribeMagic.tsx, 19 Oct 2026) ---------------------------------------------
+   A compact door on the canvas, above the view dock (owner: "not a full-sized bar … the left-side panel works best").
+   At rest a plain light pill; under the pointer, with focus, or while a card is selected it lights the edge the owner
+   picked — a thin border running blue through the colours down its left side and fading out to the right, with a
+   soft glow of the same colours inside — here blue, violet, teal and green, never orange or red (Save policy's and
+   Deny's). The edge and the glow are layers that fade in; nothing turns or moves. */
+.bb__magicat {
+  grid-column: 2; grid-row: 1; align-self: end; justify-self: center;
+  z-index: 5; margin-bottom: 68px;
+  max-width: calc(100% - var(--space-9));
+}
+.bb__magic {
+  --mg-a: var(--tint-blue-fg);
+  --mg-b: var(--fb-magenta-fg);
+  --mg-c: var(--fb-info-fg);
+  --mg-d: var(--fb-positive-dot);
+  position: relative;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  max-width: 100%; height: 40px; padding: 0 var(--space-5) 0 var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  color: var(--text-primary); font-size: var(--fs-md); font-weight: var(--fw-medium); white-space: nowrap;
+  cursor: pointer;
+  transition: box-shadow var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard);
+}
+.bb__magic::before {
+  content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1.5px;
+  background: conic-gradient(from 200deg at 22% 50%, var(--mg-a), var(--mg-b) 90deg, var(--mg-c) 150deg, var(--mg-d) 200deg, transparent 265deg, transparent 330deg, var(--mg-a));
+  /* A mask reads only alpha: any opaque token draws the ring (no hex here — the trace section's token check reads to the end of the file). */
+  -webkit-mask: linear-gradient(var(--text-primary) 0 0) content-box, linear-gradient(var(--text-primary) 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+.bb__magic::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 0;
+  background:
+    radial-gradient(90% 160% at 0% 0%, color-mix(in srgb, var(--mg-a) 14%, transparent), transparent 60%),
+    radial-gradient(80% 170% at 4% 100%, color-mix(in srgb, var(--mg-d) 12%, transparent), transparent 60%),
+    radial-gradient(60% 140% at 0% 55%, color-mix(in srgb, var(--mg-b) 10%, transparent), transparent 65%);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+.bb__magic > * { position: relative; z-index: 1; }
+.bb__magic:hover,
+.bb__magic:focus-visible,
+.bb__magic.has-context {
+  border-color: transparent;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--mg-a) 14%, transparent), 0 2px 10px color-mix(in srgb, var(--mg-b) 10%, transparent);
+}
+.bb__magic:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo), 0 10px 26px color-mix(in srgb, var(--mg-a) 14%, transparent); }
+.bb__magic:hover::before, .bb__magic:hover::after,
+.bb__magic:focus-visible::before, .bb__magic:focus-visible::after,
+.bb__magic.has-context::before, .bb__magic.has-context::after { opacity: 1; }
+.bb__magic__mark { flex: none; color: var(--text-tertiary); transition: color var(--dur-normal) var(--ease-standard); }
+.bb__magic:hover .bb__magic__mark,
+.bb__magic:focus-visible .bb__magic__mark,
+.bb__magic.has-context .bb__magic__mark { color: var(--mg-a); }
+/* The selected card it opens on: a quiet chip after the word. */
+.bb__magic__ctx {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0;
+  height: 24px; padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--tint-blue-bg); color: var(--tint-blue-fg);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium);
+}
+.bb__magic__ctxname { min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .bb__magic, .bb__magic::before, .bb__magic::after, .bb__magic__mark { transition: none; }
+}

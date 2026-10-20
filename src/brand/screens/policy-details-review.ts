@@ -1,4 +1,4 @@
-import type { Policy, PolicyStatus } from '../data'
+import type { Audience, Policy, PolicyStatus } from '../data'
 import type { ReviewLine } from '../review-rows'
 
 /* What a Policy details edit changes, in the words the save bar and the Review
@@ -11,6 +11,17 @@ import type { ReviewLine } from '../review-rows'
 export interface DetailsDraft {
   name: string
   appIds: string[]
+  /* Who the policy governs, where the form edits it: the board's start node
+     pane (owner, 13 Oct 2026: the policy's groups are seen and changed at the
+     start node). Absent: the audience is not this form's, and never changes. */
+  audience?: Audience
+}
+
+/** The same audience: everyone, or the same groups and the same people, in any order. */
+export function sameAudience(a: Audience, b: Audience): boolean {
+  if (a.everyone || b.everyone) return a.everyone === b.everyone
+  const same = (x: readonly string[], y: readonly string[]) => x.length === y.length && x.every((id) => y.includes(id))
+  return same(a.groupIds, b.groupIds) && same(a.userIds, b.userIds)
 }
 
 /* A Review changes row. The name leads the review on its own (no group, so
@@ -47,7 +58,13 @@ const STATUS_WORD: Record<PolicyStatus, string> = {
 const ASSIGNED = 'Assigned'
 
 /** The system policy covers every application, so its applications are never edited here. */
-export function detailsChanges(saved: Policy, draft: DetailsDraft, appName: (id: string) => string): DetailsChanges {
+export function detailsChanges(
+  saved: Policy,
+  draft: DetailsDraft,
+  appName: (id: string) => string,
+  /** Says an audience in words ("Everyone", "Finance and Sales"); needed only when the draft carries one. */
+  whoSaid: (a: Audience) => string = (a) => (a.everyone ? 'Everyone' : 'Chosen groups and people'),
+): DetailsChanges {
   const changes: string[] = []
   const rows: DetailsRow[] = []
 
@@ -55,6 +72,14 @@ export function detailsChanges(saved: Policy, draft: DetailsDraft, appName: (id:
   if (name !== saved.name) {
     changes.push('Name')
     rows.push({ label: 'Name', before: saved.name, after: name, kind: 'changed' })
+  }
+
+  /* One row, before and after in words: who a policy governs is read as a
+     whole ("Finance and Sales"), not as a list of ticks. The system policy
+     governs everyone, always. */
+  if (draft.audience && !saved.isSystem && !sameAudience(saved.audience, draft.audience)) {
+    changes.push('Who')
+    rows.push({ label: 'Who', before: whoSaid(saved.audience), after: whoSaid(draft.audience), kind: 'changed' })
   }
 
   const appIds = saved.isSystem ? saved.appIds : draft.appIds

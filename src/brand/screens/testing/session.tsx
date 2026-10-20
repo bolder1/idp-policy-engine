@@ -40,6 +40,7 @@ export function TestingSessionProvider({ children }: { children: ReactNode }) {
       },
       loadBoard: (policyId, form) => dispatch({ type: 'load-board', policyId, form }),
       load: (form) => dispatch({ type: 'load', form }),
+      prefill: (form) => dispatch({ type: 'prefill', form }),
       replay: () => dispatch({ type: 'replay' }),
       setView: (view) => dispatch({ type: 'view', view }),
       openBreakIn: (policyId) => dispatch({ type: 'open-break-in', policyId }),

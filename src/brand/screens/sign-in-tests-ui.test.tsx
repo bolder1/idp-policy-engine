@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import policiesSrc from './Policies.tsx?raw'
-import { MULTI_IDENTITY } from './sign-in-tests/phase'
+import { MULTI_IDENTITY, OPEN_AT_ONCE } from './sign-in-tests/phase'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -136,6 +136,7 @@ function canvas(p: TryPage, form: SignInForm, runId: number) {
     patchBoard: noop,
     loadBoard: noop,
     load: noop,
+    prefill: noop,
     replay: noop,
     setView: noop,
     openBreakIn: noop,
@@ -226,6 +227,34 @@ describe('Sign-in tests — the help desk’s blocked sign-ins (DENIAL-REASONS s
     /* A panel in the form's slot, like Saved sign-ins — not a slider over the page. */
     expect(pageSrc).toContain('<BlockedPanel key="blocked"')
     expect(pageSrc).not.toContain('<BlockedDrawer')
+  })
+
+  /* OPEN AT ONCE (phase.ts, owner, 20 Oct 2026: "when I'm in a blocked sign-in … it should open immediately — no need to
+     showcase the free-field form; it can start directly"): a blocked sign-in runs; it no longer fills the form and waits.
+     Only Run runs (2 Oct) is overridden for these opens alone, so `fillBlocked` — the flag off — still waits for Run. */
+  it('a blocked sign-in runs at once: Recently blocked on the whole canvas, the Blocked panel beside its list with the row marked', () => {
+    expect(OPEN_AT_ONCE).toBe(true)
+    expect(pageSrc).toContain('onPickBlocked={DENIAL_REASONS ? (OPEN_AT_ONCE ? playRecent : fillBlocked) : undefined}')
+    expect(pageSrc).toContain('const playRecent = (row: BlockedRow) => playForm(formOf(row.facts, zones))')
+    const played = pageSrc.slice(pageSrc.indexOf('const playBlocked = (row: BlockedRow) => {'), pageSrc.indexOf('/* Let in for a while'))
+    expect(played).toContain("start(f, 'full', { draft: f, touched: [], identities: picksOf(f) })")
+    expect(played).toContain('setPickedBlocked(row.id)')
+    /* No toCanvas: the list stays (`shutBeside` keeps 'blocked'), and the focus stays on the row. */
+    expect(played).not.toContain('toCanvas(')
+    expect(played).not.toContain('openPanel(')
+    expect(pageSrc).toContain('onPick={OPEN_AT_ONCE ? playBlocked : fillBlocked}')
+    expect(pageSrc).toContain('picked={OPEN_AT_ONCE ? pickedBlocked : undefined}')
+    /* The flag off keeps the fill that waits for Run. */
+    const fill = pageSrc.slice(pageSrc.indexOf('const fillBlocked = (row: BlockedRow) => {'), pageSrc.indexOf('const playForm = '))
+    expect(fill).toContain('openPanel(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))')
+    expect(fill).not.toContain('start(')
+    /* The Why or the form opened over the list shuts back to it; a new run lets the old mark go. */
+    expect(pageSrc).toMatch(/if \(OPEN_AT_ONCE && backTo\.current && \(panel === 'why' \|\| panel === 'form'\)\) \{\s+backTo\.current = null\s+setPanel\('blocked'\)/)
+    expect(pageSrc).toMatch(/setPickedBlocked\(null\)\s+setSubmitted\(false\)\s+setSaveOpen\(false\)\s+shutBeside\(\)\s+session\.load\(f\)/)
+    expect(pageSrc).toContain("else if (OPEN_AT_ONCE && was === 'blocked') backTo.current = 'blocked'")
+    /* A page that mounts on a run gives the canvas the focus (TryJourney's focusRun effect) and says the answer once. */
+    expect(pageSrc).toContain("const [focusRun, setFocusRun] = useState(() => (OPEN_AT_ONCE && tryPage.mode === 'journey' ? 1 : 0))")
+    expect(tryPageSrc).toContain('if (OPEN_AT_ONCE && journey && !pending) say(sentence())')
   })
 
   it('are not in the form any more, nor a button on the Policies page (owner, 6 Oct 2026): they open in a panel on Access checks', () => {
@@ -708,7 +737,8 @@ describe('Sign-in tests — the Identity field takes several, and Run runs each'
     expect(openingKind([maya, finance])).toBe('group')
     expect(openingKind([finance, maya])).toBe('user')
     expect([otherKind('user'), otherKind('group')]).toEqual(['group', 'user'])
-    expect(comboSrc).toMatch(/const start = \(typed: string, first = false\) => \{\s+const k = openingKind\(value\)[\s\S]*?setKind\(k\)/)
+    /* `openOn` is a rule's Who's (who-combo.tsx: Groups); Access checks passes none, so its field opens as before. */
+    expect(comboSrc).toMatch(/const start = \(typed: string, first = false\) => \{\s+const k = value\.length === 0 && openOn \? openOn : openingKind\(value\)[\s\S]*?setKind\(k\)/)
     /* Each list holds its own kind and nothing else, and no Users or Groups heading is drawn: the switch says it. */
     const userList = identityRows(identitiesOfKind(listed, 'user'), [], false)
     const groupList = identityRows(identitiesOfKind(listed, 'group'), [], false)
@@ -737,7 +767,8 @@ describe('Sign-in tests — the Identity field takes several, and Run runs each'
     /* Clear all empties the field: both kinds. */
     expect(comboSrc).toMatch(/if \(o\.value === NO_ONE\) \{\s+onChange\(\[\]\)/)
     /* The cap counts every pick, so past five the rows not picked are off in either list. */
-    expect(comboSrc).toContain('const full = value.length >= MAX_IDENTITIES')
+    expect(comboSrc).toContain('const full = value.length >= max')
+    expect(comboSrc).toContain('max = MAX_IDENTITIES,')
   })
 
   it('a search reads the shown kind; matching nothing there but something in the other, one button — "Search groups" or "Search users" — that flips the switch and keeps the words', () => {
@@ -805,10 +836,12 @@ describe('Sign-in tests — the Identity field takes several, and Run runs each'
 
   it('five at most: past five the rows not picked are off, "Up to 5" on hover, and a press on one picks nothing', () => {
     expect(MAX_IDENTITIES).toBe(5)
-    expect(comboSrc).toContain('const FULL = `Up to ${MAX_IDENTITIES}`')
+    /* Five is Access checks' cap, the default; a rule's Who passes its own (who-combo.tsx, no cap). */
+    expect(comboSrc).toContain('const fullTitle = (max: number) => `Up to ${max}`')
+    expect(comboSrc).toContain('max = MAX_IDENTITIES,')
     expect(comboSrc).toContain('const off = !clear && !on && full')
     expect(comboSrc).toContain('aria-disabled={off || undefined}')
-    expect(comboSrc).toContain('title={off ? FULL : undefined}')
+    expect(comboSrc).toContain('title={off ? fullTitle(max) : undefined}')
     expect(comboSrc).toContain('if (!on && full) return')
   })
 
@@ -1115,7 +1148,18 @@ describe('Sign-in tests — the run on the canvas (§14.3)', () => {
   it('a revisit shows the run where it was, and the panel holds its sign-in', () => {
     expect(initialTryPage(1, TODAY, '09:30', arun)).toMatchObject({ mode: 'form', draft: { personId: null, appId: null } })
     expect(initialTryPage(4, TODAY, '09:30', arun)).toMatchObject({ mode: 'journey', played: 4, draft: arun })
-    expect(pageSrc).toContain('initialTryPage(session.runId, todayIn(), nowIn(), session.form)')
+    expect(pageSrc).toContain('initialTryPage(session.runId, todayIn(), nowIn(), session.form, session.prefilled)')
+  })
+
+  /* An application's Check access fills the form in and plays nothing (APP-POLICY-TAB.md §5; only Run runs): the
+     form, holding it, whether or not a run was played before; nothing waits to play. */
+  it('a sign-in filled in from elsewhere opens the form holding it, with nothing to play, even after a run', () => {
+    const filled = { ...arun, appId: 'box' }
+    for (const runId of [1, 4]) {
+      const p = initialTryPage(runId, TODAY, '09:30', arun, filled)
+      expect(p).toMatchObject({ mode: 'form', played: runId, draft: filled, identities: ['arun'] })
+    }
+    expect(initialTryPage(4, TODAY, '09:30', arun, null)).toMatchObject({ mode: 'journey', draft: arun })
   })
 
   /* A People row's Try runs the People tab's own sentence, so the run never
@@ -1301,7 +1345,7 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
     expect(text(between(proxy.body, '<p class="sit-att__story">', '</p>'))).toBe('A finance user appears from a commercial proxy on a device whose fingerprint has changed.')
     expect(text(between(proxy.body, '<p class="sit-att__result"', '<span class="u-sr-only">'))).toBe('Should be Deny · Got Allow with 2FA')
     expect(proxy.body).toContain('<span class="u-sr-only">Expected Deny, got Allow with 2FA</span>')
-    expect(proxy.body).toMatch(/<button type="button" class="sit-att__by" title="Open AWS billing for Finance"><span>Decided by AWS billing for Finance · Rule 1<\/span><svg[^>]*lucide-arrow-up-right/)
+    expect(proxy.body).toMatch(/<button type="button" class="sit-att__by" title="Open AWS access"><span>Decided by AWS access · Rule 4<\/span><svg[^>]*lucide-arrow-up-right/)
     /* A sign-in nobody can tell: Can't tell, the policy named without a rule. */
     const tor = rows.find((r) => r.name === 'Executive account from a Tor exit')!
     expect(text(between(tor.body, '<p class="sit-att__result"', '<span class="u-sr-only">'))).toBe("Should be Deny · Can't tell")
@@ -1331,7 +1375,7 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
   it('a hole’s fix, before anything is done: what the rule becomes, what it moves, across the tenant only when something there does, and Fix in policy — a plain secondary; the panel has no orange', () => {
     const proxy = rowsOf(aws).find((r) => r.name === 'Finance account behind a known proxy')!
     const fix = block(proxy.body, 'div', 'sit-att__fix')
-    expect(text(between(fix, '<p class="sit-att__fixline">', '</p>'))).toBe('Add this rule Deny sign-ins from outside India — If not in zone India → Deny · at position 1')
+    expect(text(between(fix, '<p class="sit-att__fixline">', '</p>'))).toBe('Add this rule Deny sign-ins from outside India — If not in zone India → Deny · at position 4')
     expect(fix).toContain('<p class="sit-att__moved">Got through now 2</p>')
     expect(text(between(fix, '<p class="sit-att__tenant">', '</p>'))).toMatch(/^Of [\d,]+ modelled sign-ins: Now denied \d+$/)
     const btn = fix.match(/<button[^>]*class="bx-btn[^"]*"[^>]*>[\s\S]*?<\/button>/)![0]
@@ -1374,6 +1418,10 @@ describe('Sign-in tests — break-in attempts, the panel', () => {
     expect(pageSrc).toMatch(/go\(row\.ruleRef \? \{ name: 'board', policyId: row\.policyId, open: 'try', rule: row\.ruleRef \} : \{ name: 'board', policyId: row\.policyId, open: 'try' \}\)/)
     expect(pageSrc).toContain("go({ name: 'board', policyId: offer.policy.id, fix: { card: row.id, app: attempts.result.appId } })")
     expect(pageSrc).toContain('session.loadBoard(policyId, formOf(attemptFacts(row.round.challenge, attempts.result.appId), zones))')
+  })
+
+  it('Edit in builder (the details panel) opens the policy builder itself, not its Check access (20 Oct 2026)', () => {
+    expect(pageSrc).toContain("go(t.kind === 'rule' && t.ruleId ? { name: 'board', policyId: t.policyId, rule: t.ruleId } : { name: 'board', policyId: t.policyId })")
   })
 
   it('Accept this result: offered on a row that has a result to agree with, the page records it with who and why, and Restore undoes it', () => {

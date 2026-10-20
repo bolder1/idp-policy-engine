@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../fixtures'
 import { envOf, resolveSignIn } from '../tenant-resolver'
-import { NO_FILTER, activityCsv, activitySummaryOf, changesCsv, csvField, filterActivity, reasonCounts, reasonsIn, signInActivity } from './activity'
+import { NO_FILTER, activityCsv, activitySummaryOf, appReport, changesCsv, csvField, filterActivity, reasonCounts, reasonsIn, signInActivity } from './activity'
 
 const TODAY = new Date('2026-09-28T09:30:00Z')
+
+/** The weekday a row's "Mon 09:30" leads with, read off its date. */
+const whenDay = (date: string) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(`${date}T00:00:00Z`).getUTCDay()]
 
 describe('signInActivity', () => {
   const t = showcaseTenant()
@@ -31,6 +34,49 @@ describe('signInActivity', () => {
 
   it('has unique ids', () => {
     expect(new Set(rows.map((r) => r.id)).size).toBe(rows.length)
+  })
+
+  /* Spec APP-POLICY-TAB.md §7.1: drawn from the whole directory, every one of
+     Box's sample sign-ins fell to the Global Default and its own policy
+     decided none. Drawn from Box's policy's people, both decide some. */
+  it('draws an application’s sample from its own policy’s people', () => {
+    const box = rows.filter((r) => r.appId === 'box')
+    expect(box.length).toBeGreaterThan(0)
+    expect(box.some((r) => r.policyId === 'sc-box-engineering')).toBe(true)
+    expect(box.some((r) => r.policyId === 'global-default')).toBe(true)
+    /* Both readers draw the one report, row for row. */
+    const report = appReport(t.apps.find((a) => a.id === 'box')!, t.policies, env, TODAY)
+    expect(box.map((r) => r.id)).toEqual(report.rows.map((r) => `box:${r.id}`))
+    expect(box.map((r) => r.weight)).toEqual(report.rows.map((r) => r.weight))
+    /* An application with no policy of its own is everybody's: the Global Default decides it all. */
+    expect(rows.filter((r) => r.appId === 'workday' && r.policyId !== null).every((r) => r.policyId === 'global-default')).toBe(true)
+  })
+
+  it('says which policy and rule decided each row, what it weighs, and on which day', () => {
+    for (const r of rows) {
+      const res = resolveSignIn(t.policies, r.facts, env)
+      expect(r.policyId, r.id).toBe(res.decidedBy?.policyId ?? null)
+      expect(r.weight, r.id).toBeGreaterThan(0)
+      expect(r.date, r.id).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(r.when.startsWith(whenDay(r.date)), r.id).toBe(true)
+      if (r.result === 'unclear') {
+        expect(r.ruleKey, r.id).toBeNull()
+        continue
+      }
+      const hit = res.trace?.hitIndex ?? null
+      const policy = t.policies.find((p) => p.id === r.policyId)!
+      expect(r.ruleKey, r.id).toBe(hit === null ? 'fallback' : policy.rules[hit].id)
+      expect(r.ruleLine, r.id).toBe(hit === null ? 'Nothing else matched' : `Rule ${hit + 1} · ${policy.rules[hit].name}`)
+    }
+  })
+
+  /* Spec APP-CREATE-AND-ACCESS.md §5: an application added this session has no sign-ins yet. */
+  it('leaves out an application added this session, and nothing else', () => {
+    expect(rows.some((r) => r.appId === 'github')).toBe(true)
+    const added = t.apps.map((a) => (a.id === 'github' ? { ...a, addedAt: Date.UTC(2026, 9, 13) } : a))
+    const without = signInActivity(t.policies, env, TODAY, added)
+    expect(without.some((r) => r.appId === 'github')).toBe(false)
+    expect(without).toEqual(rows.filter((r) => r.appId !== 'github'))
   })
 
   it('filters by result, reason, application and text, all together', () => {

@@ -68,7 +68,7 @@ const MIN_POP = 260
 /** The chips' lines: past two, the rest fold into "+N". */
 const CHIP_LINES = 2
 /** A row past the limit, on hover. */
-const FULL = `Up to ${MAX_IDENTITIES}`
+const fullTitle = (max: number) => `Up to ${max}`
 /** The switch over the list, Users first. */
 const KINDS: { value: IdentityKind; label: string }[] = [
   { value: 'user', label: USERS_HEADING },
@@ -99,6 +99,9 @@ export function IdentityCombo({
   domId,
   invalid,
   onChange,
+  max = MAX_IDENTITIES,
+  answer,
+  openOn,
 }: {
   /** "Identity": the field's name. */
   label: string
@@ -111,6 +114,14 @@ export function IdentityCombo({
   domId: string
   invalid: boolean
   onChange: (next: readonly IdentityValue[]) => void
+  /* The optional three below are a rule's Who (who-combo.tsx, Guided setup): Access checks passes none of them, so its
+     field is drawn exactly as before. */
+  /** At most this many picks — Access checks' five; a rule's Who has no cap. */
+  max?: number
+  /** Nothing picked is itself an answer — "Everyone" — drawn in the answer's colour with its kind's mark, not as a prompt. */
+  answer?: { text: string; kind: IdentityKind }
+  /** With nothing picked, the list opens on this kind: Groups, for a rule's Who. */
+  openOn?: IdentityKind
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -139,7 +150,7 @@ export function IdentityCombo({
   const mine = identitiesOfKind(options, kind)
   const rows: readonly IdentityOption[] = needle ? rankedIdentities(mine, needle) : identityRows(mine, pinned, value.length > 0)
   const at = cursor === null ? -1 : rows.findIndex((o) => o.value === cursor)
-  const full = value.length >= MAX_IDENTITIES
+  const full = value.length >= max
   const other = otherKind(kind)
   /* Nothing of this kind matches, but the other kind has something: the list offers that kind, the words kept. */
   const elsewhere = needle !== '' && rows.length === 0 && rankedIdentities(identitiesOfKind(options, other), needle).length > 0
@@ -163,7 +174,7 @@ export function IdentityCombo({
   }
   /* The list opens on the last pick's kind — Users, nothing picked. */
   const start = (typed: string, first = false) => {
-    const k = openingKind(value)
+    const k = value.length === 0 && openOn ? openOn : openingKind(value)
     setHeight(field.current?.offsetHeight ?? null)
     setPinned(value)
     setKind(k)
@@ -418,7 +429,7 @@ export function IdentityCombo({
   }
 
   const listId = `${id}-list`
-  const state = `${value.length > 0 ? 'is-set' : 'is-empty'}${invalid ? ' is-invalid' : ''}`
+  const state = `${value.length > 0 ? 'is-set' : 'is-empty'}${invalid ? ' is-invalid' : ''}${answer && value.length === 0 ? ' is-answer' : ''}`
   const search = `Search ${NOUN[kind]}`
   /* A chip's body opens the list, as the field does; its × takes the pick
      off. A press on either takes no focus from where it is: the search,
@@ -525,7 +536,7 @@ export function IdentityCombo({
               className="sit-ident__open"
               aria-haspopup="listbox"
               aria-expanded="false"
-              aria-label={`${label}: ${chips.length > 0 ? chips.map((c) => c.name).join(', ') : choose}`}
+              aria-label={`${label}: ${chips.length > 0 ? chips.map((c) => c.name).join(', ') : (answer?.text ?? choose)}`}
               aria-invalid={invalid || undefined}
               onClick={() => start('')}
               onKeyDown={onRestKey}
@@ -537,9 +548,9 @@ export function IdentityCombo({
                 chipRow
               ) : (
                 <>
-                  <Mark kind="user" name={null} />
+                  <Mark kind={answer?.kind ?? 'user'} name={null} />
                   <span className="sit-ident__name" aria-hidden>
-                    {choose}
+                    {answer?.text ?? choose}
                   </span>
                 </>
               )}
@@ -619,7 +630,7 @@ export function IdentityCombo({
                       role="option"
                       aria-selected={on}
                       aria-disabled={off || undefined}
-                      title={off ? FULL : undefined}
+                      title={off ? fullTitle(max) : undefined}
                       className={`bx-picker__opt${on ? ' is-on' : ''}${off ? ' is-off' : ''}${i === at ? ' is-cursor' : ''}${clear ? ' sit-ident__clear' : ''}`}
                       /* Move, not enter: a list that shrinks under a still pointer as a search is typed keeps its cursor on the best match. */
                       onMouseMove={() => setCursor(o.value)}

@@ -2,6 +2,7 @@ import { AppLogo } from '../logos/AppLogo'
 import { appsLabel } from '../data'
 import { Picker } from '../picker'
 import { useBrand } from '../store'
+import { ownerOf } from './app-policies'
 
 /* -----------------------------------------------------------------------------
    What a policy protects, as one control.
@@ -34,7 +35,9 @@ import { useBrand } from '../store'
    The trigger states the answer the way every other surface does — one name, or
    the first name and a count — instead of the built-in "3 selected", which is a
    number you have to open the control to interpret. */
-export function ApplicationField({ appIds, onChange }: { appIds: string[]; onChange: (ids: string[]) => void }) {
+/* One application, one policy (owner, 14 Oct 2026): an application on another policy is listed with that policy's name and
+   cannot be chosen. `policyId` is the policy being edited, which is not another one. */
+export function ApplicationField({ appIds, onChange, policyId }: { appIds: string[]; onChange: (ids: string[]) => void; policyId?: string }) {
   const store = useBrand()
   const named = store.apps.filter((a) => appIds.includes(a.id))
   return (
@@ -71,12 +74,16 @@ export function ApplicationField({ appIds, onChange }: { appIds: string[]; onCha
          used to finding Salesforce by its cloud. `AppLogo` keeps its own
          fallback, so a logo host that moves a file gives a monogram on the
          app's tint rather than a broken image. */
-      options={store.apps.map((a) => ({
+      options={store.apps.map((a) => {
+        const holder = appIds.includes(a.id) ? undefined : ownerOf(a.id, store.policies, policyId)
+        return {
         value: a.id,
         label: a.name,
-        meta: a.protocol,
+        meta: holder ? `On ${holder.name}` : a.protocol,
+        disabled: holder !== undefined,
         art: <AppLogo appId={a.id} name={a.name} size={18} />,
-      }))}
+        }
+      })}
       /* `Picker` in multiple mode reports the row that was pressed, not the new
          set, so the toggle is the caller's. Order follows the catalogue rather
          than the clicks — `appsOf` reads it back that way, and two orders for

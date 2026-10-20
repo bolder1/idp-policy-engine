@@ -52,9 +52,12 @@ import type { RunLayoutProps } from './types'
    Something that can't be told is not offered a way in: the why can only say
    what was not stated, so it is "Why".
 
-   ONLY ON THE PAGE. Absent the page's `why` — ClassicV2Layout's static
-   renders, the builder's Check access, which draws the column and never Focus
-   — there is no link and no why, and nothing here works out a what-if.
+   ONLY WHERE A PANEL HANDS IT. Absent a `why` — ClassicV2Layout's static
+   renders — there is no link and no why, and nothing here works out a
+   what-if. The builder's Check access does hand one (board/PolicyCheck.tsx,
+   its own WhyPanel) and draws Focus (IN_POLICY_LAYOUT), so the link is there
+   too, its Fix made in place (conflict-fix.ts `FixHere`) — corrected 20 Oct
+   2026, when this said "never Focus" and the builder showed the link.
    -------------------------------------------------------------------------- */
 
 /** The link's words (see WHAT THE LINK SAYS). */

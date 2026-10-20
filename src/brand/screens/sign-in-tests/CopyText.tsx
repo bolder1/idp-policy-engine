@@ -2,6 +2,7 @@ import { Check, Copy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { playCue } from '../../sound'
+import { copyToClipboard } from './clipboard'
 
 /* Copy plain text to the clipboard, "Copied" for a moment, and the smallest
    tick (sound.ts). The Why's Copy summary (why-summary.ts) and the activity
@@ -19,25 +20,7 @@ export function CopyText({ text, label = 'Copy summary', className = 'bb__act tj
     playCue('copy')
   }
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      copied()
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.setAttribute('readonly', '')
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      try {
-        document.execCommand('copy')
-        copied()
-      } catch {
-        /* Nothing more to try. */
-      }
-      ta.remove()
-    }
+    if (await copyToClipboard(text)) copied()
   }
   return (
     <button type="button" className={className} title={label} aria-label={label} onClick={() => void copy()}>

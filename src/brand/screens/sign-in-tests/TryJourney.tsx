@@ -26,6 +26,7 @@ import { heroFinding, type FoldAsk, type FoldMode } from './journey'
 import type { RunIdentity, RunLayoutProps } from './layouts/types'
 import { OWN_EDIT, OWN_TOP, type RunLayoutId } from './run-layout'
 import { SignInNode } from './SignInCard'
+import { OPEN_AT_ONCE } from './phase'
 import { identityOf, personPick, type TryPage } from './sign-in-card'
 import { useEngineRun } from './use-engine-run'
 
@@ -381,6 +382,12 @@ export function TryJourney({
   const pending = page.mode === 'journey' && runId > page.played && !live.empty
   /* The waiting run's plan is the settled one: it begins with the engine. */
   const pendingPlan = pending ? live : null
+  /* The answer, and the findings' one line when there is one: "… Maya Iyer is in Engineering and Finance — Engineering's rule applies first". */
+  const sentence = () => {
+    const said = liveSentence(res, policies, substitute)
+    const also = heroFinding(live)?.text ?? ''
+    return also ? `${said} ${also}.` : said
+  }
   const [changed, setChanged] = useState<string | null>(null)
   /* Expand all / Collapse all, from the dock; a new run folds as the chain folds it ('auto'). */
   const [fold, setFold] = useState<FoldAsk>({ mode: 'auto', seq: 0 })
@@ -394,12 +401,7 @@ export function TryJourney({
     pace: page.pace,
     reduced,
     say,
-    /* The answer, and the findings' one line when there is one: "… Maya Iyer is in Engineering and Finance — Engineering's rule applies first". */
-    sentence: () => {
-      const said = liveSentence(res, policies, substitute)
-      const also = heroFinding(live)?.text ?? ''
-      return also ? `${said} ${also}.` : said
-    },
+    sentence,
     onStart: (id) => {
       onPage((p) => ({ ...p, played: id, askSaveFor: p.askSaveFor === id ? id : null }))
       setChanged(null)
@@ -413,6 +415,14 @@ export function TryJourney({
   const root = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const journey = !(page.mode === 'form' || live.empty)
+
+  /* A page that mounts on a run it does not play — Sign-in activity's or the app tab's Open in Check access, a revisit —
+     says its answer once, the same sentence a played run says (phase.ts OPEN_AT_ONCE, 20 Oct 2026); it was silent. A run
+     that plays says its own as it lands (`useEngineRun`). Once, on mount. */
+  useEffect(() => {
+    if (OPEN_AT_ONCE && journey && !pending) say(sentence())
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the page mounts
+  }, [])
 
   /* Landed: what an edited re-run changed, once, and Save when New sign-in
      asked for it — for this run. */
@@ -864,6 +874,7 @@ export function TryJourney({
               rows={rows}
               asGroup={asGroupName}
               policies={cardPolicies}
+              inPolicy={focus}
               start={startNode}
               answer={answerNode}
               screens={screens}

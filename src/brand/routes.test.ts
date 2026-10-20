@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import storeSrc from './store.tsx?raw'
 import appSrc from './BrandApp.tsx?raw'
 import shellSrc from './Shell.tsx?raw'
+import applicationsSrc from './screens/Applications.tsx?raw'
 
 /* Every route in the union has somewhere to go.
 
@@ -51,6 +52,40 @@ describe('the route union', () => {
 
   it('reaches the Applications screen from the rail', () => {
     expect(shellSrc).toContain("screen: { name: 'applications' }")
+  })
+
+  /* Add application (spec APP-CREATE-AND-ACCESS.md §3, §5): the Applications
+     list's button opens Choose application, a pick opens that entry's unsaved
+     application, and the rail stays on Apps throughout. It was a "coming soon"
+     toast until 13 Oct 2026. */
+  it('opens Add application on the catalogue, then on the entry picked', () => {
+    expect(ROUTES).toContain('application-new')
+    expect(appSrc).toContain('screen.catalogId ? <NewApplicationPage key={screen.catalogId} catalogId={screen.catalogId} /> : <AppCatalog />')
+    expect(applicationsSrc).toContain("store.go({ name: 'application-new' })")
+    expect(applicationsSrc).not.toContain('Adding applications is')
+    expect(shellSrc).toContain("applications: ['application', 'application-new']")
+  })
+
+  /* An application's Policies tab (spec APP-POLICY-TAB.md): "View all" opens
+     Sign-in activity on that application, or on the policy's changes with its
+     name searched; "{n} people" opens the Users tab filtered by the policy. */
+  it('lets Sign-in activity open narrowed, and the Users tab filter by policy', () => {
+    expect(storeSrc).toContain("| { name: 'sign-in-activity'; appId?: string; view?: 'sign-ins' | 'changes'; q?: string; from?: { appId: string } }")
+    const application = /\|\s*\{\s*name: 'application'\s([\s\S]*?)\n\s*\}/.exec(storeSrc)?.[1] ?? ''
+    expect(application).toContain('appId: string')
+    expect(application).toContain('group?: string')
+    expect(application).toContain('policy?: string')
+  })
+
+  it('hands the application page the drawer its route asks to open, and the Users tab its policy filter', () => {
+    expect(appSrc).toContain('const { appId, tab, group, policy, flash, from, open } = screen')
+    expect(appSrc).toContain('group={group} policy={policy}')
+    expect(appSrc).toContain('from={from} open={open} />')
+  })
+
+  it('hands Sign-in activity the way it was opened: the application, the view, the search and the way back', () => {
+    expect(appSrc).toContain('const { appId, view, q, from } = screen')
+    expect(appSrc).toContain('appId={appId} view={view} q={q} from={from} />')
   })
 
   /* Display tokens is opened from Authentication methods, and the rail has to

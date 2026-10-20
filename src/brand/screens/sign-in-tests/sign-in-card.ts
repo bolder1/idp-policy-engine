@@ -92,20 +92,24 @@ export function emptyDraft(today: string, time: string): SignInForm {
 }
 
 /* A run already played in this session: the page was left and come back to,
-   and shows where it was — the run settled, and the panel holding its sign-in. */
-export function initialTryPage(runId: number, today: string, time: string, form?: SignInForm): TryPage {
-  const back = runId > 1
+   and shows where it was — the run settled, and the panel holding its sign-in.
+   A sign-in filled in from elsewhere (`prefilled`, the testing session's
+   `prefill`: an application's Check access) opens the form holding it instead,
+   with nothing played, whatever ran before — only Run runs (2 Oct 2026). */
+export function initialTryPage(runId: number, today: string, time: string, form?: SignInForm, prefilled?: SignInForm | null): TryPage {
+  const back = runId > 1 && !prefilled
+  const draft = prefilled ?? (back && form ? form : emptyDraft(today, time))
   return {
     mode: back ? 'journey' : 'form',
     played: runId,
     intro: 'none',
     pace: 'full',
     replay: false,
-    draft: back && form ? form : emptyDraft(today, time),
+    draft,
     touched: [],
     prev: null,
     askSaveFor: null,
-    identities: back && form ? picksOf(form) : [],
+    identities: prefilled || (back && form) ? picksOf(draft) : [],
   }
 }
 

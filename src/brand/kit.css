@@ -241,6 +241,12 @@ html[data-theme='dark'] {
 .bx-btn.bx-menu__trigger--icon { width: var(--ctl-height-sm); padding: 0; }
 .bx-btn.bx-menu__trigger--icon.bx-btn--md { width: var(--ctl-height-md); }
 
+/* A trigger drawn as the thing the menu is about — a status pill — then its
+   chevron: no text of its own, and the pill keeps its own colours. */
+/* Through `.bx-menu >`, so a look's own small-button sides (rebrand.css `.bx-btn--sm`) do not box the pill. */
+.bx-menu > .bx-btn.bx-menu__trigger--face { gap: var(--space-2); padding: 0 var(--space-2); }
+.bx-menu__face { display: inline-flex; }
+
 .bx-menu { position: relative; display: inline-flex; }
 .bx-menu__trigger.is-open { background: var(--int-neutral-bg-active); }
 .bx-menu__pop {
@@ -385,6 +391,10 @@ html[data-theme='dark'] {
    faces overlap, groups sit side by side, a hair apart. */
 .bx-faces > .bx-tip:has(.bx-face.is-group) + .bx-tip,
 .bx-faces > .bx-tip + .bx-tip:has(.bx-face.is-group) { margin-left: var(--space-1); }
+/* The same stack drawn for the eye beside the names (`FaceStack tips={false}`): its faces with no tip around each. */
+.bx-faces > .bx-face + .bx-face { margin-left: -5px; }
+.bx-faces > .bx-face.is-group + .bx-face,
+.bx-faces > .bx-face + .bx-face.is-group { margin-left: var(--space-1); }
 
 /* --- Search --------------------------------------------------------------- */
 
@@ -853,9 +863,68 @@ html[data-theme='dark'] {
    word in the body onto a line of its own ("stays on / Slack / . Edits…"). */
 .bx-callout > div > strong { display: block; margin-bottom: 2px; }
 .bx-callout--info { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
+.bx-callout--neutral { background: var(--fb-neutral-bg); border-color: var(--fb-neutral-border); color: var(--fb-neutral-fg); }
 .bx-callout--notice { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
 .bx-callout--negative { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bx-callout--positive { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+
+/* --- Note (kit.tsx `Note`) ---------------------------------------------------
+   The What's new card on Authentication methods, made the one note (owner,
+   16 Oct 2026): a white card with a hairline, the info mark, one heading in
+   the info blue, the body in grey. Not a `.bx-callout`, so the rebrand's
+   "a tint, no box" never takes its line away. The head row holds still as
+   Read more opens: the mark keeps to the first line, the action is in the row
+   at its top, never centred on the card. Nothing here transforms or
+   transitions `.bx-note__more`: Motion drives its height and opacity. */
+.bx-note {
+  display: flex; align-items: flex-start; gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: var(--fs-md); line-height: 1.55;
+}
+/* 16px of glyph beside a 1.55-leading line sits on the first line's centre at 3px down. */
+.bx-note__mark { flex: none; margin-top: 3px; color: var(--fb-info-fg); }
+.bx-note__main { flex: 1; min-width: 0; }
+.bx-note__head { display: flex; align-items: flex-start; gap: var(--space-5); }
+.bx-note__text { flex: 1; min-width: 0; }
+/* Three classes: `.bpage h2/h3` and their rebrand twins (0,2,1) set every
+   heading on a page to the section scale, and a note's heading is the body's
+   size in the info blue. */
+.bx-note .bx-note__head .bx-note__title {
+  margin: 0;
+  font-size: inherit; line-height: inherit; letter-spacing: 0;
+  font-weight: var(--fw-semibold); color: var(--fb-info-fg);
+}
+.bx-note__body { color: var(--text-secondary); }
+.bx-note__toggle {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  margin: 0; padding: 0;
+  border: 0; background: none; cursor: pointer;
+  font: inherit; font-weight: var(--fw-medium); color: var(--text-link);
+  vertical-align: baseline;
+}
+.bx-note__toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
+.bx-note__toggle:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--focus-halo); }
+.bx-note__toggle svg { flex: none; }
+.bx-note__action { flex: none; display: flex; }
+.bx-note__more { overflow: hidden; }
+/* A list that opens under the body: points, one a line, in the body's grey. */
+.bx-note__more > ul,
+.bx-note__more > ol {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  margin: var(--space-3) 0 0; padding-left: var(--space-6);
+}
+.bx-note__more li::marker { color: var(--text-muted); }
+.bx-note__more > p { margin: var(--space-3) 0 0; }
+
+/* Narrow: the action goes under the text rather than squeezing it. */
+@media (max-width: 720px) {
+  .bx-note__head { flex-wrap: wrap; }
+  .bx-note__text { flex-basis: 100%; }
+}
 
 /* --- Card ----------------------------------------------------------------- */
 
@@ -1036,8 +1105,10 @@ html[data-theme='dark'] {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
-  /* The page's own side inset, so the words line up with the page's edge. */
-  padding: var(--space-6) 32px;
+  /* The words and buttons start and end with the form above (owner, 15 Oct
+     2026), measured by footer-edge.ts into --footer-l / --footer-r. Until it
+     has measured, the page's own side inset. */
+  padding: var(--space-6) var(--footer-r, 32px) var(--space-6) var(--footer-l, 32px);
   background: var(--surface-raised);
   border-top: var(--bw-thin) solid var(--border-subtle);
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
@@ -1058,7 +1129,7 @@ html[data-theme='dark'] {
 .bx-savebar__text span.is-blocked { color: var(--fb-notice-fg); font-weight: var(--fw-medium); white-space: normal; }
 .bx-savebar > .bx-btn { flex: none; min-width: 148px; }
 @media (max-width: 720px) {
-  .bx-savebar { padding: var(--space-5) 20px; }
+  .bx-savebar { padding: var(--space-5) var(--footer-r, 20px) var(--space-5) var(--footer-l, 20px); }
 }
 /* A page sized to the column (`.bcp--fit`) gives the footer its line rather
    than pushing the column into a scroll the height of the footer. */

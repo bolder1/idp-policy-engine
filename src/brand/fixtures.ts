@@ -12,6 +12,7 @@ import {
   type Group,
   type MethodSet,
   type Policy,
+  type PolicyStatus,
   type Rule,
   type Scenario,
   type User,
@@ -21,6 +22,7 @@ import { seedProfiles, type FingerprintProfile } from './fingerprint'
 import { type HardwareToken } from './hardware-tokens'
 import { seedHooks, type Hook } from './hooks'
 import { AUTH_METHODS, type AuthMethod } from './methods'
+import { isPostSignIn, postSignInRefuses, settledPostSignIn } from './post-sign-in'
 import { type RiskProfile } from './risk-signals'
 import type { SavedSignIn } from './saved-sign-ins'
 import { leaves } from './predicate'
@@ -28,6 +30,7 @@ import {
   showcaseApps,
   showcaseGroups,
   showcasePolicies,
+  showcasePostSignInPolicies,
   showcaseProfiles,
   showcaseSavedSignIns,
   showcaseScenarios,
@@ -176,13 +179,37 @@ function clonePolicy(src: Policy, i: number, dept: string, scale: number): Polic
 
    Applied to every depth, so no fixture can hand the list an Active policy that
    protects nothing. A saved draft on such a policy becomes its rules, the same
-   way `asStored` in policy-draft.ts folds one. */
+   way `asStored` in policy-draft.ts folds one.
+
+   A post sign-in policy is the exception (post-sign-in.ts, owner 13 Oct
+   2026): it is independent of applications, so linked to none it may still
+   be on, waiting on whatever links it. Unfinished for it means a rule or its
+   "Nothing else matched" left without an action (`settledPostSignIn`); made a
+   draft for that, it takes a saved draft as its rules, as a sign-in policy
+   does, since a draft never carries one. */
 export function settled(p: Policy): Policy {
+  if (isPostSignIn(p)) {
+    const s = settledPostSignIn(p)
+    if (s === p || !s.pendingDraft) return s
+    const { pendingDraft, ...rest } = s
+    return { ...rest, rules: pendingDraft.rules, fallback: pendingDraft.fallback }
+  }
   if (p.isSystem || p.appIds.length > 0 || (p.status === 'draft' && !p.pendingDraft)) return p
   const { pendingDraft, ...rest } = p
   return pendingDraft
     ? { ...rest, status: 'draft', rules: pendingDraft.rules, fallback: pendingDraft.fallback }
     : { ...rest, status: 'draft' }
+}
+
+/* The other half of the same rule, for a switch (store.tsx
+   `setPolicyStatus`), here beside `settled` so it can be tested without the
+   store: switching out of draft is refused, and nothing changes, for a
+   sign-in policy with no application and for a post sign-in policy not yet
+   complete. Having no application never stops a post sign-in policy, and
+   Monitoring is never one of its statuses (owner, 13 Oct 2026). */
+export function refusesStatus(p: Policy, status: PolicyStatus): boolean {
+  if (isPostSignIn(p)) return status === 'monitor' || postSignInRefuses(p, status)
+  return p.appIds.length === 0 && status !== 'draft'
 }
 
 /* The small tenant's stand-ins for apps it does not have. Payroll runs on
@@ -232,7 +259,7 @@ function rawPoliciesAt(depth: Depth): Policy[] {
        These three are named from the use-case document's own scenarios rather
        than invented, so a Delegator's tenant is a subset of the estate the rest
        of the console is reasoned about with. */
-    const keep = ['uc3-country-allowlist', 's9-finance', 's5-baseline']
+    const keep = ['uc3-country-allowlist', 's9-finance', 's5-workspace']
     const owned = new Set(appsAt('small').map((a) => a.id))
     const people = new Set(usersAt('small').people.map((u) => u.id))
     const segments = new Set(groupsAt('small').map((g) => g.id))
@@ -549,7 +576,9 @@ export function showcaseTenant(): Tenant {
   const medium = tenantAt('medium')
   return {
     ...medium,
-    policies: showcasePolicies.map(settled),
+    /* The post sign-in policies after the sign-in ones: list order is the
+       sign-in engine's, and they are never in it (post-sign-in.ts). */
+    policies: [...showcasePolicies, ...showcasePostSignInPolicies].map(settled),
     zones: showcaseZones,
     scenarios: showcaseScenarios,
     fingerprints: showcaseProfiles,

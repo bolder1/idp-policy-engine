@@ -51,6 +51,7 @@ function draw(page: TryPage, form: SignInForm, opts: { asGroup?: string | null; 
     patchBoard: noop,
     loadBoard: noop,
     load: noop,
+    prefill: noop,
     replay: noop,
     setView: noop,
     openBreakIn: noop,

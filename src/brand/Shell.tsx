@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, animate, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import {
   Activity,
@@ -228,6 +228,11 @@ const BUILDER_SCREENS = ['builder', 'board']
    All Policies lights, and Sign-in tests does neither the same way. */
 const RAIL_SHUT_SCREENS = [...BUILDER_SCREENS, 'sign-in-tests']
 
+/* Full view (owner, 19 Oct 2026): a canvas — either builder, or Access checks — takes the whole window. The rail and
+   the top bar fold away as it opens and come back on the way out; the screen's own bar holds the way back. Off = the
+   rail shuts to its icons, as before. */
+export const CANVAS_FULL_VIEW = true
+
 /* Screens that light a sub-item without being its screen: a page opened from
    inside another lights the item it was opened from. Both builders and the
    details page are a policy opened from All Policies, and Sign-in tests is
@@ -236,8 +241,8 @@ const RAIL_SHUT_SCREENS = [...BUILDER_SCREENS, 'sign-in-tests']
 const UNDER_ITEM: Record<string, string[]> = {
   policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests', 'sign-in-activity'],
   methods: ['display-tokens'],
-  /* An application's own page is opened from the Apps list. */
-  applications: ['application'],
+  /* An application's own page, and Add application, are opened from the Apps list. */
+  applications: ['application', 'application-new'],
 }
 
 function isActive(current: BrandScreen, item: NavItem): boolean {
@@ -277,12 +282,26 @@ function useNarrow() {
 
 export function Shell({ children }: { children: ReactNode }) {
   const { screen, go, features } = useBrand()
-  const main = useRef<HTMLElement>(null)
   const nav = useRef<HTMLElement>(null)
   const [theme, setTheme] = useTheme()
   const [sound, setSound] = useSoundSetting()
   const [collapsed, setCollapsed] = useState(false)
   const narrow = useNarrow()
+  const full = CANVAS_FULL_VIEW && RAIL_SHUT_SCREENS.includes(screen.name)
+  const reduced = useReducedMotion() ?? false
+  /* The open: the canvas grows out of the page while the chrome folds away. Only on the way in. */
+  const main = useRef<HTMLElement | null>(null)
+  const wasFull = useRef(full)
+  useEffect(() => {
+    const opening = full && !wasFull.current
+    wasFull.current = full
+    if (!opening || reduced || !main.current) return
+    void animate(
+      main.current,
+      { clipPath: ['inset(3% 3% 3% 3% round 12px)', 'inset(0% 0% 0% 0% round 0px)'], opacity: [0.35, 1] },
+      { duration: 0.42, ease: [0.22, 1, 0.36, 1] },
+    )
+  }, [full, reduced])
   /* The overlay drawer's own state, kept apart from `collapsed` on purpose.
      `collapsed` means "the rail is a 64px icon strip" and the builder drives it;
      reusing it for "the drawer is off-canvas" would make leaving a builder slide
@@ -340,6 +359,8 @@ export function Shell({ children }: { children: ReactNode }) {
        builder, so the rail came back as the 64px strip once the window widened
        again. */
     if (narrow) return
+    /* In full view there is no rail to shut: it leaves whole and comes back as the admin left it. */
+    if (CANVAS_FULL_VIEW && RAIL_SHUT_SCREENS.includes(screen.name)) return
     if (RAIL_SHUT_SCREENS.includes(screen.name)) {
       setCollapsed((c) => {
         if (!c) autoCollapsed.current = true
@@ -417,8 +438,8 @@ export function Shell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`bshell ${!narrow && collapsed ? 'is-collapsed' : ''} ${narrow && navOpen ? 'is-navopen' : ''}`}>
-      <header className="bshell__top">
+    <div className={`bshell ${!narrow && collapsed ? 'is-collapsed' : ''} ${narrow && navOpen ? 'is-navopen' : ''}${full ? ' is-full' : ''}`}>
+      <header className="bshell__top" inert={full ? true : undefined}>
         <Tip text={railLabel}>
           <button
             type="button"
@@ -509,7 +530,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <button type="button" className="bshell__scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
       )}
 
-      <aside className="bshell__rail" inert={narrow && !navOpen ? true : undefined}>
+      <aside className="bshell__rail" inert={full || (narrow && !navOpen) ? true : undefined}>
         <nav className="bshell__nav" aria-label="Console" ref={nav}>
           {NAV.map((group, gi) => (
             <div key={group.section ?? gi} className="bshell__group">

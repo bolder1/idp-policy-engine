@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../../fixtures'
+import { withBillingFinance } from './conflict-fixture'
 import { runColumns, type ColumnSpec } from '../../board/try-sign-in'
 import { envOf } from '../../tenant-resolver'
 import { rowsRead } from '../../testing/rows-read'
@@ -26,22 +27,23 @@ const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const AS_IT_STANDS: ColumnSpec = { id: 'live', label: 'As the tenant stands', tip: 'Every policy as saved' }
 
-function runOf(personName: string, appName: string, patch: Partial<SignInForm> = {}): { plan: EngineRun; props: AskProps } {
+function runOf(personName: string, appName: string, patch: Partial<SignInForm> = {}, policies = t.policies): { plan: EngineRun; props: AskProps } {
   const person = t.directory.people.find((p) => p.name === personName)
   const app = t.apps.find((a) => a.name === appName)
   if (!person || !app) throw new Error(`no ${personName} or ${appName} in the showcase`)
-  const rows = rowsRead(t.policies, null, app.id, lib)
+  const rows = rowsRead(policies, null, app.id, lib)
   const base: SignInForm = { ...emptyDraft(TODAY, '09:30'), personId: person.id, appId: app.id }
   const form = { ...forRun(withDefaults(base, rows, [], TODAY, '09:30'), rows), ...patch } as SignInForm
   const { facts } = factsOf(form, t.zones)
-  const res = runColumns([AS_IT_STANDS], t.policies, facts, env)[0].resolution
-  const plan = engineRun({ res, policies: t.policies, form, facts, env, ctx: { people: t.directory.people, apps: t.apps, zones: t.zones, rows }, intro: 'none' })
-  const screens = screensOf(res, { policies: t.policies, methods: t.methods, defaultMethodId: undefined, person })
+  const res = runColumns([AS_IT_STANDS], policies, facts, env)[0].resolution
+  const plan = engineRun({ res, policies, form, facts, env, ctx: { people: t.directory.people, apps: t.apps, zones: t.zones, rows }, intro: 'none' })
+  const screens = screensOf(res, { policies, methods: t.methods, defaultMethodId: undefined, person })
   const noop = () => {}
   return { plan, props: { asGroup: null, screens, form, rows, onAsGroup: noop, onAdd: noop, onOpenRule: noop, onOpenPolicy: noop, onRunWith: noop, onReplay: noop, onPressPerson: noop } }
 }
 
-const C = runOf('Maya Iyer', 'AWS Console')
+/* The showcase has one policy per application; the second, that also covers Maya, is rebuilt (conflict-fixture.ts). */
+const C = runOf('Maya Iyer', 'AWS Console', {}, withBillingFinance(t.policies))
 const DEP = runOf('Maya Iyer', 'AWS Console', { device: { kind: 'none' } } as Partial<SignInForm>)
 
 /** Every id the HUD can light on this plan. */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { App, Policy, PolicyStatus, PolicyType, Rule } from '../data'
 import { showcaseTenant } from '../fixtures'
-import { attachNote, compareUpdated, existingHint, removeCopy, removeToast } from './applications-model'
+import { attachNote, compareUpdated, existingHint, removeCopy, removeToast, replaceOnApp, replaceToast, type PolicyWriter } from './applications-model'
 
 let n = 0
 const rule = (enabled = true): Rule =>
@@ -75,6 +75,54 @@ describe('removeToast', () => {
   })
 })
 
+/* Replace policy (APP-POLICY-TAB.md §5): one write, one toast, one Undo that puts both policies back — the store keeps
+   one toast, so a toast per write left only the removal's, whose Undo put two policies on the application. */
+describe('replaceOnApp', () => {
+  const apps = [{ id: 'gh', name: 'GitHub' }, { id: 'jira', name: 'Jira' }] as App[]
+  const writer = (start: Policy[]) => {
+    const live = new Map(start.map((p) => [p.id, p]))
+    const toasts: { text: string; action?: { label: string; run: () => void } }[] = []
+    const store: PolicyWriter = {
+      policyById: (id) => live.get(id),
+      savePolicy: (p) => void live.set(p.id, p),
+      showToast: (text, action) => void toasts.push({ text, action }),
+    }
+    return { store, live, toasts }
+  }
+
+  it('swaps the policies in one press and says so once, with an Undo that restores both', () => {
+    const old = policy('Old', { appIds: ['gh'] })
+    const next = policy('New', { appIds: ['jira'] })
+    const { store, live, toasts } = writer([old, next])
+    expect(replaceOnApp(store, 'Old', 'New', apps[0], apps)).toBe(true)
+    expect(live.get('New')!.appIds).toEqual(['jira', 'gh'])
+    expect(live.get('Old')).toMatchObject({ appIds: [], status: 'draft' })
+    expect(toasts.map((x) => x.text)).toEqual(['Replaced Old with New on GitHub. Old is now a draft.'])
+    toasts[0].action!.run()
+    expect(live.get('Old')).toBe(old)
+    expect(live.get('New')).toBe(next)
+  })
+
+  it('undoes neither when either has changed since', () => {
+    const { store, live, toasts } = writer([policy('Old', { appIds: ['gh', 'jira'] }), policy('New', { appIds: [] })])
+    replaceOnApp(store, 'Old', 'New', apps[0], apps)
+    expect(toasts[0].text).toBe('Replaced Old with New on GitHub. Old is still on 1 application.')
+    const renamed = { ...live.get('New')!, name: 'Renamed' }
+    store.savePolicy(renamed)
+    toasts[0].action!.run()
+    expect(live.get('New')).toBe(renamed)
+    expect(live.get('Old')!.appIds).toEqual(['jira'])
+    expect(toasts.at(-1)!.text).toBe("Can't undo. New or Old has changed since.")
+  })
+
+  it('writes nothing for a policy that no longer exists', () => {
+    const { store, toasts } = writer([policy('Old')])
+    expect(replaceOnApp(store, 'Old', 'Gone', apps[0], apps)).toBe(false)
+    expect(toasts).toEqual([])
+    expect(replaceToast('A', 'B', 'GitHub', 0, true)).toBe('Replaced A with B on GitHub. A has no applications now.')
+  })
+})
+
 describe('attachNote', () => {
   it('keeps draft, inactive, monitoring and another type apart', () => {
     expect(attachNote(policy('P'), 'GitHub')).toBe('Takes effect on the next sign-in to GitHub.')
@@ -94,18 +142,21 @@ describe('attachNote', () => {
   describe('on the showcase, asked of the engine', () => {
     const t = showcaseTenant()
     const byName = (name: string) => t.policies.find((p) => p.name === name)!
+    /* One app has one policy in the showcase; the second ones are built from the merged policies. */
+    const devops: Policy = { ...byName('AWS access'), id: 'p-aws-prod', name: 'AWS production for DevOps', audience: { everyone: false, groupIds: ['devops'], userIds: [] } }
+    const draft: Policy = { ...byName('Developer tools — office and device checks'), id: 'p-code-review', name: 'Code review for Finance', status: 'draft' }
     const github = t.apps.find((a) => a.id === 'github')!
     const on = { appId: 'github', policies: t.policies, users: t.directory.people, apps: t.apps }
 
     it('says AWS production for DevOps never decides on GitHub: Developer tools decides for DevOps there', () => {
-      expect(attachNote(byName('AWS production for DevOps'), github.name, on)).toBe(
+      expect(attachNote(devops, github.name, { ...on, policies: [...t.policies, devops] })).toBe(
         `AWS production for DevOps never decides on ${github.name}, so nothing changes for users.`,
       )
     })
 
     it('still says a pick that decides takes effect, and keeps the status reasons', () => {
-      expect(attachNote(byName('Slack for everyone'), github.name, on)).toBe(`Takes effect on the next sign-in to ${github.name}.`)
-      expect(attachNote(byName('Code review for Finance'), github.name, on)).toBe(
+      expect(attachNote(byName('Slack access'), github.name, on)).toBe(`Takes effect on the next sign-in to ${github.name}.`)
+      expect(attachNote(draft, github.name, { ...on, policies: [...t.policies, draft] })).toBe(
         'Code review for Finance is a draft, so nothing changes for users yet.',
       )
     })

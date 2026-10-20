@@ -60,6 +60,26 @@ describe('Sign-in activity', () => {
     expect(panelSrc).not.toContain('Sign-in activity')
   })
 
+  /* Opened from an application's Policies tab (APP-POLICY-TAB.md, review 15 Oct 2026). */
+  it('opened from an application, goes back to it and counts that application’s reasons', () => {
+    const box = renderToStaticMarkup(
+      <BrandProvider>
+        <TestingSessionProvider>
+          <SignInActivity appId="box" from={{ appId: 'box' }} />
+        </TestingSessionProvider>
+      </BrandProvider>,
+    )
+    const crumbOf = (html: string) => text(html.slice(html.indexOf('aria-label="Breadcrumb"'), html.indexOf('</nav>', html.indexOf('aria-label="Breadcrumb"'))))
+    expect(crumbOf(box)).toContain('Box')
+    expect(crumbOf(box)).not.toContain('Policies')
+    /* Each chip's count is out of Box's sign-ins: no more than the rows the table holds. */
+    const counts = [...box.matchAll(/class="sia__chipn">(\d+)</g)].map((m) => Number(m[1]))
+    const rows = box.slice(box.indexOf('<tbody'), box.indexOf('</tbody>')).split('<tr ').length - 1
+    expect(counts.length).toBeGreaterThan(0)
+    for (const n of counts) expect(n).toBeLessThanOrEqual(rows)
+    expect(crumbOf(out)).toContain('Policies')
+  })
+
   it('opens a sign-in in Access checks by loading it into the session, and never starts a run', () => {
     expect(pageSrc).toContain('session.load(formOf(r.facts, zones))')
     expect(pageSrc).toContain("go({ name: 'sign-in-tests' })")

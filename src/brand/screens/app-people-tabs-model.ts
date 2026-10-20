@@ -58,11 +58,43 @@ export function groupNamesOf(u: Pick<User, 'groupId' | 'alsoGroupIds'>, groups: 
 
 // --- Users ---------------------------------------------------------------------------
 
+/* How the deciding policy reaches this person (spec APP-CREATE-AND-ACCESS.md
+   §4, 13 Oct 2026): the second line under the Deciding policy's name.
+
+   Read off the policy's audience — the same test `governs` makes
+   (tenant-resolver.ts), so the line names exactly what put the person in:
+   - "For everyone" — an Everyone policy, which reaches them without naming them
+   - "Through Engineering" — the person's own groups the audience names, in the
+     person's order, two and then "and N more" (`listNames`)
+   - "By name" — the audience names the person
+   - both, "Through Engineering · by name"
+
+   Nothing when the tenant default decides: the cell already names it, and "for
+   everyone" under it would read as a choice somebody made. Nothing, too, for a
+   policy whose audience names neither (the engine would not have picked it). */
+export function reachOf(
+  decider: Pick<Policy, 'isSystem' | 'audience'> | null | undefined,
+  user: Pick<User, 'id' | 'groupId' | 'alsoGroupIds'>,
+  groups: readonly Pick<Group, 'id' | 'name'>[],
+): string | null {
+  if (!decider || decider.isSystem) return null
+  if (decider.audience.everyone) return 'For everyone'
+  const through = memberGroupIds(user)
+    .filter((id) => decider.audience.groupIds.includes(id))
+    .map((id) => groups.find((g) => g.id === id)?.name ?? '(deleted)')
+  const byName = decider.audience.userIds.includes(user.id)
+  if (through.length === 0) return byName ? 'By name' : null
+  const head = `Through ${listNames(through, 2)}`
+  return byName ? `${head} · by name` : head
+}
+
 export interface AppUserRow {
   user: User
   /** "Engineering and Design", or "—" for nobody's group. */
   groups: string
   decider: Policy | null
+  /** How the decider reaches them (`reachOf`), or null when nothing needs saying. */
+  reach: string | null
   /** The app's other policies naming them, in list order. */
   also: Policy[]
 }
@@ -79,6 +111,7 @@ export function appUserRows(appId: string, policies: readonly Policy[], users: r
       user,
       groups: names.length === 0 ? '—' : listNames(names, 2),
       decider,
+      reach: reachOf(decider, user, groups),
       also: alsoNamedIn(appId, policies, decider, (p) => namesUser(p, user)),
     }
   })

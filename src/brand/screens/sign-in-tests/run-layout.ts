@@ -212,6 +212,9 @@ export const isJarvis = (l: RunLayoutId) => l === JARVIS
 export const DEDICATED: readonly RunLayoutId[] = ['focus2', 'jarvis']
 /** The main view: Focus (the layout id stays 'focus2' — v1 keeps 'focus', so a stored pick still means what it did). */
 export const MAIN_VIEW: RunLayoutId = 'focus2'
+/* The builder's Check access draws the Access checks page's canvas (owner, 19 Oct 2026: "replace this with our
+   current Access canvas"), not the older column. 'column' puts the column back. */
+export const IN_POLICY_LAYOUT: RunLayoutId = MAIN_VIEW
 
 /** The owner's favourites, in his order (2 Oct 2026), the dedicated views apart — Pass and Explainer moved to the archive the same day ("remove Pass and Explainer from the favourites"). Everything else on the switch is the archive. */
 export const DEFAULT_FAVOURITES: readonly RunLayoutId[] = ['tree', 'depth', 'directions']

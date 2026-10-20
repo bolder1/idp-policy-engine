@@ -501,7 +501,7 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    said once, in the Note at the top of the Settings pane, not as an italic tail
    on every heading. */
 .bm8__settings { display: flex; flex-direction: column; gap: var(--space-6); }
-/* The pane's scope note: one kit callout, a sentence per line. */
+/* The pane's scope note: the kit's `Note`, a sentence per line. */
 .bm8__setnote p { margin: 0; }
 .bm8__setnote p + p { margin-top: var(--space-2); }
 .bm8__setlabel {
@@ -726,14 +726,9 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    the two that matter are indistinguishable from the twenty-four that ship with
    defaults — which is what the console does, and why its dialog opens mid-form.
 */
-.bm8__prereqs {
-  padding: 12px 14px; border-radius: var(--radius-md);
-  background: var(--fb-info-bg);
-  color: var(--fb-info-fg);
-}
-.bm8__prereqhead { margin: 0 0 6px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
-.bm8__prereqs ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
-.bm8__prereqs li { font-size: var(--fs-xs); line-height: 1.5; }
+/* The kit's `Note` (16 Oct 2026): its card, mark and heading; the checklist under it. */
+.bm8__prereqs ol { margin: var(--space-2) 0 0; padding-left: var(--space-6); display: flex; flex-direction: column; gap: var(--space-2); }
+.bm8__prereqs li { font-size: var(--fs-sm); line-height: 1.5; }
 
 /* One straight form. A group is a plain heading over its fields: no panel,
    no tinted header, no divider and nothing that collapses. The space above a
@@ -1039,44 +1034,13 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
   .bmu__scan { flex-direction: column; }}
 
 /* --- What moved (tour/methods-tour.ts, 7 Oct 2026) ----------------------------
-   The announcement sits between the head and the tabs: a white card with a
-   hairline (owner, same day: "make the card white with a border outline and
-   only keep the heading blue with the icon"), the four points stacked one a
-   line in the body's grey, and the tour at its right edge, centred on the
-   block. A setting that moved says where it was beside its label, quiet: it
-   answers a returning admin, and a new one reads past it.
-
-   Its own box, not a `.bx-callout`: the rebrand takes every callout's border
-   away ("a tint, no box"), and this one is the white card with the line.
-   The top row holds still as the points open: the mark and the row keep to
-   the top, and the tour button is in the row, never centred on the card. */
-.bm8__news {
-  display: flex; align-items: flex-start; gap: var(--space-5);
-  margin: calc(-1 * var(--space-4)) 0 var(--space-6); padding: var(--space-5) var(--space-6);
-  background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg);
-  color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.55;
-}
-.bm8__news > .bx-callout__mark { align-self: flex-start; margin-top: 3px; color: var(--fb-info-fg); }
-.bm8__news strong { color: var(--fb-info-fg); font-weight: var(--fw-semibold); }
-.bm8__newsbody { flex: 1; min-width: 0; }
-/* Shut by default (owner, 7 Oct 2026): the title and one line, Read more at its end; the four points open under them. */
-.bm8__newshead { display: flex; align-items: center; gap: var(--space-5); }
-.bm8__newstext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.bm8__newsline { color: var(--text-secondary); }
-.bm8__newsmore-toggle {
-  display: inline-flex; align-items: center; gap: var(--space-1); margin-left: var(--space-3);
-  color: var(--text-link); font-weight: var(--fw-medium);
-}
-.bm8__newsmore-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
-.bm8__newsmore-toggle:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--focus-halo); }
-.bm8__newshead > .bx-btn { flex: none; }
-.bm8__newsmore { overflow: hidden; }
-.bm8__newslist { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0 0; padding-left: var(--space-6); }
-.bm8__newslist li::marker { color: var(--text-muted); }
-
-@media (max-width: 720px) {
-  .bm8__newshead { flex-wrap: wrap; }
-}
+   The announcement sits between the head and the tabs. It is the kit's `Note`
+   now (owner, 16 Oct 2026: "use this as a common note component"), so the
+   card, the mark, the blue heading, Read more and the tour's place in the row
+   are all kit.css `.bx-note*`; what is here is only where it sits on the page.
+   A setting that moved says where it was beside its label, quiet: it answers a
+   returning admin, and a new one reads past it. */
+.bm8__news { margin: calc(-1 * var(--space-4)) 0 var(--space-6); }
 .bm8__was { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-muted); }
 
 /* A person's family of one, its form open: the slider is the method's own page — no card around it, each question and

@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { EVERYONE, audienceOf, card, cond, memberGroupIds, rule, when, type Policy, type Rule, type User } from '../../data'
 import { showcaseTenant, showcaseTenantHrmsOn, type Tenant } from '../../fixtures'
+import { isPostSignIn } from '../../post-sign-in'
 import { personOf, type SignInFacts } from '../simulate'
 import { devicePreset, type DevicePresetId } from '../testing/device-presets'
 import { envOf, resolveSignIn } from '../tenant-resolver'
 import { TENANT_TZ } from '../sign-in-facts'
 import { asEachGroup, audienceViaOf, conflictsOf, personGroupsOf, viaOf, type SignInConflicts } from './conflicts'
 import { eachGroupRows, heroFinding, whyItems } from './journey'
+import { splitShowcase } from './split-policies'
 import { GROUP_PREFIX, personPick, personPickerOptions } from './sign-in-card'
 
 /* -----------------------------------------------------------------------------
@@ -18,6 +20,9 @@ import { GROUP_PREFIX, personPick, personPickerOptions } from './sign-in-card'
    every fix it suggests does what it says, the rough cases, and the sweeps that
    keep it honest against the resolver.
    -------------------------------------------------------------------------- */
+
+/* The showcase holds one sign-in policy per application, so the cross-policy cases are built from its former split policies (split-policies.ts). */
+const conflictTenant = (): Tenant => splitShowcase(showcaseTenant())
 
 const MONDAY = { date: '2026-09-28', time: '09:30', timeZone: TENANT_TZ, source: 'stated' } as const
 const BRANCH = { address: '198.51.100.20', source: 'stated' } as const
@@ -92,50 +97,65 @@ describe('the seed: the people, policies and saved sign-ins the cases need', () 
     expect(dev.rules[2]).toMatchObject({ firstFactor: 'Password', secondFactor: 'specific', secondFactorMethods: ['Google Authenticator'] })
   })
 
-  it('AWS: three live policies — Engineering (with DevOps and contractors) first, then Finance, then DevOps', () => {
+  it('AWS: ONE live policy for Engineering, DevOps, Contractors and Finance, its rules in the order the old three read', () => {
     const aws = t.policies.filter((p) => p.appIds.includes('aws'))
     expect(aws.map((p) => [p.id, p.name, p.status, p.audience.groupIds])).toEqual([
-      ['sc-aws-engineering', 'AWS for engineering teams', 'active', ['engineering', 'devops', 'contractors']],
-      ['sc-aws-finance', 'AWS billing for Finance', 'active', ['finance']],
-      ['sc-aws-devops', 'AWS production for DevOps', 'active', ['devops']],
+      ['sc-aws-engineering', 'AWS access', 'active', ['engineering', 'devops', 'contractors', 'finance']],
     ])
-    expect(aws[0].rules.map((r) => [r.name, r.who?.groupIds, r.decision])).toEqual([
-      ['Contractors away from the office', ['contractors'], 'deny'],
-      ['Engineers on a compliant device', ['engineering', 'devops'], '1fa'],
-      ['Contractors in the office', ['contractors'], '2fa'],
-    ])
-    expect(aws[1].rules.map((r) => [r.name, r.who?.userIds ?? [], r.decision])).toEqual([
-      ['Compliant device', [], '2fa'],
-      ['Thomas Byrne — access ends Friday', ['u-fin-4'], 'deny'],
+    expect(aws[0].rules.map((r) => [r.name, r.who?.groupIds ?? [], r.who?.userIds ?? [], r.decision])).toEqual([
+      ['Contractors away from the office', ['contractors'], [], 'deny'],
+      ['Engineers on a compliant device', ['engineering', 'devops'], [], '1fa'],
+      ['Contractors in the office', ['contractors'], [], '2fa'],
+      ['Finance, on a compliant device', ['finance'], [], '2fa'],
+      ['Thomas Byrne — access ends Friday', [], ['u-fin-4'], 'deny'],
+      ['DevOps, on a registered corporate device', ['devops'], [], '2fa'],
     ])
   })
 
-  it('Slack: a policy for everyone first in the list, then one for Engineering and Contractors whose Engineering rule takes Contractors back out', () => {
-    const slack = t.policies.filter((p) => p.appIds.includes('slack'))
-    expect(slack.map((p) => [p.id, p.audience.everyone, p.audience.groupIds])).toEqual([
-      ['sc-slack-everyone', true, []],
-      ['sc-slack-engineering', false, ['engineering', 'contractors']],
-    ])
-    expect(slack[1].rules[0].who).toEqual({ groupIds: ['engineering'], userIds: [], exceptGroupIds: ['contractors'] })
+  it('Slack: ONE policy for everyone; the Engineering rule takes Contractors back out', () => {
+    /* Sign-in policies: Collaboration tools is a post sign-in one linked to Slack (post-sign-in.ts). */
+    const slack = t.policies.filter((p) => p.appIds.includes('slack') && !isPostSignIn(p))
+    expect(slack.map((p) => [p.id, p.audience.everyone, p.audience.groupIds])).toEqual([['sc-slack-everyone', true, []]])
+    expect(slack[0].rules[0].who).toEqual({ groupIds: ['engineering'], userIds: [], exceptGroupIds: ['contractors'] })
+    expect(slack[0].rules.map((r) => r.name)).toEqual(['Engineers, where we operate', 'Contractors on a corporate device', 'Everyone else, where we operate'])
   })
 
-  it('Code review for Finance is a draft for Finance on GitHub, after Developer tools', () => {
-    const cr = policyOf(t, 'sc-code-review-finance')
-    expect(cr).toMatchObject({ status: 'draft', appIds: ['github'], audience: { everyone: false, groupIds: ['finance'], userIds: [] } })
-    expect(t.policies.findIndex((p) => p.id === 'sc-code-review-finance')).toBeGreaterThan(t.policies.findIndex((p) => p.id === 'sc-dev-tools'))
+  it('Box: ONE policy, Engineers first and Designers second', () => {
+    const box = t.policies.filter((p) => p.appIds.includes('box'))
+    expect(box.map((p) => [p.id, p.name, p.audience.groupIds])).toEqual([['sc-box-engineering', 'Box access', ['engineering', 'design']]])
+    expect(box[0].rules.slice(0, 2).map((r) => [r.name, r.who?.groupIds, r.decision])).toEqual([
+      ['Engineers, where we operate', ['engineering'], '1fa'],
+      ['Designers, where we operate', ['design'], '2fa'],
+    ])
+  })
+
+  it('no application has two live sign-in policies, and the Finance GitHub draft is gone', () => {
+    expect(t.policies.some((p) => p.id === 'sc-code-review-finance')).toBe(false)
+    const seen = new Map<string, number>()
+    for (const p of t.policies) if (p.id !== 'global-default' && !isPostSignIn(p) && p.status === 'active') for (const a of p.appIds) seen.set(a, (seen.get(a) ?? 0) + 1)
+    expect([...seen].filter(([, n]) => n > 1)).toEqual([])
+    expect(['sc-aws-finance', 'sc-aws-devops', 'sc-slack-engineering', 'sc-box-design'].filter((id) => t.policies.some((p) => p.id === id))).toEqual([])
+  })
+
+  it('on the merged policy: Maya decides at rule 2 (Engineers), Thomas Byrne at rule 4 (Finance) and not at his own Deny, and nobody has a policy conflict', () => {
+    for (const [id, idx] of [['ssi-maya-aws', 1], ['ssi-thomas-aws', 3]] as const) {
+      const { res, c } = judge(t, savedFacts(t, id))
+      expect([res.decidedBy?.policyId, res.trace?.hitIndex], id).toEqual(['sc-aws-engineering', idx])
+      expect(c.policies, id).toEqual([])
+    }
   })
 
   it('saves one sign-in per case, named for it, each expecting what the engine really decides', () => {
     const cases = [
       ['ssi-maya-github', 'Maya Iyer on GitHub — Engineering and Finance', '1fa'],
       ['ssi-maya-london', 'Maya Iyer on GitHub from London — same answer', '2fa'],
-      ['ssi-maya-aws', 'Maya Iyer on AWS — two policies cover her', '1fa'],
-      ['ssi-tom-aws', 'Tom Whelan on AWS — two policies for DevOps', '1fa'],
-      ['ssi-devon-slack', 'Devon Rao on Slack — a group policy before Everyone', '2fa'],
+      ['ssi-maya-aws', 'Maya Iyer on AWS — two groups with a rule', '1fa'],
+      ['ssi-tom-aws', 'Tom Whelan on AWS — two rules for DevOps', '1fa'],
+      ['ssi-devon-slack', 'Devon Rao on Slack — a group rule before Everyone', '2fa'],
       ['ssi-leo-slack', 'Leo Fernandes on Slack — left out by an exception', '2fa'],
       ['ssi-leo-aws', 'Leo Fernandes on AWS from London — a Deny comes first', 'deny'],
       ['ssi-thomas-aws', 'Thomas Byrne on AWS — named in a later Deny', '2fa'],
-      ['ssi-priya-github', 'Priya Sharma on GitHub — a draft that would not decide', '2fa'],
+      ['ssi-priya-github', 'Priya Sharma on GitHub — Finance has its own rule', '2fa'],
       ['ssi-ravi-aws', 'Ravi Menon on AWS — no AWS policy covers IT Admins', '1fa'],
     ] as const
     for (const [id, name, expected] of cases) {
@@ -150,7 +170,7 @@ describe('the seed: the people, policies and saved sign-ins the cases need', () 
 // --- The matrix: one case per saved sign-in ------------------------------------------------
 
 describe('(a) one policy, two rules for her two groups — Maya Iyer on GitHub', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c, g } = judge(t, savedFacts(t, 'ssi-maya-github'))
   const dev = policyOf(t, 'sc-dev-tools')
 
@@ -232,7 +252,7 @@ describe('(a) one policy, two rules for her two groups — Maya Iyer on GitHub',
 })
 
 describe('(b) two policies, different groups — Maya Iyer on AWS', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c, g } = judge(t, savedFacts(t, 'ssi-maya-aws'))
 
   it('the engine: AWS for engineering teams decides, higher in the list — both are bound to groups, so the tier ties', () => {
@@ -296,7 +316,7 @@ describe('(b) two policies, different groups — Maya Iyer on AWS', () => {
    is Maya's on AWS with nothing else in the way — no third policy, no rule
    that names anybody — so this pins the answer the page gives him. */
 describe("(b) the owner's case: a policy per group — Tanmay Joshi on Box", () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const facts = savedFacts(t, 'ssi-tanmay-box')
   const { res, c, g, env } = judge(t, facts)
 
@@ -433,7 +453,7 @@ describe("(b) the owner's case: a policy per group — Tanmay Joshi on Box", () 
 })
 
 describe('(b) two policies, the same group — Tom Whelan (DevOps) on AWS', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c, g } = judge(t, savedFacts(t, 'ssi-tom-aws'))
 
   it('the engine: AWS for engineering teams, which covers DevOps too, decides on rule 2', () => {
@@ -463,7 +483,7 @@ describe('(b) two policies, the same group — Tom Whelan (DevOps) on AWS', () =
 })
 
 describe("(b) a group's policy before everyone's — Devon Rao on Slack", () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c } = judge(t, savedFacts(t, 'ssi-devon-slack'))
 
   it('the engine: Slack for everyone is FIRST in the list, and Slack for engineering and contractors decides — the tier, not the order', () => {
@@ -495,7 +515,7 @@ describe("(b) a group's policy before everyone's — Devon Rao on Slack", () => 
 })
 
 describe('(c) an exception on a rule her other group matches — Leo Fernandes on Slack', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c, g } = judge(t, savedFacts(t, 'ssi-leo-slack'))
   const slack = policyOf(t, 'sc-slack-engineering')
 
@@ -547,7 +567,7 @@ describe('(c) an exception on a rule her other group matches — Leo Fernandes o
 })
 
 describe('(d) named in a rule and covered through a group — Thomas Byrne on AWS', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c } = judge(t, savedFacts(t, 'ssi-thomas-aws'))
   const fin = policyOf(t, 'sc-aws-finance')
 
@@ -581,7 +601,7 @@ describe('(d) named in a rule and covered through a group — Thomas Byrne on AW
 })
 
 describe('(e) a Deny above an allow, both matching — Leo Fernandes on AWS from London', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c, g } = judge(t, savedFacts(t, 'ssi-leo-aws'))
 
   it('the engine: rule 1 refuses contractors away from the office; rule 2 would let Engineering in', () => {
@@ -614,7 +634,7 @@ describe('(e) a Deny above an allow, both matching — Leo Fernandes on AWS from
 })
 
 describe('(f) a switched-off policy that would change it — Kavya Menon in the office', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c } = judge(t, savedFacts(t, 'ssi-kavya-office'))
 
   it('the engine: HRMS is off, so the Global Default decides — why her 2FA promise fails today', () => {
@@ -652,7 +672,7 @@ describe('(f) a switched-off policy that would change it — Kavya Menon in the 
 })
 
 describe('(f) a draft that would change nothing — Priya Sharma on GitHub', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c } = judge(t, savedFacts(t, 'ssi-priya-github'))
 
   it('the engine: Developer tools covers Finance and decides on rule 3', () => {
@@ -682,7 +702,7 @@ describe('(f) a draft that would change nothing — Priya Sharma on GitHub', () 
 })
 
 describe('(g) a fact not stated — Maya Iyer on GitHub with the device taken off', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { device: _device, ...facts } = savedFacts(t, 'ssi-maya-github')
   const { res, c, g } = judge(t, facts)
 
@@ -726,7 +746,7 @@ describe('(g) a fact not stated — Maya Iyer on GitHub with the device taken of
 })
 
 describe('(h) nobody covers them: the Global Default decides, by its own rules', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
 
   it('Ravi Menon on AWS: three AWS policies, none for IT Admins', () => {
     const { res, c } = judge(t, savedFacts(t, 'ssi-ravi-aws'))
@@ -765,7 +785,7 @@ describe('(h) nobody covers them: the Global Default decides, by its own rules',
 })
 
 describe('(i) the same decision, different factors — Maya Iyer on GitHub from London', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const { res, c, g } = judge(t, savedFacts(t, 'ssi-maya-london'))
 
   it('the engine: rule 2 (Engineering, working remotely), a push', () => {
@@ -796,7 +816,7 @@ describe('(i) the same decision, different factors — Maya Iyer on GitHub from 
 // --- The fixes are real --------------------------------------------------------------------
 
 describe('every fix the model suggests does what it says, and no more', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const decided = (x: Tenant, facts: SignInFacts) => {
     const r = resolveSignIn(x.policies, facts, envOf(x))
     return [r.decidedBy?.policyId, r.decision]
@@ -903,7 +923,7 @@ describe('every fix the model suggests does what it says, and no more', () => {
 // --- Rough cases ------------------------------------------------------------------------------
 
 describe('rough cases', () => {
-  const base = showcaseTenant()
+  const base = conflictTenant()
 
   it('a person in three groups: every policy that covers her, and a row per group', () => {
     const t = withPerson(base, 'u-maya', { alsoGroupIds: ['finance', 'devops'] })
@@ -1039,7 +1059,7 @@ describe('rough cases', () => {
 // --- Constructed policy conflicts ---------------------------------------------------------------
 
 describe('conflictsOf — policy conflicts, constructed', () => {
-  const base = showcaseTenant()
+  const base = conflictTenant()
   /* Two more live policies on GitHub, after Developer tools: one for Finance
      (the same app and group — the earlier policy applies) and one for
      everyone (the DEFAULT group — a custom-group policy applies). */
@@ -1091,7 +1111,7 @@ describe('conflictsOf — policy conflicts, constructed', () => {
 // --- Sweeps --------------------------------------------------------------------------------------
 
 describe('the sweeps: nobody in one group and named nowhere has a rule conflict, and every answer is the resolver’s', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const env = envOf(t)
   const devices: (DevicePresetId | undefined)[] = ['win11-registered', 'iphone', 'win10', undefined]
   const networks = [BRANCH, HOME, LONDON]
@@ -1161,7 +1181,7 @@ describe('the sweeps: nobody in one group and named nowhere has a rule conflict,
 // --- Via --------------------------------------------------------------------------------------------
 
 describe('viaOf and audienceViaOf', () => {
-  const t = showcaseTenant()
+  const t = conflictTenant()
   const env = envOf(t)
   const who = (id: string) => personOf(id, env)
   const dev = t.policies.find((p) => p.id === 'sc-dev-tools')!

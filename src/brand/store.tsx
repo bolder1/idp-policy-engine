@@ -36,7 +36,12 @@ import { isRevisit } from './revisit'
 import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
 import type { SavedSignIn } from './saved-sign-ins'
 import { normaliseHook, type Hook } from './hooks'
-import { settled, showcaseTenant, tenantAt, type Tenant } from './fixtures'
+/* Unfinished means draft, for both policy types (fixtures.ts): `settled`
+   stores an unfinished policy as a draft — a sign-in one with no
+   application, a post sign-in one with a rule or "Nothing else matched"
+   left without an action — and `refusesStatus` refuses switching either on
+   before that, and a post sign-in one to Monitoring ever. */
+import { refusesStatus, settled, showcaseTenant, tenantAt, type Tenant } from './fixtures'
 import { SHOWCASE } from './showcase'
 import type { ConfigField } from './method-config'
 import type { MfaValues } from './mfa-join'
@@ -102,8 +107,11 @@ export type BrandScreen =
      sign-ins, people and runs for every policy at once. A policy's board keeps
      only its own; its test panel links here, carrying the tab. */
   | { name: 'sign-in-tests'; tab?: 'try' | 'saved' | 'people' | 'runs' }
-  /* The week's sign-ins across every application, and why any were refused (screens/SignInActivity.tsx), opened from Access checks. */
-  | { name: 'sign-in-activity' }
+  /* The week's sign-ins across every application, and why any were refused (screens/SignInActivity.tsx), opened from Access checks.
+     An application's Policies tab opens it narrowed (spec APP-POLICY-TAB.md): `appId` filters to that
+     application, `view` picks Sign-ins or Policy changes, and `q` is the search it opens with. `from` is the
+     application it was opened from: its crumb goes back to that application's Policies tab. */
+  | { name: 'sign-in-activity'; appId?: string; view?: 'sign-ins' | 'changes'; q?: string; from?: { appId: string } }
   /* The policy's own three facts — name, applications, audience — on one page.
 
      They used to be scattered across a top-bar input, a dialog and a card at
@@ -155,6 +163,11 @@ export type BrandScreen =
      catalogue is an ambiguity worth not compounding. The misleading name stays
      confined to the one place it already is. */
   | { name: 'applications' }
+  /* Add application (spec APP-CREATE-AND-ACCESS.md §3): Choose application, the
+     catalogue, while `catalogId` is unset; the set-up steps for that entry
+     once one is picked. One route, so the catalogue's way back from the steps
+     is a route change rather than a page's own state. */
+  | { name: 'application-new'; catalogId?: string }
   /* One application's own page: Basic, Policies, Users and Groups. Opened from the Apps list.
 
      The route owns the tab, so a link can land on one. `group` filters the
@@ -164,10 +177,18 @@ export type BrandScreen =
   | {
       name: 'application'
       appId: string
-      tab?: 'basic' | 'policies' | 'users' | 'groups'
+      tab?: AppTab
       group?: string
+      /* Filters the Users tab to the people this policy decides for (its Policy filter): the
+         Policies tab's "{n} people" (spec APP-POLICY-TAB.md, A2). */
+      policy?: string
       flash?: string
       from?: { groupId: string }
+      /* One-shot, consumed on arrival like `flash`: a drawer to open on the
+         Policies tab. Set when the unsaved application's Policies tab saves
+         the application first and then carries on (spec §3.2, the live "Save
+         Application" gate made to continue). */
+      open?: 'add-existing'
     }
   /* Manage > Users > User List, and User Roles. `role` filters the list to one role (a User roles link). */
   | { name: 'users'; role?: string }
@@ -183,6 +204,11 @@ export type BrandScreen =
 
 /** The two halves of the Display tokens page. */
 export type DisplayTokenTab = 'assignments' | 'tokens'
+
+/* An application page's tabs, in the live console's order with ours between
+   (spec APP-CREATE-AND-ACCESS.md §4). Metadata is a SAML application's,
+   Endpoints an OAuth one's; a route naming the other lands on Policies. */
+export type AppTab = 'basic' | 'advanced' | 'sign-in' | 'attributes' | 'policies' | 'post-sign-in' | 'users' | 'groups' | 'metadata' | 'endpoints'
 
 /** The four Policy testing views. Tabs, and a route parameter, so a caller can land on one. */
 export type TestingView = 'try' | 'person' | 'saved' | 'samples'
@@ -378,6 +404,8 @@ export interface BrandStore {
   appById: (id: string) => App
   /** Replaces the application with this id, stamping Last updated now. An unknown id changes nothing. */
   saveApp: (app: App) => void
+  /** Adds an application (Add application), stamping Last updated now. Returns the id it is stored under: its own, or a fresh one when that is taken. */
+  addApp: (app: App) => string
   groupById: (id: string) => Group
   /** Replaces the group with this id, stamping Last modified now. An unknown id changes nothing. */
   saveGroup: (g: Group) => void
@@ -485,7 +513,7 @@ export interface BrandStore {
      `pendingDraft: undefined` to `savePolicy`. `checks` (Describe it's) are
      kept on a policy still in draft, beside the rules they were tried on. */
   saveDraft: (policyId: string, d: { rules: Rule[]; fallback?: Rule; checks?: Policy['checks'] }) => void
-  /** Switches a published policy on, off or to monitoring. Leaves its rules and any saved draft alone. Ignored for the system policy, and for any status but draft on a policy with no applications. */
+  /** Switches a published policy on, off or to monitoring. Leaves its rules and any saved draft alone. Ignored for the system policy, for any status but draft on a sign-in policy with no applications or a post sign-in policy not yet complete, and for Monitoring on a post sign-in policy (`refusesStatus`). */
   setPolicyStatus: (id: string, status: PolicyStatus) => void
   discardDraft: (policyId: string) => void
   /** Adds at the top of the list; a policy with no applications is stored as a draft. Returns the stored id. */
@@ -737,7 +765,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [methodConfig, setMethodConfig] = useState<Record<string, ConfigField[]>>({})
   const [setupChoice, setSetupChoice] = useState<Record<string, string>>({})
   const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
-  const [apps, setApps] = useState<App[]>(() => seed.apps)
+  const [apps, setApps, appsRef] = useCollection<App>(() => seed.apps)
   const [groups, setGroups] = useState<Group[]>(() => seed.groups)
   const [directory, setDirectoryState] = useState(() => seed.directory)
   /* The latest directory, ahead of the next render, as `tokensRef` above:
@@ -825,7 +853,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         { canSave: false },
       )
     },
-    [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setScreen, setDirectory],
+    [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setScreen, setDirectory, setApps],
   )
 
   /* With an action the toast stays six seconds rather than about three: long
@@ -939,6 +967,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       /* Stamped here, not by the caller: one writer of Last updated, as
          `savePolicy` is the one writer of a policy's. */
       saveApp: (app) => setApps((all) => all.map((a) => (a.id === app.id ? { ...app, lastUpdated: consoleStamp(new Date()) } : a))),
+      /* Appended: the list sorts itself, by name unless somebody sorted it otherwise. */
+      addApp: (app) => {
+        const id = freeId(appsRef.current, app, 'app', app.name)
+        const now = new Date()
+        setApps((all) => [...all, { ...app, id, lastUpdated: consoleStamp(now), addedAt: now.getTime() }])
+        return id
+      },
       groupById: (id) => groups.find((g) => g.id === id) ?? groups[0] ?? { id, name: id, memberCount: 0 },
       saveGroup: (g) => setGroups((all) => all.map((x) => (x.id === g.id ? { ...g, lastModified: consoleStamp(new Date()) } : x))),
       userById: (id) => directory.people.find((u) => u.id === id),
@@ -1054,11 +1089,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
       /* Stamped only when something changed. Saving an untouched policy used to
          record an edit nobody made. A policy saved with no applications is
-         stored as a draft: unfinished means draft. */
+         stored as a draft: unfinished means draft. So is a post sign-in
+         policy saved on with a rule or "Nothing else matched" left without
+         an action, though never for having no application (`settled`). */
       savePolicy: (p) => {
         const before = policiesRef.current.find((x) => x.id === p.id)
         const after = settled(asStored(p))
-        if (before && changedBeyondStamp(before, after)) setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), groups, directory.people))
+        if (before && changedBeyondStamp(before, after)) setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), groups, directory.people, appsRef.current))
         setPolicies((all) =>
           all.map((x) => {
             if (x.id !== p.id) return x
@@ -1070,14 +1107,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
       setPolicyStatus: (id, status) => {
         const before = policiesRef.current.find((x) => x.id === id)
-        if (before && before.status !== status && !before.isSystem && !(before.appIds.length === 0 && status !== 'draft')) {
+        if (before && before.status !== status && !before.isSystem && !refusesStatus(before, status)) {
           const after = settled(asStored({ ...before, status, lastModified: 'Just now', modifiedBy: 'You' }))
-          setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date()))
+          setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), undefined, undefined, appsRef.current))
         }
         setPolicies((all) =>
           all.map((x) => {
             if (x.id !== id || x.status === status || x.isSystem) return x
-            if (x.appIds.length === 0 && status !== 'draft') return x
+            if (refusesStatus(x, status)) return x
             return settled(asStored({ ...x, status, lastModified: 'Just now', modifiedBy: 'You' }))
           }),
         )
@@ -1179,8 +1216,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
       registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast,
       gauntletOverrides, breakInAccepted, changeLog, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
-      setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setDirectory,
-      policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef,
+      setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setDirectory, setApps,
+      policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef, appsRef,
     ],
   )
 

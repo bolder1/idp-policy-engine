@@ -18,11 +18,13 @@ import {
   policyRows,
   policySections,
   ruleShown,
+  walkEnd,
   workingOn,
   type CardKey,
   type OutcomeView,
   type PolicySection,
 } from './classic2-model'
+import { oneAlso, oneGdFoot, oneHead, oneWhy, outcomeMetaOne, type OneCard } from './classic2-one-model'
 import type { RunLayoutProps } from './types'
 
 /* -----------------------------------------------------------------------------
@@ -39,6 +41,12 @@ import type { RunLayoutProps } from './types'
 
    Classic v2 hands them the host's run; Focus hands them its presented one (its
    `s` the presenter's step), so in either the cards arrive at the picture's pace.
+
+   ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD, 20 Oct 2026): Focus asks for
+   `onePolicy`, and the chain is its first node, the Policy card holding the
+   rules, and the outcome — no rule card. `one` is what that card says beyond
+   the chain's own data (classic2-one-model.ts); null for every other caller,
+   whose four cards are as they were.
    -------------------------------------------------------------------------- */
 
 export interface ChainRun {
@@ -65,18 +73,21 @@ export interface ChainRun {
   shownRule: number | null
   passed: ReturnType<typeof passedLine>
   resolve: NameLookup
+  /** The merged Policy card's words (`onePolicy`); null with the four cards. */
+  one: OneCard | null
 }
 
-/** The chain's words for a run at its own step (`run.s`). */
-export function useChainRun(run: RunLayoutProps): ChainRun {
+/** The chain's words for a run at its own step (`run.s`); `onePolicy`, the merged Policy card's (ONE_POLICY_CARD). */
+export function useChainRun(run: RunLayoutProps, opts: { onePolicy?: boolean } = {}): ChainRun {
   const { plan, s, running, form, asGroup, screens } = run
+  const onePolicy = opts.onePolicy === true
   const brand = useBrand()
   const resolve = useNameLookup()
   const env = useSimEnv()
   const tenant = run.policies ?? brand.policies
   const { users, groups, apps } = brand
 
-  const shown = cardsAt(plan, s)
+  const shown = cardsAt(plan, s, onePolicy)
   const done = !running
   const landed = done && shown.includes('outcome')
   const settled = done || (plan.at.outcome >= 0 && s >= plan.at.outcome)
@@ -93,11 +104,19 @@ export function useChainRun(run: RunLayoutProps): ChainRun {
   const via = useMemo(() => (decider && simPerson ? audienceViaOf(decider, simPerson, env) : null), [decider, simPerson, env])
   const outcome = useMemo(() => outcomeView(plan, screens), [plan, screens])
   const shownRule = ruleShown(plan, s, settled)
+  /* The tenant's default, for the merged card's foot: the builder's plan may not list it (engine-run.ts `focus`). */
+  const gd = useMemo(() => tenant.find((p) => p.isSystem && p.type === 'App Access') ?? null, [tenant])
+  const inPolicy = run.inPolicy ?? null
+  const one = useMemo<OneCard | null>(() => {
+    if (!onePolicy) return null
+    const why = oneWhy(plan, inPolicy)
+    return { why, head: oneHead(plan, s), also: oneAlso(plan, why), gd: oneGdFoot(plan, gd, why), outcomeMeta: outcomeMetaOne(outcome), inPolicy, walked: s >= walkEnd(plan) }
+  }, [onePolicy, plan, s, gd, inPolicy, outcome])
 
   return {
     shown,
-    working: workingOn(plan, s),
-    at: arrivals(plan),
+    working: workingOn(plan, s, onePolicy),
+    at: arrivals(plan, onePolicy),
     done,
     landed,
     settled,
@@ -113,6 +132,7 @@ export function useChainRun(run: RunLayoutProps): ChainRun {
     shownRule,
     passed: passedLine(passedOver(plan, shownRule, s)),
     resolve,
+    one,
   }
 }
 

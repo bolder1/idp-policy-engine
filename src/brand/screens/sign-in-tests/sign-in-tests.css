@@ -251,6 +251,8 @@
 .sit-ident__field.is-open .sit-ident__chips { pointer-events: auto; }
 .sit-ident__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); line-height: 20px; color: var(--text-primary); }
 .sit-ident__field.is-empty .sit-ident__name { color: var(--text-muted); }
+/* Nothing picked is an answer for a rule's Who ("Everyone", who-combo.tsx): said in the answer's colour, not muted. */
+.sit-ident__field.is-answer .sit-ident__name { color: var(--text-primary); }
 .sit-ident__field.is-empty .sit-ident__chips { gap: var(--space-3); }
 .sit-ident__chev { flex: none; color: var(--text-muted); }
 
@@ -642,3 +644,34 @@
 }
 .sit__canvassw .bseg::-webkit-scrollbar { display: none; }
 .sit__canvassw .bseg > button { flex: none; }
+
+/* --- The why panel, in the Policy details' grammar (owner, 14 Oct 2026: "all AI generic, no hierarchy, can't see the
+   button, the boxed card looks bad"). One heading, then sections told apart by a hairline and a heading — never a box in
+   a box — and every action a visible button. Colour only where it means something: the mark and the count. */
+.sit-whypanel .tj-why__top { gap: var(--space-4); padding: var(--space-5) var(--space-6); }
+.sit-whypanel .tj-why__mark { width: var(--space-9); height: var(--space-9); border-radius: var(--radius-full); background: var(--surface-sunken); }
+.sit-whypanel .tj-why__mark.is-conflict,
+.sit-whypanel .tj-why__mark.is-depends { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.sit-whypanel .tj-why__title { font-size: var(--fs-md); line-height: 24px; }
+.sit-whypanel .tj-why__top .bb__act { width: var(--space-9); height: var(--space-9); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--text-secondary); }
+.sit-whypanel .tj-why__top .bb__act:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.sit-whypanel .tj-why__body { gap: 0; padding: 0 var(--space-6) var(--space-6); }
+.sit-whypanel .tj-why__body > * { padding: var(--space-5) 0; border-top: var(--bw-thin) solid var(--border-subtle); }
+.sit-whypanel .tj-why__body > :first-child { border-top: 0; }
+.sit-whypanel .tj-why__label { margin: 0 0 var(--space-3); font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 22px; color: var(--text-primary); }
+/* A finding is a row of the page, not a card. */
+.sit-whypanel .tj-why__list { gap: 0; }
+.sit-whypanel .tj-why__list > .tj-why__item + .tj-why__item { margin-top: var(--space-5); padding-top: var(--space-5); border-top: var(--bw-thin) solid var(--border-subtle); }
+.sit-whypanel .tj-why__item.tj-find { padding: 0; border: 0; border-radius: 0; background: none; }
+.sit-whypanel .tj-find__title { font-size: var(--fs-md); }
+/* Break-in attempts: a section with a heading, its count and a button. */
+.sit-whypanel .tj-find.tj-why__att { margin-top: 0; padding: var(--space-5) 0; border: 0; border-top: var(--bw-thin) solid var(--border-subtle); }
+.sit-whypanel .tj-why__att.is-conflict .tj-find__line { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+/* Every action reads as a button. */
+.sit-whypanel .tj-conflict__open.tj-why__act { height: var(--space-9); padding: 0 var(--space-4); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised); font-size: var(--fs-sm); color: var(--text-primary); }
+.sit-whypanel .tj-conflict__open.tj-why__act:hover { background: var(--surface-sunken); }
+.sit-whypanel .tj-find__acts > .tj-why__act { margin-left: 0; }
+/* What changed: who and when quiet above, what changed as the line. */
+.sit-whypanel .tj-why__changes { gap: var(--space-4); }
+.sit-whypanel .tj-why__changehead { order: -1; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.sit-whypanel .tj-why__changelines { font-size: var(--fs-sm); color: var(--text-primary); }

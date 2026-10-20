@@ -4,29 +4,29 @@ import { useSyncExternalStore } from 'react'
    What the zone page's side note says, and which version shows — the parts of
    zone-notes.tsx that are not drawing, in their own module so that one exports
    only components (fast refresh) and the tests can read these without a page.
-   See zone-notes.tsx for why there are four versions (owner, 1 and 2 Oct 2026).
+   See zone-notes.tsx for why there are two versions (owner, 1 Oct to 16 Oct 2026).
    -------------------------------------------------------------------------- */
 
-export type NoteStyle = 'classic' | 'blue' | 'sticky'
+export type NoteStyle = 'note' | 'sticky'
 
-/* Blue first and the default (owner, 9 Oct 2026: "the blue should be by default"; keep Classic, Blue and
-   Sticky note, remove the rest, so Clipboard and Pointer are gone).
-   Note pile and Index card stood between the sticky note and the clipboard
-   for a day (owner, 2 Oct 2026: "Remove Note pile, Index card"). */
+/* Note first and the default: the kit's one note (owner, 16 Oct 2026: "use this as a common note component …
+   change this globally"), which Classic and Blue both became. Blue had been the default since 9 Oct 2026 ("the
+   blue should be by default"); Clipboard and Pointer went that day, and Note pile and Index card on 2 Oct 2026
+   ("Remove Note pile, Index card"). */
 export const NOTE_STYLES: { value: NoteStyle; label: string }[] = [
-  { value: 'blue', label: 'Blue' },
-  { value: 'classic', label: 'Classic' },
+  { value: 'note', label: 'Note' },
   { value: 'sticky', label: 'Sticky note' },
 ]
 
 export const NOTE_STYLE_KEY = 'idp.zones.noteStyle'
 
-/** Only a stored value that names a version picks it; anything else is Classic.
+/** Only a stored value that names a version picks it; anything else is the Note.
     That covers every version withdrawn — 'colours', 'rows' and 'tip' on 1 Oct
-    2026, 'pile' and 'card' on 2 Oct — so a viewer who had one on is back on
-    the original note, not on a blank. */
+    2026, 'pile' and 'card' on 2 Oct, 'clip' and 'pointer' on 9 Oct, 'classic'
+    and 'blue' on 16 Oct — so a viewer who had one on lands on the Note, not on
+    a blank. */
 export function parseNoteStyle(value: unknown): NoteStyle {
-  return NOTE_STYLES.find((o) => o.value === value)?.value ?? 'blue'
+  return NOTE_STYLES.find((o) => o.value === value)?.value ?? 'note'
 }
 
 function readNoteStyle(): NoteStyle {
@@ -34,7 +34,7 @@ function readNoteStyle(): NoteStyle {
     return parseNoteStyle(window.localStorage.getItem(NOTE_STYLE_KEY))
   } catch {
     /* No window (tests), a private window, or storage blocked by policy. */
-    return 'blue'
+    return 'note'
   }
 }
 
@@ -64,14 +64,14 @@ export function useNoteStyle(): [NoteStyle, (s: NoteStyle) => void] {
   const style = useSyncExternalStore(
     subscribe,
     () => (current ??= readNoteStyle()),
-    () => 'blue' as NoteStyle,
+    () => 'note' as NoteStyle,
   )
   return [style, applyNoteStyle]
 }
 
 /* --- The examples --------------------------------------------------------------
-   One set, read by every version but Classic, which keeps the examples it
-   always had (zone-notes.tsx). Each is the example and what kind of thing it
+   One set, read by both versions (Classic's own India, Maharashtra and Pune
+   went with it on 16 Oct 2026). Each is the example and what kind of thing it
    is. The tone, the chip kind and the ghost row's own words that the
    withdrawn versions needed went with them (1 Oct 2026). */
 

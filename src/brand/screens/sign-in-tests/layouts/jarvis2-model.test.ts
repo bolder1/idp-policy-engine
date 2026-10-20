@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../../fixtures'
+import { withBillingFinance } from './conflict-fixture'
 import { runColumns, type ColumnSpec } from '../../board/try-sign-in'
 import { envOf } from '../../tenant-resolver'
 import { rowsRead } from '../../testing/rows-read'
@@ -22,16 +23,16 @@ const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const LIVE: ColumnSpec = { id: 'live', label: 'live', tip: '' }
 
-function planOf(person: string, app: string, patch: Partial<SignInForm> = {}): EngineRun {
+function planOf(person: string, app: string, patch: Partial<SignInForm> = {}, policies = t.policies): EngineRun {
   const pid = t.directory.people.find((p) => p.name === person)?.id ?? ''
   const aid = t.apps.find((a) => a.name === app)?.id ?? ''
-  const rows0 = rowsRead(t.policies, null, aid, lib)
+  const rows0 = rowsRead(policies, null, aid, lib)
   const form = { ...forRun(withDefaults({ ...emptyDraft(TODAY, '09:30'), personId: pid, appId: aid }, rows0, [], TODAY, '09:30'), rows0), ...patch } as SignInForm
-  const rows = rowsRead(t.policies, null, form.appId, lib)
+  const rows = rowsRead(policies, null, form.appId, lib)
   const { facts } = factsOf(form, t.zones)
-  const res = runColumns([LIVE], t.policies, facts, env)[0].resolution
+  const res = runColumns([LIVE], policies, facts, env)[0].resolution
   const ctx = { people: t.directory.people, apps: t.apps, zones: t.zones, rows }
-  return engineRun({ res, policies: t.policies, form, facts, env, ctx, intro: 'collapse' })
+  return engineRun({ res, policies, form, facts, env, ctx, intro: 'collapse' })
 }
 
 const ctxOf = (first: string, groups: string[], facts: JvContext['facts'] = [], factors: string[] = ['Password']): JvContext => ({ first, groups, facts, factors })
@@ -43,23 +44,23 @@ const settled = (p: EngineRun) => p.steps.length - 1
 
 describe('the reactor locks the answer under the pointer', () => {
   it('Maya on AWS Console: P1 decides, rule 2 matches, rule 1 failed on Who, Finance also covers her', () => {
-    const p = planOf('Maya Iyer', 'AWS Console')
+    const p = planOf('Maya Iyer', 'AWS Console', {}, withBillingFinance(t.policies))
     const m = jarvisModel(p, settled(p), ctxOf('Maya', ['Engineering', 'Finance'], FACTS))
     expect(m.landed).toBe(true)
     expect(m.policies.focus).toBe(0)
     expect(m.policies.locked).toBe(true)
-    expect(m.policies.segs.map((x) => x.tone)).toEqual(['ok', 'warn', 'idle', 'idle'])
+    expect(m.policies.segs.map((x) => x.tone)).toEqual(['ok', 'warn', 'idle'])
     expect(m.rules.focus).toBe(1)
-    expect(m.rules.segs.map((x) => x.tone)).toEqual(['bad', 'ok', 'idle', 'idle'])
-    expect(m.rules.segs[0].label).toBe('R1 ✕ WHO')
-    expect(m.rules.segs[1].label).toBe('R2 ✓ MATCH')
+    expect(m.rules.segs.map((x) => x.tone)).toEqual(['bad', 'ok', 'idle', 'warn', 'idle', 'idle', 'idle'])
+    expect(m.rules.segs[0].label).toBe('R1 ✕')
+    expect(m.rules.segs[1].label).toBe('R2 ✓')
     expect(m.checks.rule).toBe(1)
     expect(m.checks.segs.map((x) => x.tone)).toEqual(['ok', 'ok'])
     expect(m.core).toMatchObject({ tone: 'ok', word: 'ALLOW', sub: '1 factor', cells: 1 })
-    expect(m.readouts.map((r) => `${r.value} ${r.sub}`.trim())).toEqual(['1 of 4', '2 of 4', '3', 'ALLOW'])
+    expect(m.readouts.map((r) => `${r.value} ${r.sub}`.trim())).toEqual(['1 of 3', '2 of 7', '3', 'ALLOW'])
     expect(m.conds.map((c) => c.status)).toEqual(['Not checked', 'Passes rule 2'])
-    expect(m.groups.map((g) => g.tone)).toEqual(['ok', 'warn'])
-    expect(m.polRows[0].line).toBe('Covers via Engineering · decides')
+    expect(m.groups.map((g) => g.tone)).toEqual(['ok', 'ok'])
+    expect(m.polRows[0].line).toBe('Covers via Engineering and Finance · decides')
     expect(m.polRows[1].line).toBe('Also covers Maya, via Finance · not used')
     expect(m.ruleRows[1].open).toBe(true)
     expect(m.ruleRows[1].then?.text).toBe('Allow on 1 factor')
@@ -68,13 +69,13 @@ describe('the reactor locks the answer under the pointer', () => {
   it('Ravi on AWS Console: no policy covers him, the Global Default locks at the pointer', () => {
     const p = planOf('Ravi Menon', 'AWS Console')
     const m = jarvisModel(p, settled(p), ctxOf('Ravi', ['IT Admins'], FACTS))
-    expect(m.policies.focus).toBe(3)
-    expect(lockAngle(m.policies.focus, 4)).toBe(-270)
-    expect(m.policies.segs.map((x) => x.tone)).toEqual(['miss', 'miss', 'miss', 'ok'])
+    expect(m.policies.focus).toBe(1)
+    expect(lockAngle(m.policies.focus, 2)).toBe(-180)
+    expect(m.policies.segs.map((x) => x.tone)).toEqual(['miss', 'ok'])
     expect(m.policies.segs[0].label.startsWith('P1 ✕')).toBe(true)
     expect(m.polRows[0].line).toBe("Doesn't cover Ravi")
-    expect(m.polRows[3].line).toBe('No policy above covers · decides')
-    expect(m.readouts[0].value).toBe('4')
+    expect(m.polRows[1].line).toBe('No policy above covers · decides')
+    expect(m.readouts[0].value).toBe('2')
   })
 
   it('Devon from home: a deny rule matched — red, and the core says which rule', () => {

@@ -208,7 +208,9 @@ export function patchRule(r: Rule, p: Partial<Rule>): Rule {
      exactly like one never added, or the save bar lights on a no-op (the test
      below this one's). `undefined` rather than a delete, for the same reason
      `who` is stored that way: JSON drops it, and the key keeps its place. */
-  const base = r.pristine && 'decision' in p ? { ...r, pristine: undefined } : r
+  /* A post sign-in rule's outcome is its `action` (post-sign-in.ts), so
+     choosing one is that rule's first real write in the same way. */
+  const base = r.pristine && ('decision' in p || 'action' in p) ? { ...r, pristine: undefined } : r
   if (!('who' in p)) return { ...base, ...p }
   return { ...base, ...p, who: normaliseWho(p.who) }
 }

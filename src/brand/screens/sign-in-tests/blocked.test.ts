@@ -31,4 +31,15 @@ describe('blockedSignIns', () => {
   it('has unique ids', () => {
     expect(new Set(all.map((r) => r.id)).size).toBe(all.length)
   })
+
+  /* Spec APP-CREATE-AND-ACCESS.md §5: an application added this session has no
+     sign-ins yet, so none of its refusals can be listed. Row ids lead with the
+     application's id (activity.ts). */
+  it('lists nothing on an application added this session', () => {
+    const appId = all[0].id.split(':')[0]
+    const added = t.apps.map((a) => (a.id === appId ? { ...a, addedAt: Date.UTC(2026, 9, 13) } : a))
+    const without = blockedSignIns(t.policies, env, TODAY, added)
+    expect(without.length).toBeGreaterThan(0)
+    expect(without.some((r) => r.id.startsWith(`${appId}:`))).toBe(false)
+  })
 })

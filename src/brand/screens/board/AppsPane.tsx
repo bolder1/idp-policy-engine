@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check } from 'lucide-react'
+import { AppWindow, Users } from 'lucide-react'
 
-import { Button, SearchBox } from '../../kit'
-import { NoMatches } from '../../empty'
-import { enforces } from '../../data'
+import { Button } from '../../kit'
+import { enforces, type Audience } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
 import { useBrand } from '../../store'
 import type { ReadyFix } from '../guard'
 import { GuardDrawer } from '../guard-page'
+import { audienceLabel } from '../app-standing'
+import { ownerOf } from '../app-policies'
+import { AppTransfer } from '../app-transfer'
 import { detailsChanges } from '../policy-details-review'
 import { portalRoot } from '../status-options'
+import { isPostSignIn } from '../../post-sign-in'
 import { useAppsGuard } from './apps-guard'
+import { linkedRows } from './post-board'
+import { AudienceEditor } from './WhoEditor'
 
 /* -----------------------------------------------------------------------------
    The applications a sign-in arrives from — the start node's pane.
@@ -33,17 +38,20 @@ import { useAppsGuard } from './apps-guard'
    result saves in the same press; the page opens only when a Must pass or
    Protected sign-in newly fails, or somebody is newly let in. The checks
    themselves are apps-guard.ts, which an application's own page runs too.
+
+   WHO, above the applications (owner, 13 Oct 2026): the policy's audience is
+   seen and changed here, at the start node, and nowhere else on the board —
+   picking groups from an application's page was ruled out the same day. It is
+   a standing fact of the policy as the applications are, so it saves with
+   them, by the same button and through the same checks: narrowing a live
+   policy to some groups hands everyone else to whatever decides for them next.
    -------------------------------------------------------------------------- */
 
 export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a save: the board closes the pane. */ onSaved?: () => void }) {
   const store = useBrand()
   const saved = store.policyById(policyId)
   const [picked, setPicked] = useState<string[]>(saved?.appIds ?? [])
-  const [q, setQ] = useState('')
-  const [order] = useState<string[]>(() => {
-    const on = new Set(saved?.appIds ?? [])
-    return [...store.apps.filter((a) => on.has(a.id)), ...store.apps.filter((a) => !on.has(a.id))].map((a) => a.id)
-  })
+  const [aud, setAud] = useState<Audience | null>(null)
   const appsGuard = useAppsGuard()
   /* Undo on a ready fix's toast. It runs after later renders, so it reads the
      pane as it is then, not as it was when the fix was made (below). */
@@ -70,27 +78,23 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
     )
   }
 
+  /* A post sign-in policy (post-sign-in.ts): Who as here, and its linked
+     applications read only — they are linked from each application's own
+     page, never from the policy (owner, 13 Oct 2026). */
+  if (isPostSignIn(saved)) return <PostAppsPane policyId={policyId} audience={aud ?? saved.audience} onAudience={setAud} onSaved={onSaved} />
+
   const appName = (id: string) => store.appById(id).name
-  const diffOf = (ids: string[]) => detailsChanges(saved, { name: saved.name, appIds: ids }, appName)
+  const audience = aud ?? saved.audience
+  const whoSaid = (a: Audience) => audienceLabel(a, store.groups, store.users)
+  const diffOf = (ids: string[]) => detailsChanges(saved, { name: saved.name, appIds: ids, audience }, appName, whoSaid)
   const diff = diffOf(picked)
   const dirty = diff.changes.length > 0
-  const query = q.trim().toLowerCase()
-  const rows = order
-    .map((id) => store.apps.find((a) => a.id === id))
-    .filter((a) => a !== undefined)
-    .filter((a) => !query || a.name.toLowerCase().includes(query) || a.protocol.toLowerCase().includes(query))
-
-  /* Catalogue order, not click order — `appsOf` reads it back that way, and
-     two orders for one list is how a "changed" check fires on nothing. */
-  const toggle = (id: string) =>
-    setPicked((now) =>
-      now.includes(id) ? now.filter((x) => x !== id) : store.apps.filter((a) => a.id === id || now.includes(a.id)).map((a) => a.id),
-    )
-
-  const commitApps = (ids: string[]) => {
-    const d = diffOf(ids)
-    store.savePolicy({ ...saved, appIds: ids, status: d.becomesDraft ? 'draft' : saved.status })
-    store.showToast(d.becomesDraft ? `${saved.name} saved as a draft` : 'Applications saved')
+  const whoChanged = diff.changes.includes('Who')
+  const commitApps = (ids: string[], who: Audience = audience) => {
+    const d = detailsChanges(saved, { name: saved.name, appIds: ids, audience: who }, appName, whoSaid)
+    store.savePolicy({ ...saved, appIds: ids, audience: who, status: d.becomesDraft ? 'draft' : saved.status })
+    const what = d.changes.includes('Who') ? `${saved.name} saved` : 'Applications saved'
+    store.showToast(d.becomesDraft ? `${saved.name} saved as a draft` : what)
     /* The pane has done its one job, so it closes (owner, 21 Sep 2026) — the
        start node now says the new list, and the toast says it was saved. */
     onSaved?.()
@@ -98,8 +102,8 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
 
   /* --- Before saving: applications (apps-guard.ts) ------------------------------ */
   const save = () => {
-    if (!appsGuard.guards(saved)) return commitApps(picked)
-    appsGuard.check(saved, picked, commitApps)
+    if (!appsGuard.guards(saved)) return commitApps(picked, audience)
+    appsGuard.check(saved, picked, (ids, who) => commitApps(ids, who ?? audience), whoChanged ? audience : undefined)
   }
 
   /* A ready fix here keeps or leaves out one application. It changes the
@@ -128,40 +132,30 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
     store.showToast('Restored')
   }
   /* The ticks are the page's subject here: stale when they moved, and Run again reads them. */
-  const page = appsGuard.page({ primaryLabel: 'Save applications', onConfirm: commitApps, current: picked, onApplyFix: applyFix })
+  const saveLabel = whoChanged ? 'Save who and applications' : 'Save applications'
+  const page = appsGuard.page({
+    primaryLabel: saveLabel,
+    onConfirm: (ids, _p, who) => commitApps(ids, who ?? audience),
+    current: picked,
+    onApplyFix: applyFix,
+  })
 
   return (
     <div className="bb__apps">
-      {/* No heading: the panel's bar already says Applications. */}
-      <p className="bb__apps__lede">Sign-ins to these applications are decided by this policy’s rules.</p>
-
-      <div className="bb__apps__body">
-        <SearchBox block value={q} onChange={setQ} placeholder="Search applications" label="Search applications" />
-        <p className="bb__apps__count">{picked.length === 0 ? 'None selected' : `${picked.length} selected`}</p>
-        <div className="bb__apps__list" role="group" aria-label="Applications">
-          {rows.length === 0 && <NoMatches compact noun="applications" query={q} onClear={() => setQ('')} />}
-          {rows.map((a) => {
-            const on = picked.includes(a.id)
-            return (
-              <button
-                key={a.id}
-                type="button"
-                role="checkbox"
-                aria-checked={on}
-                className={`bb__apps__item${on ? ' is-on' : ''}`}
-                onClick={() => toggle(a.id)}
-              >
-                <span className="bx-tick" aria-hidden>
-                  {on && <Check size={12} strokeWidth={3} />}
-                </span>
-                <AppLogo appId={a.id} name={a.name} size={18} />
-                <b>{a.name}</b>
-                <em>{a.protocol}</em>
-              </button>
-            )
-          })}
+      {/* Who is a rule's question only (owner, 14 Oct 2026): a policy names applications, and its rules name people. */}
+      <section className="bb__sec bb__apps__sec" aria-labelledby="bb-sec-apps">
+        <div className="bb__sec__head">
+          <h3 id="bb-sec-apps">
+            <AppWindow size={15} strokeWidth={2} aria-hidden />
+            Applications
+          </h3>
         </div>
-      </div>
+        <div className="bb__sec__body bb__apps__body">
+          <p className="bb__apps__lede">Sign-ins to these applications are decided by this policy’s rules.</p>
+          {/* All applications on the left, the ones in this policy on the right (app-transfer.tsx). */}
+          <AppTransfer apps={store.apps} picked={picked} onChange={setPicked} takenBy={(id) => (picked.includes(id) ? undefined : ownerOf(id, store.policies, saved.id)?.name)} />
+        </div>
+      </section>
 
       <div className="bb__apps__foot">
         {/* "Stops deciding sign-ins" only where it was deciding them. */}
@@ -184,11 +178,98 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
           title={dirty ? undefined : 'No changes to save'}
           onClick={save}
         >
-          {appsGuard.checking ? 'Checking…' : 'Save applications'}
+          {appsGuard.checking ? 'Checking…' : saveLabel}
         </Button>
       </div>
 
       {page && createPortal(<GuardDrawer {...page} />, portalRoot())}
     </div>
+  )
+}
+
+/* --- A post sign-in policy's start node pane -----------------------------------
+
+   Who, as on a sign-in policy, saved straight to the policy by its own button
+   — the sign-in checks do not run: a post sign-in policy decides no sign-in.
+   Then the applications linked to it, READ ONLY, each with the events of it
+   this policy decides, by name. The application's name opens its Post sign-in
+   tab, where links are made and changed: the policy is independent of its
+   applications (owner, 13 Oct 2026). */
+export function PostAppsPane({
+  policyId,
+  audience,
+  onAudience,
+  onSaved,
+}: {
+  policyId: string
+  audience: Audience
+  onAudience: (a: Audience) => void
+  onSaved?: () => void
+}) {
+  const store = useBrand()
+  const saved = store.policyById(policyId)
+  if (!saved) return null
+  const dirty = JSON.stringify(audience) !== JSON.stringify(saved.audience)
+  const save = () => {
+    store.savePolicy({ ...saved, audience })
+    store.showToast(`${saved.name} saved`)
+    onSaved?.()
+  }
+  return (
+    <div className="bb__apps">
+      <section className="bb__sec" aria-labelledby="bb-sec-aud">
+        <div className="bb__sec__head">
+          <h3 id="bb-sec-aud">
+            <Users size={15} strokeWidth={2} aria-hidden />
+            Who
+          </h3>
+        </div>
+        <div className="bb__sec__body">
+          <AudienceEditor audience={audience} onChange={onAudience} />
+        </div>
+      </section>
+
+      <section className="bb__sec bb__apps__sec" aria-labelledby="bb-sec-apps">
+        <div className="bb__sec__head">
+          <h3 id="bb-sec-apps">
+            <AppWindow size={15} strokeWidth={2} aria-hidden />
+            Applications
+          </h3>
+        </div>
+        <div className="bb__sec__body bb__apps__body">
+          <LinkedApps policyId={policyId} />
+        </div>
+      </section>
+
+      <div className="bb__apps__foot">
+        <Button variant="brand" size="sm" block disabled={!dirty} title={dirty ? undefined : 'No changes to save'} onClick={save}>
+          Save who
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/* The linked applications, read only: logo, name, and the events this policy
+   decides there. One line when there are none. */
+export function LinkedApps({ policyId }: { policyId: string }) {
+  const store = useBrand()
+  const saved = store.policyById(policyId)
+  const rows = saved ? linkedRows(saved, store.apps) : []
+  if (rows.length === 0) return <p className="bb__apps__lede">Not linked to any application</p>
+  return (
+    <ul className="bb__linked" aria-label="Linked applications">
+      {rows.map((r) => (
+        <li key={r.appId} className="bb__linked__row">
+          <AppLogo appId={r.appId} name={r.name} size={18} />
+          <div className="bb__linked__text">
+            <button type="button" className="bb__linked__name" onClick={() => store.go({ name: 'application', appId: r.appId, tab: 'post-sign-in' })}>
+              {r.name}
+            </button>
+            <span className="bb__linked__events">{r.events.join(', ')}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }

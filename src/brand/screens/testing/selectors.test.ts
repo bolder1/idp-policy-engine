@@ -192,10 +192,10 @@ describe('Check a person', () => {
     for (const r of rows.filter((x) => !['hrms', 'outlook', 'dropbox', 'google-workspace', 'github', 'slack'].includes(x.appId))) {
       expect([r.policyName, r.ruleName, answerSaid(r.res)]).toEqual(['Global Default Policy', 'Corporate device, where we operate', "Can't tell · Allow on 1 factor or Allow with 2FA"])
     }
-    /* Slack for everyone (30 Sep 2026) reads only the country: from the office
-       in India, a password whatever the device. AWS covers no HR person, so
+    /* Slack access (one policy, 14 Oct 2026): from the office in India an HR
+       person meets its last rule, a password whatever the device. AWS covers no HR person, so
        the Global Default still decides it, above. */
-    expect([at('slack').policyName, at('slack').ruleName, answerSaid(at('slack').res)]).toEqual(['Slack for everyone', 'Where we operate', 'Allow on 1 factor'])
+    expect([at('slack').policyName, at('slack').ruleName, answerSaid(at('slack').res)]).toEqual(['Slack access', 'Everyone else, where we operate', 'Allow on 1 factor'])
   })
 
   it('settles Outlook and Dropbox on an Android 14 phone', () => {

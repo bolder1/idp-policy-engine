@@ -58,7 +58,9 @@ export function AppLogo({
   size?: number
   rounded?: boolean
 }) {
-  const meta = BY_ID.get(appId)
+  /* A second application added from one catalogue entry is numbered
+     ("salesforce-2", app-catalog.ts `newAppId`) and keeps the entry's mark. */
+  const meta = BY_ID.get(appId) ?? BY_ID.get(appId.replace(/-\d+$/, ''))
   /* Through the registry entry, not the raw id: an aliased app resolves to the
      file its canonical id was fetched under. */
   const resolved = RESOLVED_LOGOS[meta?.id ?? appId]

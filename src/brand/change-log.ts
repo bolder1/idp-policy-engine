@@ -1,4 +1,4 @@
-import type { Group, Policy, User } from './data'
+import type { App, Group, Policy, User } from './data'
 import { describeChanges } from './screens/changes'
 
 /* -----------------------------------------------------------------------------
@@ -38,8 +38,9 @@ export function logChange(
   at: Date,
   groups?: Group[],
   directory?: User[],
+  apps?: readonly Pick<App, 'id' | 'name'>[],
 ): ChangeEntry[] {
-  const lines = describeChanges(before, after, groups, directory)
+  const lines = describeChanges(before, after, groups, directory, apps)
   if (before.status !== after.status) lines.push(statusLine(after.status))
   return lines.length === 0 ? [...log] : [{ id: nextId(), policyId: after.id, policyName: after.name, at: at.toISOString(), by, lines }, ...log]
 }
@@ -60,7 +61,11 @@ export function recentChanges(log: readonly ChangeEntry[], policyId: string, now
 export function seedChangeLog(policies: readonly Policy[], now: Date, by = 'Jaspreet Toor'): ChangeEntry[] {
   const seeds: { policyId: string; daysAgo: number; lines: string[] }[] = [
     { policyId: 'sc-aws-engineering', daysAgo: 2, lines: ['Added “Contractors away from the office”', 'Moved it to the top of the policy'] },
-    { policyId: 'sc-slack-engineering', daysAgo: 5, lines: ['Deny message changed on “Contractors need an office”'] },
+    /* Box's own (spec APP-POLICY-TAB.md, E1): two days ago, as its "Changed 2
+       days ago" stamp says, in `describeChanges`' own words for the Design
+       rule being added and its second factor then changed. */
+    { policyId: 'sc-box-engineering', daysAgo: 2, lines: ['Added “Designers, where we operate”', 'Authentication settings changed on “Designers, where we operate”'] },
+    { policyId: 'sc-slack-everyone', daysAgo: 5, lines: ['Second factor changed on “Contractors on a corporate device”'] },
     { policyId: 'sc-device-compliance', daysAgo: 9, lines: ['Switched on'] },
     { policyId: 'sc-dev-tools', daysAgo: 12, lines: ['Authentication settings changed on “Engineers on a compliant device”'] },
   ]

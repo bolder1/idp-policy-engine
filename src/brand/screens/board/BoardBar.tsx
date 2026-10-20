@@ -8,6 +8,7 @@ import type { Policy } from '../../data'
 import { ChangeState } from '../../leave-guard'
 import type { RuleSet } from '../../policy-draft'
 import { POLICY_NAME_MAX, policyNameIssue } from '../../policy-name'
+import { isPostSignIn } from '../../post-sign-in'
 import { useBrand } from '../../store'
 import { ACCESS_CHECK } from '../sign-in-tests/names'
 import { StatusControl } from '../status-control'
@@ -149,8 +150,10 @@ export function BoardBar({
      the first app in the catalogue. */
   const fromId = store.screen.name === 'board' ? store.screen.from?.appId : undefined
   const fromApp = fromId ? store.apps.find((a) => a.id === fromId) : undefined
+  /* A post sign-in policy goes back to the application's Post sign-in tab,
+     where it was opened from and where its links are made. */
   const back = () =>
-    store.go(fromApp ? { name: 'application', appId: fromApp.id, tab: 'policies', flash: policy.id } : { name: 'policies' })
+    store.go(fromApp ? { name: 'application', appId: fromApp.id, tab: isPostSignIn(policy) ? 'post-sign-in' : 'policies', flash: policy.id } : { name: 'policies' })
 
   return (
     <header className="bbtop">
@@ -320,6 +323,7 @@ export function BoardBarActions({
   readRef,
   testing,
   canTest,
+  offerTest = true,
   onTest,
   testRef,
   views,
@@ -330,6 +334,7 @@ export function BoardBarActions({
   blockers,
   saveBlocked,
   checking = false,
+  post = false,
   onSaveDraft,
   onDiscard,
   onSave,
@@ -339,14 +344,19 @@ export function BoardBarActions({
   onRead: () => void
   /** The button's wrapper, so focus can come back to it when the panel closes. */
   readRef?: Ref<HTMLSpanElement>
-  /** Test mode is on. */
+  /** Check access is on — pressed. Off while a view of its own (Past sign-ins) has the panel. */
   testing: boolean
   /** Only an app access policy decides sign-ins, so only one can be tried. */
   canTest: boolean
+  /* There is something to check: a policy with no rules shows neither Check access nor its views (owner,
+     19 Oct 2026: "no need to add Check access in an empty policy"). */
+  offerTest?: boolean
   onTest: () => void
   /** The button's wrapper, so focus can come back to it when test mode closes. */
   testRef?: Ref<HTMLSpanElement>
-  /** Check access's views (Past sign-ins), before its button while it is on. */
+  /* The views of their own (Past sign-ins), before Check access with a hairline between: a different thing
+     (owner, 19 Oct 2026: "Check access and Past sign-ins are two different things"), so on the bar whether or not
+     Check access is on, quieter, and pressed only while its own panel is open. */
   views?: ReactNode
   /* Check access's sign-in panel is open, and its Run is the view's one
      orange: the policy's save steps down to secondary until it shuts. */
@@ -362,6 +372,10 @@ export function BoardBarActions({
   saveBlocked: boolean
   /** The checks before saving are running: the button says so, and cannot be pressed twice. */
   checking?: boolean
+  /* A post sign-in policy (post-board.ts): it decides no sign-in, so the
+     sign-in tools — Read as text, Check access and its views — are not on
+     its bar at all, rather than drawn and refused. */
+  post?: boolean
   onSaveDraft: () => void
   onDiscard: () => void
   onSave: () => void
@@ -375,16 +389,25 @@ export function BoardBarActions({
           the bar would make it louder. Every edition: it only reads. Pressed
           while open, blue then, like Check access. Hidden (owner, 1 Oct
           2026: "Hide this 3 as of now"; bar-tools.ts). */}
-      {BAR_READ && (
-        <span className="bbtop__read" ref={readRef}>
-          <IconButton icon={AlignLeft} size="sm" tone="ghost" label="Read as text" pressed={reading} onClick={onRead} />
-        </span>
+      {!post && (
+        <>
+          {BAR_READ && (
+            <span className="bbtop__read" ref={readRef}>
+              <IconButton icon={AlignLeft} size="sm" tone="ghost" label="Read as text" pressed={reading} onClick={onRead} />
+            </span>
+          )}
+        </>
       )}
-      {testing && views}
+      {offerTest && !post && views && (
+        <>
+          {views}
+          {features.trySignIn && <span className="bbtop__sep" aria-hidden />}
+        </>
+      )}
       {/* On a wrapper, for the reason the review button's anchor is: `Button`
           passes no extra props, and the walkthrough and the focus return both
           need a real box to find. */}
-      {features.trySignIn && (
+      {features.trySignIn && !post && offerTest && (
         <span className="bbtop__try" data-tour="try-sign-in" ref={testRef}>
           <Button
             variant="secondary"

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Check, Eye, Pencil, Plus, UserRound, Users, X } from 'lucide-react'
 
-import { Badge, Button, Callout, IconButton, Modal, SearchBox } from '../../kit'
+import { Badge, Button, IconButton, Modal, SearchBox } from '../../kit'
+import { Picker } from '../../picker'
 import { NoMatches } from '../../empty'
 import { Face, FaceStack, type FaceItem } from '../../faces'
-import type { Audience, Rule, RuleWho } from '../../data'
+import { EVERYONE, type Audience, type Rule, type RuleWho } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { outsideAudience } from '../../audience-ops'
 import { normaliseWho, type WhoKind, type WhoList } from '../../rule-who'
@@ -69,8 +70,11 @@ export function WhoEditor({
   rule,
   audience,
   onPatch,
+  others = [],
 }: {
   rule: Rule
+  /** The other rules that name people, to copy a Who from (owner, 14 Oct 2026). */
+  others?: readonly { id: string; label: string; meta: string; who: RuleWho }[]
   /** The policy's own audience, for marking choices it does not govern. Never written here. */
   audience: Audience
   onPatch: (p: Partial<Rule>) => void
@@ -125,15 +129,18 @@ export function WhoEditor({
      section reads as two fields of one form, one filled and one not. */
   const pair =
     named === 0 ? (
+      /* The If section's empty state, in its shape (owner, 22 Sep 2026, and again 19 Oct: "we have a different empty
+         state for this one … like we have in condition"), with the answer it stands for as its heading — Everyone
+         (owner, 14 Oct 2026: "show the Who part with Everyone so the user can easily understand"): the mark, the
+         answer, one quiet line, and the two kinds' Adds as the If's text adders. */
       <div className="bb__ifblank bb__whoblank">
         <span className="bb__ifblank__mark" aria-hidden>
           <Users size={18} strokeWidth={1.8} />
         </span>
-        <h4>No groups or people yet</h4>
-        {/* The kit's info callout (owner, 22 Sep 2026: "make it an info banner in
-            blue"). It was a blue line, then a grey one; it is the one fact about
-            an empty who worth a banner — nothing chosen means everyone. */}
-        <Callout tone="info">By default this rule covers everyone in the policy. Add groups or people to narrow it.</Callout>
+        {/* The default in full, and what narrows it (owner, 19 Oct 2026: "say the full line … by default it applies to
+            everyone, and a related sub-heading like add users or groups"). */}
+        <h4>Applies to everyone by default</h4>
+        <p className="bb__whoblank__line">Add groups or people to narrow it</p>
         <div className="bb__ifblank__acts">
           {(['group', 'user'] as WhoKind[]).map((kind) => (
             <button key={kind} type="button" className="bb__ifadd" onClick={() => setPicking({ kind, view: 'all' })}>
@@ -159,6 +166,24 @@ export function WhoEditor({
     <div className="bb__who" ref={box} tabIndex={-1} onClickCapture={keepFocus}>
       {pair}
 
+      {/* Copy, not link: the same people and groups as another rule, then this rule's own to change. */}
+      {others.length > 0 && (
+        <div className="bb__whocopy">
+          <Picker
+            label="Copy who from another rule"
+            size="md"
+            width="fill"
+            value={null}
+            placeholder="Copy from another rule"
+            options={others.map((o) => ({ value: o.id, label: o.label, meta: o.meta }))}
+            onChange={(id) => {
+              const from = others.find((o) => o.id === id)
+              if (from) onPatch({ who: normaliseWho({ groupIds: [...from.who.groupIds], userIds: [...from.who.userIds] }) })
+            }}
+          />
+        </div>
+      )}
+
       <WhoDialog
         kind={picking?.kind ?? 'group'}
         open={picking !== null}
@@ -168,6 +193,66 @@ export function WhoEditor({
            "Apply to everyone" only when that is what saving would do. */
         otherCount={picking ? named - ids(picking.kind).length : 0}
         audience={audience}
+        onClose={() => setPicking(null)}
+        onSave={(next) => {
+          if (picking) write(picking.kind, next)
+          setPicking(null)
+        }}
+      />
+    </div>
+  )
+}
+
+/* --- Who a POLICY governs: its audience, at the start node ---------------------
+
+   Owner, 13 Oct 2026: a policy's groups are seen and changed at the builder's
+   start node, beside its applications. The same two entities and the same
+   dialog as a rule's Who, but it writes `Policy.audience`. Nothing chosen is
+   "Everyone". It reports every change up and does not save. */
+export function AudienceEditor({ audience, onChange }: { audience: Audience; onChange: (next: Audience) => void }) {
+  const resolve = useNameLookup()
+  const [picking, setPicking] = useState<{ kind: WhoKind; view: DialogView } | null>(null)
+  const ids = (kind: WhoKind): string[] => (audience.everyone ? [] : kind === 'group' ? audience.groupIds : audience.userIds)
+  const named = ids('group').length + ids('user').length
+
+  const write = (kind: WhoKind, next: string[]) => {
+    const groupIds = kind === 'group' ? next : ids('group')
+    const userIds = kind === 'user' ? next : ids('user')
+    onChange(groupIds.length + userIds.length === 0 ? EVERYONE : { everyone: false, groupIds, userIds })
+  }
+
+  return (
+    <div className="bb__who bb__aud">
+      {named === 0 && (
+        <p className="bb__aud__all">
+          <Users size={14} strokeWidth={1.9} aria-hidden />
+          Everyone
+        </p>
+      )}
+      <div className="bb__whorows">
+        {(['group', 'user'] as WhoKind[]).map((kind) =>
+          ids(kind).length > 0 ? (
+            <WhoRow
+              key={kind}
+              kind={kind}
+              faces={ids(kind).map((id) => ({ kind, key: id, name: resolve(kind, id) ?? `deleted · ${id}` }))}
+              outside={0}
+              onOpen={(view) => setPicking({ kind, view })}
+            />
+          ) : (
+            <EmptyWhoRow key={kind} kind={kind} onAdd={() => setPicking({ kind, view: 'all' })} />
+          ),
+        )}
+      </div>
+
+      <WhoDialog
+        kind={picking?.kind ?? 'group'}
+        open={picking !== null}
+        startView={picking?.view ?? 'all'}
+        chosen={picking ? ids(picking.kind) : []}
+        otherCount={picking ? named - ids(picking.kind).length : 0}
+        audience={EVERYONE}
+        subject="policy"
         onClose={() => setPicking(null)}
         onSave={(next) => {
           if (picking) write(picking.kind, next)
@@ -272,6 +357,7 @@ function WhoDialog({
   chosen,
   otherCount,
   audience,
+  subject = 'rule',
   onClose,
   onSave,
 }: {
@@ -283,6 +369,8 @@ function WhoDialog({
   /** How many are named in the OTHER included list, for what the footer offers. */
   otherCount: number
   audience: Audience
+  /** What the list is for. A rule by default. */
+  subject?: 'rule' | 'policy'
   onClose: () => void
   onSave: (ids: string[]) => void
 }) {
@@ -361,7 +449,7 @@ function WhoDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title={view === 'chosen' ? `${word.many} in this rule` : `Choose ${word.noun}`}
+      title={view === 'chosen' ? `${word.many} in this ${subject}` : `Choose ${word.noun}`}
       width={560}
       footer={
         <>
@@ -393,7 +481,7 @@ function WhoDialog({
           {draft.length === 0 ? (
             <p className="bb__whopick__lede">Nothing chosen, so the rule covers everyone the policy governs.</p>
           ) : (
-            <ul className="bb__wholist" aria-label={`${word.many} in this rule`}>
+            <ul className="bb__wholist" aria-label={`${word.many} in this ${subject}`}>
               {chosenRows.length === 0 && <NoMatches compact noun={word.noun} query={q} onClear={() => setQ('')} />}
               {chosenRows.map((r) => (
                 <li key={r.id} className="bb__whoitem is-view">

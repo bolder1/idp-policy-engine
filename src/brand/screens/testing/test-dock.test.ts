@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Policy } from '../../data'
 import { showcaseTenant } from '../../fixtures'
+import { isPostSignIn } from '../../post-sign-in'
 import { boardVersion } from '../board/try-sign-in'
 import { envOf, resolveSignIn } from '../tenant-resolver'
 import { savedOnPolicy } from './board-views'
@@ -12,6 +13,7 @@ import {
   PANEL_KEY,
   PEOPLE_CAP,
   appsPhrase,
+  appsWithSignIns,
   clampPanelWidth,
   dockTabShown,
   dockTabs,
@@ -243,7 +245,8 @@ describe('Saved sign-ins in the panel', () => {
      panel judges, by the version on the board. One that failed here would stand in the way
      of the first save the guard reads it on. */
   it('opens on two to four of each scenario policy’s own, every one a pass', () => {
-    for (const p of t.policies.filter((x) => !x.isSystem)) {
+    /* Sign-in policies: a post sign-in one has no Saved sign-ins panel (post-sign-in.ts). */
+    for (const p of t.policies.filter((x) => !x.isSystem && !isPostSignIn(x))) {
       const rows = panelRows(p)
       expect(rows.length, p.id).toBeGreaterThanOrEqual(2)
       /* More where the troubleshooting cases gather (TESTING-V4 §13, 30 Sep
@@ -307,6 +310,19 @@ describe('Past sign-ins', () => {
     expect(new Set(devReport.rows.map((r) => r.sample.facts.appId))).toEqual(new Set(['github', 'jira']))
     const global = pastReport(policy('global-default'), t.policies, env, undefined, DAY, policyApps(policy('global-default'), t.apps).map((a) => a.id))
     expect(global.rows).toHaveLength(12)
+  })
+
+  /* Spec APP-CREATE-AND-ACCESS.md §5: nobody has signed in to an application
+     added this session, so the week is modelled on the others alone. */
+  it('leaves out an application added this session', () => {
+    const apps = [...t.apps, { ...t.apps.find((a) => a.id === 'salesforce')!, id: 'salesforce-2', name: 'Salesforce 2', addedAt: Date.UTC(2026, 9, 13) }]
+    expect(appsWithSignIns(apps).map((a) => a.id)).toEqual(t.apps.map((a) => a.id))
+    const ids = appsWithSignIns(policyApps(policy('global-default'), apps)).map((a) => a.id)
+    const global = pastReport(policy('global-default'), t.policies, env, undefined, DAY, ids)
+    expect(global.rows.some((r) => r.sample.facts.appId === 'salesforce-2')).toBe(false)
+    /* A policy on the new application alone has no week at all. */
+    const onNew = { id: 'p-new', appIds: ['salesforce-2'], audience: { everyone: true, groupIds: [], userIds: [] } }
+    expect(pastReport(onNew, t.policies, env, undefined, DAY, appsWithSignIns(policyApps({ ...onNew, isSystem: false }, apps)).map((a) => a.id)).rows).toEqual([])
   })
 
   it('adds the tiles up: Would change and Unchanged are the week, Newly blocked is part of Would change', () => {

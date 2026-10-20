@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../../fixtures'
+import { withBillingFinance } from './conflict-fixture'
 import { runColumns, type ColumnSpec } from '../../board/try-sign-in'
 import { envOf } from '../../tenant-resolver'
 import { rowsRead } from '../../testing/rows-read'
@@ -31,18 +32,19 @@ const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const AS_IT_STANDS: ColumnSpec = { id: 'live', label: 'As the tenant stands', tip: 'Every policy as saved' }
 
-function planOf(personName: string | null, appName: string | null, patch: Partial<SignInForm> = {}): EngineRun {
+function planOf(personName: string | null, appName: string | null, patch: Partial<SignInForm> = {}, policies = t.policies): EngineRun {
   const person = personName === null ? null : (t.directory.people.find((p) => p.name === personName) ?? null)
   const app = appName === null ? null : (t.apps.find((a) => a.name === appName) ?? null)
-  const rows = rowsRead(t.policies, null, app?.id ?? null, lib)
+  const rows = rowsRead(policies, null, app?.id ?? null, lib)
   const base: SignInForm = { ...emptyDraft(TODAY, '09:30'), personId: person?.id ?? null, appId: app?.id ?? null }
   const form = { ...forRun(withDefaults(base, rows, [], TODAY, '09:30'), rows), ...patch } as SignInForm
   const { facts } = factsOf(form, t.zones)
-  const res = runColumns([AS_IT_STANDS], t.policies, facts, env)[0].resolution
-  return engineRun({ res, policies: t.policies, form, facts, env, ctx: { people: t.directory.people, apps: t.apps, zones: t.zones, rows }, intro: 'none' })
+  const res = runColumns([AS_IT_STANDS], policies, facts, env)[0].resolution
+  return engineRun({ res, policies, form, facts, env, ctx: { people: t.directory.people, apps: t.apps, zones: t.zones, rows }, intro: 'none' })
 }
 
-const MAYA = planOf('Maya Iyer', 'AWS Console')
+/* The showcase has one policy per application; the second, that also covers Maya, is rebuilt (conflict-fixture.ts). */
+const MAYA = planOf('Maya Iyer', 'AWS Console', {}, withBillingFinance(t.policies))
 const LEO_HOME = planOf('Leo Fernandes', 'AWS Console', originPatch('home'))
 const ARUN_NO_DEVICE = planOf('Arun Patel', 'GitHub Enterprise', { device: { kind: 'none' } } as Partial<SignInForm>)
 const RUNS = [

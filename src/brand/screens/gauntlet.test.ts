@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { EVERYONE, anySignIn, card, cond, groups, policies, when, type Policy, type Rule } from '../data'
+import { EVERYONE, anySignIn, audienceOf, card, cond, groups, policies, when, type Policy, type Rule } from '../data'
 import { showcaseTenant } from '../fixtures'
 import { DECK, applyFix, classify, proposeFix, runGauntlet, contextFor } from './gauntlet'
 import { rawEnv, decide } from './simulate'
@@ -248,6 +248,16 @@ describe('badges', () => {
   })
 })
 
+/* Scenario 5's DevOps policy as it was before the Workspace policies merged: the
+   merged policy's DevOps rule with its Who lifted into the audience. Built here
+   so the deck still has the strict exemplar it was written against. */
+function devopsOnly(): Policy | undefined {
+  const ws = policies.find((p) => p.id === 's5-workspace')
+  const r = ws?.rules.find((x) => x.who?.groupIds.includes('devops'))
+  if (!ws || !r) return undefined
+  return { ...ws, audience: audienceOf(['devops']), rules: [{ ...r, who: undefined }] }
+}
+
 describe('the seeded catalogue', () => {
   /* A product whose best available score is F teaches its user that the score
      only ever says "bad", after which nobody reads it. One seeded policy has to
@@ -256,7 +266,7 @@ describe('the seeded catalogue', () => {
      change worth failing a build over. */
   it('contains a policy that actually survives the deck', () => {
     /* A caveat before the argument below, found when the break-in deck was
-       rebuilt: this A proves less than it says. `s5-devops` governs DevOps,
+       rebuilt: this A proves less than it says. the DevOps rule of `s5-workspace` governs DevOps,
        and none of the four chip people is in DevOps, so every card is skipped
        — zero rounds, and an A for surviving nothing. Making it real needs a
        DevOps person on the chip deck, which changes `SITUATIONS` and the
@@ -264,13 +274,14 @@ describe('the seeded catalogue', () => {
        real exemplar meanwhile: `break-in.test.ts` runs the showcase's HRMS
        policy and finds nothing getting through it.
 
-       `s5-devops` — the use-case document's Scenario 5, Policy B. It replaces
+       The DevOps rule of `s5-workspace` — the use-case document's Scenario 5, Policy B,
+       which was its own policy until an application was limited to one. It replaces
        the invented Zero-Trust Baseline seed and it is a better exemplar than
        that was: it is the strictest thing the document writes anywhere, and it
        is strict for a stated reason rather than to pass this test. Office IP
        AND registered device AND MDM managed, then password plus a push. Nothing
        in the deck gets past it. */
-    const zt = policies.find((p) => p.id === 's5-devops')
+    const zt = devopsOnly()
     expect(zt, 'the Scenario 5 DevOps policy').toBeDefined()
 
     const r = runGauntlet(zt!, rawEnv)
@@ -280,7 +291,7 @@ describe('the seeded catalogue', () => {
   })
 
   it('keeps that policy clean under the linter too', () => {
-    const zt = policies.find((p) => p.id === 's5-devops')!
+    const zt = devopsOnly()!
     expect(diagnose(zt, groups).filter((d) => d.severity === 'error')).toEqual([])
   })
 

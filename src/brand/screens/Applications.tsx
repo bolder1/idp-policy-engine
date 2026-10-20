@@ -7,7 +7,7 @@ import { PageHead } from '../Shell'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
 import type { App } from '../data'
-import { summarise, type AppSummary } from './app-policies'
+import { ownerOf, summarise, type AppSummary } from './app-policies'
 import { compareUpdated } from './applications-model'
 import { AppProtection } from './AppProtection'
 import { ListPager } from './list-pager'
@@ -24,11 +24,17 @@ import { SHOWCASE } from '../showcase'
    The columns, the search, the button and the pager follow the live page. The
    Protection column is new.
 
+   Add application opens Choose application, the live catalogue (AppCatalog,
+   13 Oct 2026; spec docs/specs/APP-CREATE-AND-ACCESS.md §3).
+
    The name opens the application's own page, on Policies. The row menu is the
    live one's, less App Access Configuration: Edit (the page's Basic tab), Users
    and groups (the live "Show Associated Entities", the page's Users tab), and
-   Delete. The Protection cell keeps its quick add: the protection panel, where
-   new and existing are both visible before either is chosen.
+   Delete. Delete is still a toast: deleting an application needs
+   ConfirmDelete's refuse-while-live contract, the saved sign-ins that name it
+   and its retired id, and none of that is built (spec §5). The Protection cell
+   keeps its quick add: the protection panel, where new and existing are both
+   visible before either is chosen.
    -------------------------------------------------------------------------- */
 
 type SortKey = 'name' | 'type' | 'protection' | 'updated'
@@ -114,7 +120,8 @@ export function Applications() {
     )
   }
 
-  const addApp = () => store.showToast(SHOWCASE ? 'Adding applications is coming soon.' : 'Adding applications is not built in this prototype.')
+  /* Both doors, the bar's and the empty state's, open the catalogue. */
+  const addApp = () => store.go({ name: 'application-new' })
   const empty = store.apps.length === 0
 
   return (
@@ -174,7 +181,7 @@ export function Applications() {
                     <tr>
                       {head('name', 'Application name')}
                       {head('type', 'App type')}
-                      {head('protection', 'Protection')}
+                      {head('protection', 'Policy')}
                       {head('updated', 'Last updated')}
                       <th scope="col" className="btable__actions btable__col-actions">
                         Actions
@@ -234,7 +241,7 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
       </td>
       <td className="u-muted">{app.type}</td>
       <td>
-        <ProtectionCell app={app} summary={summary} onOpen={onOpen} />
+        <ProtectionCell app={app} summary={summary} policyName={ownerOf(app.id, store.policies)?.name} onOpen={onOpen} />
       </td>
       {/* Without the seconds; the full stamp is on hover. */}
       <td className="u-muted" title={app.lastUpdated}>
@@ -257,7 +264,8 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
 
 /* What protects this application, without opening anything: the count, and the
    shortfall when there is one. */
-function ProtectionCell({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpen: () => void }) {
+/* One application, one policy (owner, 14 Oct 2026): the cell names it. */
+function ProtectionCell({ app, summary, policyName, onOpen }: { app: App; summary: AppSummary; policyName?: string; onOpen: () => void }) {
   return (
     <button
       type="button"
@@ -266,7 +274,7 @@ function ProtectionCell({ app, summary, onOpen }: { app: App; summary: AppSummar
       title={summary.title}
       aria-label={`${summary.label}${summary.tag ? `, ${summary.tag}` : ''}. Open protection for ${app.name}`}
     >
-      <span>{summary.label}</span>
+      <span>{policyName ?? summary.label}</span>
       {summary.tag && <em>{summary.tag}</em>}
     </button>
   )

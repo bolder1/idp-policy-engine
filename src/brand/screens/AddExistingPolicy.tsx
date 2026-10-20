@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 
-import { Callout, Drawer, StatusPill, TipDot } from '../kit'
-import { Picker } from '../picker'
-import { ChangeState } from '../leave-guard'
+import { Badge, Button, Callout, Drawer, SearchBox, TipDot } from '../kit'
+import { AppLogo } from '../logos/AppLogo'
+import { NoMatches } from '../empty'
 import { useBrand } from '../store'
 import { appsOf, type App, type Policy } from '../data'
-import { DECISION_WORDS } from '../decision-words'
+import { isPostSignIn } from '../post-sign-in'
 import { listNames } from '../rule-who'
 import { AlsoNote } from './AppProtection'
 import { policyOption } from './policy-option'
-import { attachKind, attachTo, listPhrase, rulesLabel, type AttachKind } from './app-policies'
-import { appStanding, deciderChanges, rowTip, takenFrom, whoLabel } from './app-standing'
+import { attachKind, attachTo, detachFrom, type AttachKind } from './app-policies'
+import { appStanding, deciderChanges, rowTip, takenFrom } from './app-standing'
 import { SliderActions } from './select-rows'
-import { fallbackOf } from './simulate'
+import { PolicyPage } from './sign-in-tests/InspectPanel'
 
 /* -----------------------------------------------------------------------------
    Add existing policy, from an application's Policies tab.
@@ -56,6 +56,7 @@ export function AddExistingPolicy({
   onClose,
   onAdd,
   onCopy,
+  replacing,
 }: {
   open: boolean
   app: App
@@ -66,12 +67,20 @@ export function AddExistingPolicy({
   onAdd: (policyId: string) => boolean | 'checking'
   /** A draft copy with this application alone, opened in the builder. False when the policy no longer exists. */
   onCopy: (policyId: string) => boolean
+  /** Swapping the application's one policy: the one it has now, which the pick takes the place of. */
+  replacing?: Policy | null
 }) {
   const store = useBrand()
-  const { policies, apps, groups, users } = store
+  const { apps, groups, users } = store
+  /* Replacing: read as if the current policy were already off this application, and never offer it back. */
+  const policies = useMemo(
+    () => (replacing ? store.policies.map((p) => (p.id === replacing.id ? detachFrom(p, app.id) : p)) : store.policies),
+    [store.policies, replacing, app.id],
+  )
   const [pickId, setPickId] = useState<string | null>(null)
   const [tried, setTried] = useState(false)
   const [gone, setGone] = useState(false)
+  const [q, setQ] = useState('')
 
   /* A fresh form each time it opens: one picked last time is not still picked. */
   useEffect(() => {
@@ -79,18 +88,26 @@ export function AddExistingPolicy({
     setPickId(null)
     setTried(false)
     setGone(false)
+    setQ('')
   }, [open])
 
   const options = useMemo(
     () =>
       policies
-        .filter((p) => !p.isSystem)
+        /* Never a post sign-in policy, not even greyed: it is not a sign-in
+           policy of another kind, it is kept apart (post-sign-in.ts). */
+        .filter((p) => !p.isSystem && !isPostSignIn(p) && p.id !== replacing?.id)
         .map((p) => ({ p, kind: attachKind(p, app.id) }))
         /* Stable, so each group keeps the list's own order. */
         .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind])
         .map(({ p }) => policyOption(p, app, { apps, groups, users })),
-    [policies, app, apps, groups, users],
+    [policies, app, apps, groups, users, replacing],
   )
+
+  const shown = useMemo(() => {
+    const k = q.trim().toLowerCase()
+    return k ? options.filter((o) => (o.label + ' ' + (o.meta ?? '')).toLowerCase().includes(k)) : options
+  }, [options, q])
 
   const picked = pickId ? (policies.find((p) => p.id === pickId) ?? null) : null
   /* Deleted since it was picked, or found gone when Add re-read it. */
@@ -108,16 +125,15 @@ export function AddExistingPolicy({
          "AWS billing for Finance" on Box takes Maya Iyer off "Box for
          engineering" as well as Finance off the Global Default. */
       const froms = takenFrom(deciderChanges(app.id, policies, after, users, groups), picked.id).map((p) => p.name)
-      return { text: `Position ${row.n}${froms.length > 0 ? ` · takes over from ${listNames(froms, 2)}` : ''}`, tip: null }
+      return { pill: `Position ${row.n}`, text: froms.length > 0 ? `Takes over from ${listNames(froms, 2)}` : '', tip: null }
     }
-    if (row.state === 'never') return { text: 'Never decides', tip: rowTip(row, groups, users) }
-    if (row.state === 'monitor') return { text: 'Watches sign-ins, decides none', tip: null }
-    return { text: 'Decides nothing until turned on', tip: null }
+    if (row.state === 'never') return { pill: 'Never decides', text: '', tip: rowTip(row, groups, users) }
+    if (row.state === 'monitor') return { pill: 'Monitoring', text: 'Watches sign-ins, decides none', tip: null }
+    return { pill: 'Not on', text: 'Decides nothing until turned on', tip: null }
   }, [picked, policies, app.id, apps, users, groups])
 
   const others = picked ? appsOf(picked, apps).filter((a) => a.id !== app.id) : []
   const named = picked ? namedApp(picked, others) : null
-  const denyMessage = picked && fallbackOf(picked) === 'deny' ? picked.fallback?.denyMessage : undefined
 
   const add = () => {
     setTried(true)
@@ -146,14 +162,14 @@ export function AddExistingPolicy({
     <Drawer
       open={open}
       onClose={onClose}
-      title="Add existing policy"
+      title={replacing ? 'Replace policy' : 'Add existing policy'}
       caption={app.name}
-      width={560}
+      width={680}
       actions={
         <SliderActions
           onCancel={onClose}
-          another={kind === 'also' ? { label: 'Add a copy', run: copy } : null}
-          primary={{ label: checking ? 'Checking…' : `Add to ${app.name}`, run: add, disabled: !picked || checking }}
+          another={kind === 'also' && !replacing ? { label: 'Duplicate and add', run: copy } : null}
+          primary={{ label: checking ? 'Checking…' : replacing ? 'Replace with this policy' : 'Add this policy', run: add, disabled: !picked || checking }}
         />
       }
     >
@@ -165,76 +181,69 @@ export function AddExistingPolicy({
           </Callout>
         )}
 
-        <div className="bmc__field">
-          <div className="bmc__label">
-            <span className="bdt__label">Policy</span>
+        {/* The policies as a list, not a dropdown (owner, 13 Oct 2026): every one
+            in view with what it is, filed by where it is now. Picking one opens
+            its details; Change goes back to the list. */}
+        {picked ? (
+          <div className="bapp__pickedhead">
+            <span className="bdt__label">Selected policy</span>
+            <Button variant="link" onClick={() => setPickId(null)}>
+              Change policy
+            </Button>
           </div>
-          <Picker
-            label="Policy"
-            width="fill"
-            size="md"
-            searchable
-            noun="policies"
-            placeholder="Choose a policy"
-            invalid={tried && !picked}
-            value={picked ? picked.id : null}
-            options={options}
-            onChange={(v) => {
-              setPickId(v)
-              setGone(false)
-            }}
-          />
-        </div>
+        ) : (
+          <div className="bapp__pick">
+            <SearchBox block value={q} onChange={setQ} placeholder="Search policies" label="Search policies" />
+            {shown.length === 0 && <NoMatches compact noun="policies" query={q} onClear={() => setQ('')} />}
+            {shown.map((o, i) => (
+              <Fragment key={o.value}>
+                {o.group && o.group !== shown[i - 1]?.group && <h3 className="bapp__pickgroup">{o.group}</h3>}
+                <button
+                  type="button"
+                  className="bapp__pickrow"
+                  disabled={o.disabled}
+                  onClick={() => {
+                    setPickId(o.value)
+                    setGone(false)
+                  }}
+                >
+                  {o.art && <span className="bapp__pickart">{o.art}</span>}
+                  <span className="bapp__picktext">
+                    <b>{o.label}</b>
+                    {o.meta && <em>{o.meta}</em>}
+                  </span>
+                </button>
+              </Fragment>
+            ))}
+            {tried && !picked && <p className="bz7__fielderr" role="alert">Choose a policy.</p>}
+          </div>
+        )}
 
         {picked && (
           <>
-            {/* Label over value, as the console's detail fields read. */}
-            <dl className="bapp__preview">
-              <div>
-                <dt>Who</dt>
-                <dd>{whoLabel(picked, groups, users)}</dd>
+            {/* Where it lands here, the one fact the details page cannot know. */}
+            {placement && (
+              <div className="bapp__lands">
+                <AppLogo appId={app.id} name={app.name} size={20} />
+                <b>{app.name}</b>
+                <Badge tone="neutral">{placement.pill}</Badge>
+                {placement.text && <span>{placement.text}</span>}
+                {placement.tip && <TipDot text={placement.tip} label={`About ${picked.name}`} />}
               </div>
-              <div>
-                <dt>Rules</dt>
-                <dd>{rulesLabel(picked)}</dd>
-              </div>
-              <div>
-                <dt>Nothing else matched</dt>
-                <dd>
-                  {DECISION_WORDS[fallbackOf(picked)]}
-                  {denyMessage && <TipDot text={denyMessage} label="Deny message" />}
-                </dd>
-              </div>
-              {kind === 'also' && (
-                <div>
-                  <dt>Also on</dt>
-                  <dd>{listPhrase(others.map((a) => a.name))}</dd>
-                </div>
-              )}
-              <div>
-                <dt>Status</dt>
-                <dd>
-                  <StatusPill status={picked.status} />
-                  {picked.pendingDraft && <ChangeState unsaved={false} draft />}
-                </dd>
-              </div>
-              {placement && (
-                <div>
-                  <dt>On {app.name}</dt>
-                  <dd>
-                    {placement.text}
-                    {placement.tip && <TipDot text={placement.tip} label={`About ${picked.name}`} />}
-                  </dd>
-                </div>
-              )}
-            </dl>
-
+            )}
+            {/* Said first: they change what adding it means (owner, 13 Oct 2026). */}
             {kind === 'also' && <AlsoNote picked={picked} />}
             {named && (
               <Callout tone="notice" title="Names another application">
                 {named.name} appears in its name or a deny message.
               </Callout>
             )}
+            {/* The rest is the Policy details slider's own page (owner, 13 Oct 2026):
+                the overview card, then the rules in order, read only. */}
+            <div className="insp__page" key={picked.id}>
+              <PolicyPage policyId={picked.id} focus={undefined} plan={null} onEdit={() => {}} onOpenOne={() => {}} canvas />
+            </div>
+
           </>
         )}
       </div>

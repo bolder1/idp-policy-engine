@@ -12,6 +12,7 @@ import {
   type App,
   type Audience,
   type Condition,
+  type ConditionCard,
   type Group,
   type Policy,
   type Rule,
@@ -1415,7 +1416,8 @@ function condsFor(v: Omit<RuleView, 'outcome'>, skipZone = false): Condition[] {
   return out
 }
 
-const outcomeFields = (o: Outcome): Partial<Rule> =>
+/** A rule's Then fields for an outcome — the same ones every described card is written with. */
+export const outcomeFields = (o: Outcome): Partial<Rule> =>
   o.decision === 'deny'
     ? { decision: 'deny', ...(o.message ? { denyMessage: o.message } : null) }
     : o.decision === '1fa'
@@ -1476,8 +1478,74 @@ interface Planned {
   conds: Condition[]
 }
 
+/* Two opt-in ways to compose (Guided setup, 19 Oct 2026; docs/specs/GUIDED-SETUP.md). Callers that pass nothing keep
+   today's: no catch-all card, and "only" as the reader has always written it.
+
+   `catchAll: 'card'` — Everyone with no condition is a rule card named "Everyone", placed last among the rules,
+   instead of merging into the last row (the owner's "Add rule must visibly change the canvas"). The last row then
+   is not reached, and says so where it is shown.
+
+   `only: 'per-rule'` — "only" writes the rule AND its refusal for the same people: the conditions negated (one card
+   per negated condition, so "only from India on Corporate devices" refuses anybody outside India OR off them),
+   Deny. So "only" is enforced whatever the last row says.
+
+   With either, the composed rules are ordered so that none can shadow another (`orderComposed`): denies first,
+   named people before everyone, more conditions first, the catch-all card last — PE103 and PE104 cannot arise from
+   one composition. */
+export interface ComposeOpts {
+  catchAll?: 'merge' | 'card'
+  only?: 'auto' | 'per-rule'
+}
+
+/* A condition, the other way round: in ↔ not in a zone, matches ↔ does not match, above n ↔ below n + 1, between ↔
+   not between, is ↔ is not. Scopes and the time window's zone are kept; the id is new. */
+export function negatedCond(c: Condition): Condition {
+  const flip: Record<string, string> = {
+    'in zone': 'not in zone',
+    'not in zone': 'in zone',
+    matches: 'does not match',
+    'does not match': 'matches',
+    between: 'not between',
+    'not between': 'between',
+    is: 'is not',
+    'is not': 'is',
+    'returns true': 'returns false',
+    'returns false': 'returns true',
+  }
+  const fresh = cond(c.typeId, c.operator, [...c.values], undefined, { ...(c.key ? { key: c.key } : null), ...(c.tz ? { tz: c.tz } : null) })
+  const scopes = c.scopes ? { scopes: { ...c.scopes } } : null
+  if (c.operator === 'above' || c.operator === 'below') {
+    const n = Number(c.values[0])
+    const values = Number.isFinite(n) ? [String(c.operator === 'above' ? n + 1 : n - 1)] : [...c.values]
+    return { ...fresh, operator: c.operator === 'above' ? 'below' : 'above', values, ...scopes }
+  }
+  return { ...fresh, operator: flip[c.operator] ?? c.operator, ...scopes }
+}
+
+/** Not all of these at once: one card per negated condition, any of which refuses (De Morgan over one AND-card). */
+export const negatedCards = (conds: readonly Condition[]): ConditionCard[] => conds.map((c) => card(negatedCond(c)))
+
+/* How a composed (or guided) rule sorts: denies first; named people before everyone; more conditions first; 2FA
+   before 1 factor; and a catch-all — everyone, no condition — always last. Lower sorts first. */
+export function rankOf(r: Pick<Rule, 'who' | 'when' | 'decision'>): number[] {
+  const named = !!r.who && (r.who.groupIds.length > 0 || r.who.userIds.length > 0)
+  const conds = r.when.cards.reduce((n, k) => Math.max(n, k.conditions.length), 0)
+  const catchAll = !named && r.when.cards.length === 0 && !(r.who?.exceptGroupIds?.length || r.who?.exceptUserIds?.length)
+  return [catchAll ? 1 : 0, r.decision === 'deny' ? 0 : 1, named ? 0 : 1, -conds, r.decision === '2fa' ? 0 : 1]
+}
+export const rankCompare = (x: number[], y: number[]): number => {
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0)
+  return 0
+}
+/** Composed rules in rank order (stable). */
+export const orderComposed = <T extends { rule: Rule }>(xs: readonly T[]): T[] =>
+  xs
+    .map((x, i) => ({ x, i }))
+    .sort((p, q) => rankCompare(rankOf(p.x.rule), rankOf(q.x.rule)) || p.i - q.i)
+    .map((p) => p.x)
+
 /** The rules, last row and audience the answers describe. See the note at the top. */
-export function compose(a: DescribeAnswers, t: DescribeTenant, ids: RuleIds = new Map()): Composed {
+export function compose(a: DescribeAnswers, t: DescribeTenant, ids: RuleIds = new Map(), opts: ComposeOpts = {}): Composed {
   const audience = audienceOfAnswers(a)
   const notAdded: NotAdded[] = []
   const sources: Record<string, string> = {}
@@ -1540,6 +1608,11 @@ export function compose(a: DescribeAnswers, t: DescribeTenant, ids: RuleIds = ne
       name = 'High risk'
     }
     if (conds.length === 0 && !who) {
+      /* `catchAll: 'card'`: a card named Everyone, last among the rules (`orderComposed`, below). */
+      if (opts.catchAll === 'card' && b === 'match') {
+        if (!pendingAny(a)) planned.push({ key: b, rule: make(b, 'Everyone', [], o.value), source: spanWords(o.spans), conds: [] })
+        continue
+      }
       if (!pendingAny(a)) merged = o.value
       continue
     }
@@ -1589,7 +1662,17 @@ export function compose(a: DescribeAnswers, t: DescribeTenant, ids: RuleIds = ne
      reached. It is not written, and "only" is said under Not added — once
      nothing is still being asked, since an answer may give that rule its
      condition. */
-  if (a.only && who && writesOnlyRule(a)) {
+  /* `only: 'per-rule'`: the first rule and its refusal — the same people, its conditions negated, Deny — whatever the
+     last row says. A rule with no condition has nothing to refuse outside of, and a Deny has nothing to keep "only":
+     its refusal would deny the same people everywhere else too. */
+  const match = planned.find((p) => p.key === 'match')
+  if (a.only && opts.only === 'per-rule') {
+    if (match && match.conds.length > 0 && match.rule.decision !== 'deny') {
+      const name = `${whoWords(a, t)} ${refusalWords(match.conds, t)}`.trim()
+      const refusal = stamp('only', rule({ name, ...(who ? { who } : null), when: whenOf(...negatedCards(match.conds)), ...outcomeFields({ decision: 'deny', method: null, message: null }) }))
+      chain.push({ key: 'only', rule: refusal, source: a.only.phrase, conds: refusal.when.cards.flatMap((k) => k.conditions) })
+    } else ids.delete('only')
+  } else if (a.only && who && writesOnlyRule(a)) {
     if (!chain.some((p) => p.conds.length === 0)) {
       const r = make('only', `${whoWords(a, t)} elsewhere`, [], { decision: 'deny', method: null, message: null })
       chain.push({ key: 'only', rule: r, source: a.only.phrase, conds: [] })
@@ -1598,11 +1681,28 @@ export function compose(a: DescribeAnswers, t: DescribeTenant, ids: RuleIds = ne
     }
   }
 
+  if (opts.catchAll === 'card' || opts.only === 'per-rule') chain = orderComposed(chain)
   const rules = chain.map((p) => p.rule)
   for (const p of chain) if (p.source) sources[p.rule.id] = p.source
   /* A catch-all outcome decides every sign-in, so it is the last row whatever
      the text said for "anything else" — nothing else is left to reach it. */
   return { rules, fallback: merged ? lastRow(merged) : fallback, audience, sources, notAdded, merged: merged !== null }
+}
+
+/* A refusal's name after its people: "outside India", "not on Corporate devices" — ", or" between several. */
+function refusalWords(conds: readonly Condition[], t: DescribeTenant): string {
+  const zone = (id: string) => t.zones.find((z) => z.id === id)?.name ?? id
+  const profile = (id: string) => t.fingerprints.find((p) => p.id === id)?.name ?? id
+  const words = conds.map((c) => {
+    const names = (f: (id: string) => string) => c.values.map(f).join(' or ')
+    if (c.typeId === 'zone') return c.operator === 'in zone' ? `outside ${names(zone)}` : `in ${names(zone)}`
+    if (c.typeId === 'fingerprint') return c.operator === 'matches' ? `not on ${names(profile)}` : `on ${names(profile)}`
+    if (c.typeId === 'device-risk') return c.operator === 'above' ? `at risk ${c.values[0]} or below` : `at risk ${c.values[0]} or above`
+    if (c.typeId === 'time') return `outside ${c.values.join('–')}`
+    if (c.typeId === 'day') return `not on ${daysWords(c.values)}`
+    return 'elsewhere'
+  })
+  return words.join(', or ')
 }
 
 /* "only" said, and something else said for the rest — "…only from the
@@ -1615,7 +1715,8 @@ function writesOnlyRule(a: DescribeAnswers): boolean {
   return !fromOnly && (!!a.everyoneElse || !!a.fallback.value)
 }
 
-const ckeyOf = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}|${JSON.stringify(c.scopes ?? {})}`
+/** A condition by what it asks, not its id: two cards that ask the same thing compare equal. */
+export const ckeyOf = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}|${JSON.stringify(c.scopes ?? {})}`
 
 /* The last row, as the panel says it. */
 export type LastRow = 'set' | 'unset' | 'not-reached' | 'merged'

@@ -1,5 +1,5 @@
-import { ArrowUpRight, ChevronRight, Download, History, ListChecks, ListFilter, type LucideIcon } from 'lucide-react'
-import { Fragment, useMemo, useState } from 'react'
+import { Download, History, ListChecks, ListFilter, type LucideIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
 
 import { CantTell, DecisionBadge } from '../decision-badge'
 import { EmptyState } from '../empty'
@@ -11,11 +11,10 @@ import { useBrand } from '../store'
 import { SAMPLE_DAY } from './monitor-sample'
 import { PageBar } from './page-bar'
 import { useSimEnv } from './sim-env'
-import { CopyText } from './sign-in-tests/CopyText'
-import { NO_FILTER, activityCsv, activitySummaryOf, changesCsv, filterActivity, reasonCounts, signInActivity, type ActivityFilter, type ActivityRow } from './sign-in-tests/activity'
-import { ACCESS_CHECK } from './sign-in-tests/names'
+import { NO_FILTER, activityCsv, changesCsv, filterActivity, reasonCounts, signInActivity, type ActivityFilter, type ActivityRow } from './sign-in-tests/activity'
+import { SignInRow } from './sign-in-tests/activity-row'
 import { relativeTime } from './sign-in-tests/runs'
-import { DENY_REASON_WORD, denyRef } from './testing/deny-reason'
+import { DENY_REASON_WORD } from './testing/deny-reason'
 import { useTestingSession } from './testing/session-state'
 import { formOf } from './testing/sign-in-form'
 import './sign-in-tests/sign-in-activity.css'
@@ -60,16 +59,26 @@ const VIEWS: { value: View; label: string; icon: LucideIcon }[] = [
   { value: 'changes', label: 'Policy changes', icon: History },
 ]
 
-export function SignInActivity() {
+/* The route's way in (spec APP-POLICY-TAB.md §8.1): an application's Policies tab opens it narrowed to that
+   application with every result, or on Policy changes searched for its policy. Read once, on arrival; from there
+   the filters are the page's own. Opened anywhere else, it starts on the blocked sign-ins, as it always has. */
+export function SignInActivity({ appId, view: startView, q, from }: { appId?: string; view?: View; q?: string; from?: { appId: string } } = {}) {
   const { policies, apps, zones, go, changeLog } = useBrand()
-  const [view, setView] = useState<View>('sign-ins')
+  /* Opened from an application's Policies tab: the crumb goes back there while the application exists, else to Policies. */
+  const fromApp = from ? apps.find((a) => a.id === from.appId) : undefined
+  const crumb = fromApp
+    ? { label: fromApp.name, onClick: () => go({ name: 'application', appId: fromApp.id, tab: 'policies' }) }
+    : { label: 'Policies', onClick: () => go({ name: 'policies' }) }
+  const [view, setView] = useState<View>(startView ?? 'sign-ins')
   const env = useSimEnv()
   const session = useTestingSession()
   const rows = useMemo(() => signInActivity(policies, env, SAMPLE_DAY, apps), [policies, env, apps])
-  const [filter, setFilter] = useState<ActivityFilter>({ ...NO_FILTER, result: 'blocked' })
+  const [filter, setFilter] = useState<ActivityFilter>({ ...NO_FILTER, q: q ?? '', appId: appId ?? 'all', result: appId ? 'all' : 'blocked' })
   const [open, setOpen] = useState<string | null>(null)
   const shown = useMemo(() => filterActivity(rows, filter), [rows, filter])
-  const why = useMemo(() => reasonCounts(rows), [rows])
+  /* Counted over the sign-ins the application and the search leave — the rows a chip narrows — so a page opened on one
+     application says that application's reasons, not the tenant's. */
+  const why = useMemo(() => reasonCounts(filterActivity(rows, { ...NO_FILTER, appId: filter.appId, q: filter.q })), [rows, filter.appId, filter.q])
   const changes = useMemo(() => {
     const needle = filter.q.trim().toLowerCase()
     return changeLog.filter((c) => !needle || `${c.policyName} ${c.by} ${c.lines.join(' ')}`.toLowerCase().includes(needle))
@@ -91,7 +100,7 @@ export function SignInActivity() {
       <PageHead
         title="Sign-in activity"
         caption="The week’s sign-ins across every application, and why any were refused."
-        crumb={{ label: 'Policies', onClick: () => go({ name: 'policies' }) }}
+        crumb={crumb}
       />
       <Tabs<View> className="bx-tabs--line sia__tabs" name="View" value={view} onChange={setView} options={VIEWS} />
       <PageBar
@@ -183,59 +192,30 @@ export function SignInActivity() {
                 {shown.map((r) => {
                   const on = open === r.id
                   return (
-                    <Fragment key={r.id}>
-                      <tr className={`sia__row${on ? ' is-open' : ''}`}>
-                        <td className="sia__when">
-                          <button type="button" className="sia__toggle" aria-expanded={on} aria-label={`${r.who} on ${r.app}, ${r.when}. Show details`} onClick={() => setOpen(on ? null : r.id)}>
-                            <ChevronRight size={14} strokeWidth={2} aria-hidden className="sia__chev" />
-                            {r.when}
-                          </button>
-                        </td>
-                        <td>{r.who}</td>
-                        <td>
-                          <span className="sia__app">
-                            <AppLogo appId={r.appId} name={r.app} size={16} />
-                            {r.app}
-                          </span>
-                        </td>
-                        <td className="sia__muted">{r.from}</td>
-                        <td>{r.decision ? <DecisionBadge decision={r.decision} /> : <CantTell />}</td>
-                        <td className="sia__muted">{r.reason ? DENY_REASON_WORD[r.reason] : ''}</td>
-                      </tr>
-                      {on && (
-                        <tr className="sia__detail">
-                          <td colSpan={6}>
-                            <div className="sia__panel">
-                              <dl className="sia__lines">
-                                {r.policyName && (
-                                  <div>
-                                    <dt>Decided by</dt>
-                                    <dd>
-                                      {r.policyName}
-                                      {r.ruleLine && <span className="sia__muted"> · {r.ruleLine}</span>}
-                                    </dd>
-                                  </div>
-                                )}
-                                {r.reason && (
-                                  <div>
-                                    <dt>Reason</dt>
-                                    <dd>
-                                      {DENY_REASON_WORD[r.reason]} <span className="sia__muted">· {denyRef(r.reason)}</span>
-                                    </dd>
-                                  </div>
-                                )}
-                              </dl>
-                              <div className="sia__acts">
-                                <Button variant="secondary" size="sm" iconRight={ArrowUpRight} onClick={() => openInChecks(r)}>
-                                  Open in {ACCESS_CHECK}
-                                </Button>
-                                <CopyText text={activitySummaryOf(r)} className="bb__act sia__copy" />
-                              </div>
-                            </div>
+                    <SignInRow
+                      key={r.id}
+                      row={r}
+                      open={on}
+                      onToggle={() => setOpen(on ? null : r.id)}
+                      when={r.when}
+                      colSpan={6}
+                      onOpenInChecks={openInChecks}
+                      cells={(toggle) => (
+                        <>
+                          <td className="sia__when">{toggle}</td>
+                          <td>{r.who}</td>
+                          <td>
+                            <span className="sia__app">
+                              <AppLogo appId={r.appId} name={r.app} size={16} />
+                              {r.app}
+                            </span>
                           </td>
-                        </tr>
+                          <td className="sia__muted">{r.from}</td>
+                          <td>{r.decision ? <DecisionBadge decision={r.decision} /> : <CantTell />}</td>
+                          <td className="sia__muted">{r.reason ? DENY_REASON_WORD[r.reason] : ''}</td>
+                        </>
                       )}
-                    </Fragment>
+                    />
                   )
                 })}
               </tbody>

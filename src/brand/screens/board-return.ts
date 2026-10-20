@@ -17,6 +17,12 @@
 /** Policy id → whether the application had a deciding policy when the press sent it to the board. */
 export type SentToBoard = Map<string, boolean>
 
+/* The one map every door shares — the application page's New policy and Add
+   a copy, and the unsaved application's New policy (13 Oct 2026) — so the
+   first deciding policy is celebrated whichever door sent it. Module state,
+   because the page that pressed is unmounted while the board is open. */
+export const SENT_TO_BOARD: SentToBoard = new Map()
+
 /** A press on an application's page sends the draft `id` to the board; `had` is whether the application had a deciding policy then. */
 export function sendToBoard(sent: SentToBoard, id: string, had: boolean): void {
   sent.set(id, had)

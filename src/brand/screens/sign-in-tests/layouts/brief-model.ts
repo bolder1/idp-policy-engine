@@ -3,6 +3,7 @@ import { DECISION_WORDS } from '../../../decision-words'
 import type { Via } from '../conflicts'
 import type { CheckRow, EngineRule, EngineRun } from '../engine-run'
 import type { TokenValue } from '../../testing/sign-in-sentence'
+import type { OneWhy } from './classic2-one-model'
 
 /* -----------------------------------------------------------------------------
    The brief's model (BriefLayout.tsx), pure: the run said as ONE sentence,
@@ -103,6 +104,10 @@ export interface BriefInput {
   appId?: string | null
   /** The sign-in's stated facts, as the row on top says them: their marks. */
   facts?: readonly TokenValue[]
+  /* ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD, 20 Oct 2026): why the card is the policy it is (classic2-one-model.ts
+     `oneWhy`). Set, the policy clause says it as the card does — the application's own policy applies, and the rule
+     that matched says how the person got in; or why the Global Default applies instead. Absent, as it was. */
+  one?: { why: OneWhy }
 }
 
 /* Cut `text` where it names one of `picks` — each at its first place, the
@@ -217,6 +222,9 @@ export function viaWords(via: Via | null | undefined): string {
   return ''
 }
 
+/** The merged card's status words, said in the sentence: "the HRMS access from corporate offices policy is inactive". */
+const ONE_IS: Record<'inactive' | 'draft' | 'monitoring', string> = { inactive: 'is inactive', draft: 'is a draft', monitoring: 'is monitoring' }
+
 /** A no-break space: "rule 2" never splits over two lines. */
 export const NB = String.fromCharCode(160)
 
@@ -316,7 +324,29 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
   }
 
   /* Then the policy, and how it covers them. */
-  if (decider) {
+  const why = inp.one?.why ?? null
+  if (decider && why && why.kind !== 'own' && why.kind !== 'none') {
+    /* The merged card's reason line, said: why the Global Default applies (classic2-one-model.ts `oneReasonWords`). */
+    t(': ', atPol)
+    if (why.kind === 'no-policy') {
+      t('the ', atPol)
+      t(inp.app, atPol, { segs: appSegs() })
+      t(`${appKind} has no sign-in policy`, atPol)
+    } else if (why.kind === 'outside') {
+      t(inp.first, atPol, { cite: 'who', segs: inp.name ? splitBy(inp.first, [{ text: inp.first, entity: 'person', glyph: { kind: 'face', name: inp.name } }]) : undefined })
+      t(` is outside the ${why.name ?? ''}${policyKind(why.name ?? '')}`, atPol)
+    } else {
+      t(`the ${why.name ?? ''}${policyKind(why.name ?? '')} ${ONE_IS[why.kind]}`, atPol)
+    }
+    t(', so the ', atPol)
+    t(decider.name, atPol, { cite: 'policy', segs: marked(decider.name, { kind: 'policy' }) })
+    t(`${policyKind(decider.name)} applies`, atPol)
+  } else if (decider && why) {
+    /* The application's own policy (or the builder's): it applies, and how the person got in is the rule's to say. */
+    t(': the ', atPol)
+    t(decider.name, atPol, { cite: 'policy', segs: marked(decider.name, { kind: 'policy' }) })
+    t(`${policyKind(decider.name)} applies`, atPol)
+  } else if (decider) {
     if (decider.isGlobalDefault && plan.policies.length > 1) {
       t(': no policy on the ', atPol)
       t(inp.app, atPol, { segs: appSegs() })
@@ -354,6 +384,13 @@ export function briefOf(plan: EngineRun, inp: BriefInput): BriefModel {
     t(', and ', atRule)
     t(ruleNo(land), atRule, { cite: 'rule', segs: marked(ruleNo(land), { kind: 'rule' }) })
     t(' matches', atRule)
+    /* Merged card, the application's own policy: how the person got in is the rule's ("through the Sales group"). */
+    const by = why?.kind === 'own' && !decider?.isGlobalDefault ? viaWords(land.via) : ''
+    if (by) {
+      const named = land.via?.groups.map((g): Seg => ({ text: g.name, entity: 'group', glyph: { kind: 'group' } })) ?? []
+      t(' ', atRule)
+      t(by, atRule, { cite: 'who', segs: splitBy(by, named) })
+    }
     if (dCheck) {
       const w = checkWords(dCheck)
       t(' because ', atCheck)

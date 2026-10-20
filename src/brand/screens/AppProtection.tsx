@@ -3,7 +3,7 @@ import { useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Pencil, ShieldPlus, Unlink } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, Modal, RowMenu, StatusPill, TipDot, type MenuItem } from '../kit'
+import { Badge, Button, Callout, Drawer, Modal, Note, RowMenu, StatusPill, TipDot, type MenuItem } from '../kit'
 import { EmptyState } from '../empty'
 import { Picker } from '../picker'
 import { AppLogo } from '../logos/AppLogo'
@@ -12,6 +12,7 @@ import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
 import { appsOf, blankPolicy, nameTaken, type Policy } from '../data'
 import { DECISION_WORDS } from '../decision-words'
+import { isPostSignIn } from '../post-sign-in'
 import { ApplicationFixed } from './scope-fields'
 import { attachKind, attachTo, attachableTo, detachFrom, rulesLabel } from './app-policies'
 import { appStanding, deciderChanges, keyName, rowTip, visibleMoves, whoLabel, type Key, type StandRow } from './app-standing'
@@ -138,7 +139,8 @@ export function AppProtection({
   const { rows, fallback, everyoneElse } = standing
   const options = app ? attachableTo(app.id, store.policies) : []
   const none = options.length === 0
-  const otherPolicies = store.policies.filter((p) => !p.isSystem).length
+  /* Sign-in policies only, as `attachableTo` offers: a post sign-in policy is never attached here. */
+  const otherPolicies = store.policies.filter((p) => !p.isSystem && !isPostSignIn(p)).length
   const picked = pickId ? (store.policyById(pickId) ?? null) : null
   const alsoOn = picked && app ? attachKind(picked, app.id) === 'also' : false
 
@@ -230,13 +232,19 @@ export function AppProtection({
           : 'Attach policy'
 
   /* The row menu here: the builder, and taking the policy off. Status changes
-     and the details slider are the application page's. */
+     and the details slider are the application page's.
+
+     The board opens carrying this application (`from`), as it does from the
+     application's own page, so its way back lands on the application's
+     Policies tab with the policy lit (BoardBar.tsx), not on All Policies
+     (spec APP-CREATE-AND-ACCESS.md §5). */
   const menu: MenuItem[] = [
     { id: 'edit', label: 'Edit policy', icon: Pencil },
     { id: 'remove', label: `Remove from ${app.name}`, icon: Unlink, danger: true, divide: true },
   ]
+  const toBoard = (policyId: string) => store.go({ name: 'board', policyId, from: { appId: app.id } })
   const onMenu = (p: Policy) => (id: string) => {
-    if (id === 'edit') store.go({ name: 'board', policyId: p.id })
+    if (id === 'edit') toBoard(p.id)
     if (id === 'remove') setRemoving(p)
   }
 
@@ -400,7 +408,7 @@ export function AppProtection({
                         tip={rowTip(row, store.groups, store.users)}
                         who={whoLabel(row.policy, store.groups, store.users)}
                         fresh={flash?.id === row.policy.id || justAdded === row.policy.id}
-                        onOpen={() => store.go({ name: 'board', policyId: row.policy.id })}
+                        onOpen={() => toBoard(row.policy.id)}
                         menu={menu}
                         onSelect={onMenu(row.policy)}
                       />
@@ -578,18 +586,19 @@ export function FallbackRow({ fallback, everyoneElse }: { fallback: Policy; ever
   )
 }
 
-/* Attaching adds; the policy keeps its other applications. Info, not a
-   warning: nothing is at stake, there is something to know. */
+/* Attaching adds; the policy keeps its other applications. A note, not a
+   warning: nothing is at stake, there is something to know. The kit's `Note`
+   since 16 Oct 2026 (owner: every note is the one note). */
 export function AlsoNote({ picked }: { picked: Policy }) {
   const store = useBrand()
   const on = appsOf(picked, store.apps)
   if (on.length === 0) return null
 
   return (
-    <Callout tone="info" title="Also on other applications">
+    <Note title="Also on other applications">
       <em>{picked.name}</em> stays on <strong>{on.map((a) => a.name).join(', ')}</strong>. Edits to it apply to every
       application it is on.
-    </Callout>
+    </Note>
   )
 }
 

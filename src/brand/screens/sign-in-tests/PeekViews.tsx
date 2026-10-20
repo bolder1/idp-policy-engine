@@ -74,6 +74,7 @@ export function KindMark({ target, small = false }: { target: InspectTarget; sma
 export function CountTip({ label, lists }: { label: string; lists: readonly { kind: string; names: readonly string[] }[] }) {
   const shown = lists.filter((l) => l.names.length > 0)
   if (shown.length === 0) return <>{label}</>
+  const faces = shown.flatMap((l) => l.names.map((name, i) => ({ key: `${l.kind}:${i}`, name, kind: (l.kind === 'Groups' ? 'group' : 'user') as 'group' | 'user' })))
   return (
     <Tip
       width={280}
@@ -88,7 +89,14 @@ export function CountTip({ label, lists }: { label: string; lists: readonly { ki
         </span>
       }
     >
-      <span className="insp__count" tabIndex={0}>
+      <span className="insp__count insp__trail" tabIndex={0}>
+        {/* The faces of who it names, then the count; the list is under the pointer. */}
+        <span className="bx-faces is-sm" aria-hidden>
+          {faces.slice(0, 4).map((f) => (
+            <Face key={f.key} kind={f.kind} name={f.name} size="sm" decorative />
+          ))}
+          {faces.length > 4 && <span className="bx-face is-more is-sm">+{faces.length - 4}</span>}
+        </span>
         {label}
       </span>
     </Tip>

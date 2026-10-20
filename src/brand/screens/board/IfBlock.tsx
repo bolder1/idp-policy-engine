@@ -5,9 +5,11 @@ import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
 import { FaceStack, type FaceItem } from '../../faces'
 import { conditionName, conditionType, zoneScopeOf, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
+import { postActionLabel } from '../../post-sign-in'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
 import { isPristine } from './parts'
+import { POST_TONE, usePostBoard } from './post-board'
 import { conditionIcon, conditionTone } from './tones'
 
 /* -----------------------------------------------------------------------------
@@ -193,6 +195,8 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
   const vals = c.values.filter(Boolean)
   if (vals.length === 0) return [{ text: 'no value', unset: true }]
   if (t.valueKind === 'time') return [{ text: `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`, unset: false }]
+  /* A typed number, with what it counts: "8 hours", "1000 records". */
+  if (t.valueKind === 'number') return [{ text: `${vals[0]}${t.unit ? ` ${t.unit}` : ''}`, unset: false }]
   if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'group' || t.valueKind === 'user')
     return vals.map((v) => {
       const name = resolve(t.valueKind as 'zone', v)
@@ -209,6 +213,8 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
 /** One condition, read-only: [attribute] operator [value]… */
 export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup }) {
   const t = conditionType(c.typeId)
+  /* "Event hours", not "Sign-in hours", on a post sign-in policy (data.ts `postLabel`). */
+  const name = conditionName(c, usePostBoard().on)
   const Ico = conditionIcon(t.id, t.group)
   const tone = conditionTone(t.id, t.group)
   /* Which half of each zone (per zone since 22 Sep 2026). One half shared by
@@ -228,14 +234,14 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
      line, which is the one most likely to push the values off it. */
   const shared = uniform ? halves[0] : undefined
   const scope = shared === 'ip' ? 'on the network only' : shared === 'location' ? 'by location only' : ''
-  const head = conditionName(c).length + ATTR + c.operator.length + OP + (scope ? scope.length + OP : 0)
+  const head = name.length + ATTR + c.operator.length + OP + (scope ? scope.length + OP : 0)
   const n = valuesShown(chips, head)
   const shown = chips.slice(0, n)
   const rest = chips.length - n
   return (
     <>
       <IfChip tone={tone} variant="attr" icon={<Ico size={11} strokeWidth={2.2} />} title={t.group}>
-        {conditionName(c)}
+        {name}
       </IfChip>
       <IfKw tone="op">{c.operator}</IfKw>
       {/* As many names as the line holds, then how many more.
@@ -270,6 +276,23 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
 
 /** The rule's consequence, in its tone, under a `then` that matches the `if`. */
 export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactNode; control?: ReactNode }) {
+  const post = usePostBoard().on
+  /* A post sign-in rule's Then is its action and nothing after it: no
+     factors, so no journey. Said "Not set" until one is chosen — in the
+     unset chip, as a value nobody has given — because a rule without one
+     keeps the policy a draft (post-sign-in.ts `turnOnIssue`). */
+  if (post)
+    return (
+      <>
+        <div className="bb__ifrow">
+          <IfKw>then</IfKw>
+        </div>
+        <IfSub className="bb__ifaction">
+          {token}
+          {rule.action ? <IfChip tone={POST_TONE[rule.action]}>{postActionLabel(rule.action)}</IfChip> : <IfChip unset>Not set</IfChip>}
+        </IfSub>
+      </>
+    )
   const journey = journeyOf(rule)
   return (
     <>
@@ -373,6 +396,7 @@ export function IfBlock({
      can move. */
   const cards = rule.when.cards
   const top = topJoin(rule.when)
+  const post = usePostBoard().on
   if (terminal)
     return (
       <div className="bb__if">
@@ -441,9 +465,28 @@ export function IfBlock({
 
   return (
     <div className="bb__if">
+      {/* Who first, always, and Everyone as a node of its own (owner, 19 Oct 2026: "we have to show the who and
+          everyone here as a node"): the rule's default said as the answer it is, the way the panel says it. */}
+      {!hasWho && (
+        <>
+          <div className="bb__ifrow">
+            <span className="bb__ifbranch" aria-hidden>
+              <Users size={12} strokeWidth={2} />
+            </span>
+            <span className="bb__ifkw">who</span>
+          </div>
+          <IfSub className="bb__ifwho">
+            <span className="bb__ifchip bb__ifwho__all">
+              <Users size={12} strokeWidth={2} aria-hidden />
+              Everyone
+            </span>
+            {mark?.('who')}
+          </IfSub>
+        </>
+      )}
       {blank && (
-        /* One quiet line rather than a skeleton of the rule. The two doors that
-           fix it are on the panel, which this card opens. */
+        /* One quiet line under the who rather than a skeleton of the rule. The doors that fix it are on the panel,
+           which this card opens. */
         <div className="bb__ifrow">
           <span className="bb__ifkw is-blank">Nothing set yet</span>
         </div>
@@ -454,7 +497,7 @@ export function IfBlock({
             <Split size={12} strokeWidth={2} />
           </span>
           <IfKw>if</IfKw>
-          <span className="bb__ifjourney">Every sign-in</span>
+          <span className="bb__ifjourney">{post ? 'Every event' : 'Every sign-in'}</span>
         </div>
       )}
       {hasWho && (

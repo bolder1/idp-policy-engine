@@ -449,44 +449,214 @@ button.bdsc__check:focus-visible { outline: 2px solid var(--ctl-border-focus); o
   .bdsc-door { transition: none; }
 }
 
-/* Describe it, the short way in (DescribeQuick.tsx). */
-.bdsq { display: flex; flex-direction: column; gap: var(--space-6); width: 100%; }
-.bdsq__q { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Describe it, the short way in (DescribeQuick.tsx), redrawn 19 Oct 2026.
+   A guided column: three questions on a rail, each marker a number until it is answered and a green tick after;
+   the sentence the form sends, written out live in a card with Add rule; examples under it. Selection is blue,
+   never orange; Add rule is ink, like the composer's Send, so the bar's Save policy stays the one orange button. */
+.bdsq { display: flex; flex-direction: column; gap: var(--space-7); width: 100%; }
 .bdsq__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.bdsq__opts { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.bdsq__opt {
-  padding: var(--space-3) var(--space-5);
-  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
-  background: var(--surface); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
-  cursor: pointer;
+
+.bdsq__steps { display: flex; flex-direction: column; }
+.bdsq__q { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: var(--space-5); padding-bottom: var(--space-7); }
+.bdsq__q.is-last { padding-bottom: 0; }
+/* The rail between markers. */
+.bdsq__q:not(.is-last)::before {
+  content: ''; position: absolute; left: 10.5px; top: 26px; bottom: 4px;
+  width: 1px; background: var(--border-subtle);
 }
-.bdsq__opt:hover { background: var(--surface-sunken); }
-.bdsq__opt[aria-pressed="true"] { background: var(--tint-blue-bg); border-color: var(--tint-blue-fg); color: var(--tint-blue-fg); }
+.bdsq__mark {
+  box-sizing: border-box; width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border-default); border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bdsq__mark.is-done { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.bdsq__markin { display: grid; place-items: center; }
+.bdsq__body { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding-top: 2px; }
+
+/* The applications chosen, by logo and name, each removable. */
+.bdsq__apps { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bdsq__app {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 26px; padding: 0 var(--space-1) 0 var(--space-3);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-size: var(--fs-sm); color: var(--text-primary);
+}
+.bdsq__appname { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bdsq__appx {
+  display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: var(--radius-sm); color: var(--text-tertiary);
+}
+.bdsq__appx:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bdsq__appx:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* What happens: three tiles, mark over word. */
+.bdsq__opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.bdsq__opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3);
+  min-height: 64px; padding: var(--space-4);
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); text-align: left;
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bdsq__opt:hover { border-color: var(--border-default); background: var(--surface-sunken); }
+.bdsq__opt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsq__opticon { color: var(--text-tertiary); }
+.bdsq__opt[aria-pressed="true"] { background: var(--tint-blue-bg); border-color: var(--tint-blue-fg); color: var(--tint-blue-fg); box-shadow: inset 0 0 0 1px var(--tint-blue-fg); }
+.bdsq__opt[aria-pressed="true"] .bdsq__opticon { color: var(--tint-blue-fg); }
+
+/* Additional actions: a quiet disclosure, its picks as blue chips beside it. */
 .bdsq__more { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .bdsq__morebtn {
   display: inline-flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  margin-left: calc(-1 * var(--space-3)); padding: var(--space-2) var(--space-3);
   font: inherit; font-size: var(--fs-sm); color: var(--text-secondary);
   background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer;
 }
 .bdsq__morebtn:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bdsq__morebtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsq__morechev { display: inline-grid; place-items: center; }
 .bdsq__menu {
-  position: absolute; top: 100%; left: 0; z-index: 5; margin-top: var(--space-2);
-  min-width: 240px; padding: var(--space-2);
+  position: absolute; top: 100%; left: calc(-1 * var(--space-3)); z-index: 5; margin-top: var(--space-2);
+  min-width: 248px; padding: var(--space-2);
   display: flex; flex-direction: column;
-  background: var(--surface); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--el-low);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--el-mid);
 }
 .bdsq__item {
+  display: flex; align-items: center; gap: var(--space-4);
   text-align: left; padding: var(--space-3) var(--space-4);
   font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
   background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer;
 }
 .bdsq__item:hover { background: var(--surface-sunken); }
-.bdsq__item[aria-checked="true"] { color: var(--tint-blue-fg); font-weight: var(--fw-medium); }
-.bdsq__chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.bdsq__item:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-halo); }
+.bdsq__check {
+  box-sizing: border-box; flex: none; width: 16px; height: 16px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  color: var(--surface-raised);
+}
+.bdsq__check.is-on { background: var(--tint-blue-fg); border-color: var(--tint-blue-fg); }
+.bdsq__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .bdsq__chip {
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   font: inherit; font-size: var(--fs-sm); color: var(--tint-blue-fg);
   background: var(--tint-blue-bg); border: 0; border-radius: var(--radius-sm); cursor: pointer;
+}
+
+/* The message, written out: a card with the sentence and Add rule. */
+.bdsq__send {
+  display: flex; flex-direction: column; gap: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.bdsq__sentence { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-secondary); }
+.bdsq__said { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bdsq__gap {
+  padding: 0 1px;
+  border-bottom: 1px dashed var(--border-strong);
+  color: var(--text-tertiary);
+}
+.bdsq__go {
+  align-self: flex-end;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 32px; padding: 0 var(--space-5);
+  border-radius: var(--radius-md);
+  font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium);
+  background: var(--text-primary); color: var(--surface-raised);
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bdsq__go:hover:not(:disabled) { opacity: 0.88; }
+.bdsq__go:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsq__go:disabled { background: var(--border-default); color: var(--text-tertiary); cursor: not-allowed; }
+
+/* Examples: whole rows, one click each. */
+.bdsq__examples { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdsq__exlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.bdsq__ex {
+  width: 100%; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-3) var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
+  border-radius: var(--radius-md);
+  font: inherit; font-size: var(--fs-md); line-height: 1.45; color: var(--text-primary); text-align: left;
+  background: none; border: 0; cursor: pointer;
+  box-sizing: content-box;
+}
+.bdsq__ex:hover { background: var(--surface-sunken); }
+.bdsq__ex:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsq__exgo { flex: none; margin-top: 3px; color: var(--text-tertiary); }
+.bdsq__ex:hover .bdsq__exgo { color: var(--text-primary); }
+.bdsq__exlist li + li { border-top: 1px solid var(--border-subtle); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bdsq__mark, .bdsq__opt, .bdsq__go { transition: none; }
+}
+
+/* --- The play (describe-stage.ts) ------------------------------------------------------
+
+   A message read out loud, quietly: the working list (Rox's checklist, its count beside the title), each line a
+   ring that spins until it turns into a tick, and the finished turn folded to one line that opens again
+   (Gumloop's collapsed steps). Greyscale and green, nothing orange. */
+.bdst { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.bdst__head { display: flex; align-items: baseline; gap: var(--space-3); margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bdst__count { font-size: var(--fs-sm); font-weight: var(--fw-regular, 400); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.bdst__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); overflow: hidden; }
+.bdst__line { display: flex; align-items: flex-start; gap: var(--space-4); font-size: var(--fs-md); line-height: 18px; color: var(--text-primary); }
+.bdst__line.is-waiting { color: var(--text-tertiary); }
+.bdst__text { min-width: 0; overflow-wrap: anywhere; }
+.bdst__label { color: var(--text-secondary); }
+.bdst__found { font-weight: var(--fw-medium); }
+
+/* The mark: a faint ring waiting, a spinning arc working, a green tick done. */
+.bdst__mark {
+  flex: none; box-sizing: border-box;
+  width: 16px; height: 16px; margin-top: 1px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-full);
+}
+.bdst__mark.is-waiting { border: 1.5px dashed var(--border-default); }
+.bdst__mark.is-working { border: 1.5px solid var(--border-subtle); border-top-color: var(--text-secondary); animation: bdst-spin 0.8s linear infinite; }
+.bdst__mark.is-done { background: var(--fb-positive-bg); color: var(--fb-positive-fg); border: 1px solid var(--fb-positive-border); }
+@keyframes bdst-spin { to { rotate: 360deg; } }
+
+/* Words still being worked on: a light passing through them. */
+.bdst__shimmer {
+  background: linear-gradient(90deg, var(--text-secondary) 0%, var(--text-secondary) 40%, var(--text-primary) 50%, var(--text-secondary) 60%, var(--text-secondary) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  animation: bdst-shimmer 1.6s linear infinite;
+}
+@keyframes bdst-shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+.bdst__w { display: inline; }
+
+/* The finished list, folded: one quiet line that opens it. */
+.bdst__fold {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin-left: calc(-1 * var(--space-2)); padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
+}
+.bdst__fold:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bdst__fold:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdst__chev { display: inline-grid; place-items: center; color: var(--text-tertiary); }
+.bdst.is-done .bdst__list { padding: var(--space-2) 0 var(--space-1) var(--space-2); }
+.bdst.is-done .bdst__line { font-size: var(--fs-sm); line-height: 16px; }
+.bdst.is-done .bdst__mark { width: 14px; height: 14px; }
+
+/* While it plays, the send button stops it. */
+.bdsc__send.is-stop { background: var(--text-primary); color: var(--surface-raised); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bdst__mark.is-working, .bdst__shimmer { animation: none; }
+  .bdst__shimmer { color: var(--text-secondary); background: none; }
 }

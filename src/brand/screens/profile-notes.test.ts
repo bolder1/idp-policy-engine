@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  APP_BASIC_NOTE,
   CHECKS_NOTE,
   DEVICES_NOTE,
   RISK_SIGNALS_NOTE,
@@ -12,9 +11,8 @@ import {
 } from './profile-notes'
 
 /* Every panel this module exports, the risk one included — it was the panel
-   this file was written for and the only one the sweep below did not reach —
-   and the application page's Basic panel, which borrows the shape. */
-const NOTES: ProfileNote[] = [TYPE_NOTE, DEVICES_NOTE, CHECKS_NOTE, SIGNALS_NOTE, RISK_SIGNALS_NOTE, APP_BASIC_NOTE]
+   this file was written for and the only one the sweep below did not reach. */
+const NOTES: ProfileNote[] = [TYPE_NOTE, DEVICES_NOTE, CHECKS_NOTE, SIGNALS_NOTE, RISK_SIGNALS_NOTE]
 
 describe('the device profile side panels', () => {
   it('says a step in the words of its own type', () => {
@@ -43,9 +41,4 @@ describe('the device profile side panels', () => {
     expect(SIGNALS_NOTE.terms?.map((t) => t.term)).toEqual(['High priority', 'Medium priority', 'Low priority'])
   })
 
-  /* The application page shows it only beside an App secret, so the secret is
-     the one thing it names. */
-  it('names the App secret on an application’s Basic panel', () => {
-    expect(APP_BASIC_NOTE.terms?.map((t) => t.term)).toEqual(['App secret'])
-  })
 })

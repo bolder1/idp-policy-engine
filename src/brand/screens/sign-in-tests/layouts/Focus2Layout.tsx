@@ -22,7 +22,7 @@ import { Focus2Brief } from './focus2-brief'
 import { footerBeside, saidOf } from './focus2-brief-model'
 import { Focus2Full, Focus2Reveal, type Focus2Calls } from './focus2-cards'
 import { CANVASBAR_FNS_LANE, CANVASBAR_H, CANVASBAR_LANE, CANVASBAR_NARROW, Focus2CanvasBar } from './focus2-canvasbar'
-import { DETAILS_IN_BAR } from '../phase'
+import { DETAILS_IN_BAR, ONE_POLICY_CARD } from '../phase'
 import { MORPH_HOLD, MORPH_LEAD, MORPH_STAGGER, ROW_H, STATION_OPENS, lineAt, overviewPlaces, rowLabel, type RouteRow, type StationKind, type StationSize } from './focus2-overview'
 import { readFocusView, writeFocusView, type FocusView } from './focus2-view'
 import { Focus2Route, LINE_S, RowFace, type RouteMood } from './focus2-route'
@@ -236,6 +236,15 @@ import './focus2.css'
    the stage, so nothing pressed in the panel reaches the stage's own presses. One
    panel: the inspector taking it shuts the why, and the why taking it shuts the
    inspector. focus2-why.tsx reads it all as EngineJourney.tsx does.
+
+   ONE POLICY, ONE CARD (20 Oct 2026; phase.ts ONE_POLICY_CARD). An application has one sign-in policy at most, so the
+   Policies card's search over its policies and the Rule card under it are one card: the policy that decides, its rules
+   inside it in order, each with its outcome, the deciding row open, and the Global Default as its foot — the chain is
+   the sign-in node, the Policy card and the outcome. The flag is read here only, and handed on: the chain's data and
+   cards (classic2-run.ts, classic2-chain.tsx), the fold's card on screen, the presenter's story and pace (no policies
+   beat; the card's own breath, about 6.5 s to the answer), the brief's policy clause, and an answer's citation — a rule
+   or a check lights the Policy card, and its row (`litRow`). The Why stays under that card's head. Off: four keys as
+   they were.
    -------------------------------------------------------------------------- */
 
 /* THE ROUTE MAP (owner, 5 Oct 2026: "just 4 simple cards will be enough"): Horizontal is the chain laid across the
@@ -373,6 +382,13 @@ const ROW_GAP = 24
 const CARD_OF: Record<StationKind, CardKey> = { sign: 'sign-in', policies: 'policy', rule: 'rule', outcome: 'outcome' }
 /** A route station's rule card hands its passed-over rules to the rows above it, so it says none of them itself. */
 const NO_PASSED: [] = []
+/** The rule a citation is about — `rule:<id>`, or `check:<ruleId>:<category>` — for the merged card's row; null otherwise. */
+const rowOf = (t: Target | null | undefined): string | null => {
+  if (!t) return null
+  if (t.startsWith('rule:')) return t.slice('rule:'.length) || null
+  if (t.startsWith('check:')) return t.slice('check:'.length).split(':')[0] || null
+  return null
+}
 /** The cards a chain without its sign-in card draws: what its fold opens and folds. */
 const chainCards = (shown: readonly CardKey[]): CardKey[] => shown.filter((k) => k !== 'sign-in')
 /** A face standing out of the flow at its own width, centred on its card while the card's own width springs. */
@@ -694,7 +710,7 @@ export default function Focus2Layout(
   }, [quickKey, runKey])
 
   const held = paused || reading
-  const pace = usePresenter({ plan, s, runKey, reduced, jumped: settled, paused: held })
+  const pace = usePresenter({ plan, s, runKey, reduced, jumped: settled, paused: held, onePolicy: ONE_POLICY_CARD })
   const { p, beat, reached, beats, clock, presenting, jumpTo, skip: skipPace } = pace
   const landed = pace.landed
   /* Sharp and in place: reduced motion, a run drawn settled, or a Skip. Stepping by hand is NOT in this list — see
@@ -749,14 +765,14 @@ export default function Focus2Layout(
   }, [running, whyDone, plan])
 
   // --- Classic v2's cards: the Vertical view's chain, and the Horizontal view's stations ---
-  const chain = useChainRun(presented)
+  const chain = useChainRun(presented, { onePolicy: ONE_POLICY_CARD })
   const identityKey = props.identities?.find((i) => i.active)?.key ?? ''
   /* Vertical: open as the story reaches each card, folded once it lands — Classic v2's fold. Horizontal: the heads, so
      the route reads at a glance; a station's fold opens it in place. Each view's presses stand until the next run. */
   /* The chain's own cards: Focus draws no sign-in card, so the fold-all and its words count only the three. */
   /* Card by card (classic2-model.ts `foldOne`): the card the engine is on is open, the ones it has done with fold to their
      heads as the next opens, and all fold once it lands — the chain stays short and nothing is born under the bar. */
-  const vFold = useChainFold(`${runKey}:${identityKey}`, chainCards(chain.shown), chain.landed, { on: onCard(presented.plan, p) })
+  const vFold = useChainFold(`${runKey}:${identityKey}`, chainCards(chain.shown), chain.landed, { on: onCard(presented.plan, p, ONE_POLICY_CARD) })
   const hFold = useChainFold(`${runKey}:${identityKey}:route`, CARDS, true)
   const { 'sign-in': signOpen, policy: policyOpen, rule: ruleOpen, outcome: outOpen } = hFold.open
   const stationOpen = useMemo<Partial<Record<StationKind, boolean>>>(() => ({ sign: signOpen, policies: policyOpen, rule: ruleOpen, outcome: outOpen }), [signOpen, policyOpen, ruleOpen, outOpen])
@@ -1138,8 +1154,12 @@ export default function Focus2Layout(
       /* In the chain nothing moves for a citation either: its card is lit where it stands, and kept in view — the
          person's being the sign-in node. */
       if (chained) {
-        const k = chainCardOf(t)
-        const el = k === 'sign-in' ? rootRef.current?.querySelector('.rl-f2v [data-node="sign-in"]') : k ? rootRef.current?.querySelector(`.rl-f2v [data-card="${k}"]`) : null
+        const k = chainCardOf(t, ONE_POLICY_CARD)
+        /* The merged card: a rule or a check is kept in view by its own row. */
+        const row = ONE_POLICY_CARD ? rowOf(t) : null
+        const el =
+          (row ? rootRef.current?.querySelector(`.rl-f2v [data-rule-row="${row}"]`) : null) ??
+          (k === 'sign-in' ? rootRef.current?.querySelector('.rl-f2v [data-node="sign-in"]') : k ? rootRef.current?.querySelector(`.rl-f2v [data-card="${k}"]`) : null)
         if (el) stageRef.current?.follow(el)
         return
       }
@@ -1172,7 +1192,7 @@ export default function Focus2Layout(
     (t: Target) => {
       setPin(t)
       /* In the chain, a citation pressed opens its card too, so what it points at is there to read. */
-      const k = chained ? chainCardOf(t) : null
+      const k = chained ? chainCardOf(t, ONE_POLICY_CARD) : null
       if (k && k !== 'sign-in') vFold.set(k, true)
       bring(t)
     },
@@ -1205,10 +1225,12 @@ export default function Focus2Layout(
     (a: Action): boolean => {
       /* In the chain both open the card itself, where it stands, and bring it into view. */
       if (chained && (a.kind === 'checks' || a.kind === 'see')) {
-        const k: CardKey = a.kind === 'checks' ? 'rule' : 'outcome'
+        const k: CardKey = a.kind === 'checks' ? (ONE_POLICY_CARD ? 'policy' : 'rule') : 'outcome'
         if (a.kind === 'see') setPin('screens')
         vFold.set(k, true)
-        const at = rootRef.current?.querySelector(`.rl-f2v [data-card="${k}"]`)
+        /* The merged card: the row whose checks the answer is about — the one that decided, else the first that can't tell. */
+        const card = rootRef.current?.querySelector(`.rl-f2v [data-card="${k}"]`)
+        const at = (ONE_POLICY_CARD && a.kind === 'checks' ? (card?.querySelector('.rl-c2__rule.is-match') ?? card?.querySelector('.rl-c2__rule.is-unknown')) : null) ?? card
         if (at) window.setTimeout(() => stageRef.current?.follow(at, { lazy: true, jump: reduced }), reduced ? 0 : FOLD_S * 1000 + 40)
         return true
       }
@@ -1276,7 +1298,7 @@ export default function Focus2Layout(
   /* The brief's sentence, said as the Brief view says it (brief-input.ts). Read here rather than in the brief itself,
      because the panel's footer has to know what it says: a run where no rule matched has the sentence say "none of
      its 3 rules match", and with the brief on, the footer's "3 rules" goes (numbers once per view). */
-  const brief = useBriefRun(props)
+  const brief = useBriefRun(props, { onePolicy: ONE_POLICY_CARD })
   const footer = useMemo(() => {
     if (!landed || plan.empty) return null
     return both ? footerBeside(plan.summary, saidOf(brief.model)) : plan.summary
@@ -1521,7 +1543,9 @@ export default function Focus2Layout(
 
   /* What an answer or the brief points at, on Classic v2's cards: the chain's card, or the route's station or row that
      holds it — a rule by its own id, so a rule passed over lights its own row, never the station's. */
-  const litCard = chainCardOf(lit)
+  const litCard = chainCardOf(lit, ONE_POLICY_CARD)
+  /* The merged card's row an answer or the brief points at: a rule, or one of its checks. */
+  const litRow = ONE_POLICY_CARD ? rowOf(lit) : null
   const litRule = (ri: number | undefined): boolean => {
     const r = ri === undefined ? undefined : plan.rules[ri]
     return !!r && !!lit && (lit === `rule:${r.id}` || lit.startsWith(`check:${r.id}:`))
@@ -1662,6 +1686,8 @@ export default function Focus2Layout(
                         links={linksOn}
                         lit={litCard}
                         why={focusWhy.link}
+                        onePolicy={ONE_POLICY_CARD}
+                        litRow={litRow}
                       />
                     </div>
                   </PresenceContext.Provider>

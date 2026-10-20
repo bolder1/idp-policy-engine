@@ -1,6 +1,12 @@
+import { Ban, KeyRound, ShieldCheck, type LucideIcon } from 'lucide-react'
+
 import type { AccessDecision } from './data'
 import type { FactorStrength } from './screens/factor-strength'
 import type { FactKey } from './screens/sign-in-facts'
+
+/* Each decision's mark, as Access checks draws it (EngineJourney.tsx): a shield for 1 factor, a key for 2FA, a ban
+   for Deny. One map, so a tile, a result line and a step line never disagree (DecisionMark, decision-badge.tsx). */
+export const DECISION_ICON: Record<AccessDecision, LucideIcon> = { '1fa': ShieldCheck, '2fa': KeyRound, deny: Ban }
 
 /* -----------------------------------------------------------------------------
    The words a decision, a factor and a sign-in fact are said in.

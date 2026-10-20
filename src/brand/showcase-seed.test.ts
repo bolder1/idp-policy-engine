@@ -6,6 +6,7 @@ import { showcaseTenant } from './fixtures'
 import { LOGO_SOURCES } from './logos/sources'
 import { AUTH_METHODS } from './methods'
 import { POLICY_NAME_MAX, policyNameIssue } from './policy-name'
+import { isPostSignIn } from './post-sign-in'
 import { leaves } from './predicate'
 import { buildTemplate } from './screens/board/apply-template'
 import { diagnose } from './screens/diagnostics'
@@ -30,54 +31,52 @@ const userIds = new Set(t.directory.people.map((u) => u.id))
 const appIds = new Set(t.apps.map((a) => a.id))
 
 const allRules = (rules: Rule[], fallback?: Rule) => (fallback ? [...rules, fallback] : rules)
-const authored = t.policies.filter((p) => !p.isSystem)
+/* The sign-in policies. The two post sign-in policies after them decide no
+   sign-in and end in an action, not a Deny (post-sign-in-fence.test.tsx
+   holds them to their own promises). */
+const signIn = t.policies.filter((p) => !isPostSignIn(p))
+const authored = signIn.filter((p) => !p.isSystem)
 const templateRules = t.scenarios.flatMap((s) => s.rules.map((spec) => spec.build()))
 
 describe('the showcase policies', () => {
-  /* Then the troubleshooting estate (30 Sep 2026): three on AWS, two on
-     Slack, a draft on GitHub — after the scenarios, so no scenario moves.
-     Then the owner's two-group example (1 Oct 2026: "Tanmay is in 2 groups
-     … Engineering … password as first factor … Design … 2FA"): a Box policy
-     per group, Engineering's first, last so nothing above them moves. */
-  it('are the system default, the four scenarios, the troubleshooting estate and the two Box policies, in that order', () => {
-    expect(t.policies.map((p) => p.id)).toEqual([
+  /* Then the troubleshooting estate (30 Sep 2026): AWS and Slack, after the
+     scenarios, so no scenario moves. Then the owner's two-group example
+     (1 Oct 2026: "Tanmay is in 2 groups … Engineering … password as first
+     factor … Design … 2FA"): a Box policy with a rule per group, last so
+     nothing above it moves. One policy per application (owner, 14 Oct 2026). */
+  it('are the system default, the four scenarios, and one policy each for AWS, Slack and Box, in that order', () => {
+    expect(signIn.map((p) => p.id)).toEqual([
       'global-default',
       'sc-hrms-office',
       'sc-corporate-devices',
       'sc-device-compliance',
       'sc-dev-tools',
       'sc-aws-engineering',
-      'sc-aws-finance',
-      'sc-aws-devops',
       'sc-slack-everyone',
-      'sc-slack-engineering',
-      'sc-code-review-finance',
       'sc-box-engineering',
-      'sc-box-design',
     ])
     expect(t.policies.filter((p) => p.isSystem)).toHaveLength(1)
+    /* Then the post sign-in policies, after every sign-in one. */
+    expect(t.policies.slice(signIn.length).map((p) => p.id)).toEqual(['ps-data-export', 'ps-collab'])
   })
 
   /* HRMS opens Inactive, so the pitch starts on a policy that is built and not
      yet on (Phase 4): Try reads "Today | Stored version", and Turn on runs
-     Before turning on. The other three are live. Code review for Finance is
-     a draft: the policy that would change nothing if turned on. */
-  it('are live but for HRMS, which opens off, and the Code review draft, each on applications the tenant has', () => {
-    expect(t.policies.map((p) => [p.id, p.status])).toEqual([
+     Before turning on. The rest are live. */
+  it('are live but for HRMS, which opens off, each on applications the tenant has', () => {
+    expect(signIn.map((p) => [p.id, p.status])).toEqual([
       ['global-default', 'always-on'],
       ['sc-hrms-office', 'inactive'],
       ['sc-corporate-devices', 'active'],
       ['sc-device-compliance', 'active'],
       ['sc-dev-tools', 'active'],
       ['sc-aws-engineering', 'active'],
-      ['sc-aws-finance', 'active'],
-      ['sc-aws-devops', 'active'],
       ['sc-slack-everyone', 'active'],
-      ['sc-slack-engineering', 'active'],
-      ['sc-code-review-finance', 'draft'],
       ['sc-box-engineering', 'active'],
-      ['sc-box-design', 'active'],
     ])
+    /* One policy per application: no app is named by two of them. */
+    const owners = authored.flatMap((p) => p.appIds)
+    expect(owners.length).toBe(new Set(owners).size)
     for (const p of authored) {
       expect(p.appIds.length, p.id).toBeGreaterThan(0)
       for (const id of p.appIds) expect(appIds.has(id), `${p.id} → ${id}`).toBe(true)

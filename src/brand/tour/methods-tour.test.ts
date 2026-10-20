@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { MOVED_STOPS, NEW_LAYOUT, SEL, SETTING_WAS } from './methods-tour'
 import { AUTH_METHODS as METHODS } from '../methods'
 import methodsSrc from '../screens/AuthMethods.tsx?raw'
+import kitSrc from '../kit.tsx?raw'
 import shellSrc from '../Shell.tsx?raw'
 import tourSrc from './MethodsTour.tsx?raw'
 
@@ -18,6 +19,7 @@ import tourSrc from './MethodsTour.tsx?raw'
 
 const lf = (s: string) => s.replace(/\r\n/g, '\n')
 const page = lf(methodsSrc)
+const kit = lf(kitSrc)
 const shell = lf(shellSrc)
 const tour = lf(tourSrc)
 
@@ -83,10 +85,19 @@ describe('every stop and task finds its element', () => {
 
 describe('announced, never pushed', () => {
   it('shut by default: the title, one line, the tour and a chevron; the four points open under it', () => {
-    expect(page).toContain('const [newsOpen, setNewsOpen] = useState(false)')
-    expect(page).toContain("{newsOpen ? 'Show less' : 'Read more'}")
-    expect(page).toMatch(/aria-expanded=\{newsOpen\}\n\s+aria-controls="bm8-news-points"/)
-    expect(page).toMatch(/<Button variant="secondary" size="sm" icon=\{Compass\} onClick=\{startTour\}>\n\s+Take the tour/)
+    /* The card is the kit's one note now (owner, 16 Oct 2026: "use this as a common note component"), so the
+       fold is the Note's `more` — shut until Read more is pressed (kit.tsx; note.test.tsx draws it) — and the
+       tour is its action, in the head row. */
+    const at = page.search(/<Note\s+as="h2"/)
+    expect(at).toBeGreaterThan(-1)
+    const card = page.slice(at, page.indexOf('</Note>', at))
+    expect(card).toContain('title={NEW_LAYOUT.title}')
+    expect(card).toMatch(/more=\{\s*<ul>\s*\{NEW_LAYOUT\.points\.map\(\(p\) => \(\s*<li key=\{p\}>\{p\}<\/li>/)
+    expect(card).toMatch(/action=\{\s*<Button variant="secondary" size="sm" icon=\{Compass\} onClick=\{startTour\}>\n\s+Take the tour/)
+    expect(card).toMatch(/>\s*\{NEW_LAYOUT\.line\}\s*$/)
+    expect(kit).toMatch(/const \[open, setOpen\] = useState\(false\)/)
+    expect(kit).toContain("{open ? 'Show less' : moreLabel}")
+    expect(kit).toContain("moreLabel = 'Read more'")
     expect(page).not.toMatch(/>\s*Hide\s*</)
     /* Only the press starts the tour. */
     expect(page).toContain('const [touring, setTouring] = useState(false)')

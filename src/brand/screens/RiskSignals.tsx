@@ -4,7 +4,6 @@ import {
   Activity,
   ArrowLeft,
   Bug,
-  Check,
   CircleCheck,
   Copy,
   CopyPlus,
@@ -12,7 +11,6 @@ import {
   FileWarning,
   Gauge,
   House,
-  Info,
   type LucideIcon,
   MonitorSmartphone,
   Pencil,
@@ -445,7 +443,6 @@ function RiskProfileList({
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Search profiles…" label="Search risk profiles" />
             <p className="brs__gap">
-              <Info size={13} strokeWidth={2} aria-hidden />
               <span>Mobile SDKs only.</span>
               <TipDot label="About risk signals" text="Browser sign-ins carry none of these signals." />
             </p>
@@ -876,7 +873,6 @@ function RiskProfileDetail({
           signal that platform does not report. Those columns are marks on the
           name now (18 Sep 2026), so there is no dash left to explain. */}
       <p className="brs__gap">
-        <Info size={13} strokeWidth={2} aria-hidden />
         <span>Mobile SDKs only.</span>
         <TipDot label="About risk signals" text="Browser sign-ins carry none of these signals." />
       </p>
@@ -1144,6 +1140,7 @@ function SignalList({
             checkbox and picker already names itself. */}
         <div className="brs__row2 brs__colhead" aria-hidden>
           <span className="brs__colhead__left">Attribute</span>
+          <span className="brs__rowswitch">Collected</span>
           <span className="brs__rowctl">Priority</span>
         </div>
         <ul className="brs__rows">
@@ -1173,20 +1170,10 @@ function SignalRow({
   const Ico = signalIcon(signal.id)
   return (
     <li className="brs__row2">
-      {/* The row IS the checkbox, as the device profile's is: one press target
-          from the tick to the platform marks. `TipMark` rather than `TipDot`
-          because a button cannot hold another button. */}
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={on}
-        aria-describedby={descId}
-        className={`bfp2__pickrow${on ? ' is-on' : ''}`}
-        onClick={() => onToggle(signal, !on)}
-      >
-        <span className="bx-tick" aria-hidden>
-          <Check size={11} strokeWidth={3.2} />
-        </span>
+      {/* The signal, read only: its mark, name, purpose and platforms. Whether
+          it is collected is the switch beside it (owner, 13 Oct 2026: "here we
+          need toggles"), not a tick on the whole row. */}
+      <div className={`bfp2__pickrow brs__name${on ? ' is-on' : ' is-off'}`} aria-describedby={descId}>
         <span className="bfp2__pickico" aria-hidden>
           <Ico size={15} strokeWidth={1.7} />
         </span>
@@ -1199,10 +1186,14 @@ function SignalRow({
         <span className="brs__rowplats">
           <SignalPlatforms signal={signal} plain />
         </span>
-      </button>
+      </div>
       {/* The purpose, for a keyboard: `TipMark` is a pointer's way to it. */}
       <span id={descId} hidden>
         {signal.purpose}
+      </span>
+
+      <span className="brs__rowswitch">
+        <Toggle checked={on} label={`Collect ${signal.name}`} onChange={(v) => onToggle(signal, v)} />
       </span>
 
       {/* A `fieldset`, so the weight dims and stops taking presses with no

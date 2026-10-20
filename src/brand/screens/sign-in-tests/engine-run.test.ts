@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { rule, type Policy, type Rule } from '../../data'
 import { showcaseTenant, showcaseTenantHrmsOn, type Tenant } from '../../fixtures'
+import { isPostSignIn } from '../../post-sign-in'
 import { leaves } from '../../predicate'
 import type { RuleTrace } from '../simulate'
 import { envOf, evaluatedList, resolveSignIn, type TenantResolution } from '../tenant-resolver'
@@ -87,11 +88,10 @@ describe('engineRun — finding the policy', () => {
   it('an app policy that decides stops the scan: the Global Default after it is never checked, and settles with its reason', () => {
     const t = showcaseTenant()
     const { run: r } = run(t, form(t, { personId: 'arun', appId: 'github' }))
-    /* The Code review draft is on GitHub too (the troubleshooting estate, 30 Sep
-       2026): waiting, never scanned, and it changes nothing here. */
+    /* One sign-in policy per application in the showcase (14 Oct 2026), so the
+       Global Default is the only other policy listed, and it is never scanned. */
     expect(r.policies.map((p) => [p.name, p.kind, p.scanned])).toEqual([
       ['Developer tools — office and device checks', 'decides', true],
-      ['Code review for Finance', 'waiting', false],
       ['Global Default Policy', 'lost', false],
     ])
     const gd = r.policies.find((p) => p.name === 'Global Default Policy')!
@@ -698,7 +698,8 @@ describe('engineRun — parity with resolveSignIn on the showcase tenant', () =>
       const facts = factsOf(f, t.zones).facts
       const rows = rowsRead(t.policies, null, f.appId, { zones: t.zones, fingerprints: t.fingerprints })
       const base = { res, policies: t.policies, form: f, facts, env: envOf(t), ctx: { people: t.directory.people, apps: t.apps, zones: t.zones, rows } }
-      for (const p of t.policies) {
+      /* Sign-in policies: a post sign-in one is never in a run, so never its focus (post-sign-in.ts). */
+      for (const p of t.policies.filter((x) => !isPostSignIn(x))) {
         const label = `${p.id} in focus: ${f.personId} on ${f.appId}`
         const r = engineRun({ ...base, focus: p.id })
         expectAgrees(r, res, t.policies, label)
@@ -789,7 +790,7 @@ describe('engineRun — a person in two groups (§13.1)', () => {
     expect(leo.steps.find((s) => s.notice)?.text).toBe('Rule 2 also applies to Leo Fernandes · via Engineering')
     expect(leo.conflicts?.findings[0]).toMatchObject({ kind: 'deny-first', caution: 'It would let in people rule 1 refuses today' })
     const thomas = run(t, saved(t, 'ssi-thomas-aws')).run
-    expect(thomas.steps.find((s) => s.notice)?.text).toBe('Rule 2 also applies to Thomas Byrne · by name')
+    expect(thomas.steps.find((s) => s.notice)?.text).toBe('Rule 5 also applies to Thomas Byrne · by name')
     expect(thomas.asEachGroup).toBeUndefined()
   })
 })
@@ -889,10 +890,8 @@ describe('engineRun — inside a policy: its draft and its own trace', () => {
        each line; the draft's own readers follow it. */
     expect(readersOf(t.policies, 'github', lib).from).toBe('Read by Global Default Policy · Rules 1, 2; Developer tools — office and device checks · Rule 1')
     expect(readersOf(t.policies, 'github', lib, noOffice).from).toBe('Read by Global Default Policy · Rules 1, 2')
-    /* "+1": the Code review draft on GitHub reads the device too (30 Sep 2026). */
-    expect(readersOf(t.policies, 'github', lib, noOffice).device).toBe('Read by Global Default Policy · Rule 1; Developer tools — office and device checks · Rules 1, 2 +1')
-    /* The draft's two rules, not the stored three. */
-    expect(readersOf(t.policies, 'github', lib).device).toBe('Read by Global Default Policy · Rule 1; Developer tools — office and device checks · Rules 1, 2, 3 +1')
+    expect(readersOf(t.policies, 'github', lib, noOffice).device).toBe('Read by Global Default Policy · Rule 1; Developer tools — office and device checks · Rules 1, 2')
+    expect(readersOf(t.policies, 'github', lib).device).toBe('Read by Global Default Policy · Rule 1; Developer tools — office and device checks · Rules 1, 2, 3')
   })
 
   it('the suggestions can prefer the sign-ins a policy decides', () => {
@@ -924,8 +923,7 @@ describe('the card: what it asks, and what it starts from', () => {
        countries (30 Sep 2026). */
     expect(askedFields(rowsRead(t.policies, null, 'google-workspace', lib))).toEqual(['from', 'place', 'device', 'risk'])
     const read = readersOf(t.policies, 'github', lib)
-    /* "+1": the Code review draft on GitHub reads the device too (30 Sep 2026). */
-    expect(read.device).toBe('Read by Global Default Policy · Rule 1; Developer tools — office and device checks · Rules 1, 2, 3 +1')
+    expect(read.device).toBe('Read by Global Default Policy · Rule 1; Developer tools — office and device checks · Rules 1, 2, 3')
     expect(read.from).toBe('Read by Global Default Policy · Rules 1, 2; Developer tools — office and device checks · Rule 1')
     expect(read.risk).toBe('')
     expect(readersOf(t.policies, 'hrms', lib).from).toBe('Read by Global Default Policy · Rules 1, 2; HRMS access from corporate offices · Rule 1')

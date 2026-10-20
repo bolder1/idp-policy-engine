@@ -81,8 +81,11 @@ export function AppsPeek({
   /** The policy's applications, already resolved. Never empty. The empty cell is the caller's. */
   apps: App[]
   policyName: string
-  /** The change-applications flow. The panel's Edit button calls this, and the cell never does. */
-  onEdit: () => void
+  /* The change-applications flow. The panel's Edit button calls this, and the
+     cell never does. Left out, the panel lists them with no Edit: a post sign-in
+     policy's applications are linked from each application's page, never from
+     the policy (post-sign-in.ts). */
+  onEdit?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<Pos | null>(null)
@@ -317,7 +320,7 @@ export function AppsPeek({
       anchor.current?.focus()
     }
     close()
-    onEdit()
+    onEdit?.()
   }
 
   const count = countLabel(apps.length)
@@ -398,10 +401,12 @@ export function AppsPeek({
                 is a long way to scroll to reach the one action here. */}
             <div className="bapk__head">
               <span className="bapk__count">{count}</span>
-              <Button size="sm" icon={Pencil} onClick={edit}>
-                Edit
-                <span className="u-sr-only"> applications for {policyName}</span>
-              </Button>
+              {onEdit && (
+                <Button size="sm" icon={Pencil} onClick={edit}>
+                  Edit
+                  <span className="u-sr-only"> applications for {policyName}</span>
+                </Button>
+              )}
             </div>
             <ul
               ref={list}

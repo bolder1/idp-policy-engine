@@ -15,6 +15,7 @@ import { Answer, EngineJourney } from './EngineJourney'
 import { eachGroupRows, expectMark, findingsCount, heroFinding, pathTone, whyItems, whyTitle, type GroupRowView, type WhyTone } from './journey'
 import { GROUP_PREFIX, emptyDraft, personPick, withDefaults } from './sign-in-card'
 import { WhyCard } from './WhyCard'
+import { splitShowcase } from './split-policies'
 import { ATTEMPTS_LINK, REVIEW_ATTEMPTS, attemptsGetThroughSaid, attemptsOnSaid, breakInSummary, runBreakInOnApp, type AppBreakInSummary } from '../break-in-app'
 import { BREAK_IN_TIP } from '../break-in-model'
 import { ATTEMPTS_PANEL_ID } from './attempts'
@@ -42,7 +43,8 @@ import policyCheckSrc from '../board/PolicyCheck.tsx?raw'
    handed what the journey hands it; how the journey opens it is pinned from
    its source. */
 
-const t = showcaseTenant()
+/* One sign-in policy per application in the showcase (14 Oct 2026): the cross-policy cases run on its former split policies (split-policies.ts). */
+const t = splitShowcase(showcaseTenant())
 const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const noop = () => {}

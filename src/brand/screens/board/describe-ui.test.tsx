@@ -260,7 +260,11 @@ describe('the panel, before the first message', () => {
     expect(out).toContain('class="bdsq"')
     expect(text(out)).toContain('Applications')
     expect(text(out)).toContain('Ask for 2FA Password only Block')
-    expect(out).toMatch(/aria-pressed="true"[^>]*>Ask for 2FA</)
+    /* Each a tile with its mark before the words (redrawn 19 Oct 2026). */
+    expect(out).toMatch(/aria-pressed="true"[^>]*>(<svg[\s\S]*?<\/svg>)?Ask for 2FA</)
+    /* The sentence it will send, with a gap where the applications go, and examples from the tenant. */
+    expect(text(out)).toMatch(/Everyone reaches\s*which applications\s*, with 2FA\./)
+    expect(text(out)).toContain('Examples')
     expect(text(out)).toContain('Everyone')
     expect(text(out)).toContain('Additional actions')
     /* The menu is closed until it is opened, and Add rule waits for an application. */

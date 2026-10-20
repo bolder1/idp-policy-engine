@@ -1,4 +1,5 @@
 import { conditionType, memberGroupIds, type Policy, type Rule, type User } from '../../data'
+import { isPostSignIn } from '../../post-sign-in'
 import { leaves } from '../../predicate'
 import type { PeekKind, PeekTarget } from './inspect-model'
 
@@ -14,10 +15,16 @@ import type { PeekKind, PeekTarget } from './inspect-model'
    it first in its own list, so a plain filter put it at the top. */
 const defaultLast = (named: readonly Policy[], policies: readonly Policy[]): Policy[] => [...named, ...policies.filter((p) => p.isSystem)]
 
+/* A sign-in policy the inspector can list: not the tenant default (it comes
+   last, above), and never a post sign-in policy, which names applications,
+   everyone and, in its rules, zones and profiles, but decides no sign-in
+   (post-sign-in.ts: kept out of Access checks). */
+const listable = (p: Policy): boolean => !p.isSystem && !isPostSignIn(p)
+
 /** The policies that cover an application, by name: the ones that name it, then the tenant default. */
 export function policiesOnApp(policies: readonly Policy[], appId: string): Policy[] {
   return defaultLast(
-    policies.filter((p) => !p.isSystem && p.appIds.includes(appId)),
+    policies.filter((p) => listable(p) && p.appIds.includes(appId)),
     policies,
   )
 }
@@ -44,7 +51,7 @@ export function objectsOfRule(rule: Rule, activeRiskProfileId: string): PeekTarg
 export function policiesForPerson(policies: readonly Policy[], user: Pick<User, 'id' | 'groupId' | 'alsoGroupIds'>): Policy[] {
   const groups = memberGroupIds(user)
   return defaultLast(
-    policies.filter((p) => !p.isSystem && (p.audience.everyone || p.audience.userIds.includes(user.id) || groups.some((g) => p.audience.groupIds.includes(g)))),
+    policies.filter((p) => listable(p) && (p.audience.everyone || p.audience.userIds.includes(user.id) || groups.some((g) => p.audience.groupIds.includes(g)))),
     policies,
   )
 }
@@ -59,7 +66,7 @@ export function usedByPolicies(policies: readonly Policy[], target: PeekTarget, 
   /* The default policy counts when its own rules name the object — last, as everywhere here — the way the library's
      own "Used by" counts it (usage.ts `policiesUsing`): opened from the Global Default's rule, it must list it. */
   const names = (p: Policy) => p.rules.some((r) => objectsOfRule(r, activeRiskProfileId).some((o) => o.kind === target.kind && o.id === target.id))
-  return [...policies.filter((p) => !p.isSystem && names(p)), ...policies.filter((p) => p.isSystem && names(p))]
+  return [...policies.filter((p) => listable(p) && names(p)), ...policies.filter((p) => p.isSystem && names(p))]
 }
 
 type Named = { id: string; name: string }

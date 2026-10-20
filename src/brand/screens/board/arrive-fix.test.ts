@@ -32,7 +32,7 @@ import pageRaw from './BoardPage.tsx?raw'
 const t = showcaseTenant()
 const env = envOf(t)
 const stored = (id: string) => t.policies.find((p) => p.id === id)!
-const finance = stored('sc-aws-finance')
+const finance = stored('sc-aws-engineering')
 const tools = stored('sc-dev-tools')
 const PROXY: ArriveFix = { card: 'proxy-finance', app: 'aws' }
 /* The working copy is CRLF on Windows checkouts; the pins read LF. */
@@ -50,14 +50,14 @@ function arriveOn(h: History, seen: { current: string | null }, policyId: string
 }
 
 describe('a fix that fits the draft', () => {
-  it('adds the proxy’s rule to AWS billing for Finance: one commit, the toast, the new rule selected on its Condition', () => {
+  it('adds the proxy’s rule to AWS access: one commit, the toast, the new rule selected on its Condition', () => {
     const out = landFix(openForEditing(finance), PROXY, env, { policies: t.policies })
     if ('none' in out) throw new Error(out.none)
     expect(out.toast).toBe('Rule added. Not saved yet.')
     expect(out.draft.rules).toHaveLength(finance.rules.length + 1)
-    expect(out.draft.rules[0].name).toBe('Deny sign-ins from outside India')
-    expect(out.select).toEqual({ kind: 'rule', id: out.draft.rules[0].id, part: 'when' })
-    expect(out.reveal).toBe(out.draft.rules[0].id)
+    expect(out.draft.rules[3].name).toBe('Deny sign-ins from outside India')
+    expect(out.select).toEqual({ kind: 'rule', id: out.draft.rules[3].id, part: 'when' })
+    expect(out.reveal).toBe(out.draft.rules[3].id)
     /* The policy's own facts are kept: only the rules and the last row move. */
     expect([out.draft.id, out.draft.name, out.draft.appIds]).toEqual([finance.id, finance.name, finance.appIds])
     /* Unsaved, and something to save: the bar's Review & save and the leave guard both read these. */
@@ -91,8 +91,8 @@ describe('once per arrival', () => {
   })
 
   it('is keyed by the policy, the card and the application; a route with no fix forgets it', () => {
-    expect(arrivalKey('sc-aws-finance', PROXY)).toBe('sc-aws-finance|proxy-finance|aws')
-    expect(arrivalKey('sc-aws-finance', undefined)).toBeNull()
+    expect(arrivalKey('sc-aws-engineering', PROXY)).toBe('sc-aws-engineering|proxy-finance|aws')
+    expect(arrivalKey('sc-aws-engineering', undefined)).toBeNull()
     const seen = { current: null as string | null }
     expect(firstArrival(seen, 'a|proxy-finance|aws')).toBe(true)
     expect(firstArrival(seen, 'a|proxy-finance|aws')).toBe(false)

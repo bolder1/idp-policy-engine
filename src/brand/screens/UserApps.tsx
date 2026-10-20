@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AppWindow, Search } from 'lucide-react'
 
+import { shownOnDashboard } from '../app-setup'
 import { EmptyState, NoMatches } from '../empty'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
@@ -10,14 +11,20 @@ import { SHOWCASE } from '../showcase'
    The end user's landing screen: the apps they can sign in to.
 
    Copied in structure from the live end-user dashboard: a heading, a search and
-   the app cards. The live page's "Show hidden apps" checkbox is left out: no
-   app here can be hidden, so it would do nothing.
+   the app cards. The live page's "Show hidden apps" checkbox is left out: a
+   person here has no way to hide an app, so it would do nothing.
+
+   An application whose Sign-in options say not to show it on the end user
+   dashboard is left out (13 Oct 2026, spec APP-CREATE-AND-ACCESS.md §5). The
+   seed applications have no setup of their own and all show (`shownOnDashboard`);
+   one added from the catalogue as OAuth starts hidden, the live form's default.
    -------------------------------------------------------------------------- */
 
 export function UserApps() {
-  const { apps, showToast } = useBrand()
+  const { apps: all, showToast } = useBrand()
   const [q, setQ] = useState('')
 
+  const apps = useMemo(() => all.filter((a) => shownOnDashboard(a.setup)), [all])
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
     if (!needle) return apps

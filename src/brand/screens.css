@@ -974,3 +974,6 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
   }
 }
 .blist__range { margin-right: var(--space-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* An application that already has another policy: said in its row, and not tickable. */
+.bassign__row.is-taken { cursor: not-allowed; color: var(--text-tertiary); }

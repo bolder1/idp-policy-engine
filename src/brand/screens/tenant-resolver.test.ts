@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { EVERYONE, audienceOf, blankPolicy, fallbackRule, rule, type Policy } from '../data'
 import { showcaseTenantHrmsOn } from '../fixtures'
+import { isPostSignIn } from '../post-sign-in'
 import type { SignInFacts } from './simulate'
 import { envOf, governingPolicy, resolveSignIn, tierOf } from './tenant-resolver'
 import { devicePreset } from './testing/device-presets'
@@ -22,6 +23,9 @@ const t = showcaseTenantHrmsOn()
 const env = envOf(t)
 const office = (personId: string, appId = 'hrms'): SignInFacts => ({ appId, personId, network: { address: '203.0.113.25', source: 'typed' } })
 const hrmsOffice = t.policies.find((p) => p.id === 'sc-hrms-office')!
+/* The sign-in policies, the ones a sign-in can give a standing: a post sign-in
+   policy has none (post-sign-in.ts; post-sign-in-fence.test.tsx). */
+const signInIds = (list: readonly Policy[]) => list.filter((p) => !isPostSignIn(p)).map((p) => p.id)
 
 const live = (over: Partial<Policy> & Pick<Policy, 'id' | 'name'>): Policy => ({
   ...blankPolicy(over.name, ['hrms']),
@@ -85,10 +89,12 @@ describe('policies that do not run', () => {
     expect(r.standings.find((s) => s.policyId === hrmsOffice.id)).toMatchObject({ kind: 'draft', reason: 'Draft' })
   })
 
+  /* Account Management, not Session: a Session policy is a post sign-in one
+     (post-sign-in.ts) and has no standing here at all (post-sign-in-fence.test.tsx). */
   it('passes over a policy that is not about app access', () => {
-    const session = live({ id: 'p-session', name: 'Session length', type: 'Session', audience: audienceOf(['hr']) })
-    const r = resolveSignIn([...t.policies, session], office('u-hr-1'), env)
-    expect(r.standings.find((s) => s.policyId === session.id)).toMatchObject({ kind: 'not-app-access', reason: 'Not an app access policy' })
+    const other = live({ id: 'p-account', name: 'Account recovery', type: 'Account Management', audience: audienceOf(['hr']) })
+    const r = resolveSignIn([...t.policies, other], office('u-hr-1'), env)
+    expect(r.standings.find((s) => s.policyId === other.id)).toMatchObject({ kind: 'not-app-access', reason: 'Not an app access policy' })
   })
 
   it('names the app a policy does not cover', () => {
@@ -136,14 +142,14 @@ describe('what it will not resolve', () => {
     const r = resolveSignIn(t.policies.filter((p) => !p.isSystem), office('u-sales-1'), env)
     expect(r.status).toBe('incomplete')
     expect(r.missing).toEqual(['a global default policy'])
-    expect(r.standings).toHaveLength(t.policies.length - 1)
+    expect(r.standings).toHaveLength(signInIds(t.policies).length - 1)
   })
 })
 
 describe('the shape later phases build on', () => {
-  it('lists every policy once, in list order, when the sign-in is complete', () => {
+  it('lists every sign-in policy once, in list order, when the sign-in is complete', () => {
     const r = resolveSignIn(t.policies, office('u-hr-1'), env)
-    expect(r.standings.map((s) => s.policyId)).toEqual(t.policies.map((p) => p.id))
+    expect(r.standings.map((s) => s.policyId)).toEqual(signInIds(t.policies))
   })
 
   it('watches nothing when no policy is monitoring', () => {
@@ -262,8 +268,8 @@ describe('a monitoring policy', () => {
     expect(noDefault.standings.find((s) => s.policyId === hrmsOffice.id)).toMatchObject({ kind: 'monitoring', reason: 'Monitoring' })
   })
 
-  it('still lists every policy once, in list order', () => {
+  it('still lists every sign-in policy once, in list order', () => {
     const r = resolveSignIn(withMonitoring, office('u-hr-1'), env)
-    expect(r.standings.map((s) => s.policyId)).toEqual(withMonitoring.map((p) => p.id))
+    expect(r.standings.map((s) => s.policyId)).toEqual(signInIds(withMonitoring))
   })
 })

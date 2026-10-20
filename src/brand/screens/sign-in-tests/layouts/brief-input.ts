@@ -6,6 +6,7 @@ import { useSimEnv } from '../../sim-env'
 import { sentenceTokens, tokenValue, type SentenceContext } from '../../testing/sign-in-sentence'
 import { audienceViaOf, type Via } from '../conflicts'
 import { briefOf, type BriefInput, type BriefModel } from './brief-model'
+import { oneWhy } from './classic2-one-model'
 import type { RunLayoutProps } from './types'
 
 /* -----------------------------------------------------------------------------
@@ -47,9 +48,12 @@ export interface BriefRun {
   model: BriefModel
 }
 
-/** The brief of a run: its input and its sentence, from the props a layout is handed. */
-export function useBriefRun(run: Pick<RunLayoutProps, 'plan' | 'form' | 'asGroup' | 'rows' | 'screens' | 'policies'>): BriefRun {
+/** The brief of a run: its input and its sentence, from the props a layout is handed. `onePolicy`: said as the merged
+    Policy card says it (phase.ts ONE_POLICY_CARD, 20 Oct 2026; Focus alone asks for it). */
+export function useBriefRun(run: Pick<RunLayoutProps, 'plan' | 'form' | 'asGroup' | 'rows' | 'screens' | 'policies' | 'inPolicy'>, opts: { onePolicy?: boolean } = {}): BriefRun {
   const { plan, form, asGroup, rows, screens } = run
+  const onePolicy = opts.onePolicy === true
+  const inPolicy = run.inPolicy ?? null
   const brand = useBrand()
   const { users, groups, apps, zones } = brand
   const env = useSimEnv()
@@ -93,8 +97,19 @@ export function useBriefRun(run: Pick<RunLayoutProps, 'plan' | 'form' | 'asGroup
   }, [rows, form, users, apps, zones])
   const groupNames = useMemo(() => (groupName ? [groupName] : memberGroups), [groupName, memberGroups])
   const briefIn = useMemo(
-    (): BriefInput => ({ person: personName, first, app: appName, via, second, name: groupName ? '' : (person?.name ?? ''), groups: groupNames, appId: app?.id ?? form.appId, facts }),
-    [personName, first, appName, via, second, groupName, person, groupNames, app, form.appId, facts],
+    (): BriefInput => ({
+      person: personName,
+      first,
+      app: appName,
+      via,
+      second,
+      name: groupName ? '' : (person?.name ?? ''),
+      groups: groupNames,
+      appId: app?.id ?? form.appId,
+      facts,
+      ...(onePolicy ? { one: { why: oneWhy(plan, inPolicy) } } : null),
+    }),
+    [personName, first, appName, via, second, groupName, person, groupNames, app, form.appId, facts, onePolicy, plan, inPolicy],
   )
   const model = useMemo(() => briefOf(plan, briefIn), [plan, briefIn])
 

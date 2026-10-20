@@ -13,7 +13,8 @@
   cursor: pointer;
 }
 .sia__toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
-.sia__chev { flex: none; color: var(--text-tertiary); transition: transform 0.15s ease; }
+/* The duration token, which reduced motion sets to nothing (tokens.css). */
+.sia__chev { flex: none; color: var(--text-tertiary); transition: transform var(--dur-fast) ease; }
 .sia__row.is-open .sia__chev { transform: rotate(90deg); }
 .sia__app { display: inline-flex; align-items: center; gap: var(--space-3); }
 .sia__muted { color: var(--text-tertiary); }
@@ -49,3 +50,13 @@
 
 /* The Sign-ins / Changes tabs, under the head as on the device profile page. */
 .sia__tabs { margin: var(--space-2) 0 var(--space-5); }
+
+/* An application's Policies tab opens the detail with motion (activity-row.tsx): the cell's own top and bottom
+   padding would hold the row open while it closes, so the panel's padding is the only room. */
+.sia__detail.is-moving > td { padding-top: 0; padding-bottom: 0; }
+.sia__reveal { overflow: hidden; }
+/* Where the tab's From column is hidden (900 and below), the place is said in the detail instead. */
+.sia__lines > .sia__narrow { display: none; }
+@media (max-width: 900px) {
+  .sia__lines > .sia__narrow { display: flex; }
+}

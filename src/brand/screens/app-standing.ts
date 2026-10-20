@@ -1,4 +1,4 @@
-import { coversEveryApp, enforces, memberGroupIds, type App, type Group, type Policy, type User } from '../data'
+import { coversEveryApp, enforces, memberGroupIds, type App, type Audience, type Group, type Policy, type User } from '../data'
 import { leaves } from '../predicate'
 import { listNames } from '../rule-who'
 import { policiesForApp, whyNotDeciding } from './app-policies'
@@ -308,10 +308,15 @@ export function rowTip(row: StandRow, groups: readonly Group[], users: readonly 
    "Finance, Sales and 2 more". An id the directory no longer has reads
    "(deleted)" rather than vanishing, so a shortened list still says so. */
 export function whoLabel(p: Policy, groups: readonly Group[], users: readonly User[]): string {
-  if (p.audience.everyone) return 'Everyone'
+  return audienceLabel(p.audience, groups, users)
+}
+
+/** An audience in words: "Everyone", or its groups then its people, "Finance and Sales". */
+export function audienceLabel(a: Audience, groups: readonly Group[], users: readonly User[]): string {
+  if (a.everyone) return 'Everyone'
   const names = [
-    ...p.audience.groupIds.map((id) => groups.find((g) => g.id === id)?.name ?? '(deleted)'),
-    ...p.audience.userIds.map((id) => users.find((u) => u.id === id)?.name ?? '(deleted)'),
+    ...a.groupIds.map((id) => groups.find((g) => g.id === id)?.name ?? '(deleted)'),
+    ...a.userIds.map((id) => users.find((u) => u.id === id)?.name ?? '(deleted)'),
   ]
   return names.length === 0 ? 'Nobody chosen' : listNames(names, 2)
 }

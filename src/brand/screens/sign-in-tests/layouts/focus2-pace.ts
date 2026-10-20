@@ -81,8 +81,15 @@ interface Draft {
   name: string
 }
 
+/* ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD, 20 Oct 2026): `onePolicy` tells the story of the merged Policy card —
+   no beat for the policies passed over (with one policy on an application there is no search to watch), and the
+   covering beat named for the card it opens: "Policy", the policy's own name in the Tip. */
+export interface StoryOptions {
+  onePolicy?: boolean
+}
+
 /** Every beat of the run, in order, each owning a run of steps: the outcome last. */
-export function storyOf(plan: EngineRun): Beat[] {
+export function storyOf(plan: EngineRun, opts: StoryOptions = {}): Beat[] {
   const last = plan.steps.length - 1
   /* No person or no application: the plan is one 'done' step and there is no
      story. One beat, so a rail still has something to draw and nothing
@@ -90,7 +97,7 @@ export function storyOf(plan: EngineRun): Beat[] {
   if (plan.empty || last < 0) return spans([{ key: 'sign', kind: 'sign', at: 0, short: 'Sign-in', label: 'Sign-in', name: 'The sign-in' }], Math.max(0, last))
 
   const raw: Draft[] = [{ key: 'sign', kind: 'sign', at: 0, short: 'Sign-in', label: 'Sign-in', name: 'The sign-in' }]
-  if (plan.policies.length > 0) {
+  if (plan.policies.length > 0 && !opts.onePolicy) {
     /* The stack is drawn from the find step, but it only takes the story as
        the first policy is asked — the find step belongs to the sign-in's
        beat, where the card is still being read. */
@@ -100,7 +107,10 @@ export function storyOf(plan: EngineRun): Beat[] {
   }
   /* The lock: `at.found` is the step the scan has stopped on the one that
      decides (-1 when none does), and the row settles and opens after it. */
-  if (plan.at.found >= 0) raw.push({ key: 'covers', kind: 'covers', at: plan.at.found, short: 'Covers', label: 'Covering policy', name: plan.decider?.name ?? 'The policy that covers' })
+  if (plan.at.found >= 0) {
+    const one = opts.onePolicy === true
+    raw.push({ key: 'covers', kind: 'covers', at: plan.at.found, short: one ? 'Policy' : 'Covers', label: one ? 'Policy' : 'Covering policy', name: plan.decider?.name ?? 'The policy that covers' })
+  }
 
   /* Rules come in only as the engine reaches them (owner, 3 Oct 2026:
      progressive, never waiting ahead), so a rule the walk never got to is no
@@ -222,6 +232,15 @@ const PRESENT_MS: Record<StepKind, number> = {
   done: 0,
 }
 
+/* The merged Policy card's pace (ONE_POLICY_CARD, 20 Oct 2026). Its card arrives with its name as the engine finds it, so
+   the steps that drew the search — the find, a scan a policy, the lock, its settling, the opening — only need a breath
+   each; the rest of the table is as it was. The covering beat is held long enough to read the card's name, and a beat
+   longer when the Global Default decides, for the line under its head that says why. Over the showcase (focus2-pace.test.ts):
+   Aisha Khan on Google Workspace presents in 6.4 s against 8.9 s with the search, Sanjay Bhatt on HRMS in 5.8 s. */
+export const ONE_PRESENT_MS: Partial<Record<StepKind, number>> = { find: 200, scan: 160, found: 360, decides: 200, expand: 240 }
+export const ONE_POLICY_MIN = 700
+export const ONE_POLICY_GD_MIN = 900
+
 /** A conflict is named on its own step and held, whatever its kind says: the finding has to be read before the answer lands. */
 export const NOTICE_MS = 1400
 /** The last step before a beat boundary is held this much longer: it carries the finding that ended the beat. */
@@ -267,6 +286,8 @@ export interface PresentedTimeline {
 export interface PresentOptions {
   /** The pace the engine ran this plan at, when the host knows it. An edit re-run presents at 0.7 ×. */
   pace?: Pace
+  /** The merged Policy card's pace (ONE_PRESENT_MS, ONE_POLICY_MIN); hand the beats `storyOf(plan, { onePolicy })` too. */
+  onePolicy?: boolean
 }
 
 /**
@@ -289,7 +310,8 @@ export interface PresentOptions {
  */
 export function presentTimeline(plan: EngineRun, beats: readonly Beat[] = storyOf(plan), opts: PresentOptions = {}): PresentedTimeline {
   const steps = plan.steps
-  const dur = steps.map((st) => (st.notice ? NOTICE_MS : (PRESENT_MS[st.kind] ?? 0)))
+  const one = opts.onePolicy === true
+  const dur = steps.map((st) => (st.notice ? NOTICE_MS : ((one ? ONE_PRESENT_MS[st.kind] : undefined) ?? PRESENT_MS[st.kind] ?? 0)))
 
   /* The read hold, on the last step of every beat but the last: that step is
      where the beat's finding lands, and in the engine's own pace it is gone
@@ -307,7 +329,7 @@ export function presentTimeline(plan: EngineRun, beats: readonly Beat[] = storyO
      goes on the beat's LAST step, where its result is already on screen, so
      the extra time is spent reading the finding rather than waiting for it. */
   for (const b of beats) {
-    const least = minOf(b, plan)
+    const least = minOf(b, plan, one)
     const held = spanMs(dur, b)
     if (held < least && b.to >= 0 && b.to < dur.length) dur[b.to] += least - held
   }
@@ -315,7 +337,7 @@ export function presentTimeline(plan: EngineRun, beats: readonly Beat[] = storyO
   let shrunk = false
   if (sum(dur) > PRESENT_CAP_MS) {
     /* The read holds first. */
-    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, holds.map((at) => ({ at, room: READ_HOLD - READ_HOLD_MIN })))
+    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, holds.map((at) => ({ at, room: READ_HOLD - READ_HOLD_MIN })), one)
   }
   if (sum(dur) > PRESENT_CAP_MS) {
     /* Then the rows, the other thing there can be a great many of. A notice
@@ -327,7 +349,7 @@ export function presentTimeline(plan: EngineRun, beats: readonly Beat[] = storyO
       if (st.kind === 'check') rows.push({ at: i, room: PRESENT_MS.check - CHECK_MIN })
       else if (st.kind === 'checked') rows.push({ at: i, room: PRESENT_MS.checked - CHECKED_MIN })
     })
-    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, rows) || shrunk
+    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, rows, one) || shrunk
   }
 
   /* An edit re-run, whole, at 0.7 ×. Read off the engine's own pace rather
@@ -363,11 +385,11 @@ interface Room {
    than everything at the front; the second hands out what the flooring left,
    a ms at a time, so the cut is exactly what was asked for and comes out the
    same on every machine. Says whether it took anything. */
-function shrink(dur: number[], plan: EngineRun, beats: readonly Beat[], need: number, rooms: readonly Room[]): boolean {
+function shrink(dur: number[], plan: EngineRun, beats: readonly Beat[], need: number, rooms: readonly Room[], one = false): boolean {
   if (need <= 0) return false
   /* What each beat can give at all, shared out among its own steps. */
   const slack = new Map<number, number>()
-  beats.forEach((b, i) => slack.set(i, Math.max(0, spanMs(dur, b) - minOf(b, plan))))
+  beats.forEach((b, i) => slack.set(i, Math.max(0, spanMs(dur, b) - minOf(b, plan, one))))
   const room = rooms.map((r) => {
     const i = beatOfStep(beats, r.at)
     const left = slack.get(i) ?? 0
@@ -396,7 +418,8 @@ function shrink(dur: number[], plan: EngineRun, beats: readonly Beat[], need: nu
   return take.some((k) => k > 0)
 }
 
-function minOf(b: Beat, plan: EngineRun): number {
+function minOf(b: Beat, plan: EngineRun, one = false): number {
+  if (one && b.kind === 'covers') return plan.decider?.isGlobalDefault ? ONE_POLICY_GD_MIN : ONE_POLICY_MIN
   if (b.kind !== 'rule') return BEAT_MIN[b.kind]
   const r = b.rule === undefined ? undefined : plan.rules[b.rule]
   return r?.state === 'off' ? OFF_RULE_MIN : BEAT_MIN.rule
@@ -526,6 +549,8 @@ export interface PresenterInput {
   paused: boolean
   /** The pace the engine ran at, when the host knows it. */
   pace?: Pace
+  /** The merged Policy card's story and pace (ONE_POLICY_CARD). */
+  onePolicy?: boolean
 }
 
 /** What the rail's segment animates over. It changes only as the beat does, so the fill is not a re-render a frame. */
@@ -571,9 +596,9 @@ export interface Presenter {
    the beat, whether it is waiting. The rail animates its own fill from
    `clock`, which changes once a beat. */
 export function usePresenter(input: PresenterInput): Presenter {
-  const { plan, s, runKey, reduced, jumped: landedAlready, paused, pace } = input
-  const beats = useMemo(() => storyOf(plan), [plan])
-  const tl = useMemo(() => presentTimeline(plan, beats, { pace }), [plan, beats, pace])
+  const { plan, s, runKey, reduced, jumped: landedAlready, paused, pace, onePolicy = false } = input
+  const beats = useMemo(() => storyOf(plan, { onePolicy }), [plan, onePolicy])
+  const tl = useMemo(() => presentTimeline(plan, beats, { pace, onePolicy }), [plan, beats, pace, onePolicy])
 
   /* Nothing to present: the host settles at once under reduced motion, and a
      revisit or a Skip is already landed. Derived, not stored, so turning

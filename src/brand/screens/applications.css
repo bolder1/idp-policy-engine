@@ -261,7 +261,23 @@
    (device-fingerprint-v2.css): the page grid's 16px is the gap, and the head's
    own margin would have doubled it. */
 .bapp > .bz7__pagehead { margin-bottom: 0; }
-.bapp__tabs { margin: var(--space-2) 0 0; }
+
+/* Eight tabs (13 Oct 2026) are wider than the page at 900 and 720, so they sit
+   in a strip that scrolls sideways and the page never does. The strip, not the
+   tablist, scrolls: a tab's active bar sits 1px over the tablist's own rule,
+   and a tablist that scrolled itself would clip the bar to its padding edge.
+   The 2px of padding on top and at the sides is the focus ring's room, and
+   the margins put the strip's contents back where the tabs stood. */
+.bapp__tabbar {
+  margin: 0 calc(-1 * var(--space-1));
+  padding: var(--space-1) var(--space-1) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.bapp__tabbar::-webkit-scrollbar { display: none; }
+.bapp__tabbar > .bx-tabs { display: flex; width: max-content; min-width: 100%; }
+.bapp__tabbar .bx-tabs__tab { flex: none; white-space: nowrap; }
 
 /* The logo before the name, kept its size; the name takes what is left. Level
    with the rename field's input while it is open, as the pills are. */
@@ -279,10 +295,37 @@
 .bpage.bapp:has(.bapp__panel .blist__pager) { grid-template-rows: auto auto auto 1fr; }
 .bapp__panel > .blist__pager { margin-top: auto; }
 
-/* Basic: the App secret's field, its copy and Regenerate on one line. */
-.bapp__secret { display: flex; align-items: center; gap: var(--space-3); }
-.bapp__secret .bmc__secret { flex: 1 1 auto; min-width: 0; }
-.bapp__secret .bx-btn { flex: none; }
+/* --- The setup forms (app-setup-forms.tsx) ---------------------------------
+
+   The method forms' fields (`.bmc__*`, method-forms.css). Only what those do
+   not cover is here. */
+
+/* The label of a control that names itself — a picker, a switch, a list — as
+   text: the `.bmc__label label` look, with no `<label>` pointing at nothing. */
+.bapp__label { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-body); }
+.bapp__label b { margin-left: var(--space-1); color: var(--fb-negative-fg); }
+
+/* A value read and copied, not typed — the client ID, the client secret, what
+   the service provider is given: the box, then Copy and Regenerate on its line.
+   It was `.bapp__secret`, for the App secret alone. */
+.bapp__copyrow { display: flex; align-items: center; gap: var(--space-3); }
+.bapp__copyrow > input,
+.bapp__copyrow > .bmc__secret { flex: 1 1 auto; min-width: 0; }
+.bapp__copyrow .bx-btn { flex: none; }
+
+/* A list field: a box per entry, a remove control on every row after the first,
+   and Add under them. The remove slot is a fixed track on every row, the first
+   included, so the boxes' right edges line up. */
+.bapp__list { display: flex; flex-direction: column; gap: var(--space-3); }
+.bapp__listrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ctl-height-md);
+  align-items: center;
+  gap: var(--space-3);
+}
+/* Attribute mapping: the name, the value it is filled from, remove. */
+.bapp__listrow.bapp__attr { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--ctl-height-md); }
+.bapp__listadd { align-self: flex-start; display: inline-flex; }
 
 /* --- Add existing policy (AddExistingPolicy.tsx) --------------------------- */
 
@@ -315,3 +358,611 @@
 }
 .bapp__moves dt { display: flex; align-items: center; gap: var(--space-3); min-width: 0; font-size: var(--fs-md); color: var(--text-tertiary); }
 .bapp__moves dd { margin: 0; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* --- An application with no policy of its own (13 Oct 2026) ---------------
+   The empty state and the tenant default in ONE frame that takes the rest of
+   the page: the message centred in the room the list would use, the Global
+   Default at the frame's foot, ruled off, as the last row of the order. */
+.bpage.bapp:has(.bapr__frame) { flex: 1; grid-template-rows: auto auto auto 1fr; }
+.bapr__frame {
+  display: flex; flex-direction: column; flex: 1; min-height: 320px;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.bapr__frame > .bempty { flex: 1; align-content: center; border: 0; border-radius: 0; }
+.bapr__frame > .bapr__fall {
+  margin-top: 0; border: 0; border-radius: 0;
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+/* --- Add existing policy: the policies as a list (13 Oct 2026) ------------ */
+.bapp__pick { display: flex; flex-direction: column; gap: var(--space-2); }
+.bapp__pickgroup {
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-tertiary);
+}
+.bapp__pickrow {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  width: 100%; padding: var(--space-4);
+  background: var(--surface-raised); text-align: left; font: inherit; cursor: pointer;
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bapp__pickrow:hover:not(:disabled) { background: var(--state-hover-bg); border-color: var(--border-default); }
+.bapp__pickrow:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bapp__pickrow:disabled { cursor: default; opacity: 0.6; }
+.bapp__pickart { flex: none; display: inline-flex; padding-top: 2px; }
+.bapp__picktext { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.bapp__picktext b { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bapp__picktext em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bapp__pickedhead { display: flex; align-items: center; justify-content: space-between; }
+
+/* Where the picked policy lands on this application: one quiet row. */
+.bapp__lands {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bapp__lands b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+
+/* --- Post sign-in (AppPostSignIn.tsx, 13 Oct 2026) -------------------------
+   The tab's rows are the Policies tab's (`.bapr__row`, `.bapr__body`,
+   `.bapr__meta`) less the number: post sign-in policies are not ranked. The
+   Link policy slider's first page is Add existing policy's list
+   (`.bapp__pick*`); only what those do not cover is here. Prefix `bapsi`,
+   checked against the tree first. */
+
+/* The row's menu level with the name, as the Policies tab's is. */
+.bapsi__row { align-items: center; }
+
+/* The slider's page moves as one: the callout, the list, the line under it. */
+.bapsi__page { display: flex; flex-direction: column; gap: var(--space-5); }
+
+/* The events page's head: the policy's name, then its status. */
+.bapsi__headline { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
+.bapsi__headline > h2 { min-width: 0; overflow-wrap: anywhere; }
+
+/* Create new policy, first on the list: the add mark in a quiet tile. */
+.bapsi__create .bapp__picktext b { color: var(--text-primary); }
+.bapsi__createart {
+  width: var(--ctl-height-sm);
+  height: var(--ctl-height-sm);
+  padding-top: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+.bapsi__create { align-items: center; }
+/* A policy's status at the row's end. */
+.bapsi__pickstatus { flex: none; margin-left: auto; display: inline-flex; }
+
+/* The events, one group per kind, each a checklist with the console's tick. */
+.bapsi__events { display: flex; flex-direction: column; gap: var(--space-5); }
+.bapsi__group { display: flex; flex-direction: column; gap: var(--space-1); }
+.bapsi__group > .bapp__pickgroup { margin-top: 0; }
+.bapsi__event {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  /* The tick level with the group's heading; the hover runs past it. */
+  width: calc(100% + 2 * var(--space-4));
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bapsi__event:hover:not(:disabled) { background: var(--state-hover-bg); }
+.bapsi__event:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Held by another policy: readable, with that policy named, and not pickable. */
+.bapsi__event:disabled { cursor: default; }
+.bapsi__event:disabled .bx-tick { background: var(--surface-sunken); border-color: var(--border-subtle); }
+.bapsi__event:disabled .bapsi__eventtext b { color: var(--text-tertiary); }
+.bapsi__eventtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bapsi__eventtext b { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bapsi__eventtext em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bapsi__event > .bx-badge { flex: none; }
+
+/* --- An application's Policies tab (app-policy-view.tsx, spec APP-POLICY-TAB.md, 15 Oct 2026) -----------------------
+   Its one policy read in the page on the full width: sections told apart by a heading and a hairline, no tiles, fills
+   or card borders. It replaced the morning's bento. Prefix
+   `apol`, checked against the tree first. Tokens only; the rules' tracks start from the spec's (§3.1), made to share
+   a laptop's column (review, 15 Oct 2026). */
+
+.apol__wrap { min-width: 0; }
+.apol { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+
+/* A · the name and its status, the fact line under them, and the two buttons at the right. */
+.apol__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-6); min-width: 0; }
+.apol__title { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.apol__nameline { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
+.apol__nameline h2 { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary); overflow-wrap: anywhere; }
+.apol__nameline h2:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.apol__status { display: inline-flex; }
+.apol__acts { flex: none; display: flex; align-items: center; gap: var(--space-3); }
+
+.apol__facts { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-8); min-width: 0; }
+.apol__fact { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.apol__fact dt { flex: none; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.apol__fact dd { margin: 0; display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; font-size: var(--fs-md); color: var(--text-body); }
+/* The kit's stack (faces.tsx `FaceStack tips={false}`), a little apart from the names it stands for. */
+.apol__fact dd > .bx-faces { margin-right: var(--space-2); }
+.apol__names { min-width: 0; overflow-wrap: anywhere; }
+/* Who it covers as chips: face then name, the count after them in the quiet voice (20 Oct 2026). */
+.apol__whochips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.apol__whochips .bx-chip__main { gap: var(--space-2); padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1); color: var(--text-primary); }
+.apol__whochips .bx-chip__main:disabled { cursor: default; }
+.apol__covercount { margin-left: var(--space-2); font-size: var(--fs-sm); color: var(--text-secondary); }
+.apol__gdhead { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-md); color: var(--text-body); }
+
+/* A text link in the link colour, with no box: groups, counts, Rule, Edit rule, the state line's ways on. */
+.apol__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-link);
+  text-align: left;
+  cursor: pointer;
+}
+.apol__link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.apol__link:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.apol__muted { color: var(--text-tertiary); }
+
+/* B · the state line: the kit's `Note` (16 Oct 2026), the state its heading, its lines stacked under it, its links on
+   the last. */
+.apol__state .bx-note__body { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.apol__notelinks { display: inline-flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); }
+.apol__notelist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.apol__notelist li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); }
+/* The ways on a weight heavier than the note's grey body, the Read more weight, so they read as things to press. */
+.apol__state .apol__link { font-weight: var(--fw-medium); }
+.apol__diff { margin: var(--space-1) 0; }
+/* The lines past three, in the Note's fold: the same list, not the fold's bulleted points. */
+.apol__state .bx-note__more > .apol__diff { margin: var(--space-3) 0 0; padding: 0; gap: var(--space-3); }
+/* Added and Removed as plain words in the note's own grey: the state line never uses red, amber or a dot (spec B), so
+   not the inspector's tinted tags. A removed sentence keeps its strike. */
+.apol__state .apol__diff li.is-added .insp__diffword,
+.apol__state .apol__diff li.is-removed .insp__diffword { padding: 0; background: none; color: inherit; font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+
+/* Every section: a heading row, then what it holds. */
+.apol__sec { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.apol__sechead { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-4); min-width: 0; }
+.apol__sechead h3 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.apol__aside { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.apol__push { margin-left: auto; display: inline-flex; }
+.apol__tools { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+
+/* C · the chain. One template on every row and on the labels, so a row's ends line up with the next one's (Row ends
+   line up). The spec's tracks (§3.1: Who 220, Outcome 220) were drawn on an 1100px column; the shell gives 780–910 on
+   a laptop, where they left the rule's own column 70–200px and its name on three lines. So the number, the figure and
+   the chevron keep fixed tracks, and the rest share what is left: the rule twice what Who and Outcome get, each with
+   a floor its words read at. Under that (the container query below) the row goes to three lines. */
+.apol__chainsec { container: apol-chain / inline-size; }
+.apol__cols,
+.apol__row {
+  display: grid;
+  grid-template-columns: 32px minmax(200px, 2fr) minmax(140px, 1fr) minmax(170px, 1fr) 140px 24px;
+  column-gap: var(--space-5);
+}
+.apol__cols { padding: 0 var(--space-4) var(--space-2); font-size: var(--fs-sm); color: var(--text-tertiary); }
+.apol__cols > :nth-child(5) { text-align: right; }
+.apol__chain { margin: 0; padding: 0; list-style: none; border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.apol__item { border-top: var(--bw-thin) solid var(--border-subtle); }
+.apol__item.is-default { border-top: 0; }
+.apol__row {
+  width: 100%;
+  align-items: start;
+  padding: var(--space-5) var(--space-4);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+}
+button.apol__row:hover { background: var(--int-ghost-bg-hover); }
+/* Open: greyscale, never orange. */
+.apol__row.is-open { background: var(--surface-sunken); }
+.apol__row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.apol__row.is-still { cursor: default; }
+
+.apol__n { display: inline-flex; padding-top: var(--space-1); font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--accent); font-variant-numeric: tabular-nums; }
+.apol__rule { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.apol__name { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; }
+.apol__nametext { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+.apol__sub { font-size: var(--fs-sm); color: var(--text-tertiary); overflow-wrap: anywhere; }
+.apol__who { display: flex; align-items: center; gap: var(--space-3); min-width: 0; font-size: var(--fs-sm); color: var(--text-body); }
+.apol__who > .bx-faces { flex: none; }
+.apol__whotext { min-width: 0; overflow-wrap: anywhere; }
+.apol__out { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; }
+.apol__outline { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-secondary); }
+.apol__factor { max-width: 100%; font-size: var(--fs-sm); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apol__out > .apol__muted { font-size: var(--fs-sm); }
+.apol__fig { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); text-align: right; }
+.apol__count { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+/* "sign-ins" after the figure, on a narrow chain only: the column label says it everywhere else. */
+.apol__unit { display: none; }
+.apol__last { font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
+.apol__chev { display: inline-flex; justify-content: center; padding-top: var(--space-1); color: var(--text-tertiary); }
+.apol__chevturn { display: inline-flex; }
+
+/* A row that cannot decide a sign-in today: a policy that is off, a rule switched off or never reached, or the Global
+   Default when the policy covers everyone. Its words go quiet; its outcome keeps its colour, since that is still what
+   the row says. */
+.apol__row.is-dim .apol__n,
+.apol__row.is-dim .apol__nametext,
+.apol__row.is-dim .apol__who { color: var(--text-tertiary); }
+
+/* "Outside {policy}": the two tiers parted by a dashed rule with the label in its middle. */
+.apol__tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-6) 0 var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}
+.apol__tier::before,
+.apol__tier::after { content: ''; flex: 1; border-top: var(--bw-thin) dashed var(--border-subtle); }
+
+/* The open row's body, in place, no frame: its parts parted by hairlines, set in under the Rule column. */
+.apol__bodywrap { min-width: 0; }
+.apol__body { overflow: hidden; }
+.apol__bodyin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-6) calc(32px + var(--space-5) + var(--space-4));
+}
+.apol__bodyin > .insp__part + .insp__part { padding-top: var(--space-5); border-top: var(--bw-thin) solid var(--border-subtle); }
+.apol__whofull { margin: 0; font-size: var(--fs-sm); color: var(--text-primary); overflow-wrap: anywhere; }
+/* The body's own Who part names the people, so the rule picture under it
+   starts at its If: its who line would say the same thing twice. */
+.apol__bodyin .bb__ifwho,
+.apol__bodyin .bb__ifrow:has(+ .bb__ifwho) { display: none; }
+.apol__bodyfoot { display: flex; justify-content: flex-end; font-size: var(--fs-sm); }
+.apol__gdlines { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-4); }
+.apol__gdlines li {
+  display: grid;
+  grid-template-columns: var(--space-7) minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--text-body);
+}
+.apol__gdn { font-weight: var(--fw-semibold); color: var(--accent); }
+.apol__gdtext { min-width: 0; overflow-wrap: anywhere; }
+
+/* D and E side by side, 8 to 4; one column at 1120 and below, E under D. */
+.apol__band { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: var(--space-8); align-items: start; }
+.apol__pair { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-8); align-items: start; }
+.apol__band.is-solo { grid-template-columns: minmax(0, 1fr); }
+.apol__rail { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
+.apol__rail > .apol__sec + .apol__sec { padding-top: var(--space-6); border-top: var(--bw-thin) solid var(--border-subtle); }
+
+/* D · Sign-in activity. */
+.apol__people { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.apol__person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-3) 0;
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-md);
+}
+.apol__personsaid { min-width: 0; overflow-wrap: anywhere; color: var(--text-body); }
+.apol__personsaid b { font-weight: var(--fw-medium); color: var(--text-primary); }
+/* The table fits D's column: not the policies table's 720px floor (screens.css `.btable`), which is for a page-wide
+   list and put Rule out of sight beside the rail at every desktop width. Its cells wrap instead. */
+.apol__activity { container: apol-activity / inline-size; }
+.apol__table .btable { min-width: 0; }
+.apol__result { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.apol__result > .apol__muted { font-size: var(--fs-sm); }
+.apol__more { display: inline-flex; align-self: flex-start; }
+.apol__quiet { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* E1 · Changes: who and when, then what changed, one change after another. */
+.apol__changes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.apol__change { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5) 0; border-top: var(--bw-thin) solid var(--border-subtle); }
+.apol__change:first-child { padding-top: 0; border-top: 0; }
+.apol__changehead { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.apol__by { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+.apol__ago { flex: none; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.apol__changeline { display: block; font-size: var(--fs-sm); color: var(--text-body); overflow-wrap: anywhere; }
+.apol__postlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--fs-sm); }
+
+@media (max-width: 1120px) {
+  .apol__band, .apol__pair { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* At 900 and below: the buttons go under the name and the facts stack label over value. Sign-in activity's From
+   column goes too; the place is in the open row. */
+@media (max-width: 900px) {
+  .apol__head { flex-direction: column; align-items: stretch; }
+  .apol__acts { flex-wrap: wrap; }
+  .apol__facts { flex-direction: column; align-items: flex-start; }
+  .apol__fact { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+  .apol__table .apol__from { display: none; }
+}
+
+/* D narrower than its five columns read at — beside the rail on most laptops, or Compact — keeps four: From goes, and
+   the place is said in the open row instead (activity-row.tsx `.sia__narrow`), as at 900 and below. */
+@container apol-activity (max-width: 759px) {
+  .apol__table .apol__from { display: none; }
+  .apol__table .sia__lines > .sia__narrow { display: flex; }
+}
+
+/* A chain narrower than its tracks — every width at 900 and below, where the shell's rail overlays the page and the
+   column is at most 860, and a laptop's Compact page — reads each row in three lines (spec §3.2): the number, the
+   name and the outcome's pill; the If; then who it is for, the factors and the sign-ins with their noun, muted. The
+   column labels go. A flex row, so the outcome's pill and its factors part (`display: contents`) and the third line
+   flows, its start under the name. */
+@container apol-chain (max-width: 860px) {
+  .apol__cols { display: none; }
+  /* Every line starts under the name; the number hangs in the gutter to its left. */
+  .apol__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2) var(--space-4);
+    padding-left: calc(var(--space-4) + var(--space-8) + var(--space-4));
+  }
+  /* The break before the third line. */
+  .apol__row::after { content: ''; order: 5; flex-basis: 100%; }
+  .apol__n { order: 1; flex: none; width: var(--space-8); margin-left: calc(-1 * (var(--space-8) + var(--space-4))); }
+  .apol__rule { order: 2; flex: 1 1 0; }
+  .apol__out { display: contents; }
+  .apol__out > * { order: 3; flex: none; }
+  .apol__chev { order: 4; flex: none; width: var(--space-8); }
+  .apol__who { order: 6; color: var(--text-tertiary); }
+  .apol__out > .apol__factor { order: 7; flex: 0 1 auto; min-width: 0; }
+  .apol__fig { order: 8; flex-direction: row; align-items: baseline; gap: var(--space-3); }
+  .apol__count { font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-tertiary); }
+  .apol__unit { display: inline; }
+  /* The third line's parts parted as the spec writes them, "Engineering · Password   183 sign-ins · last …": the
+     dots are drawn, not read (an empty alternative text). None before the figure, which often starts a line of its
+     own on a phone, where a dot would lead the line. */
+  .apol__out > .apol__factor::before,
+  .apol__last::before { content: '·' / ''; margin-right: var(--space-3); color: var(--text-tertiary); }
+  .apol__bodyin { padding-left: var(--space-4); }
+  /* A condition's value goes under its attribute rather than off the box's edge (the board's own row keeps one line). */
+  .apol__bodyin .bb__ifrow.is-cond { flex-wrap: wrap; }
+}
+
+/* --- The tab at a glance (app-policy-view.tsx `APP_POLICY_GLANCE`, 20 Oct 2026) ---------------------------------------
+   Two panels of one height side by side, each a head and a frame, and nothing inside a frame can change its height: a
+   card opened, the Global Default's sheet, a pick, a page, a search, two rules or thirty, no sign-ins or thousands. The
+   height comes from the look's own table tokens and the page size (`--apol-rows`, set inline: as many rows as end
+   above the fold, four to seven — app-policy-view.tsx `useGlanceRows`), never from the content: the rules frame is as
+   tall as the activity's bar, table head and rows, so the canvas's bottom edge is the last row's. Both frames are the table card (`.btable-wrap`), so their edge, radius and
+   ground are the look's own. */
+.apol.is-glance {
+  --apol-head-h: var(--ctl-height-sm);
+  --apol-bar-h: calc(var(--ctl-height-md) + var(--space-4) * 2);
+  --apol-foot-h: var(--table-row-h);
+  --apol-frame-h: calc(
+    var(--apol-bar-h) + var(--table-header-h) + var(--table-row-h) * var(--apol-rows) + var(--apol-foot-h) + var(--bw-thin) * 2
+  );
+}
+.apol__pair.is-glance { align-items: start; }
+.apol__panel { display: grid; grid-template-rows: var(--apol-head-h) var(--apol-frame-h); row-gap: var(--space-5); min-width: 0; }
+/* One line, one ghost button tall, in both panels, so the two titles share a baseline. */
+.apol__panelhead { height: var(--apol-head-h); flex-wrap: nowrap; }
+.apol__panelhead > h3,
+.apol__panelhead > .bx-badge { flex: none; }
+.apol__panelhead > .apol__aside { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apol__rules { container: apol-rules / inline-size; }
+
+.apol__frame { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); height: var(--apol-frame-h); min-width: 0; min-height: 0; }
+.apol__frame.has-foot { grid-template-rows: minmax(0, 1fr) var(--apol-foot-h); }
+.apol__frame.has-bar.has-foot { grid-template-rows: var(--apol-bar-h) minmax(0, 1fr) var(--apol-foot-h); }
+/* The one part of a frame that scrolls, its gutter held so a scroll appearing never narrows what is under the
+   pointer. Contained only while it overflows (`data-scrolls`, scroll-contain.ts), so reaching its end never hands the
+   wheel to the page, and a frame with nothing to scroll never keeps it from the page. */
+.apol__frame > .apol__body { min-width: 0; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+.apol__frame > .apol__body[data-scrolls] { overscroll-behavior: contain; }
+/* The sign-ins' body overflows only while people found sit over the rows, so no gutter is held for it: the table's
+   grey head and its hairlines reach the frame's edge (browser review, 20 Oct 2026). */
+.apol__frame > .apol__body.apol__actbody { scrollbar-gutter: auto; }
+.apol__frame > .apol__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: 0 var(--table-cell-x);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+}
+
+/* The page's grid does not change when the pager mounts or goes (a search that matches nothing): the Users and Groups
+   tabs' four rows, always, and the page filling the column (screens.css, and `.bpage.bapp:has(…)` above). The pager
+   sits in the activity's foot, not at the page's end. */
+.bpage.bapp:has(.apol.is-glance) { grid-template-rows: auto auto auto 1fr; }
+.bshell__main > .bpage.bapp:has(.apol.is-glance) { flex: 1 0 auto; }
+.apol__foot .blist__pager { position: static; flex: none; margin-left: auto; padding: 0; background: none; }
+
+/* The rules: the canvas fills its body and is the one that scrolls (board.css `.insp__canvas.is-framed`), so the
+   body itself holds still. Its own stacking context, so nothing on the canvas rises over the Global Default's sheet. */
+.apol__frame > .apol__body.apol__rulesbody { overflow: hidden; scrollbar-gutter: auto; isolation: isolate; }
+
+/* The Global Default, as the rules' foot: who the policy leaves to it on the first line, what it decides on the
+   second. The old row's words (spec C), on two lines in one row's height. */
+.apol__frame > .apol__rulesfoot { padding: 0; }
+.apol__gdstrip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'tier tier tier chev'
+    'mark name out chev';
+  align-content: center;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0 var(--table-cell-x);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
+/* Open: greyscale, never orange. */
+.apol__gdstrip[aria-expanded='true'] { background: var(--surface-sunken); }
+/* A picked sign-in it decided, or the Rule filter naming it: the picked row's own edge. */
+.apol__gdstrip.is-traced { box-shadow: inset var(--bw-thick) 0 0 var(--accent); }
+.apol__gdstrip:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--bw-thick) var(--focus-ring); }
+.apol__gdstrip.is-traced:focus-visible { box-shadow: inset var(--bw-thick) 0 0 var(--accent), inset 0 0 0 var(--bw-thick) var(--focus-ring); }
+.apol__gdstrip.is-still { cursor: default; color: var(--text-tertiary); }
+.apol__gdtier { grid-area: tier; min-width: 0; font-size: var(--fs-xs); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apol__gdmark { grid-area: mark; color: var(--text-tertiary); }
+.apol__gdname { grid-area: name; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apol__gdstrip.is-still .apol__gdname { color: var(--text-tertiary); }
+.apol__gdout { grid-area: out; display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; }
+.apol__gdchev { grid-area: chev; display: inline-flex; color: var(--text-tertiary); }
+/* A narrow rules panel keeps the outcome and lets the count go. */
+@container apol-rules (max-width: 399px) {
+  .apol__gdrules { display: none; }
+}
+
+/* Its sheet rises over the canvas from the strip, at most the body's height, and scrolls in itself. The positioning
+   box is always there (the strip's `aria-controls`) and takes no pointer while it is empty. */
+.apol__gdsheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--apol-foot-h);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: calc(100% - var(--apol-foot-h));
+  pointer-events: none;
+}
+.apol__gdpane {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  pointer-events: auto;
+  background: var(--surface-raised);
+  border-top: var(--bw-thin) solid var(--border-default);
+  box-shadow: var(--el-mid);
+}
+/* Contained only while its lines overflow it (scroll-contain.ts): a sheet with nothing to scroll leaves the wheel to the page. */
+.apol__gdpane[data-scrolls] { overscroll-behavior: contain; }
+.apol__gdpanein { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5) var(--table-cell-x); }
+/* Room for the traced line's ground, set out into the sheet's padding so the numbers keep their column. */
+.apol__gdpane .apol__gdlines li { margin-inline: calc(var(--space-3) * -1); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
+.apol__gdlines li.is-traced { background: var(--accent-soft); }
+
+/* Sign-in activity: the bar inside the frame, then the rows, then the foot. */
+.apol__bar { display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-4) var(--table-cell-x); }
+/* The search keeps room for its words; a narrow panel ellipsises the Rule filter's value first (Picker's own
+   ellipsis). Result's three short words keep their width. */
+.apol__bar .bx-search { flex: 1 1 auto; width: auto; min-width: calc(var(--space-16) * 2); }
+.apol__bar .btoolbar__filter { flex: none; min-width: 0; }
+.apol__bar .btoolbar__filter.apol__rulefilter { flex: 0 1 auto; }
+/* A column, so an empty state takes the space the rows would and a person found sits above them. The sticky head is
+   kept clear when a row is brought into view. */
+.apol__actbody { display: flex; flex-direction: column; scroll-padding-top: var(--table-header-h); }
+.apol__frame > .apol__body > .bempty { flex: 1 0 auto; align-content: center; }
+.apol__actbody > .apol__people { flex: none; }
+.apol__actbody .apol__person { min-height: var(--table-row-h); padding: var(--space-2) var(--table-cell-x); }
+
+/* Every row exactly one row tall: one line per cell, the overflow ellipsised, and the columns fixed so a page turn
+   never resizes them. No inner scroller, which would unstick the head. */
+.btable.apol__gtable { table-layout: fixed; width: 100%; min-width: 0; }
+.btable.apol__gtable thead th { position: sticky; top: 0; z-index: 1; }
+.apol.is-glance .btable.apol__gtable thead th:is(:first-child, :last-child) { border-radius: 0; }
+.btable.apol__gtable tbody td {
+  height: var(--table-row-h);
+  padding-block: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.btable.apol__gtable tbody tr { cursor: pointer; }
+/* Picked: the selection's colour (slate, or blue in the rebrand), never orange; the card it names wears the same. */
+.btable.apol__gtable tbody tr.is-picked > td { background: var(--accent-soft); }
+.btable.apol__gtable tbody tr.is-picked > td:first-child { box-shadow: inset var(--bw-thick) 0 0 var(--accent); }
+/* The Sign-in activity page's order (owner, 20 Oct 2026): When, Person, From, Result, Rule, then the row's menu. When,
+   Person and Result are as wide as their longest words (a weekday, date and time; a name; "Allow on 1 factor") with
+   their padding, so they never cut; the rest is Rule's, and — where it shows — From's, which gives way first. */
+.apol__gtable .apol__c-when { width: calc(var(--space-16) * 2 - var(--space-2)); }
+.apol__gtable .apol__c-who { width: calc(var(--space-16) + var(--space-12)); }
+.apol__gtable .apol__c-result { width: calc(var(--space-16) + var(--space-14)); }
+.apol__gtable .apol__from { display: none; }
+/* The menu's column: one small kebab and a little room, never a share of the table. Sticky at the right edge
+   (screens.css `.btable__actions`), so a phone that scrolls the table sideways still reaches it. */
+.btable.apol__gtable .apol__c-menu { width: calc(var(--ctl-height-sm) + var(--space-1) * 2); padding-inline: var(--space-1); }
+/* The kebab is the row's, shown when the row is: under the pointer, holding focus, picked, or with its menu open.
+   Faded, never removed, so the column never changes width and Tab still reaches it from the row's person. A touch
+   screen has no hover, so there it always shows. */
+.apol__gtable .apol__c-menu .bx-rowmenu { opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard); }
+.apol__gtable tbody tr:is(:hover, :focus-within, .is-picked) .bx-rowmenu,
+.apol__gtable .bx-rowmenu.is-open { opacity: 1; }
+.btable.apol__gtable tbody tr:has(.bx-rowmenu.is-open) > td { background: var(--table-row-hover); }
+.btable.apol__gtable tbody tr.is-picked:has(.bx-rowmenu.is-open) > td { background: var(--accent-soft); }
+@media (pointer: coarse) {
+  .apol__gtable .apol__c-menu .bx-rowmenu { opacity: 1; }
+}
+/* The person, as text that is also the row's keyboard stop. */
+.apol__pick {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.apol__pick:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+
+/* The foot: Clear and what the open row said, on one line; the pager at the right. */
+.apol__picksaid { flex: 1 1 auto; min-width: 0; font-size: var(--fs-sm); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* From has its column where the panel is wide enough for five; under that the place is said in the foot. */
+@container apol-activity (min-width: 760px) {
+  .apol__gtable .apol__c-rule { width: calc(var(--space-16) * 2 + var(--space-6)); }
+  .apol__gtable .apol__from { display: table-cell; }
+  .apol__pickfrom { display: none; }
+}
+/* Narrower than its four columns read at (a phone): the table keeps its width and scrolls sideways inside the frame,
+   never the page (owner, 19 Sep 2026: tables need no phone work). The head stays stuck. */
+@container apol-activity (max-width: 519px) {
+  .btable.apol__gtable { min-width: calc(var(--space-16) * 8 + var(--space-7)); }
+}
+/* A phone: the bar on two lines (the search, then the two filters side by side), and with a pick the foot keeps Clear,
+   what the row said and the arrows, the range giving way. */
+@media (max-width: 600px) {
+  .apol.is-glance { --apol-bar-h: calc(var(--ctl-height-md) * 2 + var(--space-4) * 3); }
+  .apol__bar { flex-wrap: wrap; align-content: center; row-gap: var(--space-4); }
+  .apol__bar .bx-search { flex-basis: 100%; }
+  .apol__bar .btoolbar__filter,
+  .apol__bar .btoolbar__filter.apol__rulefilter { flex: 1 1 0; }
+  .apol__actfoot.is-picked .blist__range { display: none; }
+}

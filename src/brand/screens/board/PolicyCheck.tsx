@@ -35,6 +35,7 @@ import {
   type TryPage,
 } from '../sign-in-tests/sign-in-card'
 import { TryJourney } from '../sign-in-tests/TryJourney'
+import { IN_POLICY_LAYOUT } from '../sign-in-tests/run-layout'
 import { SavedPanel, TryPanel, WhyPanel } from '../sign-in-tests/TryPanel'
 import { FixHere, type FixItem } from '../sign-in-tests/conflict-fix'
 import { useSimEnv } from '../sim-env'
@@ -49,7 +50,7 @@ import { DOCK_TAB_LABEL, policyApps } from '../testing/test-dock'
 import { PEOPLE_AND_BREAK_IN, firstCheckApp, onPolicyApps, type CheckView } from './test-mode'
 import { boardVersion, columnsFor, runColumns } from './try-sign-in'
 import './check-access.css'
-import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
+import { OPEN_AT_ONCE, SAVED_SIGN_INS } from '../sign-in-tests/phase'
 
 /* -----------------------------------------------------------------------------
    Check access inside a policy: the builder's test mode, as the Sign-in tests
@@ -93,10 +94,11 @@ import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
      the panel    scoped to the policy (`boardScope`): its applications, its
                   people first, its saved sign-ins
      the views    Past sign-ins, from its own button on the bar
-                  (`CheckBarViews`), in the panel's place: a row fills the
-                  sign-in and runs it, the panel shut. People and the Break-in
-                  test are views of the same kind, hidden
-                  (test-mode.ts `PEOPLE_AND_BREAK_IN`)
+                  (`CheckBarViews`), in the panel's place: a row runs its
+                  sign-in at once beside the list, the row marked (phase.ts
+                  OPEN_AT_ONCE, 20 Oct 2026; off, it fills the form and waits
+                  for Run). People and the Break-in test are views of the same
+                  kind, hidden (test-mode.ts `PEOPLE_AND_BREAK_IN`)
      Open policy  on this policy, back to its builder — on the rule, for Open
                   rule; another policy's builder, in Check access, as on the
                   page
@@ -206,6 +208,19 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   /* The why's panel body, for the run to draw the why into. */
   const [whySlot, setWhySlot] = useState<HTMLDivElement | null>(null)
   const [focusRun, setFocusRun] = useState(0)
+  /* OPEN AT ONCE (phase.ts, 20 Oct 2026): the past sign-in the run beside the Past list is of, marked there; and the list
+     the Why or the form was opened over, which they shut back to. */
+  const [pickedPast, setPickedPast] = useState<string | null>(null)
+  const backTo = useRef<'past' | null>(null)
+  /* Read off the panel's own moves, so no way of opening the two has to say it: the Why or the form taking the list's
+     place keeps the list to come back to; any other panel lets it go. */
+  const panelWas = useRef(panel)
+  useEffect(() => {
+    const was = panelWas.current
+    panelWas.current = panel
+    if (panel !== 'why' && panel !== 'form') backTo.current = null
+    else if (OPEN_AT_ONCE && was === 'past') backTo.current = 'past'
+  }, [panel])
   useEffect(() => {
     kept.current = { page, runId, loaded, zoom }
   })
@@ -298,6 +313,16 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     else window.setTimeout(then, ARRIVE_MS)
   }
   const closePanel = (focus = false) => {
+    /* The Why or the form opened over the Past list shuts back to it (OPEN_AT_ONCE): its own mount puts the focus on its marked row. */
+    if (OPEN_AT_ONCE && backTo.current && (panel === 'why' || panel === 'form')) {
+      const back = backTo.current
+      backTo.current = null
+      onPanel(back)
+      setSaveOpen(false)
+      setSavedOpen(false)
+      return
+    }
+    backTo.current = null
     const from = panel
     const inPanel = !!(document.activeElement instanceof HTMLElement && document.activeElement.closest('.sit-panel'))
     onPanel(null)
@@ -313,6 +338,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     onPanel(null)
     setSaveOpen(false)
     setSavedOpen(false)
+    backTo.current = null
     if (leaving.current) window.clearTimeout(leaving.current.timer)
     leaving.current = null
     const go = (keepFocus: boolean) => {
@@ -355,6 +381,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     setPage((p) => ({ ...p, mode: 'journey', intro: 'none', pace, replay: false, prev: null, askSaveFor: null, ran: undefined, ...next }))
     setSubmitted(false)
     setSaveOpen(false)
+    setPickedPast(null)
     loadBoard(saved.id, f)
     setRunId((n) => n + 1)
   }
@@ -437,12 +464,22 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     const f = formOf(sv.facts, zones)
     tryWhole(f, { name: sv.name, form: f, expected: sv.expected })
   }
+  /* A past sign-in runs at once (OPEN_AT_ONCE; owner, 20 Oct 2026: "it should open immediately — no need to showcase the
+     free-field form"): beside the list, which stays with the row marked, the focus staying on the row. `tryWhole` above
+     is what the flag off keeps, and what a saved sign-in still does. */
+  const playPast = (f: SignInForm, id?: string) => {
+    setLoaded(null)
+    begin(f, 'full', { draft: f, touched: [], identities: picksOf(f) })
+    setPickedPast(id ?? null)
+  }
 
   /* Reset (TryPanel's foot): the blank form, the canvas empty, and the Identity field to start again from. */
   const resetCheck = () => {
     setPage((p) => resetPage(p, blankOf(todayIn(), nowIn())))
     setLoaded(null)
     setSubmitted(false)
+    setPickedPast(null)
+    backTo.current = null
     focusRow('person')
   }
 
@@ -479,7 +516,23 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   const mine = useMemo(() => policyApps(draft, apps), [draft, apps])
   const closeView = () => closePanel(true)
   /* The why, in the panel: the answer's Review conflict, the policy's count. */
-  const why = useMemo(() => ({ open: panel === 'why', slot: whySlot, onOpen: (o: boolean) => onPanel(o ? 'why' : null) }), [panel, whySlot, onPanel])
+  const why = useMemo(
+    () => ({
+      open: panel === 'why',
+      slot: whySlot,
+      onOpen: (o: boolean) => {
+        if (o) {
+          onPanel('why')
+          return
+        }
+        /* Opened over the Past list (OPEN_AT_ONCE), its X goes back to the list. */
+        const back = OPEN_AT_ONCE ? backTo.current : null
+        backTo.current = null
+        onPanel(back)
+      },
+    }),
+    [panel, whySlot, onPanel],
+  )
   /* The Why's Fix on this policy is made here, in this draft (conflict-fix.ts `FixHere`); on another, it opens that one. */
   const fixHere = useMemo(() => ({ policyId: saved.id, onFixes, form: ran }), [saved.id, onFixes, ran])
 
@@ -513,6 +566,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
             onEdit={editSignIn}
             editing={panel === 'form'}
             unrun={unrun}
+            layout={IN_POLICY_LAYOUT}
           />
         </FixHere.Provider>
       </div>
@@ -552,7 +606,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
         )}
         {panel === 'past' && (
           <ViewPanel key="past" view="past" reduced={reduced} wide={wide} onToggleWidth={onToggleWidth} onClose={closeView}>
-            <DockPast draft={draft} apps={mine} version={version} onLoad={(f) => tryWhole(f, null)} />
+            <DockPast draft={draft} apps={mine} version={version} picked={OPEN_AT_ONCE ? pickedPast : undefined} onLoad={OPEN_AT_ONCE ? playPast : (f) => tryWhole(f, null)} />
           </ViewPanel>
         )}
         {PEOPLE_AND_BREAK_IN && panel === 'people' && (
@@ -644,7 +698,7 @@ export function CheckBarViews({ views, panel, onToggle }: { views: readonly Chec
             key={v}
             type="button"
             data-check-view={v}
-            className={`bx-btn bx-btn--neutral bx-btn--sm sit__savedbtn${on ? ' is-on' : ''}`}
+            className={`bx-btn bx-btn--ghost bx-btn--sm sit__savedbtn${on ? ' is-on' : ''}`}
             aria-expanded={on}
             aria-controls={on ? viewId(v) : undefined}
             onClick={() => onToggle(v)}

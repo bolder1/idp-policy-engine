@@ -35,6 +35,12 @@ export interface TestingSessionState {
   runId: number
   /** The last field a patch changed, on the page or the board, for "Changed by …". Cleared by `load`. */
   lastEdited: FormField | null
+  /* A sign-in filled in from elsewhere for Access checks to open on, with
+     nothing run (an application's Policies tab: its Check access, and Check
+     access for a person found there — only Run runs, 2 Oct 2026). The page
+     opens on its form holding this, whatever ran before; a run (`load`,
+     `replay`) or another tenant spends it. `form` stays the last run's. */
+  prefilled: SignInForm | null
   /** Which policy the Break-in test runs on, and whether its page is open. */
   breakIn: { policyId: string | null; open: boolean }
 }
@@ -46,6 +52,8 @@ export type SessionAction =
   /** A whole sign-in into the board's form for this policy: a saved sign-in's Try in the board's panel. */
   | { type: 'load-board'; policyId: string; form: SignInForm }
   | { type: 'load'; form: SignInForm }
+  /** A sign-in for Access checks' form to open on, run by nothing until Run. */
+  | { type: 'prefill'; form: SignInForm }
   | { type: 'replay' }
   | { type: 'view'; view: TestingView }
   | { type: 'open-break-in'; policyId: string | null }
@@ -54,7 +62,7 @@ export type SessionAction =
   | { type: 'reset'; form: SignInForm }
 
 export function initialSession(form: SignInForm): TestingSessionState {
-  return { form, boardForms: {}, view: 'try', runId: 1, lastEdited: null, breakIn: { policyId: null, open: false } }
+  return { form, boardForms: {}, view: 'try', runId: 1, lastEdited: null, prefilled: null, breakIn: { policyId: null, open: false } }
 }
 
 export function sessionReducer(s: TestingSessionState, a: SessionAction): TestingSessionState {
@@ -68,13 +76,16 @@ export function sessionReducer(s: TestingSessionState, a: SessionAction): Testin
         lastEdited: a.field,
       }
     case 'load':
-      return { ...s, form: a.form, runId: s.runId + 1, lastEdited: null }
+      return { ...s, form: a.form, runId: s.runId + 1, lastEdited: null, prefilled: null }
+    /* No runId: nothing is to play. The form waits for the page to open on it. */
+    case 'prefill':
+      return { ...s, prefilled: a.form }
     /* The board plays its own run (Check access, PolicyCheck.tsx), so no runId here; what
        changed is forgotten, as a load on the page forgets it. */
     case 'load-board':
       return { ...s, boardForms: { ...s.boardForms, [a.policyId]: a.form }, lastEdited: null }
     case 'replay':
-      return { ...s, runId: s.runId + 1 }
+      return { ...s, runId: s.runId + 1, prefilled: null }
     case 'view':
       return s.view === a.view ? s : { ...s, view: a.view }
     case 'open-break-in':
@@ -94,6 +105,8 @@ export interface TestingSession extends TestingSessionState {
   loadBoard(policyId: string, form: SignInForm): void
   /** Replaces the form and plays a run: a sample, a saved sign-in, a row-menu prefill. */
   load(form: SignInForm): void
+  /** Fills Access checks' form in for its next opening and plays nothing: Run is what runs it. */
+  prefill(form: SignInForm): void
   replay(): void
   setView(v: TestingView): void
   openBreakIn(policyId: string | null): void

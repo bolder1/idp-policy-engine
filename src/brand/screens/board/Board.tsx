@@ -20,6 +20,7 @@ import { WhichGate } from './RouteGate'
 import { ruleStage, type ColumnView, type RouteModel, type StageId } from './try-sign-in'
 import { revealKeepsWhich, revealKey } from './try-sign-in-run'
 import { BOARD_SKINS, readBoardSkin, writeBoardSkin, type BoardSkin } from './board-skin'
+import { usePostBoard } from './post-board'
 import { SHOWCASE } from '../../showcase'
 import { Tip } from '../../kit'
 
@@ -105,11 +106,14 @@ export function Board({
   destination,
   destinationAppId,
   destinationMore = 0,
+  audienceNames = null,
   selection,
   diagnostics,
   shadowed,
   test = null,
   fitKey,
+  fitFloor,
+  locked = false,
   resolve,
   onSelect,
   onInsert,
@@ -128,6 +132,8 @@ export function Board({
   traced,
   highlight,
   onHoverLast,
+  cardHead,
+  foldOnPress,
 }: {
   policy: Policy
   /* Where a sign-in is arriving, in words — the application this policy
@@ -148,6 +154,10 @@ export function Board({
   destinationAppId?: string | null
   /** How many more applications the policy protects beyond the one named. */
   destinationMore?: number
+  /* Who the policy governs, by name, when it is narrowed to groups or people;
+     null for everyone, which the sentence leaves unsaid (owner, 13 Oct 2026:
+     the policy's groups are read and changed at the start node). */
+  audienceNames?: string[] | null
   selection: Selection
   diagnostics: Diagnostic[]
   /** Rules dimmed because the hovered rule puts them out of reach. */
@@ -158,6 +168,10 @@ export function Board({
      cards. In the commit that changes it, with the grid switched without its
      transition (`.bb.is-snap`), so the fit measures the column it ends at. */
   fitKey?: string
+  /** The smallest scale a refit may choose (ZMIN when unset): past it the canvas pans rather than shrinks. */
+  fitFloor?: number
+  /** Read-only (Guided setup on the left or the right): the rule cards' reorder handles leave the tab order. */
+  locked?: boolean
   resolve: NameLookup
   onSelect: (s: Selection) => void
   onInsert: (at: number) => void
@@ -196,6 +210,11 @@ export function Board({
   /** Test mode: the card a hovered row in the test panel lands on, read by each card itself. */
   highlight?: CardHighlight
   onHoverLast?: (on: boolean) => void
+  /* A read-only canvas only (ReadOnlyCanvas `framed`, an application's Policies tab, 20 Oct 2026): what each card's
+     head says in place of its state pill, by rule id or 'fallback' — undefined keeps the pill — and a press folds
+     the card. The builder passes neither. */
+  cardHead?: (id: string) => ReactNode
+  foldOnPress?: boolean
 }) {
   const stage = useRef<HTMLDivElement | null>(null)
   const world = useRef<HTMLDivElement | null>(null)
@@ -284,9 +303,9 @@ export function Board({
     const s = stage.current
     const w = world.current
     if (!s || !w || !w.offsetWidth) return
-    const z = Math.min(1, Math.max(ZMIN, (s.clientWidth - FIT_PAD) / w.offsetWidth))
+    const z = Math.min(1, Math.max(fitFloor ?? ZMIN, (s.clientWidth - FIT_PAD) / w.offsetWidth))
     apply(() => ({ x: 0, y: 0, z }))
-  }, [fitKey, apply])
+  }, [fitKey, fitFloor, apply])
 
   /* The Decision gate, never behind the view dock.
 
@@ -695,6 +714,38 @@ export function Board({
   }
 
   const diagsFor = (i: number) => diagnostics.filter((d) => d.ruleIndex === i)
+  /* A post sign-in policy (post-board.ts): the start node says where events
+     come from, and a rule with no action yet needs setup — it keeps the
+     policy a draft (post-sign-in.ts `turnOnIssue`). */
+  const post = usePostBoard().on
+  const stateOf = (r: Rule, i: number) => (post && r.enabled && !r.action ? 'setup' : ruleState(diagsFor(i)))
+  const noteOf = (r: Rule, i: number) =>
+    post && r.enabled && !r.action
+      ? 'No action chosen'
+      : (
+          /* "Unreachable" is explained by the finding that makes it so. */
+          diagsFor(i).find((d) => UNREACHABLE_CODES.includes(d.code)) ??
+          diagsFor(i).find((d) => d.severity === 'error') ??
+          diagsFor(i).find((d) => d.severity === 'warning')
+        )?.title
+  /* Who the policy is narrowed to, before where it is narrowed — "A sign-in
+     from Finance arrives at …", "An event from Finance in …". */
+  const fromWhom = audienceNames && audienceNames.length > 0 && (
+    <>
+      from <b className="bb__start__at">{audienceNames[0]}</b>
+      {audienceNames.length === 2 && (
+        <>
+          {' '}or <b className="bb__start__at">{audienceNames[1]}</b>
+        </>
+      )}
+      {audienceNames.length > 2 && (
+        <>
+          {' '}or <b className="bb__start__at">{audienceNames.length - 1} more</b>
+        </>
+      )}{' '}
+    </>
+  )
+  const fromWords = audienceNames && audienceNames.length > 0 ? `from ${audienceNames.join(', ')}, ` : ''
   /* Materialised here rather than written into the draft, and that distinction
      is load-bearing. `Policy.fallback` is optional and only `blankPolicy()`
      sets one, so every policy that already existed reached this line with
@@ -801,9 +852,13 @@ export function Board({
               aria-label={
                 test
                   ? `${test.person?.name ?? 'Nobody chosen'} signs in to ${test.appId ? test.appName : 'no application'}. Edit applications`
+                  : post
+                  ? destination === null
+                    ? 'Not linked to any application. Edit who'
+                    : `Edit who: ${fromWords}events in ${destination}${destinationMore > 0 ? ` and ${destinationMore} more` : ''}`
                   : destination === null
                   ? 'No applications. Choose applications'
-                  : `Edit applications: ${destination}${destinationMore > 0 ? ` and ${destinationMore} more` : ''}`
+                  : `Edit who and applications: ${fromWords}${destination}${destinationMore > 0 ? ` and ${destinationMore} more` : ''}`
               }
               aria-controls="bb-insp-body"
               aria-expanded={selection.kind === 'apps'}
@@ -847,11 +902,28 @@ export function Board({
                   )}
                   {destination === null ? (
                     <span>
-                      <b className="bb__start__at">No applications</b>
+                      {/* A post sign-in policy is independent of applications:
+                          they are linked to it from their own pages, and
+                          until one is, it says so. */}
+                      <b className="bb__start__at">{post ? 'Not linked to any application' : 'No applications'}</b>
+                    </span>
+                  ) : post ? (
+                    /* Events, not a sign-in: what a post sign-in policy decides
+                       arrives from the applications linked to it. */
+                    <span>
+                      An event {fromWhom}in <b className="bb__start__at">{destination}</b>
+                      {destinationMore > 0 && (
+                        <>
+                          {' '}and <b className="bb__start__at">{destinationMore} more</b>
+                        </>
+                      )}
                     </span>
                   ) : (
                     <span>
-                      A sign-in arrives at <b className="bb__start__at">{destination}</b>
+                      {/* "From" whom, when the policy is narrowed: the first
+                          name and how many more, as the applications are said. */}
+                      A sign-in {fromWhom}
+                      arrives at <b className="bb__start__at">{destination}</b>
                       {destinationMore > 0 && (
                         <>
                           {' '}and <b className="bb__start__at">{destinationMore} more</b>
@@ -948,15 +1020,10 @@ export function Board({
                          the card cannot claim to be selected while naming no
                          part. */
                       openPart={selection.kind === 'rule' && selection.id === r.id ? selection.part : null}
-                      state={ruleState(diagsFor(ri))}
+                      state={stateOf(r, ri)}
                       /* The pill says what; its tooltip says why, which is the
                          only place Lite says it on the canvas. */
-                      stateNote={(
-                        /* "Unreachable" is explained by the finding that makes it so. */
-                        diagsFor(ri).find((d) => UNREACHABLE_CODES.includes(d.code)) ??
-                        diagsFor(ri).find((d) => d.severity === 'error') ??
-                        diagsFor(ri).find((d) => d.severity === 'warning')
-                      )?.title}
+                      stateNote={noteOf(r, ri)}
                       unreachable={diagsFor(ri).some((d) => UNREACHABLE_CODES.includes(d.code))}
                       route={cardRoute(r.id, stageAt(ruleStage(r.id)), r)}
                       shadowed={shadowed.includes(ri)}
@@ -964,8 +1031,9 @@ export function Board({
                       expanded={expandedOf(r.id)}
                       onToggleExpand={() => onToggleExpand(r.id)}
                       resolve={resolve}
-                      canUp={ri > 0}
-                      canDown={ri < policy.rules.length - 1}
+                      canUp={!locked && ri > 0}
+                      canDown={!locked && ri < policy.rules.length - 1}
+                      locked={locked}
                       onOpen={(part) => onSelect({ kind: 'rule', id: r.id, part })}
                       onToggle={(on) => onToggle(ri, on)}
                       onMove={(dir) => onMove(ri, ri + dir)}
@@ -977,6 +1045,8 @@ export function Board({
                       source={sources?.[r.id]}
                       traced={traced?.includes(r.id)}
                       highlight={highlight}
+                      head={cardHead?.(r.id)}
+                      foldOnPress={foldOnPress}
                       onHover={(on) => onHover(on ? ri : null)}
                       cardRef={(el) => {
                         if (el) cards.current.set(r.id, el)
@@ -1016,6 +1086,8 @@ export function Board({
               flash={flashing === 'fallback'}
               traced={traced?.includes('fallback')}
               highlight={highlight}
+              head={cardHead?.('fallback')}
+              foldOnPress={foldOnPress}
               onHover={onHoverLast}
               cardRef={(el) => {
                 terminalCard.current = el

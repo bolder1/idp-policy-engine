@@ -1,15 +1,33 @@
 import {
   Activity,
+  Banknote,
   CalendarDays,
+  ChartColumn,
   Clock,
+  FileLock,
+  FileText,
   Gauge,
   Globe,
+  Hourglass,
+  KeyRound,
+  Laptop,
   ListFilter,
   type LucideIcon,
+  MonitorCheck,
   MonitorSmartphone,
+  Network,
+  Plane,
+  Radar,
+  Repeat,
+  Rows3,
+  Send,
+  ShieldCheck,
   Tag,
+  Timer,
   UserRound,
+  UserX,
   Users,
+  VenetianMask,
   Webhook,
 } from 'lucide-react'
 
@@ -36,6 +54,11 @@ const GROUP_ICON: Record<string, LucideIcon> = {
   Risk: Gauge,
   Group: Users,
   User: UserRound,
+  /* A post sign-in policy's families (data.ts, phase 'post'). */
+  Session: Hourglass,
+  Device: Laptop,
+  Network: Network,
+  Event: FileText,
 }
 
 export const GROUP_TONE: Record<string, string> = {
@@ -45,6 +68,10 @@ export const GROUP_TONE: Record<string, string> = {
   Risk: 'positive',
   Group: 'neutral',
   User: 'neutral',
+  Session: 'notice',
+  Device: 'accent',
+  Network: 'info',
+  Event: 'magenta',
 }
 
 export const groupIcon = (g: string): LucideIcon => GROUP_ICON[g] ?? ListFilter
@@ -77,6 +104,23 @@ const COND_ICON: Record<string, LucideIcon> = {
   'ml-risk': Activity,
   group: Users,
   user: UserRound,
+  /* A post sign-in policy's own (data.ts, 13 Oct 2026). */
+  'session-age': Hourglass,
+  'idle-time': Timer,
+  'mfa-age': KeyRound,
+  'device-compliance': ShieldCheck,
+  'device-managed': MonitorCheck,
+  'device-changed': Repeat,
+  'ip-changed': Network,
+  'impossible-travel': Plane,
+  anonymous: VenetianMask,
+  'user-risk': UserX,
+  'risk-detection': Radar,
+  records: Rows3,
+  label: FileLock,
+  destination: Send,
+  amount: Banknote,
+  volume: ChartColumn,
 }
 
 export const conditionIcon = (id: string, group: string): LucideIcon => COND_ICON[id] ?? groupIcon(group)
@@ -110,6 +154,25 @@ const COND_TONE: Record<string, string> = {
   'ml-risk': 'positive',
   group: 'neutral',
   user: 'neutral',
+  /* A post sign-in policy's: one tone per family, as above — the session amber
+     with the clock, the device as the device profile, the network as the
+     zone, risk green, the event's own details magenta. */
+  'session-age': 'notice',
+  'idle-time': 'notice',
+  'mfa-age': 'notice',
+  'device-compliance': 'accent',
+  'device-managed': 'accent',
+  'device-changed': 'accent',
+  'ip-changed': 'info',
+  'impossible-travel': 'info',
+  anonymous: 'info',
+  'user-risk': 'positive',
+  'risk-detection': 'positive',
+  records: 'magenta',
+  label: 'magenta',
+  destination: 'magenta',
+  amount: 'magenta',
+  volume: 'magenta',
 }
 
 export const conditionTone = (id: string, group: string): string =>

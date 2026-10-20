@@ -17,6 +17,7 @@ import {
   type Zone,
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
+import { linkApp, type PostAction } from './post-sign-in'
 import type { SavedSignIn } from './saved-sign-ins'
 import { devicePreset } from './screens/testing/device-presets'
 import { TENANT_TZ, type SignInDevice, type SignInFacts } from './screens/sign-in-facts'
@@ -442,44 +443,48 @@ export const showcasePolicies: Policy[] = [
   },
 
   /* ---------------------------------------------------------------------------
-     The troubleshooting estate (30 Sep 2026). Owner: "with this few policies
-     it's hard to fulfil all the use cases … two policies collide and both
-     match, what will we show?" Six more, on applications no scenario policy
-     covers (AWS, Slack) and one GitHub draft, so that every way a person can
-     get an answer they did not expect is one saved sign-in away — and not one
-     of the saved sign-ins above moves. Each is a policy a real tenant grows
-     into, and each lints clean; what goes wrong is only ever the PERSON (two
-     groups, or named) meeting two of them.
+     The troubleshooting estate (30 Sep 2026), made one policy per application
+     (owner, 14 Oct 2026: "one application has at most one sign-in policy").
+     Owner, 30 Sep: "with this few policies it's hard to fulfil all the use
+     cases". Three applications are covered by a policy that holds a rule for
+     each team, so that every way a person can get an answer they did not
+     expect is one saved sign-in away. Each lints clean; what goes wrong is
+     only ever the PERSON (two groups, or named) meeting two of its rules.
 
-       AWS    three policies on one application. Engineering's (with DevOps
-              and contractors in it) is highest in the list; Finance's billing
-              policy and DevOps's production policy came later. Maya Iyer
-              (Engineering and Finance) is covered by two through different
-              groups; Tom Whelan (DevOps) by two through the SAME group; the
-              Engineering policy's first rule refuses contractors away from
-              the office, above the rule that lets Engineering in, so Leo
+       AWS    one policy for Engineering, DevOps, Contractors and Finance.
+              Maya Iyer (Engineering and Finance) lands on the Engineering
+              rule first; the first rule refuses contractors away from the
+              office, above the rule that lets Engineering in, so Leo
               Fernandes (Engineering and a contractor) is refused from
-              London; Finance's refuses Thomas Byrne by name, below the rule
-              that lets Finance in. Nobody in IT Admins is covered by any.
-       Slack  a policy for everyone first, and a policy for Engineering and
-              Contractors after it: the group's policy decides whatever the
-              order (the documented tier), and its Engineering rule takes
+              London; Finance's rule lets Thomas Byrne in, and the rule that
+              refuses him by name sits below it. Nobody in IT Admins is
+              covered.
+       Slack  one policy for everyone; the rules for Engineering and
+              Contractors come first, and the Engineering rule takes
               Contractors back out, which leaves Leo out of it.
-       GitHub "Code review for Finance", a draft for Finance: Developer tools
-              already covers Finance and comes first, so turning it on would
-              change nothing.
+       Box    one policy for Engineering and Design: Tanmay Joshi (both) meets
+              the Engineering rule first.
      ------------------------------------------------------------------------ */
 
-  /* AWS for the people who build: engineers on a compliant device sign in on
-     a password; contractors reach it from an office only, on a compliant
-     device and with Google Authenticator. The contractor Deny is rule 1 so it
-     is read before anything that could let a contractor in. */
+  /* AWS: the three AWS policies merged (14 Oct 2026) into the first, with the
+     audience of all three. Rules read in the order the engine ranked the
+     policies: Engineering's (the largest audience, highest in the list), then
+     Finance's billing rules, then DevOps's production rule, each with its old
+     audience as the rule's Who. Last row: Engineering's, the broadest
+     audience's (all three said the same thing in other words).
+
+     Contractors reach it from an office only, on a compliant device and with
+     Google Authenticator; the contractor Deny is rule 1 so it is read before
+     anything that could let a contractor in. Naming Thomas Byrne in a Deny of
+     his own sits BELOW the rule that lets Finance in, so on a compliant
+     device that rule still lets him in: naming somebody does not move their
+     rule up. */
   {
     id: 'sc-aws-engineering',
-    name: 'AWS for engineering teams',
+    name: 'AWS access',
     type: 'App Access',
     appIds: ['aws'],
-    audience: audienceOf(['engineering', 'devops', 'contractors']),
+    audience: audienceOf(['engineering', 'devops', 'contractors', 'finance']),
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Jaspreet Toor',
@@ -510,26 +515,9 @@ export const showcasePolicies: Policy[] = [
         secondFactorMethods: ['Google Authenticator'],
         matchEstimate: 23,
       }),
-    ],
-    fallback: denyAll('AWS needs a compliant device. Update your device, or contact IT.'),
-  },
-
-  /* Finance reads the AWS bill: a compliant device and Google Authenticator.
-     Thomas Byrne leaves on Friday and was named in a Deny of his own — BELOW
-     the rule that lets Finance in, so on a compliant device rule 1 still lets
-     him in. Naming somebody does not move their rule up. */
-  {
-    id: 'sc-aws-finance',
-    name: 'AWS billing for Finance',
-    type: 'App Access',
-    appIds: ['aws'],
-    audience: audienceOf(['finance']),
-    status: 'active',
-    lastModified: '2 days ago',
-    modifiedBy: 'Jaspreet Toor',
-    rules: [
       rule({
-        name: 'Compliant device',
+        name: 'Finance, on a compliant device',
+        who: { groupIds: ['finance'], userIds: [] },
         when: when(card(cond('fingerprint', 'matches', ['fp-compliant']))),
         decision: '2fa',
         firstFactor: 'Password',
@@ -544,25 +532,9 @@ export const showcasePolicies: Policy[] = [
         denyMessage: 'Your AWS access has ended. Contact IT if you still need it.',
         matchEstimate: 1,
       }),
-    ],
-    fallback: denyAll('AWS billing needs a compliant device. Update your device, or contact IT.'),
-  },
-
-  /* A stricter policy for production, made for DevOps after AWS for
-     engineering teams already covered them — so for DevOps it never decides:
-     one policy applies per application and group, the one higher in the list. */
-  {
-    id: 'sc-aws-devops',
-    name: 'AWS production for DevOps',
-    type: 'App Access',
-    appIds: ['aws'],
-    audience: audienceOf(['devops']),
-    status: 'active',
-    lastModified: 'Yesterday',
-    modifiedBy: 'Jaspreet Toor',
-    rules: [
       rule({
-        name: 'Registered corporate device',
+        name: 'DevOps, on a registered corporate device',
+        who: { groupIds: ['devops'], userIds: [] },
         when: when(card(onCorporateDevice())),
         decision: '2fa',
         firstFactor: 'Password',
@@ -571,43 +543,24 @@ export const showcasePolicies: Policy[] = [
         matchEstimate: 26,
       }),
     ],
-    fallback: denyAll('AWS production needs a registered corporate device.'),
+    fallback: denyAll('AWS needs a compliant device. Update your device, or contact IT.'),
   },
 
-  /* Slack for everyone — the DEFAULT group — from the countries we work in.
-     First in the list, and still never the one deciding for somebody a Slack
-     policy for their group covers. */
+  /* Slack: the two Slack policies merged (14 Oct 2026) into the one for
+     everyone — the DEFAULT group — keeping EVERYONE as its audience. The
+     group rules come first, as the group's policy used to decide before the
+     one for everyone: engineers sign in on a password from the countries we
+     work in — except contractors, who need a corporate device and an OTP over
+     Email. A contract engineer is in Engineering AND Contractors, and the
+     exception wins. The last rule is the old everyone rule, which takes the
+     contractors out so that one off a corporate device is still refused, as
+     it was. Last row: the broadest audience's (everyone's). */
   {
     id: 'sc-slack-everyone',
-    name: 'Slack for everyone',
+    name: 'Slack access',
     type: 'App Access',
     appIds: ['slack'],
     audience: EVERYONE,
-    status: 'active',
-    lastModified: '5 days ago',
-    modifiedBy: 'Jaspreet Toor',
-    rules: [
-      rule({
-        name: 'Where we operate',
-        when: when(card(cond('zone', 'in zone', ['operating-countries']))),
-        decision: '1fa',
-        firstFactor: 'Password',
-        matchEstimate: 905,
-      }),
-    ],
-    fallback: denyAll('Slack opens only from the countries we work in.'),
-  },
-
-  /* Engineering's workspace, which contractors join: engineers sign in on a
-     password from the countries we work in — except contractors, who need a
-     corporate device and an OTP over Email. A contract engineer is in
-     Engineering AND Contractors, and the exception wins. */
-  {
-    id: 'sc-slack-engineering',
-    name: 'Slack for engineering and contractors',
-    type: 'App Access',
-    appIds: ['slack'],
-    audience: audienceOf(['engineering', 'contractors']),
     status: 'active',
     lastModified: '4 days ago',
     modifiedBy: 'Jaspreet Toor',
@@ -630,91 +583,55 @@ export const showcasePolicies: Policy[] = [
         secondFactorMethods: ['OTP over Email'],
         matchEstimate: 58,
       }),
-    ],
-    fallback: denyAll('Slack needs a corporate device for contractors, and the countries we work in for everyone.'),
-  },
-
-  /* A draft for Finance on GitHub: reviewers on a corporate device sign in on
-     a password. Developer tools already covers Finance on GitHub and is higher
-     in the list, so turned on, this would change nothing. */
-  {
-    id: 'sc-code-review-finance',
-    name: 'Code review for Finance',
-    type: 'App Access',
-    appIds: ['github'],
-    audience: audienceOf(['finance']),
-    status: 'draft',
-    lastModified: 'Yesterday',
-    modifiedBy: 'Jaspreet Toor',
-    rules: [
       rule({
-        name: 'Corporate device',
-        when: when(card(onCorporateDevice())),
-        decision: '1fa',
-        firstFactor: 'Password',
-        matchEstimate: 40,
-      }),
-    ],
-    fallback: denyAll('Code review needs a registered corporate device.'),
-  },
-
-  /* ---------------------------------------------------------------------------
-     One person, two groups, a policy for each (owner, 1 Oct 2026): "think
-     someone called Tanmay is in 2 groups, one is Engineering group and one is
-     Design group. For Engineering there is a different policy like sign in
-     with password as first factor, but for the Design group it's sign in with
-     2FA … how do we fulfil this kind of use case?"
-
-     Exactly that, on Box — the one application in the catalogue both teams
-     work in every day (specs and handoff files; there is no Figma here, and
-     no logo for one). Two policies, as an admin would write them: one per
-     group, each a single rule from the countries we work in, each ending in
-     its own last row. Engineering's was made first and is higher in the
-     list, so for somebody in both, it decides: one policy applies to a
-     person on an application, and within a tier it is the one higher in the
-     list (tenant-resolver.ts). Tanmay Joshi gets a password; Box for design,
-     which would ask him for a push, is reported beside the answer and not
-     used — the Sign-in tests page says which, and why, and that a rule
-     naming him in Box for engineering is the fix if Design's should win.
-     Anyone in Design alone gets the push, and nobody else is in both.
-     ------------------------------------------------------------------------ */
-
-  /* Box for Engineering: a password, from the countries we work in. */
-  {
-    id: 'sc-box-engineering',
-    name: 'Box for engineering',
-    type: 'App Access',
-    appIds: ['box'],
-    audience: audienceOf(['engineering']),
-    status: 'active',
-    lastModified: '6 days ago',
-    modifiedBy: 'Jaspreet Toor',
-    rules: [
-      rule({
-        name: 'Engineers, where we operate',
+        name: 'Everyone else, where we operate',
+        who: { groupIds: [], userIds: [], exceptGroupIds: ['contractors'] },
         when: when(card(cond('zone', 'in zone', ['operating-countries']))),
         decision: '1fa',
         firstFactor: 'Password',
-        matchEstimate: 241,
+        matchEstimate: 905,
       }),
     ],
-    fallback: denyAll('Box opens only from the countries we work in.'),
+    fallback: denyAll('Slack opens only from the countries we work in.'),
   },
 
-  /* Box for Design: a password and miniOrange Push, from the same countries.
-     Made after Engineering's, so it is lower in the list. */
+  /* GitHub: "Code review for Finance", a draft, was merged away (14 Oct
+     2026). Developer tools already covers Finance on GitHub, and its Finance
+     rule decides first, so the draft's one rule (a corporate device on a
+     password) could never be reached: it is not carried over. */
+
+  /* Box: one policy for Engineering and Design (owner, 1 Oct 2026: "think
+     someone called Tanmay is in 2 groups, one is Engineering group and one is
+     Design group. For Engineering there is a different policy like sign in
+     with password as first factor, but for the Design group it's sign in with
+     2FA"). Box is the one application in the catalogue both teams work in
+     every day; there is no Figma here, and no logo for one. Two rules, one per
+     group, each from the countries we work in. Engineering's first: somebody
+     in both lands on it, so Tanmay Joshi gets a password, and a rule naming
+     him above it is the fix if Design's should win. Anyone in Design alone
+     gets the push, and nobody else is in both. Last row: the same words
+     either old policy ended with. */
   {
-    id: 'sc-box-design',
-    name: 'Box for design',
+    id: 'sc-box-engineering',
+    name: 'Box access',
     type: 'App Access',
     appIds: ['box'],
-    audience: audienceOf(['design']),
+    audience: audienceOf(['engineering', 'design']),
     status: 'active',
     lastModified: '2 days ago',
     modifiedBy: 'Jaspreet Toor',
     rules: [
       rule({
+        name: 'Engineers, where we operate',
+        who: { groupIds: ['engineering'], userIds: [] },
+        when: when(card(cond('zone', 'in zone', ['operating-countries']))),
+        decision: '1fa',
+        firstFactor: 'Password',
+        matchEstimate: 241,
+      }),
+      rule({
         name: 'Designers, where we operate',
+        who: { groupIds: ['design'], userIds: [] },
         when: when(card(cond('zone', 'in zone', ['operating-countries']))),
         decision: '2fa',
         firstFactor: 'Password',
@@ -725,6 +642,81 @@ export const showcasePolicies: Policy[] = [
     ],
     fallback: denyAll('Box opens only from the countries we work in.'),
   },
+]
+
+// --- Post sign-in policies ----------------------------------------------------
+
+/* The second policy type (owner, 13 Oct 2026; post-sign-in.ts): what happens
+   during the session, each time an event of a linked application happens.
+   Kept apart from the list above on purpose: every sign-in surface reads
+   `type === 'App Access'`, and fixtures adds these after the sign-in
+   policies, where list order means nothing to them.
+
+   Built in the board, as a sign-in policy is (owner, 13 Oct 2026: "use the
+   same sign-in builder for post sign-in"), so the rules are the board's own:
+   `rule()` with a Who / If / Then, the If in the catalogue's post sign-in
+   conditions (data.ts, `phase: 'post'`) and the Then in `action`. The last
+   row is the policy's "Nothing else matched", and its `action` is what
+   happens to any other event. The applications are linked from outside, each
+   with the events of it the policy decides, through `linkApp`, which keeps
+   the catalogue's order and mirrors `appIds` — so a seed can never link an
+   event the catalogue does not have.
+
+   Two policies, so the Post sign-in tab opens on both states the owner ruled
+   on: one live and complete, linked to two applications, and one draft whose
+   last row has no action yet, so the board says what is left. */
+
+/* A post sign-in policy: its rules and last row, then the applications linked
+   to it, in the order they were linked, each with its events. Everyone, as a
+   new one is (`blankPostSignInPolicy`): a rule's Who narrows it. */
+function postSignIn(
+  head: Pick<Policy, 'id' | 'name' | 'status' | 'lastModified' | 'modifiedBy'>,
+  rules: Rule[],
+  last: PostAction | undefined,
+  links: [appId: string, eventIds: string[]][],
+): Policy {
+  const fallback = fallbackRule('1fa')
+  const policy: Policy = { ...head, type: 'Session', appIds: [], audience: EVERYONE, rules, fallback: last ? { ...fallback, action: last } : fallback, session: { links: [] } }
+  return links.reduce((p, [appId, eventIds]) => linkApp(p, appId, eventIds), policy)
+}
+
+export const showcasePostSignInPolicies: Policy[] = [
+  /* Live and complete (the store would not let it be turned on otherwise).
+     Read top to bottom: a large export is refused, a confidential file asks
+     for a second factor, high user risk ends the session, and a device out of
+     compliance is blocked on that application; anything else goes ahead.
+     Salesforce first, then Workday, as an admin would link them: Salesforce
+     with its exports and downloads and two session events, Workday with its
+     worker export and bank details. */
+  postSignIn(
+    { id: 'ps-data-export', name: 'Data export protection', status: 'active', lastModified: '3 days ago', modifiedBy: 'Jaspreet Toor' },
+    [
+      rule({ name: 'Large export', when: when(card(cond('records', 'above', ['1000']))), action: 'deny' }),
+      rule({ name: 'Confidential file', when: when(card(cond('label', 'is', ['Confidential']))), action: 'step-up' }),
+      rule({ name: 'High risk', when: when(card(cond('user-risk', 'is', ['High']))), action: 'terminate' }),
+      rule({ name: 'Non-compliant device', when: when(card(cond('device-compliance', 'is', ['Not compliant']))), action: 'block-device' }),
+    ],
+    'allow',
+    [
+      ['salesforce', ['sf-report-export', 'sf-api-query', 'sf-file-download', 'risk-change', 'device-compliance']],
+      ['workday', ['wd-export', 'wd-bank']],
+    ],
+  ),
+
+  /* A draft: one rule set and the last row's action not chosen yet, so the
+     board says "Choose an action for Nothing else matched." and Turn on is
+     refused until it is. Outside the corporate offices a second factor is
+     asked. Linked to Slack and GitHub already: a draft acts on nothing, so its
+     links wait on it. */
+  postSignIn(
+    { id: 'ps-collab', name: 'Collaboration tools', status: 'draft', lastModified: 'Yesterday', modifiedBy: 'Jaspreet Toor' },
+    [rule({ name: 'Outside the office', when: when(card(cond('zone', 'not in zone', ['corp-offices']))), action: 'step-up' })],
+    undefined,
+    [
+      ['slack', ['sl-download', 'sl-external-invite']],
+      ['github', ['gh-token']],
+    ],
+  ),
 ]
 
 // --- Templates ----------------------------------------------------------------
@@ -1079,33 +1071,33 @@ export const showcaseSavedSignIns: SavedSignIn[] = [
     level: 'note',
     ...SAVED,
   },
-  /* Two AWS policies cover Maya, through different groups: Engineering's is
-     higher in the list and lets her in on a password; Finance's would ask for
+  /* Maya is in two groups the AWS policy has a rule for: the Engineering rule
+     is above Finance's and lets her in on a password; Finance's would ask for
      Google Authenticator. */
   {
     id: 'ssi-maya-aws',
-    name: 'Maya Iyer on AWS — two policies cover her',
+    name: 'Maya Iyer on AWS — two groups with a rule',
     facts: { personId: 'u-maya', appId: 'aws', network: BRANCH, when: MONDAY_0930, device: devicePreset('win11-registered').facts },
     expected: '1fa',
     level: 'note',
     ...SAVED,
   },
-  /* Two AWS policies cover DevOps: the production policy made for them never
-     decides, because AWS for engineering teams also covers DevOps and is
-     higher in the list. */
+  /* DevOps has two rules in the AWS policy: the production rule made for them
+     never decides, because the Engineering rule, which also names DevOps, is
+     above it. */
   {
     id: 'ssi-tom-aws',
-    name: 'Tom Whelan on AWS — two policies for DevOps',
+    name: 'Tom Whelan on AWS — two rules for DevOps',
     facts: { personId: 'u-dev-3', appId: 'aws', network: BRANCH, when: MONDAY_0930, device: CORP_LAPTOP },
     expected: '1fa',
     level: 'note',
     ...SAVED,
   },
-  /* Slack for everyone is first in the list; Slack for engineering and
-     contractors covers Devon's group, and a group's policy comes first. */
+  /* Slack is open to everyone, and the policy's group rules come before the
+     rule for everyone else, so Devon's group rule decides. */
   {
     id: 'ssi-devon-slack',
-    name: 'Devon Rao on Slack — a group policy before Everyone',
+    name: 'Devon Rao on Slack — a group rule before Everyone',
     facts: { personId: 'devon', appId: 'slack', network: HOME, when: MONDAY_0930, device: CORP_LAPTOP },
     expected: '2fa',
     level: 'note',
@@ -1132,8 +1124,8 @@ export const showcaseSavedSignIns: SavedSignIn[] = [
     level: 'note',
     ...SAVED,
   },
-  /* Thomas is named in a Deny, but it is rule 2: on a compliant device rule 1
-     (everyone in Finance) lets him in first. */
+  /* Thomas is named in a Deny, but it is below Finance's rule: on a compliant device rule 1
+     (Finance on a compliant device) lets him in first. */
   {
     id: 'ssi-thomas-aws',
     name: 'Thomas Byrne on AWS — named in a later Deny',
@@ -1142,17 +1134,18 @@ export const showcaseSavedSignIns: SavedSignIn[] = [
     level: 'note',
     ...SAVED,
   },
-  /* Code review for Finance is a draft for Finance on GitHub. Turned on, it
-     would still not decide: Developer tools covers Finance and is higher. */
+  /* Finance on GitHub: Developer tools has a rule of its own for them, so the
+     sign-in is decided there (the draft policy that once sat beside it is
+     gone: one policy per application). */
   {
     id: 'ssi-priya-github',
-    name: 'Priya Sharma on GitHub — a draft that would not decide',
+    name: 'Priya Sharma on GitHub — Finance has its own rule',
     facts: { personId: 'priya', appId: 'github', network: BRANCH, when: MONDAY_0930, device: devicePreset('win11-registered').facts },
     expected: '2fa',
     level: 'note',
     ...SAVED,
   },
-  /* Three AWS policies, and none covers IT Admins: the Global Default decides. */
+  /* The AWS policy does not cover IT Admins: the Global Default decides. */
   {
     id: 'ssi-ravi-aws',
     name: 'Ravi Menon on AWS — no AWS policy covers IT Admins',
@@ -1162,9 +1155,9 @@ export const showcaseSavedSignIns: SavedSignIn[] = [
     ...SAVED,
   },
   /* The owner's own case (1 Oct 2026), one click away: Tanmay Joshi, in
-     Engineering and Design, opens Box from the Bengaluru office. Box for
-     engineering is higher in the list and lets him in on a password; Box for
-     design would ask for a push. Saved as what the engine decides, like
+     Engineering and Design, opens Box from the Bengaluru office. The
+     Engineering rule is above the Design one and lets him in on a password;
+     the Design rule would ask for a push. Saved as what the engine decides, like
      Maya's, so it passes on load and what it shows is why. */
   {
     id: 'ssi-tanmay-box',
@@ -1175,10 +1168,10 @@ export const showcaseSavedSignIns: SavedSignIn[] = [
     ...SAVED,
   },
   /* And the other half of it: Ishita Banerjee, in Design alone, on the same
-     line and laptop. Box for design decides, and asks for a push — what
-     Tanmay would get if Design's policy were the one higher in the list.
-     It is also the second sign-in on Box, so neither Box policy's Saved
-     sign-ins tab opens on just one (saved-sign-ins.test.ts). */
+     line and laptop. The Design rule decides, and asks for a push — what
+     Tanmay would get if it were above the Engineering one. It is also the
+     second sign-in on Box, so the policy's Saved sign-ins tab does not open
+     on just one (saved-sign-ins.test.ts). */
   {
     id: 'ssi-ishita-box',
     name: 'Ishita Banerjee on Box — Design alone',

@@ -40,16 +40,15 @@
 .brs__band.is-medium dd { color: var(--fb-notice-fg); }
 .brs__band.is-low dd { color: var(--fb-positive-fg); }
 
-/* --- What this page does not cover ----------------------------------------- */
+/* --- What this page does not cover -----------------------------------------
+   Plain text in the bar, not a tinted box with an info mark (16 Oct 2026):
+   every info note is the kit's `Note`, and a second blue treatment beside one
+   read as a second note. */
 .brs__gap {
-  display: flex; align-items: flex-start; gap: var(--space-2);
+  display: flex; align-items: center; gap: var(--space-2);
   margin: 0 0 var(--space-5);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--fb-info-border); border-radius: var(--radius-md);
-  background: var(--fb-info-bg);
-  font-size: var(--fs-xs); line-height: 1.5; color: var(--fb-info-fg);
+  font-size: var(--fs-xs); line-height: 1.5; color: var(--text-tertiary);
 }
-.brs__gap svg { flex: none; margin-top: 1px; }
 
 /* --- Search ---------------------------------------------------------------- */
 /* `.brs__search` stood here — a fourth copy of the same box, at a fourth height
@@ -357,3 +356,13 @@
 .brs__preview { margin-left: auto; }
 /* In the showcase build the switch is hidden, and Restore takes its place at the end of the row. */
 .brs__restore { margin-left: auto; }
+
+/* Collected, as a switch (owner, 13 Oct 2026: "here we need toggles"). The
+   signal's name block is read only now, so it keeps the picked row's look
+   without its press: no pointer, no hover. Off reads quieter, as the priority
+   beside it does. The switch has a fixed track of its own, so every row's
+   switch and picker line up whatever the name holds (row-ends-line-up). */
+.brs__rows .brs__name { cursor: default; }
+.brs__rows .brs__name:hover { background: transparent; }
+.brs__rows .brs__name.is-off .bfp2__pickword { color: var(--text-tertiary); }
+.brs__rowswitch { flex: none; width: 72px; display: inline-flex; justify-content: center; }

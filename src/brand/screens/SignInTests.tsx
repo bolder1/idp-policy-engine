@@ -61,7 +61,7 @@ import { tokenDomId, tokenOfField, type TokenId } from './testing/sign-in-senten
 /* The builder's sheet: the page wears its bar, region, dock and panel, and
    may be the first of the two opened in a visit. */
 import './board/board.css'
-import { BREAK_IN_ATTEMPTS, CANVAS_OPTIONS, DENIAL_REASONS, INSPECTOR, SAVED_SIGN_INS } from './sign-in-tests/phase'
+import { BREAK_IN_ATTEMPTS, CANVAS_OPTIONS, DENIAL_REASONS, INSPECTOR, OPEN_AT_ONCE, SAVED_SIGN_INS } from './sign-in-tests/phase'
 import { CanvasSwitch } from './sign-in-tests/CanvasSwitch'
 import { setCheckStage, useCheckStage, useFavourites, useStageFollowsTheme } from './sign-in-tests/canvas-shelf'
 import { JARVIS_END_MS, JARVIS_MID_MS, JarvisButton, JarvisTransition, type JarvisPhase } from './sign-in-tests/jarvis-mode/JarvisMode'
@@ -227,7 +227,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   }
   /* The form's Use a saved sign-in, its list open under the row. */
   const [savedAt, setSavedAt] = useState<'panel' | null>(null)
-  const [tryPage, setTryPage] = useState<TryPage>(() => initialTryPage(session.runId, todayIn(), nowIn(), session.form))
+  const [tryPage, setTryPage] = useState<TryPage>(() => initialTryPage(session.runId, todayIn(), nowIn(), session.form, session.prefilled))
   const onTryPage = useCallback((next: (p: TryPage) => TryPage) => setTryPage(next), [])
   const [submitted, setSubmitted] = useState(false)
   const [saveOpen, setSaveOpen] = useState(false)
@@ -273,8 +273,24 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     },
     [],
   )
-  /* A run started from the panel or a picker that has gone: the canvas takes the focus (TryJourney). */
-  const [focusRun, setFocusRun] = useState(0)
+  /* A run started from the panel or a picker that has gone: the canvas takes the focus (TryJourney). A page that mounts
+     on a run — Open in Check access from Sign-in activity or an application's tab, a revisit — gives it the focus too
+     (OPEN_AT_ONCE, 20 Oct 2026): it was left on nothing. */
+  const [focusRun, setFocusRun] = useState(() => (OPEN_AT_ONCE && tryPage.mode === 'journey' ? 1 : 0))
+  /* OPEN AT ONCE (phase.ts, 20 Oct 2026): the blocked sign-in the Blocked panel's run is of, marked in the list; the list
+     the Why or the form was opened over, which they shut back to; and the list's search, kept across the two. */
+  const [pickedBlocked, setPickedBlocked] = useState<string | null>(null)
+  const backTo = useRef<'blocked' | null>(null)
+  const [blockedQ, setBlockedQ] = useState('')
+  /* Read off the panel's own moves, so no way of opening the two has to say it: the Why or the form taking the list's
+     place keeps the list to come back to; any other panel lets it go. */
+  const panelWas = useRef(panel)
+  useEffect(() => {
+    const was = panelWas.current
+    panelWas.current = panel
+    if (panel !== 'why' && panel !== 'form') backTo.current = null
+    else if (OPEN_AT_ONCE && was === 'blocked') backTo.current = 'blocked'
+  }, [panel])
   /* The canvas's zoom, from the dock: the run's column scaled, the dots with it. */
   const [zoom, setZoom] = useState(1)
   /* The layout the run is drawn in, while the layouts are compared (phase.ts `CANVAS_OPTIONS`) — Focus, whatever was
@@ -464,6 +480,16 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
      taken first would beat it), the Replay on its sign-in card, the canvas
      itself. */
   const closePanel = (focusBack = false) => {
+    /* The Why or the form opened over the Blocked list shuts back to it (OPEN_AT_ONCE): the list's own mount puts the
+       focus on its marked row. */
+    if (OPEN_AT_ONCE && backTo.current && (panel === 'why' || panel === 'form')) {
+      backTo.current = null
+      setPanel('blocked')
+      setSaveOpen(false)
+      setSavedAt(null)
+      return
+    }
+    backTo.current = null
     const from = panel
     const inPanel = !!(document.activeElement instanceof HTMLElement && document.activeElement.closest('.sit-panel'))
     const opened = opener.current
@@ -510,6 +536,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     setPanel(null)
     setSaveOpen(false)
     setSavedAt(null)
+    backTo.current = null
     /* One run waits at a time: a second Run while the first waits takes its place. */
     if (leaving.current) window.clearTimeout(leaving.current.timer)
     leaving.current = null
@@ -559,6 +586,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
      press that runs, say which they covered. */
   const start = (f: SignInForm, pace: TryPage['pace'], next: Partial<TryPage> = {}) => {
     setTryPage((p) => ({ ...p, mode: 'journey', intro: 'none', pace, replay: false, prev: null, askSaveFor: null, ran: undefined, ...next }))
+    setPickedBlocked(null)
     setSubmitted(false)
     setSaveOpen(false)
     shutBeside()
@@ -629,6 +657,8 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     setTryPage((pg) => resetPage(pg, emptyDraft(todayIn(), nowIn())))
     setLoaded(null)
     setSubmitted(false)
+    setPickedBlocked(null)
+    backTo.current = null
     focusRow('person')
   }
   /* The Identity field's picks: the panel's, and nothing runs (only Run runs). */
@@ -685,6 +715,21 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     setLoaded(null)
     toCanvas(() => start(f, 'full', { draft: f, touched: [], identities: picksOf(f) }))
   }
+  /* OPEN AT ONCE (phase.ts, 20 Oct 2026: "when I'm in a blocked sign-in or try to click on any past sign-in, it should
+     open immediately — no need to showcase the free-field form"). Only Run runs (2 Oct) is overridden for these opens
+     alone; `fillBlocked` above is what the flag off keeps.
+       playRecent   the empty canvas's Recently blocked: the form panel slides out and the run takes the whole canvas,
+                    as a what-if from the Why does (`playForm`)
+       playBlocked  the Blocked panel's row: the run plays beside the list, which stays with the row marked, so a second
+                    is one press — nothing slides, and the focus stays on the row
+     The pencil on the run's node still opens the form holding the sign-in, and Run is still what runs an edit. */
+  const playRecent = (row: BlockedRow) => playForm(formOf(row.facts, zones))
+  const playBlocked = (row: BlockedRow) => {
+    const f = formOf(row.facts, zones)
+    setLoaded(null)
+    start(f, 'full', { draft: f, touched: [], identities: picksOf(f) })
+    setPickedBlocked(row.id)
+  }
   /* Let in for a while, from a refusal's Why: the policy that refused gets a first rule for that person that ends by itself,
      said in a toast with Undo (sign-in-tests/temp-access.ts). */
   const grantAccess = (policyId: string, person: { id: string; name: string }, until: string, reason: string) => {
@@ -710,8 +755,11 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   const PEEK_SCREEN = { zone: { name: 'zones' }, device: { name: 'fingerprint' }, risk: { name: 'risk-signals' }, hook: { name: 'hooks' }, app: { name: 'applications' } } as const
   const editInBuilder = (t: InspectTarget) => {
     if (isPeek(t)) return t.kind === 'person' ? undefined : go(PEEK_SCREEN[t.kind])
+    /* The builder opens on the policy itself, not its Check access (owner, 20 Oct 2026: "when I go inside the builder,
+       don't start with Check access mode; start with the policy builder part"). The sign-in still rides along, so the
+       builder's own Check access holds it when it is opened there. */
     session.loadBoard(t.policyId, session.form)
-    go(t.kind === 'rule' && t.ruleId ? { name: 'board', policyId: t.policyId, open: 'try', rule: t.ruleId } : { name: 'board', policyId: t.policyId, open: 'try' })
+    go(t.kind === 'rule' && t.ruleId ? { name: 'board', policyId: t.policyId, rule: t.ruleId } : { name: 'board', policyId: t.policyId })
   }
   const openAttempt = (row: AppBreakInRow) => {
     if (row.policyId === null) return
@@ -831,7 +879,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
             onAsGroup={(g) => pickPerson(`${GROUP_PREFIX}${g}`, true)}
             onTryForm={playForm}
             onBlocked={DENIAL_REASONS ? openBlocked : undefined}
-            onPickBlocked={DENIAL_REASONS ? fillBlocked : undefined}
+            onPickBlocked={DENIAL_REASONS ? (OPEN_AT_ONCE ? playRecent : fillBlocked) : undefined}
             onGrant={grantAccess}
             onPickIdentity={showPick}
             loaded={loaded}
@@ -902,7 +950,9 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
             />
           )}
           {/* The week's refused sign-ins, from the empty canvas's Blocked sign-ins: a panel in the form's slot, as Saved sign-ins is. */}
-          {DENIAL_REASONS && panel === 'blocked' && <BlockedPanel key="blocked" reduced={reduced} wide={wide} onToggleWidth={() => setWide((w) => !w)} onClose={() => closePanel(true)} onPick={fillBlocked} />}
+          {DENIAL_REASONS && panel === 'blocked' && (
+            <BlockedPanel key="blocked" reduced={reduced} wide={wide} onToggleWidth={() => setWide((w) => !w)} onClose={() => closePanel(true)} picked={OPEN_AT_ONCE ? pickedBlocked : undefined} query={OPEN_AT_ONCE ? blockedQ : undefined} onQuery={OPEN_AT_ONCE ? setBlockedQ : undefined} onPick={OPEN_AT_ONCE ? playBlocked : fillBlocked} />
+          )}
           {INSPECTOR && panel === 'inspect' && inspect && (
             <InspectPanel
               key="side"

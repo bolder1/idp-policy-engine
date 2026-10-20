@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AppWindow, ArrowRight, History } from 'lucide-react'
 
 import type { App, Policy } from '../../data'
@@ -14,6 +14,7 @@ import { answerSaid } from './selectors'
 import { formOf, type SignInForm } from './sign-in-form'
 import {
   PAST_EMPTY,
+  appsWithSignIns,
   formatCount,
   landingRuleOf,
   pastColumns,
@@ -61,22 +62,39 @@ export function DockPast({
   onLoad,
   onHighlight,
   summary = 'cards',
+  picked: pickedRow,
 }: {
   draft: Pick<Policy, 'id' | 'appIds' | 'audience'>
-  /** This policy's applications (`policyApps`): where the week's sign-ins are modelled. */
-  apps: readonly Pick<App, 'id' | 'name'>[]
+  /** This policy's applications (`policyApps`): where the week's sign-ins are modelled, less any added this session. */
+  apps: readonly Pick<App, 'id' | 'name' | 'addedAt'>[]
   version: { substitute: Policy; label: string; tip: string } | null
-  onLoad: (form: SignInForm) => void
+  /** A row pressed: its sign-in, and the row's id (the builder marks the row its run is of, OPEN_AT_ONCE). */
+  onLoad: (form: SignInForm, id?: string) => void
   onHighlight?: (target: string | 'fallback' | null) => void
   /* Over the list (owner, 6 Oct 2026): with nothing to compare, the week as a card per decision — each one the list's
      filter — in place of the bar ("add cards here"); 'none' is the list alone, the policy details slider's ("remove"). */
   summary?: 'cards' | 'none'
+  /* OPEN AT ONCE (sign-in-tests/phase.ts, 20 Oct 2026): a row runs at once in the builder's Check access and the list stays
+     beside the run, so the builder hands the row its run is of — marked, `aria-current`, and the focus's as the list comes
+     back after the Why or the form; with it, Up and Down walk the rows. Absent, the list is as it was. */
+  picked?: string | null
 }) {
   const { policies, zones } = useBrand()
   const env = useSimEnv()
   const reduced = useReducedMotion() === true
+  const list = useRef<HTMLUListElement | null>(null)
+  const keys = pickedRow !== undefined
+  /* Back after the Why or the form: the marked row takes the focus once the panel has slid in. Once, on mount. */
+  useEffect(() => {
+    if (!pickedRow) return
+    const t = window.setTimeout(() => list.current?.querySelector<HTMLElement>('.tpanel-row.is-picked .tpanel-rowbtn')?.focus({ preventScroll: true }), reduced ? 0 : 220)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the list comes back
+  }, [])
   const substitute = version?.substitute
-  const appIds = useMemo(() => apps.map((a) => a.id), [apps])
+  /* An application added this session has no week behind it (`appsWithSignIns`):
+     a policy on that one alone reads "No sign-ins to model", which is true. */
+  const appIds = useMemo(() => appsWithSignIns(apps).map((a) => a.id), [apps])
   const report = useMemo(() => pastReport(draft, policies, env, substitute, SAMPLE_DAY, appIds), [draft, policies, env, substitute, appIds])
   const cols = pastColumns(version)
   /* The tile pressed, or — until one is — the first with anything in it. */
@@ -99,7 +117,16 @@ export function DockPast({
     )
   }
 
-  const load = (r: PastRow) => onLoad(formOf(r.sample.facts, zones))
+  const load = (r: PastRow) => onLoad(formOf(r.sample.facts, zones), r.id)
+  /* Up or Down on a row: the focus to the next row's button, never past either end; Enter or Space runs it. */
+  const walk = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const btns = Array.from(list.current?.querySelectorAll<HTMLElement>('.tpanel-rowbtn') ?? [])
+    const at = btns.indexOf(e.target as HTMLElement)
+    if (at < 0) return
+    e.preventDefault()
+    btns[Math.max(0, Math.min(btns.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))]?.focus()
+  }
   const light = (r: PastRow | null) => onHighlight?.(r ? landingRuleOf(r.edits, draft.id) : null)
 
   return (
@@ -158,14 +185,16 @@ export function DockPast({
               )}
             </div>
             <ul
+              ref={list}
               className="tpanel-list"
               aria-label={filter ? `Past sign-ins: ${report.tiles.find((t) => t.filter === filter)?.label ?? ''}` : 'Past sign-ins'}
               onPointerLeave={() => light(null)}
+              onKeyDown={keys ? walk : undefined}
             >
               {rows.map((r, i) => (
                 <motion.li
                   key={r.id}
-                  className="tpanel-row"
+                  className={`tpanel-row${keys && pickedRow === r.id ? ' is-picked' : ''}`}
                   initial={reduced ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.16, delay: reduced ? 0 : i * 0.03 }}
@@ -176,6 +205,7 @@ export function DockPast({
                   <button
                     type="button"
                     className="tpanel-rowbtn tpanel-past__who"
+                    aria-current={keys && pickedRow === r.id ? 'true' : undefined}
                     title={`${r.when} · ${r.sample.personName} · ${r.sample.appName} · ${r.from}`}
                     aria-label={`${r.when}, ${r.sample.personName} on ${r.sample.appName} from ${r.from}: ${cols.left} ${answerSaid(r.today)}${report.compared ? `, ${cols.right} ${answerSaid(r.edits)}` : ''}. Try this sign-in`}
                     onClick={(e) => {

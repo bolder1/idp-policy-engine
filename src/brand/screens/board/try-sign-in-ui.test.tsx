@@ -63,6 +63,7 @@ describe('a sign-in to an application the policy no longer protects', () => {
     patchBoard: noop,
     loadBoard: noop,
     load: noop,
+    prefill: noop,
     replay: noop,
     setView: noop,
     openBreakIn: noop,
@@ -78,8 +79,9 @@ describe('a sign-in to an application the policy no longer protects', () => {
 
   it('tries it on the policy’s first application instead', () => {
     expect(dev.appIds).not.toContain('slack')
-    /* Check access plays it as it opens (1 Oct): the engine finds the policy for GitHub, not Slack. */
-    expect(text(out)).toContain('Finding the policy for GitHub Enterprise')
+    /* Check access plays it as it opens (1 Oct), on the Access checks canvas since 19 Oct 2026 (a lazy layout, so
+       a server render holds its frame): a run on GitHub, and Slack nowhere. */
+    expect(out).toContain('tj-canvas is-layout is-focus2')
     expect(text(out)).not.toContain('Slack')
   })
 })

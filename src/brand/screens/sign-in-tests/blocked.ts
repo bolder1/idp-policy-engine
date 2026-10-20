@@ -22,8 +22,10 @@ export interface BlockedRow {
 /** The most the list shows: a help desk narrows by name, it does not page. */
 export const BLOCKED_MAX = 30
 
-/** The week's refused sign-ins on `apps`, matching `query` against the person, the application and where from. */
-export function blockedSignIns(policies: readonly Policy[], env: SimEnv, today: Date, apps: readonly Pick<App, 'id' | 'name'>[], query = ''): BlockedRow[] {
+/* The week's refused sign-ins on `apps`, matching `query` against the person,
+   the application and where from. An application added this session is left
+   out with the activity it is read from: nobody has signed in to it yet. */
+export function blockedSignIns(policies: readonly Policy[], env: SimEnv, today: Date, apps: readonly Pick<App, 'id' | 'name' | 'addedAt'>[], query = ''): BlockedRow[] {
   return filterActivity(signInActivity(policies, env, today, apps), { ...NO_FILTER, result: 'blocked', q: query })
     .slice(0, BLOCKED_MAX)
     .map((r) => ({ id: r.id, when: r.when, who: r.who, app: r.app, from: r.from, facts: r.facts }))

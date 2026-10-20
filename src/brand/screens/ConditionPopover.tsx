@@ -14,7 +14,9 @@ import {
   Fingerprint,
   Building2,
   CalendarClock,
+  FileText,
   Globe,
+  Hourglass,
   Laptop,
   Layers,
   ListX,
@@ -85,6 +87,7 @@ import { FOCUSABLE, appRoot } from '../dialog-chrome'
 import { EmptyState, NoMatches } from '../empty'
 import { modeLabel } from '../fingerprint'
 import { conditionIcon, conditionTone } from './board/tones'
+import { usePostBoard } from './board/post-board'
 import { Picker } from '../picker'
 import { useBrand, type BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
@@ -94,6 +97,8 @@ import {
   zoneScopeOf,
   WHEN_CONDITIONS,
   conditionType,
+  typeLabel,
+  whenConditionsFor,
   ipSectionEmpty,
   locationEmpty,
   type Condition,
@@ -390,11 +395,15 @@ export function ConditionPopover({
   stacked?: boolean
 }) {
   const t = conditionType(c.typeId)
+  /* On a post sign-in policy an attribute is called by its post sign-in name
+     ("Event hours"), and its If offers that type's attributes (post-board.ts). */
+  const post = usePostBoard().on
+  const tLabel = typeLabel(t, post)
   /* An attribute condition is named by its attribute — "Email", not "User
      attribute" — and the menu row it came from is `typeId:key`. */
   const keyed = !!t.keys?.length && !!c.key
   const pickedWhat = keyed ? `${c.typeId}:${c.key}` : c.typeId
-  const whatLabel = keyed ? attrLabel(c.key!) : t.label
+  const whatLabel = keyed ? attrLabel(c.key!) : tLabel
   /* `'op'`, not `'what'`.
 
      A row is only ever added by choosing an attribute in the catalogue dialog —
@@ -438,7 +447,7 @@ export function ConditionPopover({
      knowing strictly less than the chips already say to everybody else — and
      what the label announces would depend on how wide the panel happened to be,
      which is not a thing an accessible name may depend on. */
-  const valueLabel = `Change what ${t.label} is compared against. Currently ${
+  const valueLabel = `Change what ${tLabel} is compared against. Currently ${
     unset && !names.length ? 'nothing chosen' : spoken(names.length ? names : values) || summary
   }.`
 
@@ -469,7 +478,7 @@ export function ConditionPopover({
         <input
           type="time"
           className="cp__fldinput"
-          aria-label={`${t.label} from`}
+          aria-label={`${tLabel} from`}
           value={c.values[0] ?? '09:00'}
           onChange={(e) => onValues([e.target.value, c.values[1] ?? '17:00'])}
         />
@@ -477,7 +486,7 @@ export function ConditionPopover({
         <input
           type="time"
           className="cp__fldinput"
-          aria-label={`${t.label} to`}
+          aria-label={`${tLabel} to`}
           value={c.values[1] ?? '17:00'}
           onChange={(e) => onValues([c.values[0] ?? '09:00', e.target.value])}
         />
@@ -487,17 +496,31 @@ export function ConditionPopover({
         <input
           type="number"
           className="cp__fldinput is-num"
-          aria-label={t.label}
+          aria-label={tLabel}
           placeholder="0"
           value={values[0] ?? ''}
           onChange={(e) => onValues([e.target.value])}
         />
         <span className="cp__unit">score</span>
       </div>
+    ) : t.valueKind === 'number' ? (
+      /* A post sign-in number, with what it counts after it: "8 hours". */
+      <div className="cp__inline">
+        <input
+          type="number"
+          className="cp__fldinput is-num"
+          aria-label={tLabel}
+          min={0}
+          placeholder="0"
+          value={values[0] ?? ''}
+          onChange={(e) => onValues(e.target.value === '' ? [] : [e.target.value])}
+        />
+        {t.unit && <span className="cp__unit">{t.unit}</span>}
+      </div>
     ) : t.valueKind === 'text' ? (
       <input
         className="cp__fldinput is-text"
-        aria-label={`What ${c.key || t.label} is compared against`}
+        aria-label={`What ${c.key || tLabel} is compared against`}
         placeholder="Value…"
         value={values[0] ?? ''}
         onChange={(e) => onValues([e.target.value])}
@@ -606,7 +629,7 @@ export function ConditionPopover({
           ref={opRef}
           kind="op"
           open={open === 'op'}
-          label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
+          label={`Change how ${tLabel} is compared. Currently ${c.operator}.`}
           onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
         >
           {c.operator}
@@ -635,7 +658,7 @@ export function ConditionPopover({
       {keyRow}
       {tzRow}
     </div>
-    <button type="button" className="cp__del is-solo" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
+    <button type="button" className="cp__del is-solo" aria-label={`Remove ${tLabel}`} title="Remove" onClick={onRemove}>
       <X size={18} strokeWidth={1.9} />
     </button>
     </div>
@@ -655,7 +678,7 @@ export function ConditionPopover({
         ref={opRef}
         kind="op"
         open={open === 'op'}
-        label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
+        label={`Change how ${tLabel} is compared. Currently ${c.operator}.`}
         onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
       >
         {c.operator}
@@ -687,7 +710,7 @@ export function ConditionPopover({
         {scopeTag}
       </Seg>
 
-      <button type="button" className="cp__pill__x" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
+      <button type="button" className="cp__pill__x" aria-label={`Remove ${tLabel}`} title="Remove" onClick={onRemove}>
         <X size={12} strokeWidth={2.4} />
       </button>
     </span>
@@ -700,7 +723,7 @@ export function ConditionPopover({
       {open && !(stacked && open === 'val' && typedValue) && (
         <Holder
           stacked={stacked}
-          title={open === 'what' ? 'Change what is checked' : open === 'op' ? `How ${t.label} is compared` : t.label}
+          title={open === 'what' ? 'Change what is checked' : open === 'op' ? `How ${tLabel} is compared` : tLabel}
           anchor={anchorFor[open]}
           onClose={() => {
             setOpen(null)
@@ -860,6 +883,13 @@ const KINDS = {
   user: { label: 'User attribute', icon: UserRound, tone: 'lime' },
   custom: { label: 'Custom attribute', icon: Building2, tone: 'lime' },
   risk: { label: 'Risk', icon: ShieldAlert, tone: 'positive' },
+  /* A post sign-in policy's own families (post-sign-in.ts, 13 Oct 2026): the
+     session itself, the network as it changes in the session, and the
+     event's own details. Its device rows are the Device family, its risk
+     rows the Risk family. */
+  session: { label: 'Session', icon: Hourglass, tone: 'notice' },
+  network: { label: 'Network', icon: Network, tone: 'info' },
+  event: { label: 'Event', icon: FileText, tone: 'magenta' },
 } satisfies Record<string, NonNullable<ValueOption['kind']>>
 
 /* No pill on the three library rows (owner, 9 Oct 2026): each is its own
@@ -874,6 +904,22 @@ const KIND_OF: Record<string, NonNullable<ValueOption['kind']> | null> = {
   'custom-attr': KINDS.custom,
   'device-risk': KINDS.risk,
   'ml-risk': KINDS.risk,
+  'session-age': KINDS.session,
+  'idle-time': KINDS.session,
+  'mfa-age': KINDS.session,
+  'device-compliance': KINDS.device,
+  'device-managed': KINDS.device,
+  'device-changed': KINDS.device,
+  'ip-changed': KINDS.network,
+  'impossible-travel': KINDS.network,
+  anonymous: KINDS.network,
+  'user-risk': KINDS.risk,
+  'risk-detection': KINDS.risk,
+  records: KINDS.event,
+  label: KINDS.event,
+  destination: KINDS.event,
+  amount: KINDS.event,
+  volume: KINDS.event,
 }
 
 /* A condition added to the catalogue later gets its group as its family until
@@ -881,7 +927,38 @@ const KIND_OF: Record<string, NonNullable<ValueOption['kind']> | null> = {
 const kindOf = (id: string, group: string): ValueOption['kind'] =>
   id in KIND_OF ? (KIND_OF[id] ?? undefined) : { label: group, icon: conditionIcon(id, group), tone: conditionTone(id, group) }
 
-const MENU_ORDER = ['zone', 'fingerprint', 'webhook', 'device-risk', 'ml-risk', 'time', 'day', 'user-attr', 'custom-attr']
+/* One order for both types; each menu holds only its own type's rows, so a
+   sign-in policy's reads as it did (13 Oct 2026). A post sign-in policy's
+   follows the same reading: the three sub policies, then the session, the
+   device and the network as they change in it, the risk raised about the
+   person, the event's own details, then when, then who the user is. */
+const MENU_ORDER = [
+  'zone',
+  'fingerprint',
+  'webhook',
+  'session-age',
+  'idle-time',
+  'mfa-age',
+  'device-compliance',
+  'device-managed',
+  'device-changed',
+  'ip-changed',
+  'impossible-travel',
+  'anonymous',
+  'device-risk',
+  'ml-risk',
+  'user-risk',
+  'risk-detection',
+  'records',
+  'label',
+  'destination',
+  'amount',
+  'volume',
+  'time',
+  'day',
+  'user-attr',
+  'custom-attr',
+]
 const menuRank = (id: string) => {
   const i = MENU_ORDER.indexOf(id)
   return i < 0 ? MENU_ORDER.length : i
@@ -963,28 +1040,32 @@ function AttrMenuSwitch({ value, onChange }: { value: AttrMenuVersion; onChange:
 function AttributeMenu({ picked, menu, onPick }: { picked: string[]; menu?: boolean; onPick: (v: string) => void }) {
   const [stored, setVersion] = useAttrMenuVersion()
   const version: AttrMenuVersion = ATTR_MENU_SWITCH ? stored : 'v2'
+  /* A post sign-in policy's If offers its own attributes and the shared
+     ones; a sign-in policy's never offers those (data.ts `phase`). */
+  const post = usePostBoard().on
   return (
     <>
       <AttrMenuSwitch value={version} onChange={setVersion} />
-      <OptionList key={version} items={attributeOptions(version)} searchLabel="Search attributes" picked={picked} single menu={menu} onPick={onPick} />
+      <OptionList key={version} items={attributeOptions(version, post)} searchLabel="Search attributes" picked={picked} single menu={menu} onPick={onPick} />
     </>
   )
 }
 
-function attributeOptions(version: AttrMenuVersion = 'v1'): ValueOption[] {
-  return [...WHEN_CONDITIONS].sort((a, b) => menuRank(a.id) - menuRank(b.id)).flatMap((x): ValueOption[] => {
+function attributeOptions(version: AttrMenuVersion = 'v1', post = false): ValueOption[] {
+  return [...whenConditionsFor(post)].sort((a, b) => menuRank(a.id) - menuRank(b.id)).flatMap((x): ValueOption[] => {
     const kind = version === 'v2' && KIND_OF[x.id] === null ? SUB_POLICIES : kindOf(x.id, x.group)
     const tone = conditionTone(x.id, x.group)
     const icon = conditionIcon(x.id, x.group)
+    const tip = (post && x.postHint) || x.hint
     return x.keys?.length
-      ? x.keys.map((k) => ({ value: `${x.id}:${k}`, label: attrLabel(k), icon, kind, tone, tip: x.hint }))
+      ? x.keys.map((k) => ({ value: `${x.id}:${k}`, label: attrLabel(k), icon, kind, tone, tip }))
       : [{
           value: x.id,
-          label: x.label,
+          label: typeLabel(x, post),
           icon,
           kind,
           tone,
-          tip: x.hint,
+          tip,
           note: x.soon ? 'Coming soon' : undefined,
           disabled: x.soon,
         }]
@@ -1708,6 +1789,16 @@ function ValueBody({
     )
   }
 
+  /* A post sign-in number (data.ts `unit`): typed, with what it counts after it. */
+  if (t.valueKind === 'number') {
+    return (
+      <div className="cp__body cp__body--inline">
+        <input ref={take} type="number" min={0} className="cp__input is-num" aria-label={t.label} value={values[0] ?? ''} placeholder="0" onChange={(e) => onValues(e.target.value === '' ? [] : [e.target.value])} />
+        {t.unit && <span className="cp__to">{t.unit}</span>}
+      </div>
+    )
+  }
+
   /* An empty list is an empty LIBRARY now, and that changes what belongs here.
 
      This was a free-text box, and the guard is `options.length === 0` rather
@@ -1838,6 +1929,7 @@ export function condSummary(t: ConditionType, c: Condition, names: string[]): st
   if (t.valueKind === 'time') return `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`
   if (t.valueKind === 'range')
     return values[0] ? `${values[0]} ${t.id === 'trust-age' ? 'days' : t.id === 'coords' ? 'km' : ''}`.trim() : 'Choose…'
+  if (t.valueKind === 'number') return values[0] ? `${values[0]} ${t.unit ?? ''}`.trim() : 'Choose…'
   return summarise(names.length ? names : values, 'Choose…')
 }
 

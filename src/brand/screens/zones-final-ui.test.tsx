@@ -15,13 +15,12 @@ import zonesCss from './zones-final.css?raw'
 /* The zone page, drawn without a browser, after the owner's asks of 1 Oct 2026:
    no summary line under the name; each IP row says its kind; Locations has a
    "My current location" Quick add; the side note comes in versions behind one
-   switch — Classic, the note as it was, and three paper notes that never show
-   the zone's own places (the second ask that day: "I only like the sticky
-   note, so have the old one as a classic … give me some more good options
-   like the sticky note"; and on 2 Oct 2026, "Remove Note pile, Index card");
-   and the row being searched on Locations shows its Range, disabled, rather
-   than an empty gap. The browser pass checks the arrivals, the paper, the
-   layout and that the disabled Range takes no focus.
+   switch, none showing the zone's own places — since 16 Oct 2026 two: the
+   kit's one Note, which Classic and Blue became ("use this as a common note
+   component … change this globally"), and the sticky note; and the row being
+   searched on Locations shows its Range, disabled, rather than an empty gap.
+   The browser pass checks the arrivals, the paper, the layout and that the
+   disabled Range takes no focus.
 
    `useReducedMotion` is the one thing mocked, so each paper note can be drawn
    both ways. */
@@ -54,10 +53,10 @@ describe('the zone page head', () => {
     expect(head).not.toMatch(/<p>/)
   })
 
-  it('carries the Note style switch with its three versions, in the preview slot', () => {
+  it('carries the Note style switch with its two versions, in the preview slot', () => {
     expect(head).toContain('class="bpage__preview"')
-    expect(text(head)).toContain('Note style Blue Classic Sticky note')
-    expect(head.match(/aria-pressed="(true|false)"/g)).toHaveLength(3)
+    expect(text(head)).toContain('Note style Note Sticky note')
+    expect(head.match(/aria-pressed="(true|false)"/g)).toHaveLength(2)
   })
 })
 
@@ -121,77 +120,59 @@ const NEW = ['Japan', 'California', 'Toronto', 'Within 50 km of Berlin']
 const note = (half: 'net' | 'place', style: NoteStyle, rollOut = false) =>
   html(<ZoneNote half={half} style={style} rollOut={rollOut} />)
 
-describe('the Blue note (owner, 5 Oct 2026)', () => {
-  it('is Classic’s card in the info blue: the kind on the left, the example in monospace on a chip, the facts under a rule on Locations', () => {
-    const net = note('net', 'blue')
-    expect(net).toContain('class="bz7n-blue"')
-    expect(net).toContain('What you can add')
+describe('the Note (owner, 16 Oct 2026)', () => {
+  it('is the kit’s one note holding what Blue held: the kind on the left, the example in monospace on a chip, the facts under a rule on Locations', () => {
+    const net = note('net', 'note')
+    expect(net).toMatch(/^<div class="bx-note bz7n-note" role="note" aria-labelledby="[^"]+"><svg[^>]*class="lucide[^"]*bx-note__mark"/)
+    expect(net).toMatch(/<h3 id="[^"]+" class="bx-note__title">What you can add<\/h3>/)
     expect(net).toContain('<dt>IPv4 or IPv6 address</dt><dd><code>10.0.0.1</code></dd>')
-    expect(net).not.toContain('bz7n-blue__facts')
-    const place = note('place', 'blue')
+    expect(net).not.toContain('bz7n-note__facts')
+    const place = note('place', 'note')
     expect(place).toContain('<dt>Country</dt><dd><code>Japan</code></dd>')
-    expect(place).toContain('bz7n-blue__facts')
-    /* Static: nothing animates and nothing is pressed. */
-    expect(net).not.toMatch(/<button|style="/)
-    expect(parseNoteStyle('blue')).toBe('blue')
+    expect(place).toContain('bz7n-note__facts')
+    for (const f of PLACE_FACTS) expect(text(place)).toContain(f)
+    /* Static: nothing animates, nothing folds and nothing is pressed. */
+    expect(net).not.toMatch(/<button|style="|aria-expanded/)
+    expect(parseNoteStyle('note')).toBe('note')
+  })
+
+  it('shows the same new places as the sticky note, never the zone’s own', () => {
+    const out = note('place', 'note')
+    for (const p of NEW) expect(text(out)).toContain(p)
+    for (const own of OWN) expect(text(out)).not.toContain(own)
+  })
+
+  it('is the page’s default, until the sticky note is picked', () => {
+    expect(page()).toContain('class="bx-note bz7n-note"')
+    expect(page()).not.toMatch(/bz7__sidehead|bz7n-blue/)
+    expect(text(page())).toContain('What you can add')
+  })
+
+  it('leaves the card to the kit: Classic’s and Blue’s own styles are gone from the stylesheet', () => {
+    expect(cssRules).not.toMatch(/\.bz7__sidehead|\.bz7__sidelist code|\.bz7n-blue/)
+    expect(cssRules).not.toMatch(/\.bz7__side \{/)
   })
 })
 
 describe('the Note style switch', () => {
-  it('offers Blue, Classic and the sticky note, in that order, Blue first', () => {
-    expect(NOTE_STYLES.map((s) => s.label)).toEqual(['Blue', 'Classic', 'Sticky note'])
-    expect(NOTE_STYLES.map((s) => s.value)).toEqual(['blue', 'classic', ...PAPER])
+  it('offers the Note and the sticky note, in that order, the Note first', () => {
+    expect(NOTE_STYLES.map((s) => s.label)).toEqual(['Note', 'Sticky note'])
+    expect(NOTE_STYLES.map((s) => s.value)).toEqual(['note', ...PAPER])
   })
 
-  it('keeps a stored sticky note, and puts the withdrawn versions, and anything else, on Blue', () => {
+  it('keeps a stored sticky note, and puts the withdrawn versions, and anything else, on the Note', () => {
     expect(parseNoteStyle('sticky')).toBe('sticky')
-    /* Withdrawn on 1 Oct 2026, then 2 Oct 2026, then never a version at all. */
-    for (const gone of ['colours', 'rows', 'tip', 'pile', 'card', 'clip', 'pointer', 'nonsense', '', null, undefined])
-      expect(parseNoteStyle(gone)).toBe('blue')
+    /* Withdrawn on 1 Oct 2026, then 2 Oct, 9 Oct and 16 Oct 2026, then never a version at all. */
+    for (const gone of ['colours', 'rows', 'tip', 'pile', 'card', 'clip', 'pointer', 'classic', 'blue', 'nonsense', '', null, undefined])
+      expect(parseNoteStyle(gone)).toBe('note')
   })
 
-  it('draws one pressed segment among three, and it is Blue', () => {
+  it('draws one pressed segment among two, and it is the Note', () => {
     const out = html(<NoteStyleSwitch />)
-    expect(out.match(/aria-pressed="(true|false)"/g)).toHaveLength(3)
+    expect(out.match(/aria-pressed="(true|false)"/g)).toHaveLength(2)
     expect(out.match(/aria-pressed="true"/g)).toHaveLength(1)
-    expect(out).toMatch(/aria-pressed="true"[^>]*>Blue</)
+    expect(out).toMatch(/aria-pressed="true"[^>]*>Note</)
     expect(out).toContain('aria-label="Note style"')
-  })
-})
-
-describe('Classic: the note as it was', () => {
-  it('is not the page’s default: the Blue card is, until another is picked (owner, 9 Oct 2026)', () => {
-    expect(page()).toContain('class="bz7n-blue"')
-    expect(page()).not.toContain('<div class="bz7__side"><h3 class="bz7__sidehead">')
-    expect(text(page())).toContain('What you can add')
-  })
-
-  it('keeps the original card, heading and Locations examples in monospace, with both facts', () => {
-    const out = note('place', 'classic')
-    expect(out).toMatch(/^<div class="bz7__side"><h3 class="bz7__sidehead"><svg[^>]*aria-hidden="true"/)
-    expect(text(out)).toMatch(/^What you can add India A country Maharashtra A state or region Pune A city Within 25 km of Pune A city with a range/)
-    expect(out).toContain('<li><code>Within 25 km of Pune</code><em>A city with a range</em></li>')
-    expect(out.match(/<p class="bz7__sidep">/g)).toHaveLength(2)
-    expect(text(out)).toContain('A country covers its states and cities, and a state covers its cities. The narrower ones stay in the list, marked as covered.')
-    expect(text(out)).toContain("Matched on the sign-in's IP address. A VPN shows where it exits.")
-  })
-
-  it('keeps the IP tab’s original note, with no facts under it', () => {
-    const out = note('net', 'classic')
-    expect([...out.matchAll(/<code>([^<]+)<\/code><em>([^<]+)<\/em>/g)].map((m) => `${m[1]} / ${m[2]}`)).toEqual([
-      '10.0.0.1 / An IPv4 or IPv6 address',
-      '192.168.0.0/24 / A CIDR block',
-      '192.168.0.1-192.168.0.254 / An IPv4 range',
-      'AS15169 / An ASN',
-    ])
-    expect(out).not.toContain('bz7__sidep')
-  })
-
-  it('keeps the card and its monospace in the stylesheet', () => {
-    expect(zonesCss).toMatch(
-      /\.bz7__side \{[^}]*background: var\(--surface-raised\);[^}]*border: var\(--bw-thin\) solid var\(--border-subtle\);[^}]*border-radius: var\(--radius-lg\);/,
-    )
-    expect(zonesCss).toMatch(/\.bz7__sidelist code \{\s*font-family: var\(--font-mono\); font-size: var\(--fs-xs\);/)
   })
 })
 
@@ -296,7 +277,7 @@ describe('the paper notes and motion', () => {
 })
 
 describe('the note styles use tokens only', () => {
-  const at = zonesCss.indexOf('/* --- The side note, four ways')
+  const at = zonesCss.indexOf('/* --- The side note, two ways')
   /* The rules, not the comments that say what went and what they were. */
   const notes = zonesCss.slice(at).replace(/\/\*[\s\S]*?\*\//g, '')
 
@@ -321,7 +302,7 @@ describe('the note styles use tokens only', () => {
   })
 
   it('has dropped the withdrawn versions’ styles', () => {
-    expect(cssRules).not.toMatch(/\.bz7n-(kind|legend|eg|ghost|tip|pile|card)\b/)
+    expect(cssRules).not.toMatch(/\.bz7n-(kind|legend|eg|ghost|tip|pile|card|blue)\b/)
   })
 })
 

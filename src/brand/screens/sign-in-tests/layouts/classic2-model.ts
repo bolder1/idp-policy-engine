@@ -12,11 +12,11 @@ import type { RowFact } from './shared/sign-in-row'
    without drawing them (classic2-layout.test.tsx), and the .tsx exports its
    component only.
 
-     arrivals(plan)            the step each of the four cards arrives at
-     cardsAt(plan, s)          the cards on screen at step s, top to bottom
-     workingOn(plan, s)        the card the engine is still working on, or null
+     arrivals(plan, one?)      the step each of the four cards arrives at (`one`: ONE_POLICY_CARD, no rule card)
+     cardsAt(plan, s, one?)    the cards on screen at step s, top to bottom
+     workingOn(plan, s, one?)  the card the engine is still working on, or null
      foldOpen(cards, …)        which cards are open: as reached while it plays, folded once it lands
-     chainCardOf(target)       the card an answer points at, where the chain has a questions panel beside it
+     chainCardOf(target, one?) the card an answer points at, where the chain has a questions panel beside it
      factRows(facts)           the sign-in card's `if`: each stated fact as a condition row
      policyRows(plan, s, …)    the policy card's rows: one line a policy
      policySections(rows)      the policy card's body: applies / also covers / skipped / not reached
@@ -50,26 +50,34 @@ const NEVER = Number.POSITIVE_INFINITY
    the policy as the engine starts finding one, the rule as it opens the one
    that applies, the outcome as the answer lands. No policy applies: the rule
    card arrives with the answer and says so. An empty plan (nobody, or no
-   application) draws the sign-in alone. */
-export function arrivals(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>): Record<CardKey, number> {
+   application) draws the sign-in alone.
+
+   ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD, 20 Oct 2026: "only one policy per app, mostly … so maybe one card"):
+   `onePolicy` draws no rule card — the policy card holds its rules — and the policy card arrives with its name, as the
+   engine has found the one that decides, rather than as a search over the application's policies. With none deciding,
+   it arrives where the search began, to say so. */
+export function arrivals(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>, onePolicy = false): Record<CardKey, number> {
   if (plan.empty) return { 'sign-in': 0, policy: NEVER, rule: NEVER, outcome: NEVER }
   const { at } = plan
   const outcome = at.outcome >= 0 ? at.outcome : at.done
+  if (onePolicy) return { 'sign-in': 0, policy: at.found >= 0 ? at.found : Math.max(0, at.which), rule: NEVER, outcome }
   const rule = plan.decider && at.expand >= 0 ? at.expand : outcome
   return { 'sign-in': 0, policy: Math.max(0, at.which), rule, outcome }
 }
 
-/** The cards on screen at step `s`, top to bottom. */
-export function cardsAt(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>, s: number): CardKey[] {
-  const at = arrivals(plan)
+/** The cards on screen at step `s`, top to bottom (`onePolicy`: never the rule card). */
+export function cardsAt(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>, s: number, onePolicy = false): CardKey[] {
+  const at = arrivals(plan, onePolicy)
   return CARDS.filter((k) => s >= at[k])
 }
 
 /* The card the engine is still at work on — its head turns the builder's
    spinner: the policy while it finds the one that applies, the rule while it
-   reads them. The sign-in is stated, and the outcome lands done. */
-export function workingOn(plan: Pick<EngineRun, 'empty' | 'decider' | 'at' | 'steps'>, s: number): CardKey | null {
+   reads them. The sign-in is stated, and the outcome lands done. One policy card (`onePolicy`): it is at work from its
+   arrival until the walk through its rules is over. */
+export function workingOn(plan: Pick<EngineRun, 'empty' | 'decider' | 'at' | 'steps'>, s: number, onePolicy = false): CardKey | null {
   if (plan.empty) return null
+  if (onePolicy) return plan.decider && s >= arrivals(plan, true).policy && s < walkEnd(plan) ? 'policy' : null
   const { at } = plan
   if (s >= at.which && at.decides >= 0 && s < at.decides) return 'policy'
   const deciding = plan.steps.findIndex((k) => k.kind === 'deciding')
@@ -81,7 +89,7 @@ export function workingOn(plan: Pick<EngineRun, 'empty' | 'decider' | 'at' | 'st
 // --- The rule list, as the walk reaches it -----------------------------------------------------------------
 
 /* Where the walk through the deciding policy's rules is over: the deciding step, else the outcome. */
-function walkEnd(plan: Pick<EngineRun, 'at' | 'steps'>): number {
+export function walkEnd(plan: Pick<EngineRun, 'at' | 'steps'>): number {
   const deciding = plan.steps.findIndex((k) => k.kind === 'deciding')
   return deciding >= 0 ? deciding : plan.at.outcome
 }
@@ -166,8 +174,8 @@ export function foldOpen(cards: readonly CardKey[], landed: boolean, hand: Parti
 /* The card the engine is on at step `s` while the run plays — the newest card on screen (owner's queued ask, 6 Oct 2026:
    "card-by-card done-and-fold"): the policies while it finds the one that applies, the rule card while it walks the
    rules, the outcome once it decides. Null before any card is on screen. */
-export function onCard(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>, s: number): CardKey | null {
-  const shown = cardsAt(plan, s).filter((k) => k !== 'sign-in')
+export function onCard(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>, s: number, onePolicy = false): CardKey | null {
+  const shown = cardsAt(plan, s, onePolicy).filter((k) => k !== 'sign-in')
   return shown.at(-1) ?? null
 }
 
@@ -186,13 +194,14 @@ export const foldAllWord = (anyOpen: boolean): 'Collapse all' | 'Expand all' => 
 /* The card an answer points at (assistant/intents.ts `Target`: 'person', 'policy:<id>', 'rule:<id>',
    'check:<ruleId>:<category>', 'outcome', 'screens'), where the chain is drawn inside a view that has a questions panel
    (Focus's Vertical): the person is the sign-in, any policy the policies card, any rule the rule card — its body says
-   the rules it passed over too — and the outcome or what they see the outcome. Null for anything else. */
-export function chainCardOf(target: string | null | undefined): CardKey | null {
+   the rules it passed over too — and the outcome or what they see the outcome. Null for anything else. One policy card
+   (`onePolicy`): a rule or a check is the policy card's, which holds the rules. */
+export function chainCardOf(target: string | null | undefined, onePolicy = false): CardKey | null {
   if (!target) return null
   if (target === 'person') return 'sign-in'
   if (target === 'outcome' || target === 'screens') return 'outcome'
   if (target.startsWith('policy:')) return 'policy'
-  if (target.startsWith('rule:') || target.startsWith('check:')) return 'rule'
+  if (target.startsWith('rule:') || target.startsWith('check:')) return onePolicy ? 'policy' : 'rule'
   return null
 }
 
@@ -257,7 +266,7 @@ export const NOT_REACHED = 'Not reached'
 
 /* A policy the person is not in says so without their name ("Maya Iyer is not in it"): the sign-in card above names
    them once, and three rows of it was the name three times. */
-const plainReason = (reason: string): string => (/ is not in (it|this policy)$/.test(reason) ? 'Not in this policy' : reason)
+export const plainReason = (reason: string): string => (/ is not in (it|this policy)$/.test(reason) ? 'Not in this policy' : reason)
 
 /** One line a policy, in the order the engine asks them, as they stand at step `s`. `via` is how the one that decides lets this person in (conflicts.ts `audienceViaOf`). */
 export function policyRows(plan: Pick<EngineRun, 'policies' | 'conflicts'>, s: number, via: Via | null = null): PolicyRow[] {
@@ -461,6 +470,8 @@ export interface HeadMeta {
   text: string
   /** After the words, in the decision's colour: "Then Allow on 1 factor". */
   then?: AccessDecision
+  /** The words' tooltip, where the line may be cut short (the merged card's Outcome: a Deny's whole message). */
+  tip?: string
 }
 
 export interface CardHead {

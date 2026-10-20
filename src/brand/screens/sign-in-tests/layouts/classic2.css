@@ -618,3 +618,49 @@
 .rl-c2__use em { font-style: normal; color: var(--text-tertiary); }
 .rl-c2__use:hover { background: var(--surface-sunken); }
 .rl-c2__use:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+
+/* ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD, 20 Oct 2026; classic2-one-model.ts). Every rule here is scoped to the
+   merged card's list (`.is-one`) or its own pieces, so the rule card's list is as it was. A row's head stays one line:
+   its name gives way, its state and outcome never wrap. The outcome badge is the kit's (decision-badge.tsx), grey on a
+   row that did not decide; on the one that did it takes its tone, the colour easing in as the row's edge rings — the
+   ring's own keyframes, on a filter only, played only as the run reaches it (`is-hit`). Rules never reached read quiet; a later rule that also applies is amber, as the
+   policies' own "also covers" was; a row an answer points at takes the accent's soft ground, never a ring, never orange. */
+.rl-c2__rules.is-one .rl-c2__rulestate { white-space: nowrap; }
+/* The card's body is a grid (board.css `.bb__cardbody`), whose items keep their min-content width: a row's state and
+   outcome, which never wrap, would push the list past the card. The list and the foot take the card's width instead,
+   and a row's name gives way. */
+.rl-c2 .bb__cardbody > .rl-c2__rules.is-one,
+.rl-c2 .bb__cardbody > .rl-c2__onefoot { min-width: 0; }
+.rl-c2__rulehead > .bx-decision-badge { flex: none; }
+.rl-c2__rules.is-one > .rl-c2__rule.is-match.is-hit .rl-c2__rulehead > .bx-decision-badge { animation: rl-c2-badge-in var(--dur-normal) var(--ease-standard) both; }
+@keyframes rl-c2-badge-in { from { filter: saturate(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .rl-c2__rules.is-one > .rl-c2__rule.is-match.is-hit .rl-c2__rulehead > .bx-decision-badge { animation: none; }
+}
+.rl-c2__rules.is-one > .rl-c2__rule.is-not-reached .rl-c2__rulename { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+.rl-c2__rules.is-one > .rl-c2__rule.is-also .rl-c2__rulestate { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+.rl-c2__rules.is-one > .rl-c2__rule.is-lit,
+.rl-c2__rules.is-one > .rl-c2__rule.is-lit.is-open { background: var(--accent-soft); }
+.rl-c2__chain.is-across .rl-c2__rules.is-one .rl-c2__rulehead { flex-wrap: wrap; }
+/* Why the Global Default decides (classic2-one.tsx `OneReason`): one quiet line under the head, in line with the title as
+   the Why under it is — an unseen tile holds the column — the policy it names a press in the link's colour. */
+.rl-c2__onereason { display: flex; align-items: center; gap: var(--space-5); margin-top: calc(var(--space-3) * -1); }
+.rl-c2__onewhy { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--fs-xs); color: var(--text-secondary); }
+.rl-c2__onewhy > svg { flex: none; color: var(--text-tertiary); }
+.rl-c2__onetext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-c2__onewhy .rl-c2__pname,
+.rl-c2__oneline .rl-c2__pname { font-size: inherit; }
+/* The foot (classic2-one.tsx `OneFoot`): under a dashed rule, at most two quiet lines — the Global Default under the
+   application's own policy, and another policy on the application, amber where it would answer otherwise. */
+.rl-c2__onefoot { margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--bw-thin) dashed var(--border-subtle); }
+.rl-c2__oneline { display: flex; align-items: center; gap: var(--space-2); min-width: 0; margin: 0; padding: var(--space-2) var(--space-4); font-size: var(--fs-xs); color: var(--text-tertiary); }
+.rl-c2__oneline > svg { flex: none; }
+.rl-c2__oneline .rl-c2__pname { flex: 0 1 auto; }
+.rl-c2__onelabel,
+.rl-c2__onewords { flex: none; white-space: nowrap; }
+.rl-c2__oneline.is-conflict .rl-c2__onewords { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+
+/* The deny colour on the outcome is enough here; the coloured left edge stays in the policy builder only. */
+.rl-c2 .bb__card.rl-c2__card.is-terminal, .rl-c2 .bb__card.rl-c2__card.is-terminal:hover { border-left: var(--bw-thin) solid var(--border-subtle); }
+.rl-c2 .bb__card.rl-c2__card.is-terminal:not(.is-matched):hover { border-left-color: var(--border-default); }
+.rl-c2 .bb__card.rl-c2__card.is-terminal.rl-c2__out, .rl-c2 .bb__card.rl-c2__card.is-terminal.is-matched { border-color: var(--border-subtle); }

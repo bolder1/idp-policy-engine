@@ -253,8 +253,20 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
 
    It was centred, which put its left edge well in from everything above it
    (owner, 16 Sep 2026: "the center alignment doesn't go well"). */
-.bdpw__cols--solo { grid-template-columns: minmax(0, 1fr); justify-items: start; }
-.bdpw__cols--solo > .bdpw__work { width: 100%; max-width: 720px; }
+/* 15 Oct 2026: the review keeps the form's half, empty beside it, so the
+   ladder, the step and the footer's buttons end on one line on every step
+   (owner: the buttons and the progress bar end with the form). It was one
+   column capped at 720px, which ended past the ladder above it. */
+.bdpw__cols--solo > .bdpw__work { width: 100%; }
+
+/* The ladder heads the form, so it is the form's width: the left half of
+   `.bz7__cols`, less half its gap (owner, 15 Oct 2026, "the progress bar at
+   the top till that part"; it ran the page's full width from 16 Sep). Where
+   the columns fold into one (zones-final.css, 1120px), it is full width again
+   with them. The drawer's ladder is the drawer's own width. */
+@media (min-width: 1121px) {
+  .bfp2 > .bdpw__steps { width: calc((100% - var(--space-9)) / 2); }
+}
 
 /* No gap: the change list's own groups carry their padding and the hairline
    between them, and a gap on top of that read as a stack of cards (owner,

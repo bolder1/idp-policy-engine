@@ -6,6 +6,7 @@ import { Button, DecisionChip } from '../kit'
 import { EmptyState } from '../empty'
 import { AppLogo } from '../logos/AppLogo'
 import { coversEveryApp, enforces, type AccessDecision, type App, type Group, type Policy, type Rule, type User } from '../data'
+import { isPostSignIn } from '../post-sign-in'
 import { whoPasses } from '../rule-who'
 import { useBrand } from '../store'
 
@@ -66,8 +67,10 @@ function reachesGroup(r: Rule, group: Group, directory: User[]): boolean {
 }
 
 function match(p: Policy, app: App, group: Group, directory: User[]): Cell | null {
-  /* `enforces`, not `!== 'inactive'`: a draft decides nothing either. */
-  if (!enforces(p)) return null
+  /* `enforces`, not `!== 'inactive'`: a draft decides nothing either. Nor
+     does a post sign-in policy, live or not: it acts after sign-in, and is
+     never cover (post-sign-in.ts). */
+  if (!enforces(p) || isPostSignIn(p)) return null
   /* `includes`, so one policy legitimately fills several columns of this grid.
      That used to be the argument AGAINST a list — a policy drawn three times
      looked like three decisions. It is one decision shown where it lands, and

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { fallbackRule, type Policy } from '../data'
 import { EFFECT_GROUP, GENERAL_GROUP, groupReview } from '../review-rows'
-import { detailsChanges } from './policy-details-review'
+import { detailsChanges, sameAudience } from './policy-details-review'
 
 const NAMES: Record<string, string> = { salesforce: 'Salesforce', workday: 'Workday', github: 'GitHub' }
 const appName = (id: string) => NAMES[id] ?? id
@@ -92,5 +92,37 @@ describe('detailsChanges', () => {
     const c = detailsChanges(system, { name: 'Payroll — Finance', appIds: ['salesforce'] }, appName)
     expect(c.changes).toEqual([])
     expect(c.becomesDraft).toBe(false)
+  })
+})
+
+/* Who the policy governs, edited at the board's start node (13 Oct 2026). */
+describe('detailsChanges: the audience', () => {
+  const whoSaid = (a: Policy['audience']) => (a.everyone ? 'Everyone' : [...a.groupIds, ...a.userIds].join(' and '))
+  const base = { name: 'Payroll — Finance', appIds: ['salesforce', 'workday'] }
+
+  it('says nothing when the draft carries no audience, or the same one in another order', () => {
+    const saved = policy({ audience: { everyone: false, groupIds: ['finance', 'hr'], userIds: [] } })
+    expect(detailsChanges(saved, base, appName, whoSaid).changes).toEqual([])
+    expect(detailsChanges(saved, { ...base, audience: { everyone: false, groupIds: ['hr', 'finance'], userIds: [] } }, appName, whoSaid).changes).toEqual([])
+  })
+
+  it('names a narrowing as one Who row, before and after in words', () => {
+    const c = detailsChanges(policy(), { ...base, audience: { everyone: false, groupIds: ['finance'], userIds: ['u1'] } }, appName, whoSaid)
+    expect(c.changes).toEqual(['Who'])
+    expect(c.rows).toEqual([{ label: 'Who', before: 'Everyone', after: 'finance and u1', kind: 'changed' }])
+  })
+
+  it('never edits the system policy, which governs everyone', () => {
+    const c = detailsChanges(policy({ isSystem: true }), { ...base, audience: { everyone: false, groupIds: ['finance'], userIds: [] } }, appName, whoSaid)
+    expect(c.changes).toEqual([])
+  })
+})
+
+describe('sameAudience', () => {
+  it('reads everyone as everyone, whatever lists it carries, and lists as sets', () => {
+    expect(sameAudience({ everyone: true, groupIds: [], userIds: [] }, { everyone: true, groupIds: ['x'], userIds: [] })).toBe(true)
+    expect(sameAudience({ everyone: true, groupIds: [], userIds: [] }, { everyone: false, groupIds: ['x'], userIds: [] })).toBe(false)
+    expect(sameAudience({ everyone: false, groupIds: ['a', 'b'], userIds: ['u'] }, { everyone: false, groupIds: ['b', 'a'], userIds: ['u'] })).toBe(true)
+    expect(sameAudience({ everyone: false, groupIds: ['a'], userIds: [] }, { everyone: false, groupIds: ['a'], userIds: ['u'] })).toBe(false)
   })
 })

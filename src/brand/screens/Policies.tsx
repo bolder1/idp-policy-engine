@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlignLeft,
   AppWindow,
-  Check,
   CopyPlus,
   Eye,
   Grid3x3,
@@ -26,8 +25,7 @@ import {
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppsPeek } from './apps-peek'
-import { AppLogo } from '../logos/AppLogo'
-import { Badge, Button, Modal, RowMenu, SearchBox, StatusPill, TipMark, type MenuItem } from '../kit'
+import { Badge, Button, Modal, RowMenu, SearchBox, StatusPill, Tabs, type MenuItem } from '../kit'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import type { LibView, ViewOption } from './library-view-state'
 import { PageBar } from './page-bar'
@@ -41,10 +39,11 @@ import { freeName } from '../policy-name'
 import { scenarioFromPolicy } from '../template-from-policy'
 import { SaveTemplateDialog } from './builder-dialogs'
 import { ConfirmDelete } from './confirm-delete'
-import { decidesFor, deleteDetail, protectionOf } from './app-policies'
+import { AppTransfer } from './app-transfer'
+import { decidesFor, deleteDetail, listPhrase, ownerOf } from './app-policies'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
-import { rowMenu, type RowMenuId } from './status-options'
+import { rowMenu, statusOptions, type RowMenuId } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { SHOWCASE } from '../showcase'
 import { screenOffered } from '../edition-screens'
@@ -52,15 +51,61 @@ import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
 import { ACCESS_CHECK } from './sign-in-tests/names'
 import { DENIAL_REASONS } from './sign-in-tests/phase'
 import { PolicyDetailsDrawer } from './policy-details-drawer'
+import { blankPostSignInPolicy, isPostSignIn } from '../post-sign-in'
+/* Here and not in main.tsx's list, against that list's rule, because it can be:
+   the sheet sets only margins, on its own class and on the page head through
+   `:has()`, which out-weighs console-theme's rule rather than tying with it. So
+   landing before kit.css (Policies is eager) leaves source order nothing to decide. */
+import './policies-types.css'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
 
-   Name, applications, status and the row menu; Exposure too in the full
-   edition. One status filter and a search. Every dialog a row opens lives on
-   the page, not in the row, so a row that is deleted or filtered out does not
-   take its dialog — and the keyboard focus — with it.
+   Two policy types, on two line tabs under the head (owner, 13 Oct 2026;
+   docs/specs/POST-SIGN-IN-POLICIES.md, Screens 1): Sign-in, decided once as
+   somebody signs in, and Post sign-in, acting on events in the session after
+   it. They are kept apart, so each tab is its own list with its own bar.
+
+   Sign-in: name, applications, status and the row menu; Exposure too in the
+   full edition. One status filter and a search. Every dialog a row opens lives
+   on the page, not in the row, so a row that is deleted or filtered out does
+   not take its dialog — and the keyboard focus — with it.
    -------------------------------------------------------------------------- */
+
+type PolicyKind = 'sign-in' | 'post-sign-in'
+
+/* No counts on the tabs (15 Sep 2026): the number is the list's own. */
+const POLICY_KINDS: { value: PolicyKind; label: string }[] = [
+  { value: 'sign-in', label: 'Sign-in' },
+  { value: 'post-sign-in', label: 'Post sign-in' },
+]
+
+/* The tab a viewer last had open, so the way back from the board — opened
+   from the Post sign-in tab, by its New policy or a policy's name — lands on
+   Post sign-in again. A convenience only. Storage is read first; where it is
+   blocked or empty, the module copy still holds the tab for this visit, and
+   with neither the page opens on Sign-in. */
+const KIND_KEY = 'brand-policies-type'
+let lastKind: PolicyKind | null = null
+
+function readKind(): PolicyKind {
+  try {
+    const stored = localStorage.getItem(KIND_KEY)
+    if (stored === 'sign-in' || stored === 'post-sign-in') return stored
+  } catch {
+    /* Blocked: fall through to this visit's copy. */
+  }
+  return lastKind ?? 'sign-in'
+}
+
+function keepKind(kind: PolicyKind) {
+  lastKind = kind
+  try {
+    localStorage.setItem(KIND_KEY, kind)
+  } catch {
+    /* Blocked: the module copy holds it. */
+  }
+}
 
 type SortKey = 'name' | 'modified' | 'exposure'
 type StatusFilter = 'all' | 'draft' | 'active' | 'monitor' | 'inactive'
@@ -113,6 +158,29 @@ const POLICY_VIEWS: ViewOption<PolicyView>[] = [
 ]
 
 export function Policies() {
+  const [kind, setKind] = useState<PolicyKind>(readKind)
+  const show = (k: PolicyKind) => {
+    setKind(k)
+    keepKind(k)
+  }
+
+  /* One head over both tabs, so its caption names both types rather than
+     only the sign-in check it said before 13 Oct 2026. */
+  return (
+    <div className="bpage">
+      <PageHead title="Policies" caption="Every sign-in, and the session after it, is checked against these policies." docs />
+      <Tabs<PolicyKind> className="bx-tabs--line bpol__types" name="Policy types" value={kind} onChange={show} options={POLICY_KINDS} />
+      {/* Each tab brings its own bar and list; a fragment, so they stay rows of
+          the page grid as they were before the tabs. */}
+      {kind === 'sign-in' ? <SignInPolicies /> : <PostSignInPolicies />}
+    </div>
+  )
+}
+
+/* The Sign-in tab: the page as it was before the tabs, reading sign-in
+   policies only. A post sign-in policy is never in this table, its empty state
+   or its count of policies deciding sign-ins (spec, Rulings: kept apart). */
+function SignInPolicies() {
   const store = useBrand()
   const resolveName = useNameLookup()
   const libView = POLICY_VIEW
@@ -167,16 +235,6 @@ export function Policies() {
     store.go({ name: 'board', policyId: id })
   }
 
-  /* The rows' container in whichever view is showing, for the focus pass. */
-  const bodyRef = useRef<HTMLElement | null>(null)
-  const setBody = useCallback((el: HTMLElement | null) => {
-    bodyRef.current = el
-  }, [])
-  const searchRef = useRef<HTMLInputElement | null>(null)
-  /* The row a confirmed change may remove from the list: a delete, a status
-     change under a status filter, an assignment that makes it a draft. */
-  const leaving = useRef<{ id: string; index: number } | null>(null)
-
   const showExposure = store.features.exposure
 
   /* Keyed on the collections it reads, not on the store object, so the deck
@@ -211,8 +269,11 @@ export function Policies() {
 
   const q = query.trim().toLowerCase()
 
+  /* Sign-in policies only: the Post sign-in tab lists the rest. */
+  const signIn = useMemo(() => store.policies.filter((p) => !isPostSignIn(p)), [store.policies])
+
   const rows = useMemo(() => {
-    let list = store.policies.filter((p) => {
+    let list = signIn.filter((p) => {
       /* "Active" means what decides sign-ins, so the always-on default is in it
          and a monitoring policy, which decides none, is not. */
       if (status === 'active' && !enforces(p)) return false
@@ -239,35 +300,20 @@ export function Policies() {
     })
     // System policy is pinned regardless of sort — it always evaluates.
     return [...list.filter((p) => p.isSystem), ...list.filter((p) => !p.isSystem)]
-  }, [store.policies, status, q, sort, grades])
+  }, [signIn, status, q, sort, grades])
 
-  const deciding = useMemo(() => store.policies.filter(enforces).length, [store.policies])
+  const deciding = useMemo(() => signIn.filter(enforces).length, [signIn])
 
   /* Counted across everything graded, not just the filtered rows. */
   const leaking = [...grades.values()].filter((r) => r.breaches > 0).length
 
   const filtered = status !== 'all'
-  const systemPolicy = store.policies.find((p) => p.isSystem)
+  const systemPolicy = signIn.find((p) => p.isSystem)
   /* A tenant with nothing but the system policy: the list is empty in every
      sense that matters, though the pinned row is there. */
-  const noPolicies = !q && !filtered && store.policies.every((p) => p.isSystem)
+  const noPolicies = !q && !filtered && signIn.every((p) => p.isSystem)
 
-  const markLeaving = (id: string) => {
-    leaving.current = { id, index: rows.findIndex((r) => r.id === id) }
-  }
-
-  /* After a change that removed a row, focus the row now in its place (or the
-     one above, at the end), or the search box when the list is empty. Runs
-     after the closing dialog has tried to restore focus to the gone row. */
-  useEffect(() => {
-    const l = leaving.current
-    if (!l) return
-    leaving.current = null
-    if (rows.some((r) => r.id === l.id)) return
-    const links = bodyRef.current?.querySelectorAll<HTMLButtonElement>('.btable__link, .blist__open')
-    const next = links && links.length > 0 ? links[Math.min(Math.max(l.index, 0), links.length - 1)] : null
-    ;(next ?? searchRef.current)?.focus({ preventScroll: true })
-  }, [rows])
+  const { setBody, searchRef, markLeaving } = useLeavingFocus(rows)
 
   const statusChange = useStatusChange({
     onAssignApps: (p) => openDialog('assign', p),
@@ -311,20 +357,15 @@ export function Policies() {
     }
   }
 
-  /* `scope` and `aria-sort` are what a sortable header owes a screen reader. */
   function head(key: SortKey, label: string, extra?: string) {
-    const on = sort.key === key
     return (
-      <th className={extra} scope="col" aria-sort={on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
-        <button
-          type="button"
-          className={`btable__sort ${on ? 'is-on' : ''}`}
-          onClick={() => setSort((s) => ({ key, dir: s.key === key && s.dir === 1 ? -1 : 1 }))}
-        >
-          {label}
-          <span aria-hidden>{on ? (sort.dir === 1 ? '↑' : '↓') : '↕'}</span>
-        </button>
-      </th>
+      <SortHead
+        label={label}
+        className={extra}
+        on={sort.key === key}
+        dir={sort.dir}
+        onSort={() => setSort((s) => ({ key, dir: s.key === key && s.dir === 1 ? -1 : 1 }))}
+      />
     )
   }
 
@@ -380,13 +421,7 @@ export function Policies() {
   const current = dialog ? (store.policies.find((p) => p.id === dialog.policy.id) ?? dialog.policy) : null
 
   return (
-    <div className="bpage">
-      <PageHead
-        title="Policies"
-        caption="Every sign-in is checked against the policies on the app being opened."
-        docs
-      />
-
+    <>
       {/* The row every list page has — see `PageBar`: the search box, then the
           filter; the view and New on the right. Coverage has no rows to search
           or filter. */}
@@ -579,8 +614,304 @@ export function Policies() {
       {details && store.policies.some((p) => p.id === details.id) && (
         <PolicyDetailsDrawer open={details.open} policyId={details.id} onClose={() => setDetails({ ...details, open: false })} />
       )}
-    </div>
+    </>
   )
+}
+
+/* --- The Post sign-in tab -------------------------------------------------------
+
+   Post sign-in policies (post-sign-in.ts): name, applications, status and the
+   row menu, with a search and a status filter, as the Sign-in tab has. Less
+   than that tab on purpose:
+   - No Monitoring, in the filter or the menu: these have Draft, Active and
+     Inactive only (owner, 13 Oct 2026). `statusOptions` already leaves Monitor
+     out for anything but an app access policy.
+   - No Sign-in activity or Check access in the bar: those test and explain
+     sign-ins, and these are never part of one.
+   - No details slider: the name opens the board, the one builder for both
+     types (owner, 13 Oct 2026: "I don't want to add a new builder until
+     needed"), where the policy is its rules, its "Nothing else matched" and
+     the applications linked to it, read only.
+   - No Assign apps: an application is linked, with its events, from its own
+     page (spec, Rulings), so the Applications cell only lists them.
+   - No Exposure, Coverage, Read as text or Save as template: each reads a
+     sign-in decision, and a post sign-in rule's Then is an action on an
+     event. No Duplicate: a copy would hold its applications' events too, and
+     an event is decided by one policy at most. */
+
+type PostStatusFilter = 'all' | 'active' | 'draft' | 'inactive'
+type PostSortKey = 'name' | 'modified'
+
+const POST_STATUS: { value: PostStatusFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'inactive', label: 'Inactive' },
+]
+
+type PostRowAction = 'edit' | 'active' | 'inactive' | 'delete'
+
+/* Edit policy, the switch its status allows, then Delete — the Sign-in tab's
+   marks and order, with only the items that apply to this type. */
+function postSignInMenu(policy: Policy): MenuItem[] {
+  return [
+    { id: 'edit', label: 'Edit policy', icon: ROW_ICON.edit },
+    ...statusOptions(policy, { monitor: false }).map((s) => ({ id: s.target, label: s.label, icon: ROW_ICON[s.target] })),
+    { id: 'delete', label: 'Delete policy', icon: ROW_ICON.delete, danger: true, divide: true },
+  ]
+}
+
+/* What the delete confirmation adds about a post sign-in policy: where it is
+   acting, while it is. `deleteDetail` speaks of protecting sign-ins, which
+   this type never does. */
+function postDeleteDetail(policy: Policy, apps: readonly { id: string; name: string }[]): string | undefined {
+  if (policy.status !== 'active') return undefined
+  const named = apps.filter((a) => policy.appIds.includes(a.id)).map((a) => a.name)
+  return named.length > 0 ? `Acts on events in ${listPhrase(named)}.` : undefined
+}
+
+function PostSignInPolicies() {
+  const store = useBrand()
+  const [status, setStatus] = useState<PostStatusFilter>('all')
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<{ key: PostSortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
+  /* Kept while the confirmation animates out, including after the delete. */
+  const [deleting, setDeleting] = useState<Policy | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  const all = useMemo(() => store.policies.filter(isPostSignIn), [store.policies])
+  const q = query.trim().toLowerCase()
+  const filtered = status !== 'all'
+
+  /* "Modified" is the store's own order, newest first; only the name sorts. */
+  const rows = useMemo(() => {
+    const list = all.filter((p) => (!filtered || p.status === status) && (!q || p.name.toLowerCase().includes(q)))
+    return sort.key === 'name' ? [...list].sort((a, b) => a.name.localeCompare(b.name) * sort.dir) : list
+  }, [all, filtered, status, q, sort])
+
+  const live = useMemo(() => all.filter((p) => p.status === 'active').length, [all])
+
+  const { setBody, searchRef, markLeaving } = useLeavingFocus(rows)
+  const statusChange = useStatusChange({ onChange: (p) => markLeaving(p.id) })
+
+  const openBuilder = (p: Policy) => store.go({ name: 'board', policyId: p.id })
+
+  /* New policy makes an Untitled draft of this tab's type, linked to nothing,
+     and opens it in the board with nothing asked first — the Sign-in tab's
+     way (23 Sep 2026). */
+  const startDraft = () => {
+    const name = freeName('Untitled post sign-in policy', store.policies.map((p) => p.name))
+    const id = store.addPolicy(blankPostSignInPolicy(name))
+    store.go({ name: 'board', policyId: id })
+  }
+
+  const act = (policy: Policy, action: PostRowAction) => {
+    switch (action) {
+      case 'edit':
+        openBuilder(policy)
+        break
+      /* The switches every policy uses (use-status-change.tsx). Turn on is
+         offered on a draft too, and refused there in a toast that says what
+         is left, until every rule and "Nothing else matched" have an action
+         (`turnOnIssue`). */
+      case 'active':
+      case 'inactive':
+        statusChange.request(policy, action)
+        break
+      case 'delete':
+        setDeleting(policy)
+        setDeleteOpen(true)
+        break
+    }
+  }
+
+  const current = deleting ? (store.policies.find((p) => p.id === deleting.id) ?? deleting) : null
+
+  return (
+    <>
+      {/* New policy alone on the right: Sign-in activity and Check access are
+          the Sign-in tab's, as they explain and test sign-ins. */}
+      <PageBar
+        left={
+          <>
+            <SearchBox value={query} onChange={setQuery} inputRef={searchRef} placeholder="Search policies…" label="Search policies" />
+            <span className={`btoolbar__filter bbar__filter ${filtered ? 'is-set' : ''}`}>
+              <Picker
+                label="Filter by status"
+                size="md"
+                icon={ListFilter}
+                prefix="Status"
+                value={status}
+                options={POST_STATUS}
+                onChange={(v) => setStatus(v as PostStatusFilter)}
+              />
+            </span>
+          </>
+        }
+        right={
+          <Button variant="brand" icon={Plus} onClick={startDraft}>
+            New policy
+          </Button>
+        }
+      />
+
+      <div className="btable-wrap">
+        {rows.length > 0 && (
+          <div className="btable__scroll">
+            <table className="btable">
+              <thead>
+                <tr>
+                  <SortHead
+                    label="Policy name"
+                    on={sort.key === 'name'}
+                    dir={sort.dir}
+                    onSort={() => setSort((s) => ({ key: 'name', dir: s.key === 'name' && s.dir === 1 ? -1 : 1 }))}
+                  />
+                  <th scope="col">Applications</th>
+                  <th scope="col" className="btable__col-status">
+                    Status
+                  </th>
+                  <th scope="col" className="btable__actions btable__col-actions">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody ref={setBody}>
+                {rows.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <div className="btable__primary">
+                        <span className="blist__tile bpol__tile" aria-hidden>
+                          <ShieldCheck size={18} strokeWidth={1.8} />
+                        </span>
+                        <button type="button" className="btable__link" onClick={() => openBuilder(p)}>
+                          {p.name}
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <LinkedApps policy={p} />
+                    </td>
+                    <td>
+                      <StatusPill status={p.status} />
+                    </td>
+                    <td className="btable__actions">
+                      <RowMenu label={`Actions for ${p.name}`} items={postSignInMenu(p)} onSelect={(id) => act(p, id as PostRowAction)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {all.length === 0 ? (
+          <EmptyState
+            compact
+            icon={ShieldPlus}
+            title="No post sign-in policies yet"
+            action={
+              <Button variant="secondary" icon={Plus} onClick={startDraft}>
+                New policy
+              </Button>
+            }
+          />
+        ) : (
+          rows.length === 0 && (
+            <NoMatches
+              noun="policies"
+              query={query}
+              filtered={filtered}
+              compact
+              onClear={() => {
+                setStatus('all')
+                setQuery('')
+              }}
+            />
+          )
+        )}
+        {all.length > 0 && (
+          <footer className="btable__foot">
+            {live} {live === 1 ? 'policy' : 'policies'} acting after sign-in
+          </footer>
+        )}
+      </div>
+
+      {current && (
+        <ConfirmDelete
+          open={deleteOpen}
+          name={current.name}
+          noun="policy"
+          detail={postDeleteDetail(current, store.apps)}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={() => {
+            markLeaving(current.id)
+            setDeleteOpen(false)
+            store.deletePolicy(current.id)
+            store.showToast(`${current.name} deleted`)
+          }}
+        />
+      )}
+      {statusChange.dialog}
+    </>
+  )
+}
+
+/* --- Shared by both tabs ------------------------------------------------------- */
+
+/* `scope` and `aria-sort` are what a sortable header owes a screen reader. */
+function SortHead({
+  label,
+  on,
+  dir,
+  onSort,
+  className,
+}: {
+  label: string
+  on: boolean
+  dir: 1 | -1
+  onSort: () => void
+  className?: string
+}) {
+  return (
+    <th className={className} scope="col" aria-sort={on ? (dir === 1 ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className={`btable__sort ${on ? 'is-on' : ''}`} onClick={onSort}>
+        {label}
+        <span aria-hidden>{on ? (dir === 1 ? '↑' : '↓') : '↕'}</span>
+      </button>
+    </th>
+  )
+}
+
+/* Focus after a change that removed a row: the row now in its place (or the
+   one above, at the end), or the search box when the list is empty. Runs
+   after the closing dialog has tried to restore focus to the gone row.
+   `markLeaving` names the row a confirmed change may remove from the list —
+   a delete, a status change under a status filter, an assignment that makes
+   it a draft — just before it is written. */
+function useLeavingFocus(rows: readonly Policy[]) {
+  /* The rows' container in whichever view is showing, for the focus pass. */
+  const bodyRef = useRef<HTMLElement | null>(null)
+  const setBody = useCallback((el: HTMLElement | null) => {
+    bodyRef.current = el
+  }, [])
+  const searchRef = useRef<HTMLInputElement | null>(null)
+  const leaving = useRef<{ id: string; index: number } | null>(null)
+
+  const markLeaving = (id: string) => {
+    leaving.current = { id, index: rows.findIndex((r) => r.id === id) }
+  }
+
+  useEffect(() => {
+    const l = leaving.current
+    if (!l) return
+    leaving.current = null
+    if (rows.some((r) => r.id === l.id)) return
+    const links = bodyRef.current?.querySelectorAll<HTMLButtonElement>('.btable__link, .blist__open')
+    const next = links && links.length > 0 ? links[Math.min(Math.max(l.index, 0), links.length - 1)] : null
+    ;(next ?? searchRef.current)?.focus({ preventScroll: true })
+  }, [rows])
+
+  return { setBody, searchRef, markLeaving }
 }
 
 /* The mark for each item. Radar for Monitor (owner, 25 Sep 2026), leaving Eye
@@ -628,6 +959,17 @@ function PolicyApps({ policy, onAssign }: { policy: Policy; onAssign: () => void
       Assign apps
     </button>
   )
+}
+
+/* A post sign-in policy's applications: the ones linked to it, through
+   `appIds`, which mirrors its links (post-sign-in.ts). Read only. Each is
+   linked, with its events, from the application's own page, so the panel has
+   no Edit and the empty cell no Assign apps. */
+function LinkedApps({ policy }: { policy: Policy }) {
+  const store = useBrand()
+  const named = appsOf(policy, store.apps)
+  if (named.length > 0) return <AppsPeek apps={named} policyName={policy.name} />
+  return <span className="u-muted">Not linked</span>
 }
 
 /* How exposed a policy is, as a grade that opens its Break-in test. */
@@ -751,7 +1093,6 @@ function AssignAppsDialog({
 }) {
   const store = useBrand()
   const [picked, setPicked] = useState<string[]>(policy.appIds)
-  const [q, setQ] = useState('')
 
   /* The seed as a string, so the effect re-seeds only when the assignment
      actually changes, not on every store change. */
@@ -760,26 +1101,7 @@ function AssignAppsDialog({
   useEffect(() => {
     if (!open) return
     setPicked(seed === '' ? [] : seed.split(','))
-    setQ('')
   }, [open, seed])
-
-  /* Other deciding policies on each application, for the tooltip beside its name. */
-  const alsoOn = useMemo(() => {
-    const m = new Map<string, string[]>()
-    for (const a of store.apps) {
-      const others = protectionOf(a.id, store.policies).decides.filter((p) => p.id !== policy.id)
-      if (others.length > 0) m.set(a.id, others.map((p) => p.name))
-    }
-    return m
-  }, [store.apps, store.policies, policy.id])
-
-  const shown = store.apps.filter((a) => a.name.toLowerCase().includes(q.trim().toLowerCase()))
-  const toggle = (id: string) =>
-    setPicked((p) =>
-      p.includes(id)
-        ? p.filter((x) => x !== id)
-        : store.apps.filter((a) => a.id === id || p.includes(a.id)).map((a) => a.id),
-    )
 
   const changed = picked.join() !== policy.appIds.join()
   const noApps = store.apps.length === 0
@@ -819,7 +1141,7 @@ function AssignAppsDialog({
       open={open}
       onClose={onClose}
       title={`Applications for ${policy.name}`}
-      width={520}
+      width={760}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -854,50 +1176,14 @@ function AssignAppsDialog({
           <>
             <p className="bassign__lede">Every sign-in to one of these is checked against this policy.</p>
 
-            {/* Only once the list is long enough to need it. */}
-            {store.apps.length > 8 && (
-              <SearchBox block placeholder="Search applications…" label="Search applications" value={q} onChange={setQ} />
-            )}
+            {/* All applications on the left, the ones in this policy on the right (app-transfer.tsx). */}
+            <AppTransfer
+              apps={store.apps}
+              picked={picked}
+              onChange={setPicked}
+              takenBy={(id) => (picked.includes(id) ? undefined : ownerOf(id, store.policies, policy.id)?.name)}
+            />
 
-            {shown.length > 0 ? (
-              <div className="bassign__list">
-                {shown.map((a) => {
-                  const on = picked.includes(a.id)
-                  const others = alsoOn.get(a.id)
-                  const also = others ? `Also decided by ${others.join(', ')}.` : null
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      role="checkbox"
-                      aria-checked={on}
-                      className={`bassign__row ${on ? 'is-on' : ''}`}
-                      onClick={() => toggle(a.id)}
-                    >
-                      <span className="bx-tick" aria-hidden>
-                        <Check size={11} strokeWidth={3.2} />
-                      </span>
-                      <AppLogo appId={a.id} name={a.name} size={22} />
-                      <span className="bassign__name">
-                        {a.name}
-                        {also && (
-                          <>
-                            {' '}
-                            <TipMark text={also} />
-                            <span className="u-sr-only">{also}</span>
-                          </>
-                        )}
-                      </span>
-                      <span className="bassign__meta">{a.protocol}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <NoMatches noun="applications" query={q} compact onClear={() => setQ('')} />
-            )}
-
-            {picked.length > 0 && <p className="bassign__foot">{picked.length} selected</p>}
             {picked.length === 0 && policy.status !== 'draft' && (
               <p className="bassign__foot">With no applications, this policy becomes a draft.</p>
             )}

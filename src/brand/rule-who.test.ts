@@ -335,7 +335,11 @@ describe('the seeds', () => {
     expect(named).toEqual([
       's21-oncall / After hours, on-call rotation only',
       's23-vault / Paralegal, cleared, on matter, from the office',
+      's5-workspace / Admin, office only',
+      's5-workspace / DevOps, office IP and office device',
+      's5-workspace / End users, office IP',
       's9-finance / CFO anywhere, hardened',
+      's9-finance / Finance office access',
     ])
   })
 })

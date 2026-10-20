@@ -12,6 +12,13 @@
   transition: grid-template-columns var(--dur-normal) var(--ease-standard);
 }
 .bshell.is-collapsed { --nav-sidebar-w: 64px; }
+.bshell { transition: grid-template-columns var(--dur-normal) var(--ease-standard), grid-template-rows var(--dur-normal) var(--ease-standard); }
+
+/* Full view (Shell.tsx `CANVAS_FULL_VIEW`): a canvas takes the window. Both tracks close to nothing, so the rail and
+   the bar fold away rather than vanish; every offset written against the bar's height (toasts, docks) follows. */
+.bshell.is-full { --nav-sidebar-w: 0px; --nav-topbar-h: 0px; }
+.bshell.is-full .bshell__top { height: auto; min-height: 0; overflow: hidden; box-shadow: none; padding-block: 0; }
+.bshell.is-full .bshell__rail { min-width: 0; }
 
 /* --- Topbar --------------------------------------------------------------- */
 
@@ -421,6 +428,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bshell,
   .bshell__rail { transition: none; }
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { audienceOf, type Policy } from '../data'
 import { showcaseTenant, showcaseTenantHrmsOn } from '../fixtures'
 import src from './AppProtection.tsx?raw'
 import { detachFrom } from './app-policies'
@@ -112,17 +113,30 @@ describe('the protection panel runs the apps checks', () => {
   })
 })
 
+/* Spec APP-CREATE-AND-ACCESS.md §5: the board opened from here comes back to
+   the application's Policies tab, as it does from the application's own page. */
+describe('the way to the board', () => {
+  it('carries the application, from the row name and from Edit policy', () => {
+    expect(code).toContain("store.go({ name: 'board', policyId, from: { appId: app.id } })")
+    expect(code).toContain('onOpen={() => toBoard(row.policy.id)}')
+    expect(code).toContain("if (id === 'edit') toBoard(p.id)")
+    /* No way to the board without it. */
+    expect(calls("name: 'board'")).toBe(1)
+  })
+})
+
 describe('the Remove dialog', () => {
   const t = showcaseTenant()
   const people = t.directory.people
 
   /* The dialog's own reading, as its memo runs it. */
   const PIPELINE = 'visibleMoves(changes, app.id, store.policies, after).filter((m) => m.from?.id === policy.id)'
-  const listed = (name: string, appId: string) => {
-    const policy = t.policies.find((p) => p.name === name)!
-    const after = t.policies.map((p) => (p.id === policy.id && !p.isSystem ? detachFrom(p, appId) : p))
-    const changes = deciderChanges(appId, t.policies, after, people, t.groups)
-    return visibleMoves(changes, appId, t.policies, after)
+  const listed = (name: string, appId: string, extra: Policy[] = []) => {
+    const before = [...t.policies, ...extra]
+    const policy = before.find((p) => p.name === name)!
+    const after = before.map((p) => (p.id === policy.id && !p.isSystem ? detachFrom(p, appId) : p))
+    const changes = deciderChanges(appId, before, after, people, t.groups)
+    return visibleMoves(changes, appId, before, after)
       .filter((m) => m.from?.id === policy.id)
       .map((m) => `${keyName(m.key, t.groups, people)} → ${m.to?.name ?? 'No policy'}`)
   }
@@ -131,12 +145,35 @@ describe('the Remove dialog', () => {
     expect(between('export function RemoveDialog', 'const copy')).toContain(PIPELINE)
   })
 
-  it('lists Everyone once when Slack for everyone goes, not each group no Slack policy names', () => {
-    expect(listed('Slack for everyone', 'slack')).toEqual(['Everyone → Global Default Policy'])
+  it('lists Everyone once when Slack access goes, and the groups its rules name', () => {
+    expect(listed('Slack access', 'slack')).toEqual([
+      'Everyone → Global Default Policy',
+      'Engineering → Global Default Policy',
+      'Contractors → Global Default Policy',
+    ])
+  })
+
+  it('lists Everyone alone when a Slack policy with no rules goes, not each group no Slack policy names', () => {
+    const slack = t.policies.find((p) => p.id === 'sc-slack-everyone')!
+    const bare: Policy = { ...slack, id: 'p-slack-bare', name: 'Slack for everyone', rules: [] }
+    const others = t.policies.filter((p) => p.id !== slack.id)
+    const after = [...others, bare].map((p) => (p.id === bare.id ? detachFrom(p, 'slack') : p))
+    const before = [...others, bare]
+    const changes = deciderChanges('slack', before, after, people, t.groups)
+    expect(visibleMoves(changes, 'slack', before, after).map((m) => `${keyName(m.key, t.groups, people)} → ${m.to?.name ?? 'No policy'}`)).toEqual([
+      'Everyone → Global Default Policy',
+    ])
   })
 
   it("lists a person in two groups where their groups' rows do not say where they go", () => {
-    expect(listed('Box for engineering', 'box')).toEqual(['Engineering → Global Default Policy', 'Tanmay Joshi → Box for design'])
+    /* One policy per app in the showcase: a second Box policy naming Tanmay is built from Box access. */
+    const box = t.policies.find((p) => p.id === 'sc-box-engineering')!
+    const forDesign: Policy = { ...box, id: 'p-box-design', name: 'Box for Tanmay', audience: audienceOf([], ['u-tanmay']) }
+    expect(listed('Box access', 'box', [forDesign])).toEqual([
+      'Engineering → Global Default Policy',
+      'Design → Global Default Policy',
+      'Tanmay Joshi → Box for Tanmay',
+    ])
   })
 
   it("draws a person's row with a person's face", () => {

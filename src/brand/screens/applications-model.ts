@@ -90,6 +90,46 @@ export function addToApp(store: PolicyWriter, policyId: string, app: Pick<App, '
   return true
 }
 
+/** "Replaced Box access with Box contractors on Box." and what became of the one taken off, as `removeToast` says it. */
+export function replaceToast(oldName: string, newName: string, appName: string, remaining: number, wasDraft = false): string {
+  const after = remaining === 0 ? `${oldName} ${wasDraft ? 'has no applications now' : 'is now a draft'}.` : `${oldName} is still on ${remaining} ${plural(remaining, 'application', 'applications')}.`
+  return `Replaced ${oldName} with ${newName} on ${appName}. ${after}`
+}
+
+/* Replace policy (APP-POLICY-TAB.md §5): the new policy goes on and the old
+   one comes off in the same press, so the application never holds two (one
+   application, one sign-in policy, 14 Oct 2026) — and ONE toast says so, with
+   one Undo that puts both back. Two toasts, one per write, left only the
+   second in the store's one slot, and its Undo put the old policy back beside
+   the new one. Same re-read and the same stale-write refusal as `addToApp`.
+   False when the new policy no longer exists. */
+export function replaceOnApp(store: PolicyWriter, oldId: string, newId: string, app: Pick<App, 'id' | 'name'>, apps: App[]): boolean {
+  const beforeNew = store.policyById(newId)
+  if (!beforeNew || beforeNew.isSystem) return false
+  const beforeOld = store.policyById(oldId)
+  store.savePolicy(attachTo(beforeNew, app.id, apps))
+  const savedNew = store.policyById(newId)
+  if (!beforeOld || beforeOld.isSystem) {
+    store.showToast(`${beforeNew.name} added to ${app.name}.`, { label: 'Undo', run: () => undoTo(store, beforeNew, savedNew) })
+    return true
+  }
+  store.savePolicy(detachFrom(beforeOld, app.id))
+  const savedOld = store.policyById(oldId)
+  store.showToast(replaceToast(beforeOld.name, beforeNew.name, app.name, remainingApps(beforeOld, app.id), beforeOld.status === 'draft'), {
+    label: 'Undo',
+    run: () => {
+      /* Both or neither: half an Undo would leave two policies on the application, or none. */
+      if (!savedNew || !savedOld || store.policyById(newId) !== savedNew || store.policyById(oldId) !== savedOld) {
+        store.showToast(`Can't undo. ${beforeNew.name} or ${beforeOld.name} has changed since.`)
+        return
+      }
+      store.savePolicy(beforeOld)
+      store.savePolicy(beforeNew)
+    },
+  })
+  return true
+}
+
 /** The application a pick would land on, and the lists `attachNote` asks the engine with. */
 export interface AttachOn {
   appId: string

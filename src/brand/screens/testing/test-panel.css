@@ -145,6 +145,9 @@
   cursor: pointer;
 }
 .tpanel-row:hover { background: var(--surface-sunken); }
+/* The past sign-in the run beside the list is of (the builder's Check access, OPEN_AT_ONCE, 20 Oct 2026): the accent's
+   soft ground and its bar at the left edge — never orange. */
+.tpanel-row.is-picked { background: var(--accent-soft); box-shadow: inset var(--bw-thick) 0 0 var(--accent); }
 
 /* The edge a row Run all moved flashes: a plain element over the row's left
    edge, remounted by each run so it plays again. */

@@ -26,11 +26,19 @@ const MONITOR: StatusOption = { target: 'monitor', label: 'Monitor' }
    status left out: Turn on, then Monitor, then Turn off. Empty for drafts,
    always-on and system policies. Monitor is for App Access policies only —
    Session and Account Management policies decide no sign-in to watch — and
-   only where the edition has it. */
+   only where the edition has it.
+
+   But a post sign-in draft offers Turn on (spec POST-SIGN-IN-POLICIES.md,
+   Turning on): it is a draft until every rule and "Nothing else matched" have
+   an action, and Turn on is how it leaves, refused with what is left until
+   then (use-status-change.tsx) — never a switch withheld without a word.
+   Linked to no application, it can still be turned on. Never Monitor: its
+   statuses are Draft, Active and Inactive (owner, 13 Oct 2026). */
 export function statusOptions(
   policy: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType },
   opts: { monitor?: boolean } = {},
 ): StatusOption[] {
+  if (policy.status === 'draft' && policy.type === 'Session' && !policy.isSystem) return [TURN_ON]
   if (policy.isSystem || policy.status === 'draft' || policy.status === 'always-on') return []
   const monitor = opts.monitor !== false && (policy.type ?? 'App Access') === 'App Access'
   switch (policy.status) {
@@ -71,27 +79,31 @@ export function watchAfter(watch: MonitoringWatch | null, watching: boolean): Mo
    `monitor`: the edition has the Monitoring status. `trySignIn`: the edition
    has Try a sign-in, which only an app access policy can be tried with.
    `trail`: the older trail builder is offered — not in the showcase build,
-   where the board is the one builder. */
+   where the board is the one builder.
+
+   A post sign-in policy (post-sign-in.ts) is built in the board too, so Edit
+   policy opens the board for it. It has none of the other sign-in items: no
+   trail, no Read as text and no Save as template, which read and reuse a
+   sign-in decision it does not have, and no Duplicate, which would copy its
+   links and leave an application's event with two policies. */
 export type RowMenuId = 'edit' | 'test' | StatusTarget | 'monitoring' | 'trail' | 'text' | 'template' | 'duplicate' | 'delete'
 
 export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean }): { id: RowMenuId; label: string }[] {
   const { monitor } = opts
+  const signIn = policy.type !== 'Session'
   return [
     { id: 'edit', label: 'Edit policy' },
     ...(opts.trySignIn && policy.type === 'App Access' ? [{ id: 'test' as const, label: ACCESS_CHECK }] : []),
     ...statusOptions(policy, { monitor }).map((s) => ({ id: s.target, label: s.label })),
     /* What a monitoring policy would decide, were it on (spec C §3.4). */
     ...(offersMonitoringView(policy, { monitor }) ? [{ id: 'monitoring' as const, label: 'View monitoring' }] : []),
-    ...(opts.trail ? [{ id: 'trail' as const, label: 'Open in trail' }] : []),
-    { id: 'text' as const, label: 'Read as text' },
+    ...(opts.trail && signIn ? [{ id: 'trail' as const, label: 'Open in trail' }] : []),
+    ...(signIn ? [{ id: 'text' as const, label: 'Read as text' }] : []),
     /* A template of a policy with no rules would apply nothing. */
-    ...(openForEditing(policy).rules.length > 0 ? [{ id: 'template' as const, label: 'Save as template' }] : []),
+    ...(signIn && openForEditing(policy).rules.length > 0 ? [{ id: 'template' as const, label: 'Save as template' }] : []),
     ...(policy.isSystem
       ? []
-      : [
-          { id: 'duplicate' as const, label: 'Duplicate' },
-          { id: 'delete' as const, label: 'Delete policy' },
-        ]),
+      : [...(signIn ? [{ id: 'duplicate' as const, label: 'Duplicate' }] : []), { id: 'delete' as const, label: 'Delete policy' }]),
   ]
 }
 
@@ -172,7 +184,9 @@ export function statusToast(name: string, from: PolicyStatus, to: StatusTarget):
    - Active → Monitoring (M1) stops enforcement, and says only that.
    - Inactive → Monitoring (M2) changes nobody's sign-in, so it asks only
      because something is held back from it — the builder's edits, else a saved
-     draft — and names which. */
+     draft — and names which.
+   - A post sign-in policy decides no sign-in at all: Turn on and Turn off
+     say it starts or stops acting on events in its applications. */
 export interface StatusConfirm {
   title: string
   lines: string[]
@@ -180,13 +194,19 @@ export interface StatusConfirm {
 }
 
 export function statusConfirmCopy(
-  policy: Pick<Policy, 'name' | 'status' | 'pendingDraft'>,
+  policy: Pick<Policy, 'name' | 'status' | 'pendingDraft'> & { type?: PolicyType },
   target: StatusTarget,
   unsaved: boolean,
   apps: string | null,
 ): StatusConfirm {
   const { name } = policy
   const to = apps ? ` to ${apps}` : ''
+  if (policy.type === 'Session' && target !== 'monitor') {
+    const inApps = apps ? ` in ${apps}` : ''
+    return target === 'active'
+      ? { title: `Turn on ${name}?`, lines: [`It starts acting on events${inApps}.`], verb: 'Turn on' }
+      : { title: `Turn off ${name}?`, lines: [`It stops acting on events${inApps}.`], verb: 'Turn off' }
+  }
   if (target === 'active') {
     return {
       title: `Turn on ${name}?`,

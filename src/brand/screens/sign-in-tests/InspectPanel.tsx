@@ -1,5 +1,5 @@
 import { motion, useIsPresent } from 'motion/react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowUpRight,
   Check,
@@ -29,6 +29,7 @@ import { Board } from '../board/Board'
 import type { Selection } from '../board/model'
 import { IfBlock } from '../board/IfBlock'
 import { useDraftDiff } from '../board/use-lines'
+import { containWhileScrolling } from '../scroll-contain'
 import { readFoot, storedVersions } from '../board/read-as-text'
 import type { EngineRun } from './engine-run'
 import { FATE_WORDS, PEEK_FALLBACK, evidenceOf, isPeek, ruleList, ruleOf, targetLabel, type Evidence, type InspectTarget, type PeekTarget, type RuleFate, type RuleListRow } from './inspect-model'
@@ -385,7 +386,9 @@ export function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne, canvas = 
 
 const MARK = { pass: Check, fail: X, unknown: CircleHelp } as const
 
-function RuleBody({ policy, ruleId, plan, shown, list, onEdit }: { policy: Policy; ruleId: string | null; plan: EngineRun | null; shown: Shown | null; list: readonly RuleListRow[]; onEdit: (t: InspectTarget) => void }) {
+/* Exported for an application's Policies tab (app-policy-view.tsx), which opens each row of its chain on this body with
+   no run on screen (`plan` null, `shown` null, `list` empty): what it checks, what it uses, what the person is told. */
+export function RuleBody({ policy, ruleId, plan, shown, list, onEdit }: { policy: Policy; ruleId: string | null; plan: EngineRun | null; shown: Shown | null; list: readonly RuleListRow[]; onEdit: (t: InspectTarget) => void }) {
   const lib = useBrand()
   const { zones, fingerprints, hooks, riskProfiles, activeRiskProfileId, users, apps } = lib
   const resolve = useNameLookup()
@@ -494,7 +497,27 @@ function UseFacts({ target, onEdit }: { target: PeekTarget; onEdit: (t: InspectT
    (board.css), and every handler stands down. Pan and zoom stay. */
 const NONE: Selection = { kind: 'none' }
 const noop = () => {}
-function ReadOnlyCanvas({ policy, traced }: { policy: Policy; traced: readonly string[] }) {
+/* `framed` (an application's Policies tab, 20 Oct 2026): the chain at a glance in a panel of fixed height that
+   scrolls it (board.css `.insp__canvas.is-framed`). A press anywhere on a card folds it — not while text in it is
+   being selected — its title is its one keyboard stop, and the reorder number leaves the tab order. `open` and
+   `onOpen` hold the one unfolded card for the host (the board's accordion, 23 Sep 2026), so a sign-in picked beside it
+   can open its rule; left out, each card folds on its own, as here before. `cardHead` puts each card's outcome where
+   its state pill was. Every one is opt-in: the details slider and the Add existing preview pass none of them. */
+export function ReadOnlyCanvas({
+  policy,
+  traced,
+  framed = false,
+  open: openId,
+  onOpen,
+  cardHead,
+}: {
+  policy: Policy
+  traced: readonly string[]
+  framed?: boolean
+  open?: string | null
+  onOpen?: (id: string | null) => void
+  cardHead?: (id: string) => ReactNode
+}) {
   const { apps } = useBrand()
   const resolve = useNameLookup()
   const mine = policy.appIds.flatMap((id) => apps.find((a) => a.id === id) ?? [])
@@ -508,8 +531,30 @@ function ReadOnlyCanvas({ policy, traced }: { policy: Policy; traced: readonly s
     el?.addEventListener('wheel', stop, { capture: true })
     return () => el?.removeEventListener('wheel', stop, { capture: true })
   }, [])
+  /* Framed, the canvas is its panel's scroller: it keeps the wheel only while it has something to scroll. */
+  useEffect(() => {
+    const el = wrap.current
+    if (!framed || !el) return
+    const stage = el.querySelector('.bb__stage')
+    return containWhileScrolling(el, stage ? [stage] : [])
+  }, [framed])
+  const held = openId !== undefined
+  const toggle = (id: string) => {
+    if (held) onOpen?.(openId === id ? null : id)
+    else setOpen((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  /* Text being selected inside the canvas is somebody reading, not pressing. */
+  const selecting = () => {
+    const s = typeof window === 'undefined' ? null : window.getSelection()
+    return !!s && !s.isCollapsed && !!wrap.current?.contains(s.anchorNode)
+  }
+  const press = (s: Selection) => {
+    if (selecting()) return
+    if (s.kind === 'rule') toggle(s.id)
+    else if (s.kind === 'fallback') toggle('fallback')
+  }
   return (
-    <div ref={wrap} className="bb is-left-open insp__canvas">
+    <div ref={wrap} className={`bb is-left-open insp__canvas${framed ? ' is-framed' : ''}`}>
       <Board
         policy={policy}
         destination={mine[0]?.name ?? (policy.isSystem ? 'any application' : null)}
@@ -521,15 +566,18 @@ function ReadOnlyCanvas({ policy, traced }: { policy: Policy; traced: readonly s
         fitKey={policy.id}
         traced={traced}
         resolve={resolve}
-        onSelect={noop}
+        onSelect={framed ? press : noop}
         onInsert={noop}
         onMove={noop}
         onToggle={noop}
         onDuplicate={noop}
         onDelete={noop}
         onHover={noop}
-        expandedOf={(id) => open.has(id)}
-        onToggleExpand={(id) => setOpen((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n })}
+        expandedOf={held ? (id) => id === openId : (id) => open.has(id)}
+        onToggleExpand={toggle}
+        locked={framed}
+        foldOnPress={framed || undefined}
+        cardHead={cardHead}
       />
     </div>
   )

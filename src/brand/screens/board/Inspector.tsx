@@ -22,8 +22,11 @@ import { AppsPane } from './AppsPane'
 import { type Selection } from './model'
 import { settledName } from './parts'
 import { WhatEditor } from './WhatEditor'
+import { PostThen } from './PostThen'
+import { usePostBoard } from './post-board'
 import { WhenEditor } from './WhenEditor'
 import { WhoEditor } from './WhoEditor'
+import { normaliseWho } from '../../rule-who'
 import { ruleMenu } from './rule-menu'
 
 /* -----------------------------------------------------------------------------
@@ -113,13 +116,18 @@ export function Inspector({
   const rule = at >= 0 ? draft.rules[at] : undefined
   const part = selection.kind === 'rule' ? selection.part : null
   const patch = (p: Partial<Rule>) => onPatchRule(at, p)
+  /* A post sign-in policy (post-board.ts): its Then is one of five actions. */
+  const post = usePostBoard().on
 
   /* ONE heading for a rule (owner, 22 Sep 2026: "merge these two — I want only
      one heading and to do everything there: the number, then an input for the
      rule name, and the toggle"). The bar said "Rule 1" over a second row that
      held the name and the switch; now the bar IS that row, with the panel's own
      two buttons at its end. Applications and the default keep a plain title. */
-  const what = selection.kind === 'apps' ? 'Applications' : 'The default'
+  /* The start node's pane holds the policy's applications: its Who section went on 15 Oct 2026
+     (Who belongs to rules), so the title says what is left (owner, 15 Oct 2026). */
+  /* A post sign-in policy's start pane still holds its Who (post-board), so it keeps both words. */
+  const what = selection.kind === 'apps' ? (post ? 'Who and applications' : 'Applications') : 'The default'
   const editingRule = !!(rule && part)
 
   return (
@@ -242,13 +250,24 @@ export function Inspector({
                 two. */}
             <motion.div key={`pane:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
               <Section id="who" title="Who" icon={Users} tour="insp-who" focused={part === 'who'}>
-                <WhoEditor rule={rule} audience={draft.audience} onPatch={patch} />
+                <WhoEditor
+                  rule={rule}
+                  audience={draft.audience}
+                  onPatch={patch}
+                  others={draft.rules.flatMap((r, i) => {
+                    const w = r.id === rule.id ? undefined : normaliseWho(r.who)
+                    if (!w || w.groupIds.length + w.userIds.length === 0) return []
+                    const g = w.groupIds.length
+                    const u = w.userIds.length
+                    return [{ id: r.id, label: `Rule ${i + 1} · ${r.name.trim() || 'Untitled rule'}`, meta: [g ? `${g} group${g === 1 ? '' : 's'}` : '', u ? `${u} ${u === 1 ? 'person' : 'people'}` : ''].filter(Boolean).join(' · '), who: w }]
+                  })}
+                />
               </Section>
 
               <ConditionSection rule={rule} onPatch={patch} onRemoved={onRemoved} focused={part === 'when'} />
 
               <Section id="then" title="Then" icon={CornerDownRight} tour="insp-then">
-                <WhatEditor rule={rule} onPatch={patch} />
+                {post ? <PostThen rule={rule} onPatch={patch} /> : <WhatEditor rule={rule} onPatch={patch} />}
               </Section>
             </motion.div>
           </>
@@ -261,7 +280,7 @@ export function Inspector({
              a selection of `none` into the fallback pane and was saved only by
              the board declining to mount this at all. */
           <motion.div key="fallback" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-            <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} />
+            <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} post={post} />
           </motion.div>
         ) : null}
       </div>
@@ -457,7 +476,7 @@ function RuleHead({
 
 /* What is wrong with this rule, where it is edited.
 
-   The card's pill says "Needs setup" or "Check"; this says why. Errors first.
+   The card's pill says "Incomplete" or "Needs review"; this says why. Errors first.
    A missing first or second factor method is said under its own picker in
    Then, so it is not said twice. */
 const SHOWN_IN_THEN = new Set(['PE122', 'PE123'])
@@ -498,7 +517,7 @@ function RuleFindings({ diagnostics }: { diagnostics: Diagnostic[] }) {
    panel mounts one at a time (`WhoEditor`, `WhenEditor`, `WhatEditor`); nothing
    was unique to it except the two-column grid it put them in. */
 
-function FallbackPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+function FallbackPane({ rule, onPatch, post = false }: { rule: Rule; onPatch: (p: Partial<Rule>) => void; post?: boolean }) {
   return (
     <>
       <div className="bb__insphead">
@@ -513,7 +532,7 @@ function FallbackPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule
         </div>
         <div className="bb__rulebody">
           <div className="bb__rulehalf">
-            <WhatEditor rule={rule} onPatch={onPatch} terminal />
+            {post ? <PostThen rule={rule} onPatch={onPatch} terminal /> : <WhatEditor rule={rule} onPatch={onPatch} terminal />}
           </div>
         </div>
       </section>

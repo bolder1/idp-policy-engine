@@ -45,7 +45,18 @@ import statusControlSrc from './screens/status-control.tsx?raw'
 import libraryGuardSrc from './screens/library-guard.ts?raw'
 import libraryReviewSrc from './screens/library-review.tsx?raw'
 import describePanelSrc from './screens/board/DescribePanel.tsx?raw'
+import describeStageSrc from './screens/board/DescribeStage.tsx?raw'
+import describeStageLogicSrc from './screens/board/describe-stage.ts?raw'
+import describeMagicSrc from './screens/board/DescribeMagic.tsx?raw'
 import describeSessionSrc from './screens/board/describe-session.ts?raw'
+import describeQuickSrc from './screens/board/DescribeQuick.tsx?raw'
+import guidedRuleFormSrc from './screens/board/GuidedRuleForm.tsx?raw'
+import pickComboSrc from './screens/pick-combo.tsx?raw'
+import guidedSetupSrc from './screens/board/GuidedSetup.tsx?raw'
+import guidedSetupModelSrc from './screens/board/guided-setup.ts?raw'
+import describeSaidSrc from './screens/board/describe-said.ts?raw'
+import whoComboSrc from './screens/who-combo.tsx?raw'
+import whoOptionsSrc from './screens/who-options.ts?raw'
 import describeModelSrc from './create/describe-model.ts?raw'
 import describeChecksSrc from './create/describe-checks.ts?raw'
 import draftChecksSrc from './draft-checks.ts?raw'
@@ -67,11 +78,25 @@ import boardTourSrc from './tour/board-tour.ts?raw'
 import boardTourViewSrc from './tour/BoardTour.tsx?raw'
 import boardTourArtSrc from './tour/BoardTourArt.tsx?raw'
 import applicationPageSrc from './screens/ApplicationPage.tsx?raw'
+import appPolicyViewSrc from './screens/app-policy-view.tsx?raw'
+import appActivitySrc from './screens/app-activity.tsx?raw'
+import activityRowSrc from './screens/sign-in-tests/activity-row.tsx?raw'
 import addExistingPolicySrc from './screens/AddExistingPolicy.tsx?raw'
 import appPeopleTabsSrc from './screens/app-people-tabs.tsx?raw'
 import userDrawerSrc from './screens/UserDrawer.tsx?raw'
 import usersPageSrc from './screens/UsersPage.tsx?raw'
 import groupsPageSrc from './screens/GroupsPage.tsx?raw'
+import appCatalogPageSrc from './screens/AppCatalog.tsx?raw'
+import appSetupFormsSrc from './screens/app-setup-forms.tsx?raw'
+import appSetupSrc from './app-setup.ts?raw'
+import appCatalogSrc from './screens/app-catalog.ts?raw'
+import appPageModelSrc from './screens/app-page-model.ts?raw'
+import postSignInSrc from './post-sign-in.ts?raw'
+import policiesPageSrc from './screens/Policies.tsx?raw'
+/* Check access's merged Policy card (20 Oct 2026, phase.ts ONE_POLICY_CARD): sign-in-tests/layouts/* is not globbed, so
+   its two new files are named. */
+import classic2OneModelSrc from './screens/sign-in-tests/layouts/classic2-one-model.ts?raw'
+import classic2OneSrc from './screens/sign-in-tests/layouts/classic2-one.tsx?raw'
 import { CONDITION_CATALOGUE, scenarios, templates } from './data'
 import { TYPED_DECK } from './screens/gauntlet'
 
@@ -153,7 +178,19 @@ const NAMED: Record<string, string> = {
      (describe-words.ts) are NOT here: they are what an admin types, not what
      the console says, and they have to hold "login" to read past it. */
   './screens/board/DescribePanel.tsx': describePanelSrc,
+  './screens/board/DescribeStage.tsx': describeStageSrc,
+  './screens/board/describe-stage.ts': describeStageLogicSrc,
+  './screens/board/DescribeMagic.tsx': describeMagicSrc,
   './screens/board/describe-session.ts': describeSessionSrc,
+  /* Guided setup (19 Oct 2026): its panel, model and plain lines, the New rule form, and the Who field it asks with. */
+  './screens/board/DescribeQuick.tsx': describeQuickSrc,
+  './screens/board/GuidedRuleForm.tsx': guidedRuleFormSrc,
+  './screens/pick-combo.tsx': pickComboSrc,
+  './screens/board/GuidedSetup.tsx': guidedSetupSrc,
+  './screens/board/guided-setup.ts': guidedSetupModelSrc,
+  './screens/board/describe-said.ts': describeSaidSrc,
+  './screens/who-combo.tsx': whoComboSrc,
+  './screens/who-options.ts': whoOptionsSrc,
   './create/describe-model.ts': describeModelSrc,
   /* Its checks: the rows under the answers, and the names the guard lists
      them by once the policy keeps them. */
@@ -163,6 +200,9 @@ const NAMED: Record<string, string> = {
      The sentences are predicate-prose.ts, scanned below with the rest. */
   './screens/board/ReadAsTextPanel.tsx': readAsTextPanelSrc,
   './screens/board/read-as-text.ts': readAsTextSrc,
+  /* Check access's merged Policy card (20 Oct 2026): its words and its two new pieces. */
+  './screens/sign-in-tests/layouts/classic2-one-model.ts': classic2OneModelSrc,
+  './screens/sign-in-tests/layouts/classic2-one.tsx': classic2OneSrc,
 }
 
 /** Every piece of text a file could put on screen. */
@@ -362,6 +402,11 @@ describe('sign-in, not login', () => {
   it('says sign-in and none of the banned words on the application, user and group pages', () => {
     const PEOPLE: Record<string, string> = {
       'ApplicationPage.tsx': applicationPageSrc,
+      /* Its Policies tab (15 Oct 2026, spec APP-POLICY-TAB.md): the policy read in the page, the application's
+         sign-ins and the policy's changes, and the sign-in row it shares with Sign-in activity. */
+      'app-policy-view.tsx': appPolicyViewSrc,
+      'app-activity.tsx': appActivitySrc,
+      'activity-row.tsx': activityRowSrc,
       'AddExistingPolicy.tsx': addExistingPolicySrc,
       'app-people-tabs.tsx': appPeopleTabsSrc,
       'UserDrawer.tsx': userDrawerSrc,
@@ -373,6 +418,64 @@ describe('sign-in, not login', () => {
       const said = uiStrings(src, file).filter((s) => LOGIN.test(s))
       expect(`${file}: ${said.join(' | ')}`).toBe(`${file}: `)
       expect(`${file}: ${offences(src, file).join(' | ')}`).toBe(`${file}: `)
+    }
+  })
+
+  /* Add application (13 Oct 2026, spec APP-CREATE-AND-ACCESS.md §5): Choose
+     application, the unsaved application's set-up tabs, and the setup and
+     catalogue models whose labels they print. Their words are copied from the
+     live console's forms, which say "Login Options" and "each login attempt",
+     so they are held to both lists as the application pages are.
+
+     A URL is not a word: the values an admin pastes into the service provider
+     are the IdP's own addresses, and its host is login.xecurify.com
+     (app-setup.ts `idpValues`). Only a whole string that is a URL is passed
+     over; a sentence with one inside is still read. */
+  it('says sign-in and none of the banned words on Add application', () => {
+    const ADD: Record<string, string> = {
+      'AppCatalog.tsx': appCatalogPageSrc,
+      'app-setup-forms.tsx': appSetupFormsSrc,
+      'app-setup.ts': appSetupSrc,
+      'app-catalog.ts': appCatalogSrc,
+      'app-page-model.ts': appPageModelSrc,
+    }
+    const url = /^https?:\/\/\S+$/
+    for (const [file, src] of Object.entries(ADD)) {
+      expect(uiStrings(src, file).length, file).toBeGreaterThan(10)
+      const said = uiStrings(src, file).filter((s) => !url.test(s) && LOGIN.test(s))
+      expect(`${file}: ${said.join(' | ')}`).toBe(`${file}: `)
+      expect(`${file}: ${offences(src, file).join(' | ')}`).toBe(`${file}: `)
+    }
+  })
+
+  /* Post sign-in policies (13 Oct 2026, spec POST-SIGN-IN-POLICIES.md): the
+     owner named the two types "Sign-in policy" and "Post sign-in policy", and
+     the word "login" never appears on screen — the research called them
+     post-login, and the model's catalogue copies vendors' event names, so
+     both are where it could creep in. The Policies page holds both tabs; an
+     application's Post sign-in tab (AppPostSignIn.tsx) links them, with their
+     events. Their rules are built in the board, which the board's own scans
+     cover (owner, 13 Oct 2026: no builder of their own).
+
+     That tab is read through a glob, so the rest of this file runs while it is
+     being written; the first assertion below still requires it. "AI" and
+     "assistant" are held here too, as the copy rules ban them everywhere. */
+  const APP_POST_SIGN_IN = import.meta.glob<string>('./screens/AppPostSignIn.tsx', { query: '?raw', import: 'default', eager: true })
+
+  it('says sign-in and none of the banned words on post sign-in policies and the Policies page', () => {
+    expect(Object.keys(APP_POST_SIGN_IN)).toEqual(['./screens/AppPostSignIn.tsx'])
+    const POST: Record<string, string> = {
+      'post-sign-in.ts': postSignInSrc,
+      'AppPostSignIn.tsx': APP_POST_SIGN_IN['./screens/AppPostSignIn.tsx'] ?? '',
+      'Policies.tsx': policiesPageSrc,
+    }
+    for (const [file, src] of Object.entries(POST)) {
+      expect(uiStrings(src, file).length, file).toBeGreaterThan(10)
+      const said = uiStrings(src, file).filter((s) => LOGIN.test(s))
+      expect(`${file}: ${said.join(' | ')}`).toBe(`${file}: `)
+      expect(`${file}: ${offences(src, file).join(' | ')}`).toBe(`${file}: `)
+      const machine = uiStrings(src, file).filter((s) => /\bAI\b/.test(s) || /\bassistant\b/i.test(s))
+      expect(`${file}: ${machine.join(' | ')}`).toBe(`${file}: `)
     }
   })
 

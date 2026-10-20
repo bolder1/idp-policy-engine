@@ -6,6 +6,7 @@ import { appsOf, enforces, type App, type Policy, type PolicyStatus } from '../d
 import { guardSignIns } from '../draft-checks'
 import { commitToast, lastSaved, monitorBlocker, published, sameRules, turnOnBlocker, type RuleSet } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
+import { isPostSignIn, turnOnIssue } from '../post-sign-in'
 import { playCue } from '../sound'
 import { listPhrase } from './app-policies'
 import { diagnose } from './diagnostics'
@@ -77,6 +78,9 @@ interface Ask {
   fix: 'open' | 'apps' | null
   /* The builder held edits nobody had saved when this was asked. */
   unsaved: boolean
+  /* A post sign-in policy turned on from the board: the board's rules, which
+     turn on with it in one write. */
+  edits?: RuleSet
 }
 
 /* One guard page, as it stands: the switch, the versions it can turn on, and
@@ -158,10 +162,15 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
   /* Writes the switch and says so. `from` is the status it was asked from, so
      Undo goes back to what the admin saw rather than to whatever a second
      switch left. A policy going live has its own chime (sound.ts), which the
-     toast under it does not repeat. */
-  const commit = (policy: Policy, target: StatusTarget) => {
+     toast under it does not repeat.
+
+     With `edits` (a post sign-in policy turned on from the board), the
+     board's rules are saved and turned on in one write, as Before turning on
+     does with a sign-in policy's edits, and a saved draft ends with it. */
+  const commit = (policy: Policy, target: StatusTarget, edits?: RuleSet) => {
     options.onChange?.(policy, target)
-    store.setPolicyStatus(policy.id, target)
+    if (edits) store.savePolicy({ ...policy, rules: edits.rules, fallback: edits.fallback, pendingDraft: undefined, status: target })
+    else store.setPolicyStatus(policy.id, target)
     if (target === 'active') playCue('publish')
     const { text, undo } = statusToast(policy.name, policy.status, target)
     store.showToast(text, undo ? { label: 'Undo', run: () => store.setPolicyStatus(policy.id, undo) } : undefined)
@@ -231,6 +240,33 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
   const request = (given: Policy, target: StatusTarget, opts: { edits?: RuleSet } = {}) => {
     const policy = store.policyById(given.id) ?? given
     const unsaved = options.unsaved === true
+
+    /* A post sign-in policy (post-sign-in.ts) has no sign-in checks to run.
+       Turning it on with a rule or "Nothing else matched" left without an
+       action is refused in a toast, in `turnOnIssue`'s words — the reason the
+       board gives under the rule — before any confirm, with the way to the
+       board unless it is open. On the board it reads the board's rules, the
+       ones the admin is looking at, and those are what turn on, saved in the
+       same write. Linked to no application is no reason: the policy is
+       independent of them. Monitor is never one of its statuses. */
+    if (isPostSignIn(policy)) {
+      if (target === 'monitor') return
+      const edits = target === 'active' ? (opts.edits ?? options.edits) : undefined
+      const issue = target === 'active' ? turnOnIssue(edits ?? policy) : null
+      if (issue) {
+        const screen = store.screen
+        const here = (screen.name === 'board' || screen.name === 'builder') && screen.policyId === policy.id
+        const open = { label: 'Open policy', run: () => store.go({ name: 'board', policyId: policy.id }) }
+        store.showToast(issue, here ? undefined : open, { tone: 'warning' })
+        if (here) options.onRevealRule?.(null)
+        return
+      }
+      if (!asksFirst(policy.status, target, false)) return commit(policy, target, edits)
+      setAsk({ policy, target, blocker: null, fix: null, unsaved: false, edits })
+      setOpen(true)
+      return
+    }
+
     let blocker: string | null = null
     let fix: Ask['fix'] = null
     const noApps = policy.status !== 'draft' && !policy.isSystem && policy.appIds.length === 0
@@ -322,7 +358,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
 
   let dialog: ReactNode = null
   if (ask) {
-    const { policy, target, blocker, fix, unsaved } = ask
+    const { policy, target, blocker, fix, unsaved, edits } = ask
     const name = policy.name
     const screen = store.screen
     /* Already in this policy's builder, "Open policy" would go nowhere. */
@@ -395,7 +431,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
               <Button
                 variant="brand"
                 onClick={() => {
-                  commit(policy, target)
+                  commit(policy, target, edits)
                   close()
                 }}
               >

@@ -1,4 +1,5 @@
 import { coversEveryApp, enforces, type App, type Group, type Policy, type User } from '../data'
+import { isPostSignIn } from '../post-sign-in'
 import { listNames } from '../rule-who'
 /* A cycle, and a harmless one: app-standing reads `policiesForApp` from here
    and `summarise` and the delete lines below read `appStanding` from there,
@@ -40,9 +41,15 @@ export function decidesFor(p: Policy): boolean {
    as "covers this app" would put the tenant default at the top of every
    application's list and imply it had been attached to each one. It is the
    fall-through, and it belongs in `Protection.fallback` where it can be said
-   once, as what happens when nothing above matched. */
+   once, as what happens when nothing above matched.
+
+   Never a post sign-in policy either (post-sign-in.ts, owner 13 Oct 2026). It
+   names applications, but it acts during the session and decides no sign-in,
+   so it is kept off an application's Policies tab, the Apps list's
+   Protection cell and every standing read from here — not listed as one that
+   "never decides". */
 export function policiesForApp(appId: string, policies: readonly Policy[]): Policy[] {
-  return policies.filter((p) => !p.isSystem && p.appIds.includes(appId))
+  return policies.filter((p) => !p.isSystem && !isPostSignIn(p) && p.appIds.includes(appId))
 }
 
 export interface Protection {
@@ -166,6 +173,14 @@ export function deleteDetail(
   return `Protects ${names}. Sign-ins to ${aloneNames} will use the ${fallback.name}.`
 }
 
+/* One application, one policy (owner, 14 Oct 2026). The sign-in policy an application belongs to, or undefined. The tenant
+   default and post sign-in policies are left out: the default covers every application by being the fall-through, and a
+   post sign-in policy is linked from the application's page, so neither counts as its one policy. `except` is the policy
+   being edited, which is not "another" one. */
+export function ownerOf(appId: string, policies: readonly Policy[], except?: string): Policy | undefined {
+  return policies.find((p) => p.id !== except && !p.isSystem && !isPostSignIn(p) && p.appIds.includes(appId))
+}
+
 export type AttachKind = 'fresh' | 'already-here' | 'also' | 'system'
 
 /* What assigning this policy to this app would actually be.
@@ -199,9 +214,15 @@ export function attachKind(p: Policy, appId: string): AttachKind {
    The order stays, for a different and smaller reason: a policy with no
    applications is doing nothing at all until it gets one, so it is the one this
    list can most usefully offer first. What has gone is the warning that used to
-   ride on the distinction. */
+   ride on the distinction.
+
+   Sign-in policies only: Add existing policy never offers a post sign-in one,
+   which is added to an application from its own builder. */
 export function attachableTo(appId: string, policies: Policy[]): Policy[] {
+  /* It already has its one policy: nothing to add. */
+  if (ownerOf(appId, policies)) return []
   const kinds = policies
+    .filter((p) => !isPostSignIn(p))
     .map((p) => ({ p, kind: attachKind(p, appId) }))
     .filter((x) => x.kind === 'fresh' || x.kind === 'also')
   return [...kinds.filter((x) => x.kind === 'fresh'), ...kinds.filter((x) => x.kind === 'also')].map((x) => x.p)

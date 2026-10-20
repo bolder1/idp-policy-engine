@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../fixtures'
+import { splitShowcase } from './split-policies'
 import { BrandProvider } from '../../store'
 import { envOf, resolveSignIn } from '../tenant-resolver'
 import { rowsRead } from '../testing/rows-read'
@@ -52,7 +53,8 @@ import ruleCardSrc from '../board/RuleCard.tsx?raw'
 const src = [journeySrc, clockSrc].join('\n')
 
 const TODAY = '2026-09-28'
-const t = showcaseTenant()
+/* One sign-in policy per application in the showcase (14 Oct 2026): the cross-policy cases run on its former split policies (split-policies.ts). */
+const t = splitShowcase(showcaseTenant())
 const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const noop = () => {}

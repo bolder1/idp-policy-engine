@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type RefObject } from 'react'
 import { Check, Download, Eye, EyeOff, FileText, KeyRound, Plus, Upload, Users } from 'lucide-react'
 
-import { Button, Callout, Modal, NumberStepper, SearchBox, TipDot } from '../kit'
+import { Button, Modal, Note, NumberStepper, SearchBox, TipDot } from '../kit'
 import { Picker } from '../picker'
 import { initials } from '../data'
 import { EmptyState, NoMatches } from '../empty'
@@ -97,8 +97,8 @@ export function AddTokenForm({
 
   return (
     <div className="bmc__fields">
-      {/* The live console's one rule for this form, before the field it governs. */}
-      <Callout tone="info">The serial number must be unique across all tokens.</Callout>
+      {/* The live console's one rule for this form, before the field it governs, in the kit's `Note`. */}
+      <Note title="Serial numbers">The serial number must be unique across all tokens.</Note>
 
       <div className="bmc__field">
         <div className="bmc__label">
@@ -301,14 +301,14 @@ export function AssignForm({
 
   return (
     <div className="bmc__fields">
-      {/* The live console's three lines, shortened. */}
-      <Callout tone="info">
+      {/* The live console's three lines, shortened, in the kit's `Note`. */}
+      <Note title="Token assignment">
         <ul className="bdt__rules">
           <li>Every token you pick goes to the person you choose.</li>
           <li>Only tokens added under Manage tokens are listed.</li>
           <li>Tokens the person already holds are skipped.</li>
         </ul>
-      </Callout>
+      </Note>
 
       <div className="bmc__field">
         <div className="bmc__label">

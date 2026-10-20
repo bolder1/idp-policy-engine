@@ -1,5 +1,5 @@
 import type { KeyboardEvent as ReactKeyboardEvent, Ref } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   useCallback,
   useEffect,
@@ -38,6 +38,7 @@ import { describeBy, nameOf, tipAdds, tipTarget } from './tip-describe'
 import { ChangeList, ChangeSection, type ChangeItem } from './change-list'
 import { groupSections, reviewItemName, reviewSave, sectionsOpen, type KindBlock, type ReviewLine } from './review-rows'
 import { useReviewView, type ReviewView } from './review-view'
+import { footerEdge } from './footer-edge'
 import { SHOWCASE } from './showcase'
 import { playCue, switchTick } from './sound'
 
@@ -84,6 +85,7 @@ export function Button({
   pressed,
   keys,
   busy,
+  expanded,
 }: {
   children: ReactNode
   onClick?: () => void
@@ -97,6 +99,8 @@ export function Button({
   type?: 'button' | 'submit'
   /** A button that stays on until pressed again, such as Try a sign-in. Absent is an ordinary button. */
   pressed?: boolean
+  /** A button that shows or hides more in place — Show more, Show all — and whether it is showing it. Absent: neither. */
+  expanded?: boolean
   /** The shortcut that presses it, as `aria-keyshortcuts` writes one: "T", "Meta+Enter". */
   keys?: string
   /** Its work is running — Save policy's checks — so it is `aria-busy` until they finish. */
@@ -110,6 +114,7 @@ export function Button({
       disabled={disabled}
       onClick={onClick}
       aria-pressed={pressed}
+      aria-expanded={expanded}
       aria-keyshortcuts={keys}
       aria-busy={busy || undefined}
       className={`bx-btn bx-btn--${ROLE[variant]} bx-btn--${size} ${block ? 'is-block' : ''}`}
@@ -208,6 +213,7 @@ export function MenuButton({
   size = 'md',
   align = 'end',
   iconOnly = false,
+  face,
 }: {
   label: string
   icon?: LucideIcon
@@ -221,6 +227,11 @@ export function MenuButton({
      named menu — a labelled trigger in a hover cluster is three words competing
      with the three icons beside it. */
   iconOnly?: boolean
+  /* What the trigger shows in place of the label's text — a status pill that
+     opens the status menu (APP-POLICY-TAB.md A1) — with the chevron after it.
+     `label` stays the accessible name, so the pill's one word is not all a
+     screen reader hears: "Status: Active. Change status". */
+  face?: ReactNode
 }) {
   /* `iconOnly` without an `icon` used to render an EMPTY button — no glyph, no
      label, no chevron — and the risk-profile table shipped one: three rows of
@@ -283,8 +294,8 @@ export function MenuButton({
       <button
         ref={trigger}
         type="button"
-        className={`bx-btn bx-btn--${ROLE[variant]} bx-btn--${size} bx-menu__trigger ${iconOnly ? 'bx-menu__trigger--icon' : ''} ${open ? 'is-open' : ''}`}
-        aria-label={iconOnly ? label : undefined}
+        className={`bx-btn bx-btn--${ROLE[variant]} bx-btn--${size} bx-menu__trigger ${iconOnly ? 'bx-menu__trigger--icon' : ''} ${face ? 'bx-menu__trigger--face' : ''} ${open ? 'is-open' : ''}`}
+        aria-label={iconOnly || face ? label : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
@@ -302,7 +313,7 @@ export function MenuButton({
         }}
       >
         {Glyph && <MenuIcon icon={Glyph} size={size} />}
-        {!iconOnly && label}
+        {!iconOnly && (face ? <span className="bx-menu__face" aria-hidden>{face}</span> : label)}
         {!iconOnly && <ChevronDown size={size === 'sm' ? 12 : 13} strokeWidth={2.2} aria-hidden />}
       </button>
 
@@ -441,6 +452,7 @@ export function RowMenu({
   size = 'sm',
   align = 'end',
   disabled,
+  tabIndex,
 }: {
   /** The accessible name, naming the row: "Actions for Corporate network". */
   label: string
@@ -453,6 +465,8 @@ export function RowMenu({
   /** Which edge of the kebab the menu lines up with. */
   align?: 'start' | 'end'
   disabled?: boolean
+  /** A table with one tab stop (a roving row) keeps every kebab but its row's out of the order. Unset: in it. */
+  tabIndex?: number
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number; side: 'top' | 'bottom' } | null>(null)
@@ -571,6 +585,7 @@ export function RowMenu({
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         disabled={disabled}
+        tabIndex={tabIndex}
         onClick={(e) => {
           /* Rows are often one big link or button; the kebab is not part of it. */
           e.stopPropagation()
@@ -955,6 +970,10 @@ export function Field({
 
 const CALLOUT_ICON = {
   info: Info,
+  /* A fact to read the page by that is no problem and no news — a policy that
+     is a draft, or off (APP-POLICY-TAB.md B): the grey of the console's
+     neutral pill, never amber. */
+  neutral: Info,
   notice: AlertTriangle,
   negative: AlertOctagon,
   positive: CheckCircle2,
@@ -970,7 +989,7 @@ export function Callout({
   title,
   children,
 }: {
-  tone?: 'info' | 'notice' | 'negative' | 'positive'
+  tone?: 'info' | 'neutral' | 'notice' | 'negative' | 'positive'
   title?: string
   children: ReactNode
 }) {
@@ -984,6 +1003,111 @@ export function Callout({
       <div>
         {title && <strong>{title}</strong>}
         <div>{children}</div>
+      </div>
+    </div>
+  )
+}
+
+/* The one note (owner, 16 Oct 2026, of the What's new card on Authentication
+   methods: "use this as a common note component … one heading with an accent
+   colour like blue, and Read more and a button based on need … whatever
+   content we have on the right can be static, no accordion"). Every info note
+   in the console is this card: white, a hairline, the info mark, ONE heading
+   in the info blue, then the body in grey.
+
+   Its own box, not a `.bx-callout`: the rebrand takes every callout's border
+   away ("a tint, no box"), and a note keeps its line in both looks.
+
+   `more` is the only fold. Without it the note is static, which is what every
+   side note is. With it, Read more sits at the end of the body's first line
+   and the rest opens under the body, in the text's column; shut by default.
+   `action` is a kit Button at the head row's right, top-aligned with the
+   heading, so it never moves as the rest opens. Never the brand button: the
+   view's one orange button is the view's, not a note's. */
+const NOTE_EASE: [number, number, number, number] = [0.2, 0, 0, 1]
+
+export function Note({
+  title,
+  children,
+  more,
+  action,
+  as: Heading = 'h3',
+  moreLabel = 'Read more',
+  className,
+}: {
+  /** The one heading, a short noun: "What's new", "Serial number". */
+  title: ReactNode
+  /** The static body, under the heading. */
+  children?: ReactNode
+  /** What Read more opens, under the body. Absent: no fold at all. */
+  more?: ReactNode
+  /** A kit Button — secondary, small. Never the brand button. */
+  action?: ReactNode
+  /** The heading's level, by where the note sits in the page's outline. */
+  as?: 'h2' | 'h3' | 'h4'
+  /** The fold's closed label. */
+  moreLabel?: string
+  className?: string
+}) {
+  const uid = useId()
+  const titleId = `${uid}-title`
+  const moreId = `${uid}-more`
+  const [open, setOpen] = useState(false)
+  const reduce = useReducedMotion()
+  return (
+    <div className={`bx-note${className ? ` ${className}` : ''}`} role="note" aria-labelledby={titleId}>
+      <Info className="bx-note__mark" size={16} strokeWidth={2} aria-hidden />
+      <div className="bx-note__main">
+        <div className="bx-note__head">
+          <div className="bx-note__text">
+            <Heading id={titleId} className="bx-note__title">
+              {title}
+            </Heading>
+            {(children != null || more != null) && (
+              <div className="bx-note__body">
+                {children}
+                {/* The gap is a space in the line, not a margin on the box, so a
+                    Read more that wraps starts flush with the body. */}
+                {children != null && more != null && ' '}
+                {more != null && (
+                  <button
+                    type="button"
+                    className="bx-note__toggle"
+                    aria-expanded={open}
+                    /* Only while open: shut, the fold is not in the DOM, and an
+                       IDREF to nothing is a dangling reference. */
+                    aria-controls={open ? moreId : undefined}
+                    onClick={() => setOpen((o) => !o)}
+                  >
+                    {open ? 'Show less' : moreLabel}
+                    {open ? (
+                      <ChevronUp size={14} strokeWidth={2} aria-hidden />
+                    ) : (
+                      <ChevronDown size={14} strokeWidth={2} aria-hidden />
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Inside the text column, so the opened points never run under the action. */}
+            <AnimatePresence initial={false}>
+              {more != null && open && (
+                <motion.div
+                  key="more"
+                  id={moreId}
+                  className="bx-note__more"
+                  initial={reduce ? false : { height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.22, ease: NOTE_EASE }}
+                >
+                  {more}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          {action != null && <div className="bx-note__action">{action}</div>}
+        </div>
       </div>
     </div>
   )
@@ -2124,6 +2248,15 @@ export function SaveBar({
 }) {
   const [reviewing, setReviewing] = useState(false)
   const bar = useRef<HTMLDivElement | null>(null)
+  /* The footer's buttons end with the form above it (footer-edge.ts). */
+  const barRef = useCallback((el: HTMLDivElement | null) => {
+    bar.current = el
+    const stop = footerEdge(el)
+    return () => {
+      stop?.()
+      bar.current = null
+    }
+  }, [])
   const cameFrom = useRef<HTMLElement | null>(null)
   const [host, setHost] = useState<HTMLElement | null>(null)
   useEffect(() => {
@@ -2169,7 +2302,7 @@ export function SaveBar({
     <AnimatePresence>
       {open && (
         <motion.div
-          ref={bar}
+          ref={barRef}
           className="bx-savebar"
           /* Opacity only. The footer takes its line in the column as it
              arrives, so a slide would move the page twice. */

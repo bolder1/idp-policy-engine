@@ -178,8 +178,6 @@ describe('Beat 2: Devon opens GitHub', () => {
       ['Global Default Policy', 'Decides this sign-in', false],
       /* Finance joined the audience for Maya Iyer's conflict (TESTING-V4 §13). */
       ['Developer tools — office and device checks', 'Not in audience: Engineering, DevOps, Finance', true],
-      /* The troubleshooting estate's GitHub draft (30 Sep 2026): on GitHub, not on. */
-      ['Code review for Finance', 'Draft', false],
     ])
   })
 })

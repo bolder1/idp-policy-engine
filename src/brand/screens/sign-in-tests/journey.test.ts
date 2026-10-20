@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../fixtures'
+import { splitShowcase } from './split-policies'
 import { leaves } from '../../predicate'
 import { envOf, resolveSignIn } from '../tenant-resolver'
 import { rowsRead } from '../testing/rows-read'
@@ -271,7 +272,7 @@ describe('followTo — keeping the step in view', () => {
    plan the showcase tenant gives, so the words and the marks are the
    engine's own. */
 describe('the chain: rule cards, the policy node, the person node', () => {
-  const t = showcaseTenant()
+  const t = splitShowcase(showcaseTenant())
   const env = envOf(t)
   const planOf = (f: SignInForm) => {
     const { facts } = factsOf(f, t.zones)
@@ -362,7 +363,7 @@ describe('the chain: rule cards, the policy node, the person node', () => {
    run, what the dock's Expand all and Collapse all do, and the builder's
    accordion. */
 describe('the fold: one line each, the dock, the accordion', () => {
-  const t = showcaseTenant()
+  const t = splitShowcase(showcaseTenant())
   const env = envOf(t)
   const planOf = (f: SignInForm) => {
     const { facts } = factsOf(f, t.zones)

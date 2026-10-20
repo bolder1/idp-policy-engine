@@ -43,6 +43,20 @@ describe('the application Users tab', () => {
     const filtered = render(<AppUsersTab appId="slack" group="engineering" />)
     expect(filtered).toContain('bbar__filter is-set')
   })
+
+  /* The second line under the Deciding policy (spec APP-CREATE-AND-ACCESS.md §4). */
+  it('says how the deciding policy reaches each person, and nothing under the tenant default', () => {
+    expect(text(render(<AppUsersTab appId="outlook" />))).toContain('For everyone')
+    expect(text(render(<AppUsersTab appId="github" group="engineering" />))).toContain('Through Engineering')
+    const fallback = text(render(<AppUsersTab appId="salesforce" />))
+    expect(fallback).not.toContain('For everyone')
+    expect(fallback).not.toContain('Through ')
+  })
+
+  it('takes the page\'s saving state, and still has no button of its own', () => {
+    expect(render(<AppUsersTab appId="slack" saving />)).not.toContain('bx-btn--brand')
+    expect(render(<AppGroupsTab appId="slack" onShowUsers={() => {}} saving />)).not.toContain('bx-btn--brand')
+  })
 })
 
 describe('the application Groups tab', () => {

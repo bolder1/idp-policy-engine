@@ -67,15 +67,15 @@ const GD = runOf('Ravi Menon', 'AWS Console')
 const DENY = runOf('Devon Rao', 'AWS Console', { origin: 'home' })
 const DEP = runOf('Arun Patel', 'GitHub Enterprise', { patch: { device: { kind: 'none' } } as Partial<SignInForm> })
 const OFF = runOf('Priya Sharma', 'HRMS')
-/* A policy of six rules: AWS for engineering teams with its first rule (Contractors away from the office) copied three times ahead. */
+/* A policy of six rules: AWS access with its first rule (Contractors away from the office) copied three times ahead. */
 const SIX = runOf('Maya Iyer', 'AWS Console', {
-  policies: t.policies.map((p) => (p.name === 'AWS for engineering teams' ? { ...p, rules: [...[1, 2, 3].map((k) => ({ ...p.rules[0], id: `${p.rules[0].id}-copy${k}`, name: `${p.rules[0].name} ${k}` })), ...p.rules] } : p)),
+  policies: t.policies.map((p) => (p.name === 'AWS access' ? { ...p, rules: [...[1, 2, 3].map((k) => ({ ...p.rules[0], id: `${p.rules[0].id}-copy${k}`, name: `${p.rules[0].name} ${k}` })), ...p.rules] } : p)),
 })
 
 describe('the steps, in the engine’s order', () => {
   it('names the deciding policy and the group it covers the person through', () => {
     const e = ev(C)
-    expect(e.decider?.line).toBe('AWS for engineering teams covers Maya, through Engineering.')
+    expect(e.decider?.line).toBe('AWS access covers Maya, through Engineering and Finance.')
     expect(e.who.groups.find((g) => g.counts)?.name).toBe('Engineering')
     expect(e.skipped.map((r) => r.line)).toEqual(['Rule 1 is skipped — Maya isn’t in Contractors.'])
     expect(e.deciding?.line).toMatch(/^Rule 2 matches: /)
@@ -83,9 +83,9 @@ describe('the steps, in the engine’s order', () => {
   })
   it('says the policies before the decider by the person’s name as stored, never lower-cased', () => {
     const e = ev(PRI)
-    expect(e.beforeLine).toBe('AWS for engineering teams doesn’t cover Priya.')
+    expect(e.beforeLine).toBe('')
     for (const p of e.policies) expect(p.line).not.toMatch(/priya/)
-    expect(e.decider?.line).toBe('AWS billing for Finance covers Priya, through Finance.')
+    expect(e.decider?.line).toBe('AWS access covers Priya, through Finance.')
     expect(e.outcome.line).toBe('So Priya is asked for Password, then Google Authenticator.')
   })
   it('marks a check only as the engine found it: never ✓ beside a failing value', () => {
@@ -137,7 +137,8 @@ describe('the steps, in the engine’s order', () => {
     expect(e.policies.filter((p) => p.state === 'decides')).toHaveLength(1)
     const after = e.policies.slice(e.policies.findIndex((p) => p.state === 'decides') + 1)
     for (const p of after) expect(['also-covers', 'not-reached', 'off', 'watching']).toContain(p.state)
-    expect(e.policies.find((p) => p.name === 'AWS billing for Finance')?.state).toBe('also-covers')
+    /* One application has one sign-in policy: nothing else covers AWS. */
+    expect(after.filter((p) => p.state === 'also-covers')).toHaveLength(0)
   })
   it('never throws, and always says the outcome, for every person on every application', () => {
     let runs = 0
@@ -158,7 +159,7 @@ describe('how it was decided, in the panel', () => {
   it('reads the steps in the engine’s order: the policy, each rule passed over, the rule that matched, the outcome', () => {
     const steps = howStepsOf(ev(C))
     expect(steps.map((x) => x.text)).toEqual([
-      'AWS for engineering teams covers Maya, through Engineering.',
+      'AWS access covers Maya, through Engineering and Finance.',
       'Rule 1 is skipped — Maya isn’t in Contractors.',
       expect.stringMatching(/^Rule 2 matches: /),
       'So Maya is asked for Password.',
@@ -169,8 +170,8 @@ describe('how it was decided, in the panel', () => {
   })
   it('says the policies before the decider in one line, by the name as stored', () => {
     const steps = howStepsOf(ev(PRI))
-    expect(steps[0]).toMatchObject({ key: 'before', text: 'AWS for engineering teams doesn’t cover Priya.', mark: 'fail' })
-    expect(steps[1].text).toBe('AWS billing for Finance covers Priya, through Finance.')
+    expect(steps.some((x) => x.key === 'before')).toBe(false)
+    expect(steps[0]).toMatchObject({ key: 'decider', text: 'AWS access covers Priya, through Finance.', mark: 'pass' })
     expect(answerLineOf(ev(PRI).outcome)).toBe('Allow with 2FA · Password → Google Authenticator')
   })
   it('ends a Deny in red with its message, a Depends in amber with the fact to add', () => {
@@ -217,6 +218,6 @@ describe('the links between the dock, the row and the brief', () => {
   })
   it('says the sentence plainly for the narrator', () => {
     /* Each named thing says what it is (6 Oct 2026): the app, the policy, the group, the profile. */
-    expect(spokenOf(C.model)).toMatch(/^Maya Iyer gets into the AWS Console app on one factor: the AWS for engineering teams policy applies through the Engineering group, .+ the Compliant devices profile\.( .+)?$/)
+    expect(spokenOf(C.model)).toMatch(/^Maya Iyer gets into the AWS Console app on one factor: the AWS access policy applies through the Engineering and Finance groups, .+ the Compliant devices profile\.( .+)?$/)
   })
 })

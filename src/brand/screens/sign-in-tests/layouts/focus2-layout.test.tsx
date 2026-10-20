@@ -16,6 +16,7 @@ import layoutRaw from './Focus2Layout.tsx?raw'
 import chainRaw from './classic2-chain.tsx?raw'
 import glideRaw from './classic2-glide.ts?raw'
 import { conditionsWord, factRows } from './classic2-model'
+import { ONE_POLICY_CARD } from '../phase'
 import { rowFacts } from './shared/sign-in-row'
 import { citeOfLit, citeTargets, footerBeside, readViews, saidOf, viewsOf } from './focus2-brief-model'
 import { FIRST_FOCUS_VIEW, FOCUS_VIEW_KEY, readFocusView, type FocusView } from './focus2-view'
@@ -147,6 +148,9 @@ const text = (html: string) =>
     .replace(/\s+/g, ' ')
     .trim()
 const count = (html: string, needle: string) => html.split(needle).length - 1
+/* The chain's cards after its node: the Policy card and the outcome since the merged card (20 Oct 2026, phase.ts
+   ONE_POLICY_CARD: the rule card's rules are the Policy card's own), the policy, rule and outcome cards with it off. */
+const CHAIN_CARDS: readonly string[] = ONE_POLICY_CARD ? ['policy', 'outcome'] : ['policy', 'rule', 'outcome']
 
 const ALLOW = propsOf('Maya Iyer', 'AWS Console')
 const DENY = propsOf('Devon Rao', 'AWS Console', { patch: { device: { kind: 'preset', id: 'win10' } } as Partial<SignInForm> })
@@ -258,7 +262,7 @@ describe('the first paint', () => {
     /* At the first step the chain is its node and the cards the engine has reached — never the answer — in either view. */
     for (const { name, paint } of PAINTS) {
       const out = wrap(propsOf('Maya Iyer', 'AWS Console', { at: 'first' }), paint)
-      expect(['policy', 'rule', 'outcome'].slice(0, cardsIn(out).length), name).toEqual(cardsIn(out))
+      expect(CHAIN_CARDS.slice(0, cardsIn(out).length), name).toEqual(cardsIn(out))
       expect(cardsIn(out), name).not.toContain('outcome')
       expect(nodeOf(out), name).toContain('Maya Iyer')
       /* One view (HORIZONTAL_VIEW off, 5 Oct 2026): the bar holds no side of a pair, in any paint. */
@@ -352,7 +356,13 @@ describe('the first paint', () => {
         expect(out, `${name} ${view}`).not.toContain('rl-f2__qs')
       }
     }
-    expect(wrap(DENY, { view: 'horizontal' })).toMatch(/class="bb__card rl-c2__card is-deny[^"]* is-matched"/)
+    /* The matched rule's deny edge: the rule card's with the merged card off. With it on (20 Oct 2026) there is no rule
+       card: the deciding row inside the Policy card takes the edge (classic2-one-ui.test.tsx draws it open), and the
+       folded card says which row decided on its head. */
+    if (ONE_POLICY_CARD) {
+      const policy = (html: string) => html.slice(html.lastIndexOf('<', html.indexOf('data-card="policy"')), html.lastIndexOf('<', html.indexOf('data-card="outcome"')))
+      for (const view of ['vertical', 'horizontal'] as const) expect(text(policy(wrap(DENY, { view }))), view).toMatch(/^Policy .+ (Rule \d+ · .+|No rule matched)/)
+    } else expect(wrap(DENY, { view: 'horizontal' })).toMatch(/class="bb__card rl-c2__card is-deny[^"]* is-matched"/)
   })
 
   it('draws a run with nothing chosen without throwing, and says so', () => {
@@ -378,8 +388,9 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
   }
   /* 6 Oct 2026: a connector carries its ink (owner: "blue for progress, and at the end based on outcome, and then greyed
      out") — `is-run` while the engine travels, `is-landed` as the outcome reaches it, `is-rest` after — and the outcome's
-     tone as `is-out-<tone>`. A run drawn settled (these paints are `jumped`) is grey from the start, so each of its three
-     connectors is at rest and names the run's own outcome. */
+     tone as `is-out-<tone>`. A run drawn settled (these paints are `jumped`) is grey from the start, so each of its
+     connectors — one a card: two with the merged Policy card (20 Oct 2026), three with it off — is at rest and names
+     the run's own outcome. */
   const LINK_TONE = new Map<RunLayoutProps, string>([
     [ALLOW, 'allow'],
     [DENY, 'deny'],
@@ -410,10 +421,10 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
       expect(out, name).toMatch(/class="rl-c2__chain"/)
       expect(out, name).not.toContain('is-across')
       if (props !== EMPTY) {
-        expect(cardsIn(out), name).toEqual(['policy', 'rule', 'outcome'])
-        /* Three connectors and no other, each at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
-        expect(count(out, 'class="bb__link'), name).toBe(3)
-        expect(count(out, settledLink(props)), name).toBe(3)
+        expect(cardsIn(out), name).toEqual(CHAIN_CARDS)
+        /* A connector a card and no other, each at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
+        expect(count(out, 'class="bb__link'), name).toBe(CHAIN_CARDS.length)
+        expect(count(out, settledLink(props)), name).toBe(CHAIN_CARDS.length)
       }
       /* The same as asking for Vertical. */
       expect(out, name).toBe(wrap(props, { view: 'vertical' }))
@@ -454,12 +465,13 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
     for (const { name, props } of RUNS) {
       const out = wrap(props, { view: 'horizontal' })
       expect(out, name).toMatch(/class="rl-c2__chain is-across"/)
-      expect(out, name).toMatch(/--rl-c2-tracks:3/)
+      /* A track a card: two since the merged Policy card (20 Oct 2026), three with it off. */
+      expect(out, name).toMatch(new RegExp(`--rl-c2-tracks:${CHAIN_CARDS.length}`))
       expect(nodeOf(out), name).toContain(props.plan.appName)
-      expect(cardsIn(out), name).toEqual(['policy', 'rule', 'outcome'])
-      /* The same three connectors as down the canvas, at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
-      expect(count(out, 'class="bb__link'), name).toBe(3)
-      expect(count(out, settledLink(props)), name).toBe(3)
+      expect(cardsIn(out), name).toEqual(CHAIN_CARDS)
+      /* The same connectors as down the canvas, at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
+      expect(count(out, 'class="bb__link'), name).toBe(CHAIN_CARDS.length)
+      expect(count(out, settledLink(props)), name).toBe(CHAIN_CARDS.length)
       for (const gone of ['f2o__', 'rl-focus__slot', 'rl-focus__edge', 'rl-f2__band']) expect(out, `${name} ${gone}`).not.toContain(gone)
       /* The row is drawn by `initialView` alone: the bar still has no pair to press. */
       expect(side(out, 'horizontal'), name).toBeNull()

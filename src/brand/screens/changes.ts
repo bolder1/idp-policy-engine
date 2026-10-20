@@ -1,4 +1,4 @@
-import { DECISION_LABEL, FALLBACK_NAME, fallbackRule, groups as seedGroups, users as seedUsers, type Group, type Policy, type Rule, type User } from '../data'
+import { DECISION_LABEL, FALLBACK_NAME, fallbackRule, groups as seedGroups, users as seedUsers, type App, type Group, type Policy, type Rule, type User } from '../data'
 import { leafCount, sig } from '../predicate'
 import { hasWho, normaliseWho, whoKey, type WhoList } from '../rule-who'
 
@@ -44,6 +44,10 @@ export function describeChanges(
   draft: Policy,
   groups: Group[] = seedGroups,
   directory: User[] = seedUsers,
+  /* The applications, so a gained or lost one is said by its name. Without
+     them the id stands in, as it always did — fine for the seed apps, whose
+     ids read as names, not for an added one ("oauth", "custom-saml-2"). */
+  apps?: readonly Pick<App, 'id' | 'name'>[],
 ): string[] {
   const out: string[] = []
 
@@ -154,12 +158,13 @@ export function describeChanges(
      as two lines rather than as one replacement. */
   const gained = draft.appIds.filter((id) => !saved.appIds.includes(id))
   const lost = saved.appIds.filter((id) => !draft.appIds.includes(id))
-  if (gained.length > 0) out.push(`Now protects ${gained.join(', ')}`)
+  const appName = (id: string) => apps?.find((x) => x.id === id)?.name ?? id
+  if (gained.length > 0) out.push(`Now protects ${gained.map(appName).join(', ')}`)
   if (lost.length > 0) {
     out.push(
       draft.appIds.length === 0
         ? 'No longer attached to an application'
-        : `No longer protects ${lost.join(', ')}`,
+        : `No longer protects ${lost.map(appName).join(', ')}`,
     )
   }
 

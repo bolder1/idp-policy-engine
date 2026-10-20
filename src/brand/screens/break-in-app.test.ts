@@ -61,8 +61,7 @@ describe('AWS Console', () => {
   it('hands each card to the policy that covers its person, in tenant order, and the executive to the Global Default', () => {
     expect(t.policies.findIndex((p) => p.isSystem)).toBe(0)
     expect(r.deciders.map((d) => [d.policyId, d.cardIds])).toEqual([
-      ['sc-aws-engineering', ['no-mfa', 'expired-trust', 'nightshift', 'unmanaged-contractor', 'aitm-relay', 'office-regular', 'after-reset', 'roaming-unknown-origin']],
-      ['sc-aws-finance', ['proxy-finance', 'risk-inside', 'push-bombing', 'finance-home', 'first-login']],
+      ['sc-aws-engineering', ['proxy-finance', 'no-mfa', 'expired-trust', 'nightshift', 'risk-inside', 'unmanaged-contractor', 'push-bombing', 'aitm-relay', 'office-regular', 'finance-home', 'first-login', 'after-reset', 'roaming-unknown-origin']],
       [GD.id, ['tor-exec', 'exec-office']],
     ])
   })
@@ -77,9 +76,9 @@ describe('AWS Console', () => {
       ['Held', ['no-mfa', 'nightshift', 'risk-inside', 'unmanaged-contractor', 'push-bombing', 'office-regular', 'exec-office', 'finance-home']],
     ])
     const proxy = rowOf(r, 'proxy-finance')
-    expect([proxy.expected, proxy.got, proxy.policyName, proxy.ruleRef]).toEqual(['deny', '2fa', 'AWS billing for Finance', stored('sc-aws-finance').rules[0].id])
-    expect(decidedByLine(proxy)).toBe('Decided by AWS billing for Finance · Rule 1')
-    expect(decidedByLine(rowOf(r, 'roaming-unknown-origin'))).toBe('Decided by AWS for engineering teams · Last row')
+    expect([proxy.expected, proxy.got, proxy.policyName, proxy.ruleRef]).toEqual(['deny', '2fa', 'AWS access', stored('sc-aws-engineering').rules[3].id])
+    expect(decidedByLine(proxy)).toBe('Decided by AWS access · Rule 4')
+    expect(decidedByLine(rowOf(r, 'roaming-unknown-origin'))).toBe('Decided by AWS access · Last row')
     /* The Global Default decides it, and which of its rules can't be told: a Tor exit has no place. */
     const tor = rowOf(r, 'tor-exec')
     expect([tor.isGlobalDefault, tor.status, decidedByLine(tor)]).toEqual([true, 'depends', 'Decided by Global Default Policy'])
@@ -89,8 +88,8 @@ describe('AWS Console', () => {
   it('closes the proxy with a rule above Compliant device, and previews Got through 2', () => {
     const proxy = rowOf(r, 'proxy-finance')
     const offer = offeredAppFix(proxy, t.policies, 'aws', env, r.counts)!
-    expect(offer.policy.id).toBe('sc-aws-finance')
-    expect(fixLine(offer.fix, offer.policy, resolve)).toBe('Deny sign-ins from outside India — If not in zone India → Deny · at position 1')
+    expect(offer.policy.id).toBe('sc-aws-engineering')
+    expect(fixLine(offer.fix, offer.policy, resolve)).toBe('Deny sign-ins from outside India — If not in zone India → Deny · at position 4')
     expect(offer.preview.counts.gotThrough).toBe(2)
     expect(offer.preview.changed).toEqual(['gotThrough'])
     expect(offer.preview.moved).toBe('Got through now 2.')
@@ -242,10 +241,10 @@ describe('acceptances from the builder', () => {
     const before = runBreakInOnApp(t.policies, 'aws', env)
     const proxy = rowOf(before, 'proxy-finance')
     const a = acceptanceFor(proxy.round, 'Jaspreet Toor', '2026-10-01T08:35:00.000Z', 'Finance is on 2FA everywhere')!
-    const after = runBreakInOnApp(t.policies, 'aws', env, { accepted: { 'sc-aws-finance': { 'proxy-finance': a } } })
+    const after = runBreakInOnApp(t.policies, 'aws', env, { accepted: { 'sc-aws-engineering': { 'proxy-finance': a } } })
     expect(after.counts.gotThrough).toBe(2)
     expect(rowOf(after, 'proxy-finance')).toMatchObject({ group: 'held', accepted: a, expected: '2fa' })
-    const elsewhere = runBreakInOnApp(t.policies, 'aws', env, { accepted: { 'sc-aws-engineering': { 'proxy-finance': a } } })
+    const elsewhere = runBreakInOnApp(t.policies, 'aws', env, { accepted: { 'sc-dev-tools': { 'proxy-finance': a } } })
     expect(elsewhere.counts).toEqual(before.counts)
   })
 })
@@ -277,17 +276,17 @@ describe('breakInOnApp', () => {
 })
 
 describe('fixOnArrival', () => {
-  it('adds the proxy’s rule to AWS billing for Finance and selects the new rule', () => {
-    const p = stored('sc-aws-finance')
+  it('adds the proxy’s rule to AWS access and selects the new rule', () => {
+    const p = stored('sc-aws-engineering')
     const arrived = fixOnArrival(p, 'proxy-finance', 'aws', env, { policies: t.policies })
     if (!('next' in arrived)) throw new Error(arrived.none)
     expect(arrived.toast).toBe('Rule added. Not saved yet.')
     expect(arrived.next.rules).toHaveLength(p.rules.length + 1)
-    expect(arrived.ruleRef).toBe(arrived.next.rules[0].id)
-    expect(arrived.next.rules[0].name).toBe('Deny sign-ins from outside India')
+    expect(arrived.ruleRef).toBe(arrived.next.rules[3].id)
+    expect(arrived.next.rules[3].name).toBe('Deny sign-ins from outside India')
     /* Born with its outcome chosen: no pristine mark for the card to read as "Outcome not chosen yet", saved or not. */
-    expect(arrived.next.rules[0].pristine).toBeUndefined()
-    expect(outcomePhrase(arrived.next.rules[0])).toBe('deny')
+    expect(arrived.next.rules[3].pristine).toBeUndefined()
+    expect(outcomePhrase(arrived.next.rules[3])).toBe('deny')
     /* And on the draft it made, the card holds. */
     expect(fixOnArrival(arrived.next, 'proxy-finance', 'aws', env)).toEqual({ none: 'This draft already holds that sign-in.' })
   })
@@ -302,9 +301,9 @@ describe('fixOnArrival', () => {
   })
 
   it('changes nothing, and says why in a line, when no fix fits the draft', () => {
-    const p = stored('sc-aws-finance')
+    const p = stored('sc-aws-engineering')
     expect(fixOnArrival(p, 'proxy-finance', 'box', env)).toEqual({ none: 'This draft does not cover Box.' })
-    expect(fixOnArrival(p, 'unmanaged-contractor', 'aws', env)).toEqual({ none: 'This draft does not cover Devon Rao.' })
+    expect(fixOnArrival(stored('sc-box-engineering'), 'unmanaged-contractor', 'box', env)).toEqual({ none: 'This draft does not cover Devon Rao.' })
     expect(fixOnArrival(stored('sc-box-engineering'), 'after-reset', 'box', env)).toEqual({ none: 'No fix fits this draft. Nothing changed.' })
     expect(fixOnArrival(GD, 'risk-inside', 'box', env)).toEqual({ none: 'The Global Default takes no fixes from here.' })
     expect(fixOnArrival(p, 'no-such-card', 'aws', env)).toEqual({ none: 'That sign-in is not in the Break-in test.' })

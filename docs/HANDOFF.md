@@ -1,6 +1,6 @@
 # Handoff: start here
 
-For Surajit (the owner) and for the next Claude Code session. State as of **12 Oct 2026**. `main` and the day branch `2026-10-12-applications-users-groups` carry everything: the 3 to 9 Oct work and the 10 Oct [Applications, Users and Groups](#10-oct-2026-applications-users-groups-and-sounds) build. No worktree holds work that `main` lacks (see [Git](#git)).
+For Surajit (the owner) and for the next Claude Code session. State as of **20 Oct 2026**. Everything to 20 Oct is committed: `main` = `origin/main` = the day branch `2026-10-20-app-glance-guided-setup-check-access` (see [16-20 Oct](#16-20-oct-2026-full-view-canvases-guided-setup-the-apps-policies-tab-at-a-glance-and-check-access-for-one-policy-per-app); the 13-15 Oct sections below are in the same commit). No worktree holds work that `main` lacks (see [Git](#git)).
 
 ## What this is
 
@@ -197,6 +197,148 @@ Product owners say most admins add policies from the application, right after cr
 - **Gate on 10 Oct:** tsc 0, oxlint 27, vitest 5114 pass (`ui-copy` and `player-ui` pass alone), build ok. Browser-checked in the owner's :5173 and with `tools/rigs/app-pages/check.cjs` (screens, sound counts, phone width).
 - **Open questions for the owner:** (1) the live console's add-from-app flow is group-first ("Assign Group": groups, then First factor / MFA / Adaptive); ours keeps the audience on the policy. Ask for groups when adding from an app? (2) Should a template set the policy's audience? (3) These pages count directory members while the Who picker uses each group's stated size: keep both? (4) What should a group's "Make Default" change?
 - **Not built (toasts say so):** add, edit or delete users, roles and groups; group and membership custom fields; deleting an app; App Access Configuration; reordering policies from the app page.
+
+## 16-20 Oct 2026: full-view canvases, Guided setup, the app's Policies tab at a glance, and Check access for one policy per app
+
+Committed and pushed on 20 Oct, on the owner's word, as the day branch `2026-10-20-app-glance-guided-setup-check-access`; `main` was moved to it. The 13 to 19 Oct work is in the same commit: it was never committed day by day, and multi-day uncommitted work can't be split into commits that build (the 6 Oct finding, in [Git](#git)).
+
+- **16 Oct: one Note for every note.** The kit `Note` is the What's new card. A zone's note can be shown as a Note or a Sticky.
+- **19 Oct: canvases in full view** (`CANVAS_FULL_VIEW`, `Shell.tsx`). The builder and Access checks open without the rail or the top bar, with an open animation and Back in the screen's bar.
+- **19 Oct: the app's Policies tab** shows the rules as the builder's read-only canvas (`RULES_CANVAS`). Changes is gone, and the app page is full width.
+- **19 Oct: Guided setup**, which was Describe it (`GUIDED_SETUP`; spec `docs/specs/GUIDED-SETUP.md`).
+  - It works with picks and forms only, on any draft or edit, from one door on the canvas.
+  - The New rule form has four section rows: Applications, What happens, Who, Conditions.
+  - A guided rule lands in the safest place automatically.
+- **19 Oct: builder fixes.**
+  - There is no Check access on an empty policy, and Past sign-ins is a separate control.
+  - Save rule is a grey slate button.
+  - Rule states read Complete (blue), Incomplete, a named warning (magenta) and Not set up.
+  - Who's empty state reads "Applies to everyone by default".
+- **20 Oct: the app's Policies tab at a glance** (`APP_POLICY_GLANCE`, `app-policy-view.tsx` + `app-activity.tsx` `GlanceActivity`).
+  - Two panels share one fixed height, with their heads and feet aligned. The canvas scrolls inside its panel, and the Global Default sits in the rules panel's foot.
+  - Sign-in activity has Find a person, Result and Rule filters and the console pager. Each row ends in a ⋯ menu (Open in Check access, Copy details). The columns read When · Person · From · Result · Rule.
+  - A picked row rings the rule that decided it.
+  - Who it covers shows one chip per group, a face beside its name.
+- **20 Oct: Check access for one policy per app** (`ONE_POLICY_CARD`, `sign-in-tests/phase.ts`).
+  - The run is the sign-in pill, then one Policy card, then the Outcome.
+  - The Policy card lists its rules, each with an outcome badge. The Global Default is its foot, or a "why" line when it decides. The policy's Details button sits on the card's head; rows carry none.
+  - The Outcome head says what the person goes through.
+- **20 Oct: past and blocked sign-ins open at once** (`OPEN_AT_ONCE`). The run plays with no form showcase. This overrides "Only Run runs" for those entry points only.
+- **20 Oct: Edit in builder** from the details panel now opens the policy builder, not its Check access.
+- **In progress, not in this commit:** the run's motion, always animated (`RUN_MOTION`), the mega card (`MEGA_CARD`), and a Classic / Modern switch for Check access.
+- **Gate, 20 Oct:** tsc 0, oxlint 27, vitest 5,555 pass in 225 files (`player-ui` and `focus2-layout` timed out under load and pass alone), build ok.
+
+## 13 Oct 2026: Add application, the app's setup tabs, and Who at the start node
+
+Owner, 13 Oct: "go through the app part, check how an app is created and try to mimic that with our use case, and fix the policy attachment and groups and users in that part." Spec: `docs/specs/APP-CREATE-AND-ACCESS.md` (v2, after an adversarial review on the rulings, the engine and admin UX). The live create flow was read in the owner's Chrome, read only and with nothing saved: local note `docs/research/live-console-app-create-13-oct.md`.
+
+- **What the live console does.** Choose Application (a catalogue) leads to one tabbed form (Basic · Advanced · Login Options · Attributes · Policies · Provisioning/Metadata or Endpoints) with Cancel · Back · Next · Save. Policies, Metadata and Endpoints stay **locked until the app is saved**. Assign Group then makes one App Login Policy per group.
+- **Choose application** (`screens/AppCatalog.tsx`, `app-catalog.ts`, route `application-new`):
+  - search, a Type filter (All apps · SAML/WS-FED · OAuth/OpenID) and a Show filter (All apps · Custom apps)
+  - "Submit new app request" (a toast)
+  - Featured apps (AWS, Google Apps, Office 365, Salesforce), shown only while nothing narrows the page
+  - All apps as button tiles: logo, name and protocol only (the "Added" pill was removed, owner 13 Oct)
+- **The unsaved application** (`NewApplicationPage` in `ApplicationPage.tsx`) is the application page in a "new" mode, so create and edit are one form.
+  - Tabs: Basic · Advanced · Sign-in options · Attributes · Policies · Metadata or Endpoints, with the live fields and defaults (`app-setup.ts`, `app-setup-forms.tsx`).
+  - Footer: Cancel · Back · Next · Save, with Save on every tab and nothing disabled. A refused Save opens Basic with each problem under its field.
+  - The Policies tab is usable before saving: New policy and Add existing policy save the app first, then carry on (Untitled draft into the board; or the app's page with the Add existing drawer open, `open: 'add-existing'`).
+  - Metadata and Endpoints are readable before saving.
+- **The saved application page** has the same tabs plus Users and Groups. Basic, Advanced, Sign-in options and Attributes share one draft and the SaveBar, blocked while Basic has a problem. "App secret" is now **Client secret**. Seed apps get made-up setup values (`setupOf`).
+- **G1 answered (owner, 13 Oct): no group picking from an application.** No Assign groups door. Instead, **a policy's groups are seen and changed at the builder's start node**.
+  - The sentence reads "A sign-in from **Finance** arrives at **Confluence**".
+  - Its pane is "Who and applications": a Who section (Groups and People rows, the rule Who dialog worded for a policy) above Applications.
+  - One Save stores both. A live policy runs Before saving through the apps guard, which now carries the audience (`apps-guard.ts`, `policy-details-review.ts` Who row).
+- **Users tab:** the Deciding policy cell says how it reaches the person ("Through Finance", "By name", "For everyone"; nothing for the Global Default) (`reachOf`).
+- **Elsewhere:**
+  - The Protection drawer's Edit opens the board with `from`.
+  - The end user's Apps page hides an app whose "Show on end user dashboard" is off.
+  - Sign-in activity, Blocked and Past sign-ins leave out an app added this session (`App.addedAt`).
+  - Change-log lines name applications rather than ids.
+  - `SENT_TO_BOARD` (board-return.ts) is shared, so a first deciding policy is celebrated whichever door sent it.
+- **Gate, 13 Oct:**
+  - tsc 0 errors, oxlint 27 warnings, build ok.
+  - vitest 5214 pass. Nine tests timed out under load and passed alone: ui-copy, engine-run, impact-arena, board-views-ui, player-ui, sign-in-tests-ui, focus2-ask, focus2-layout.
+  - Browser-checked in my own tab: the catalogue, a refused Save, New policy from the unsaved app into the board, Who at the start node, the Users line, and Slack's Advanced tab.
+- **Not built:**
+  - deleting an application (needs ConfirmDelete's refuse-while-live, saved sign-ins and retired ids)
+  - Provisioning, Import SP metadata, Upload app logo, Primary identity provider, SSO flows, WS-Fed and other app types
+  - unassigning from the app page
+- **Open for the owner:**
+  1. A New policy still starts empty (last row Allow on 1 factor), so turning it on can loosen an app compared with the Global Default. The turn-on checks catch it. Should a new policy start from the Global Default's rules?
+  2. Featured apps swap the live BigCommerce (JWT) and Cisco-ASA VPN (RADIUS) for types the prototype can create.
+
+- **Later the same day (owner's picks):**
+  - **Add existing policy** (`AddExistingPolicy.tsx`, 680 wide): a searchable list of policies instead of a dropdown. After a pick it shows "Selected policy" with Change policy, the line that says where it lands (logo, name, position pill), the two callouts (also on other apps, names another app), then the policy's own details page (`PolicyPage`, the same component as Policy details). Footer: **Duplicate and add** · **Add this policy**.
+  - **The app's Policies tab** fills the height (`.bapr__frame`) with the Global Default pinned at the foot. Its buttons read **Create new policy** and Add existing policy.
+  - **Risk signals:** each row has a Toggle ("Collected") instead of a checkbox.
+
+## 14-15 Oct 2026: one policy per app, the app's Policies tab, and footers
+
+All uncommitted on `main`. The gate on 15 Oct is in the last bullet.
+
+- **One sign-in policy per application (owner, 14 Oct).**
+  - `ownerOf()` in `app-policies.ts` is the test, and pickers show an app held by another policy as "In use".
+  - Who belongs to rules only. A sign-in policy's start-node pane is "Applications", and each rule's Who has "Copy from another rule".
+  - The application picker has three drawings behind `APP_PICKER_COMPARE` (`app-picker-view.ts`): Two lists, One list and Chips. The owner has not picked one yet.
+  - Memory: `one-app-one-policy-14-oct.md`.
+- **The app's Policies tab, rebuilt on 15 Oct.** Spec: `docs/specs/APP-POLICY-TAB.md`, from Mobbin research (local: `docs/research/app-policy-tab-15-oct.md`). It replaces the morning's bento, which is archived in `local-archive/2026-10-15-app-bento/`.
+  - **Head:** two buttons, Replace policy and Edit (the one orange button). Status, Remove from {app} and Delete draft sit in the status pill's menu.
+  - **Fact line:** "Who it covers" (faces and the number of people the policy decides for). "Other applications" appears only when the policy is shared.
+  - **State line:** only for a draft, inactive, monitoring (with the plan line) or unpublished draft changes.
+  - **Rules:** the policy's rules in place, at full width, one row open at a time. The rows end with "Nothing else matched", then "Outside {policy}", then the Global Default. Each row has its sign-ins over the last 7 days.
+  - **Sign-in activity:** Find a person, a Rule link back to the row, and View all filtered to the app. Changes sit in a rail beside it.
+  - **No policy:** the Global Default's own rules, read only.
+  - **Code:** `app-policy-view.tsx`, `app-policy-model.ts` (pure, tested), `app-activity.tsx` and `sign-in-tests/activity-row.tsx` (shared with the Sign-in activity page).
+  - **Data fix:** an app's sample sign-ins are drawn from its own policy's people (`appReport`). Before, Box's own rules decided none of them.
+  - **Access checks:** `session.prefill` fills Access checks without running.
+  - **Replace:** `replaceOnApp` makes Replace one write with one Undo.
+  - Break-in stays behind `BREAK_IN_ON_APP = false`.
+- **Footers end with the form (owner, 15 Oct).** Every `.bx-savebar` puts its words and buttons inside the form column. `footer-edge.ts` measures `.bz7__cols > :first-child`, else a `data-footer-edge` element, else `.bpage` inside its padding. The device profile wizard's progress bar is the form's width above 1120px. This supersedes the 16 Sep full-width stepper.
+- **Open for the owner:**
+  1. The picker drawing.
+  2. The kit's face overlap clips two-letter initials such as "MB" (a kit-wide −5px).
+  3. Active → Monitor has no Undo by design.
+- **Gate, 15 Oct (evening):** tsc 0 errors, oxlint 27 warnings, vitest 5,380 pass in 216 files, build ok. Browser-checked in a headless rig (acceptance checks 5-23 in the spec) and in my own tab (Box, Salesforce, the wizard and four save footers at 1686, 1000 and 375px).
+
+## 13 Oct 2026: Post sign-in policies
+
+Owner's brief, 13 Oct: a second policy type that acts after sign-in, during the session. Spec: `docs/specs/POST-SIGN-IN-POLICIES.md`. Model: `src/brand/post-sign-in.ts`. MoM: https://claude.ai/artifact/9ymzcs2Ndd9y8CyQbXAYhu (private). Research (local): `docs/research/post-login-13-oct/`.
+
+- **Rulings:**
+  - The names are "Sign-in policy" and "Post sign-in policy" ("login" never appears).
+  - The two types are kept apart, with no Monitoring.
+  - Actions: Allow · Deny · Step up · Terminate session · Block device. Block device applies to that app only.
+  - **The policy is independent of applications.** Apps are linked from the app's page, each link carrying that app's events. An event belongs to one policy at most.
+  - **It uses the same board as sign-in policies**, with no new builder "until needed".
+- **Model:**
+  - `type: 'Session'`, `session: { links: [{ appId, eventIds }] }`, `appIds` mirrors the links.
+  - Rules are `Policy.rules` with `Rule.action`. "Nothing else matched" is `fallback.action`.
+  - `turnOnIssue` names the first rule, or the last row, with no action. The store's guards (`refusesStatus`, `settled`) keep an incomplete one a draft.
+- **Policies page:**
+  - Line tabs Sign-in · Post sign-in. The chosen tab is remembered in `brand-policies-type`.
+  - New policy on Post sign-in opens an Untitled draft in the board.
+  - The row menu has Edit, the status switch and Delete only.
+- **The board** (`board/post-board.ts`, `PostThen.tsx`):
+  - The start node reads "An event in Slack and 1 more". Its pane is Who plus the linked apps, read only, with their events.
+  - The If menu has the 16 post conditions and drops the risk scores. Number conditions carry a unit, and Sign-in hours and days read Event hours and days.
+  - Then has five action cards, and "Not set" until one is chosen. A refused save or Turn on marks the card and says why under its Then.
+  - Left out for this type: Check access, Past sign-ins, Read as text, Describe it, the template chooser and the deny message.
+- **App page:**
+  - A Post sign-in tab (saved apps only) lists the linked policies with their events.
+  - **Link policy** is a two-step slider: first the policy or Create new policy, then the events. Events another policy holds are disabled and named, and "Reported after" events are tagged. With nothing ticked, the reason appears under the list.
+  - Each row has Edit events and Unlink (with Undo). Back from the board returns to this tab.
+- **Seed:** "Data export protection" (Active, Salesforce + Microsoft 365) and "Collaboration tools" (Draft, Slack + GitHub Enterprise; its last row has no action).
+- **Fence:** `post-sign-in-fence.test.tsx` keeps them out of the sign-in engine, `deciderFor`, app standing, Add existing, Protection, Access checks and Sign-in activity. Count tests count sign-in policies only.
+- **Gate, 13 Oct (evening):**
+  - tsc 0 errors, oxlint 27 warnings, build ok.
+  - vitest 5316 pass. ui-copy and player-ui timed out under load and passed alone.
+  - Browser-checked in my own tab: both tabs on Policies; a refused Turn on (toast, then the card marked on the board); the If menu; a number condition; the five actions; the start pane; save to Inactive; Back to the right tab; Salesforce's Post sign-in tab with Link policy (refusal, link, Undo toast, Back from the board); the sign-in tab leaving them out; the catalogue; a sign-in board unchanged.
+- **Open for the owner:**
+  1. Deny has no message for an event yet, because the sign-in default talks about signing in.
+  2. Check access for events.
+  3. Step up method and duration.
+  4. Post sign-in on an unsaved application.
+  5. Hide the Advanced, Sign-in options, Attributes and Metadata tabs behind a flag? (Asked 13 Oct: "don't need all forms.")
 
 ## House rules
 

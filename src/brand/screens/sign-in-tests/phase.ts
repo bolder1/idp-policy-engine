@@ -73,3 +73,19 @@ export const WHY_IN_FOCUS: boolean = true
     feel real). Off, the rows carry their marks alone, as the builder's do — the owner's pick the same day ("remove, no
     need"). */
 export const ROW_EVIDENCE: boolean = false
+
+/* One policy per application (owner, 20 Oct 2026: "only one policy per app, mostly. So we can merge the whole thing — the
+   policy, and add their rules inside, so maybe one card"). The Policies card (the search, "Policy 1 of 2 applies", the
+   applies / not reached list) and the Rule card become ONE Policy card: the policy that decides, its rules in order
+   inside it with each rule's outcome, the deciding rule open, Nothing else matched last, and the Global Default as its
+   quiet foot — the app Policies tab's 1:1 changes (20 Oct). When the Global Default decides, the card is the Global
+   Default, and one line under its head says why. Off: the four-key chain, as it was. */
+export const ONE_POLICY_CARD: boolean = true
+
+/* Past and blocked sign-ins open straight into their run (owner, 20 Oct 2026: "when I'm in a blocked sign-in or try to
+   click on any past sign-in, it should open immediately — no need to showcase the free-field form; it can start
+   directly"). Overrides only-Run-runs for these opens alone: Blocked sign-ins (the empty canvas's Recently blocked and the
+   Blocked panel) and the builder's Past sign-ins. The list stays beside the run with the row marked. A page that mounts on
+   a run (Sign-in activity's or the app tab's Open in Check access) gives the canvas the focus and says the answer once.
+   Off: a past or blocked sign-in fills the form and waits for Run, as it did. */
+export const OPEN_AT_ONCE: boolean = true

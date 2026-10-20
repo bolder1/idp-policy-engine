@@ -71,13 +71,13 @@ describe('Saved sign-ins, at the panel’s width', () => {
 
   it('lists this policy’s saved sign-ins only, every one a pass', () => {
     /* Maya Iyer's renamed for her case, her London one and Priya's (the
-       troubleshooting cases, 30 Sep 2026) are on GitHub too. */
+       troubleshooting cases, renamed 14 Oct 2026) are on GitHub too. */
     expect(rowNames(out).sort()).toEqual([
       'Arun Patel in the office',
       'Contractor at home on Jira',
       'Maya Iyer on GitHub from London — same answer',
       'Maya Iyer on GitHub — Engineering and Finance',
-      'Priya Sharma on GitHub — a draft that would not decide',
+      'Priya Sharma on GitHub — Finance has its own rule',
       'Sofia Marchetti in London on an iPhone',
       'Tom Whelan on Windows 10',
     ])

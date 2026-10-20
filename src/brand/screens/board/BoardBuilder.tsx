@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, History as PastIcon, Keyboard, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Redo2, ShieldAlert, Trash2, Undo2, Users, Wrench, type LucideIcon } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, History as PastIcon, Keyboard, ListChecks, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Redo2, ShieldAlert, Trash2, Undo2, Users, Wrench, type LucideIcon } from 'lucide-react'
 
 import { Button, Modal, Tip } from '../../kit'
 import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
@@ -33,6 +34,12 @@ import type { SignInFacts } from '../sign-in-facts'
 import { Board } from './Board'
 import { BAR_DEMO, BAR_TOUR } from './bar-tools'
 import { DescribePanel } from './DescribePanel'
+import { DESCRIBE_BAR, DESCRIBE_CARD, GUIDED_SETUP } from './describe-stage'
+import { DescribeDoor, type DescribeContext } from './DescribeMagic'
+import { GuidedSetup } from './GuidedSetup'
+import { guidedOffered, planGuided, readGuidedSide, ruleLabel, sameSet, writeGuidedSide, type GuidedAct, type GuidedEntry, type GuidedSide } from './guided-setup'
+import { useAppsGuard } from './apps-guard'
+import { ownerOf } from '../app-policies'
 import {
   RULES_ADDED,
   bodyOf,
@@ -64,6 +71,8 @@ import { applyConflictFixes, type FixItem } from '../sign-in-tests/conflict-fix'
 import { CHECK_PANEL_NARROW, CHECK_PANEL_WIDE, PEOPLE_AND_BREAK_IN, checkViews, type BoardOpen, type CheckView } from './test-mode'
 import { nextPart, patchRule as patchOne, ruleAt, type Part, type Selection } from './model'
 import { copyName } from './parts'
+import { isPostSignIn } from '../../post-sign-in'
+import { PostBoardContext, committedPost, issueTarget, linkedAppsOf, postFindings, saveRefused, type PostBoard, type Refusal } from './post-board'
 import { boardShortcuts, chord, isMacPlatform } from './shortcuts'
 
 import { boardTourSeen } from '../../tour/board-tour'
@@ -135,8 +144,11 @@ const CHECK_PANELS = '.sit-panel'
 /* Each Check access view's mark in the palette, as on its bar button. */
 const VIEW_ICON: Record<CheckView, LucideIcon> = { past: PastIcon, people: Users, 'break-in': ShieldAlert }
 /* Describe it's thread (V4 §4.1): its own track on the left, not the
-   inspector's, and a surface a rule shortcut never reaches either. */
-const DESCRIBE_SURFACE = '.bdsc'
+   inspector's, and a surface a rule shortcut never reaches either — nor
+   Guided setup's panel, wherever it stands. */
+const DESCRIBE_SURFACE = '.bdsc, .bgs'
+/* Guided setup's width, on the right (the inspector's track) as on the left. */
+const GUIDED_W = 400
 
 /* Before saving, as it last ran: what the checks said, what they read, and
    the rules they read — by reference, so an Undo pressed behind the page is
@@ -211,6 +223,8 @@ export function BoardBuilder({
   const [describing, setDescribing] = useState(false)
   const [describeState, setDescribeState] = useState<DescribeState>(emptyDescribe)
   const describeIds = useRef<RuleIds>(new Map())
+  /* The audience Describe it last wrote, so a Who saved from the start node's pane since is kept (factsToSave). */
+  const threadAudience = useRef<Policy['audience'] | null>(null)
   const session = useRef<DescribeSession | null>(null)
   /* The thread as this opening found it: what the toast's Undo gives back
      with the board, so the two never disagree about what was written. */
@@ -263,6 +277,31 @@ export function BoardBuilder({
   /* A card clicked while the panel is open, and the answer under the pointer. */
   const [describeFocus, setDescribeFocus] = useState<{ key: AnswerKey; n: number } | null>(null)
   const [tracing, setTracing] = useState<AnswerKey | null>(null)
+  /* Describe it's held turn (sendDescribe), and the canvas cue while it plays. */
+  const heldDescribe = useRef<DescribeState | null>(null)
+  const [cooking, setCooking] = useState(false)
+  /* Guided setup (GUIDED_SETUP; GuidedSetup.tsx, guided-setup.ts): where its panel stands — remembered per viewer —
+     every action of this visit (its log, oldest first), and the action held from its plan until the panel's canvas
+     beat writes it, as one history entry. `guidedApps` carries an Add rule on past the start node's checks before
+     saving applications, when they open their page. */
+  const [guidedSide, setGuidedSideNow] = useState<GuidedSide>(readGuidedSide)
+  const setGuidedSide = (s: GuidedSide) => {
+    setGuidedSideNow(s)
+    writeGuidedSide(s)
+  }
+  const [guidedLog, setGuidedLog] = useState<GuidedEntry[]>([])
+  /* The applications an Add rule chose ride on the board, unsaved until Save policy, like its rules: each history
+     entry they hold is marked here with them and with the stored list they were chosen over (`over`). Undo, Redo
+     and Discard move between entries, so the list moves with the rules and nothing is written to the stored policy
+     before a save. A mark goes stale — and the stored list stands — once the stored list changes under it (a save,
+     the start node's own Save applications). */
+  const [pendingApps] = useState(() => new WeakMap<Policy, { apps: string[]; over: string[] }>())
+  /* The entries Discard left as the present: the edits under one are no longer on the board. */
+  const [discards] = useState(() => new WeakSet<Policy>())
+  const guidedHeld = useRef<GuidedEntry | null>(null)
+  const guidedSeq = useRef(0)
+  const guidedApps = useRef<((ids: string[]) => void) | null>(null)
+  const appsGuard = useAppsGuard()
   /* The last policy handed to the history, and the history as last rendered —
      both for Undo on a removal toast, which acts seconds after the removal. */
   const lastCommitted = useRef<Policy | null>(null)
@@ -484,8 +523,47 @@ export function BoardBuilder({
      when it spreads the draft into the store) sees the saved facts, and
      publishing can never write an old name or app list back over a new one. */
   const present = hist.present
-  const facts = useMemo(() => (saved ? { name: saved.name, appIds: saved.appIds, audience: saved.audience } : null), [saved])
-  const draft = useMemo(() => (facts ? { ...present, ...facts } : present), [present, facts])
+  /* Who is a rule's question only (owner, 14 Oct 2026): a new rule starts empty, which reads as Everyone. */
+  const newRule = () => blankRule()
+  /* A post sign-in policy's links are a standing fact too: they are made from
+     the applications' pages while the board may be open, so the stored ones
+     are read here and a save never writes old links back. */
+  const facts = useMemo(
+    () => (saved ? { name: saved.name, appIds: saved.appIds, audience: saved.audience, ...(saved.session ? { session: saved.session } : null) } : null),
+    [saved],
+  )
+  /* Guided setup's applications, while a history entry holds a list the stored policy does not (`pendingApps`). */
+  const pendingOn = (p: Policy, stored: Policy | undefined): string[] | null => {
+    if (!GUIDED_SETUP || !stored) return null
+    const m = pendingApps.get(p)
+    return m && sameSet(m.over, stored.appIds) && !sameSet(m.apps, stored.appIds) ? m.apps : null
+  }
+  const pending = pendingOn(present, saved)
+  const draft = useMemo(() => (facts ? { ...present, ...facts, ...(pending ? { appIds: pending } : null) } : present), [present, facts, pending])
+  /* The same board builds a post sign-in policy (owner, 13 Oct 2026: "use the
+     same sign-in builder for post sign-in as well"; post-board.ts). It has no
+     sign-in to read, so Check access, Past sign-ins, Describe it, the
+     template chooser and the checks before saving stay off for it. */
+  const post = isPostSignIn(draft)
+  /* A save or a Turn on refused for a rule or the last row with no action:
+     the reason stands under that card's Then until it is answered, and moves
+     to the next one left (post-board.ts `issueTarget`). */
+  const [attempted, setAttempted] = useState(false)
+  const issue = useMemo(() => (post ? issueTarget(draft) : null), [post, draft])
+  const refusal: Refusal | null = attempted ? issue : null
+  useEffect(() => {
+    if (attempted && !issue) setAttempted(false)
+  }, [attempted, issue])
+  /* A route to another policy's board keeps this builder mounted: it starts
+     with no reason standing. */
+  const boardOf = saved?.id
+  useEffect(() => setAttempted(false), [boardOf])
+  const refusalAt = refusal?.at
+  const refusalText = refusal?.text
+  const postBoard = useMemo<PostBoard>(
+    () => ({ on: post, refusal: refusalAt && refusalText ? { at: refusalAt, text: refusalText } : null }),
+    [post, refusalAt, refusalText],
+  )
   /* ONE CARD OPEN AT A TIME, and selecting a card opens it (owner, 23 Sep 2026:
      "when I select any rule card it should expand, and one card can expand at a
      time — so if I want to expand another card, the current expanded one should
@@ -545,7 +623,16 @@ export function BoardBuilder({
   /* Describe it's left track switches the same way (V4 §4.1): the panel's
      own slide-in is the motion, and the canvas refits once beside it. */
   const describeOpen = describing && !testOn
-  const layout = testOn ? 'test' : describeOpen ? 'describe' : 'edit'
+  /* Guided setup stands left, right, or left beside the rule panel. Left or right, the canvas is its output and the
+     rule panel is closed; beside, the rule panel is open and the canvas can be edited as ever (guided-setup.css). */
+  const guidedOpen = GUIDED_SETUP && describeOpen
+  const guidedBeside = guidedOpen && guidedSide === 'beside'
+  const guidedRight = guidedOpen && guidedSide === 'right'
+  const canvasLocked = describeOpen && !guidedBeside
+  /* Beside the rule panel, the canvas is refitted as that panel opens and closes too (`fitKey`, below). */
+  const besideInsp =
+    guidedBeside && inspOpen && (selection.kind === 'fallback' || selection.kind === 'apps' || (selection.kind === 'rule' && present.rules.some((r) => r.id === selection.id)))
+  const layout = testOn ? 'test' : describeOpen ? `describe-${GUIDED_SETUP ? guidedSide : 'left'}${besideInsp ? '-insp' : ''}` : 'edit'
   const [snapFor, setSnapFor] = useState(layout)
   const snapping = snapFor !== layout
   useEffect(() => {
@@ -572,6 +659,8 @@ export function BoardBuilder({
     () => ({ apps: store.apps, groups: store.groups, users: store.users, zones: store.zones, fingerprints: store.fingerprints, methods: store.methods, policies: store.policies, scenarios: store.scenarios }),
     [store.apps, store.groups, store.users, store.zones, store.fingerprints, store.methods, store.policies, store.scenarios],
   )
+  /* The tenant's own risk bands, for Guided setup's Deny at high risk: read when asked for, once per tenant. */
+  const guidedCut = useRef<{ tenant: DescribeTenant; cut: { mediumFrom: number; highAbove: number } } | null>(null)
   /* The checks under the answers (describe-checks.ts): a handful of sign-ins
      built from them, tried through the whole tenant with the draft on. On
      today's date where the tenant is, as Check access starts. */
@@ -580,7 +669,8 @@ export function BoardBuilder({
   const describeReading = describeState.reading
   const describeChecks = useMemo(
     () =>
-      describeOpen && features.draftChecks
+      /* Guided setup has no checks row: it says what changed in plain lines. */
+      describeOpen && !GUIDED_SETUP && features.draftChecks
         ? checksView(describeReading.answers, { draft, sources, tenant: describeTenant, env, adminId: store.account.id, today })
         : undefined,
     /* Not the box: typing leaves the reading as it was, so nothing here runs while the admin types. */
@@ -607,16 +697,24 @@ export function BoardBuilder({
      it runs on. */
   const pagesAllowed = boardPagesAllowed(features.policyTesting, features.breakInTest, draft)
   const views = checkViews({ policyTesting: features.policyTesting, breakIn: pagesAllowed.breakIn })
-  const diagnostics = useMemo(() => (saved ? diagnose(draft, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints }) : []), [draft, store.groups, store.hooks, store.users, store.zones, store.fingerprints, saved])
-  const shadowed = useMemo(() => (hover === null ? [] : shadowedBy(draft, hover)), [draft, hover])
+  /* A post sign-in policy keeps the structural findings only: the rest read a
+     rule as a sign-in (post-board.ts `postFindings`). Nor is a rule shadowed
+     on hover there — that is worked out from what each rule decides. */
+  const diagnostics = useMemo(() => {
+    if (!saved) return []
+    const all = diagnose(draft, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints })
+    return post ? postFindings(all) : all
+  }, [draft, store.groups, store.hooks, store.users, store.zones, store.fingerprints, saved, post])
+  const shadowed = useMemo(() => (hover === null || post ? [] : shadowedBy(draft, hover)), [draft, hover, post])
   /* Draft mode — see policy-draft.ts.
 
      `unsaved` is measured against the last save or draft: it drives the leave
      guard, Save draft and the pill. `live` is measured against the rules that
      decide sign-ins: it drives the readings and, with a never-published policy,
      the publish gate. */
-  const unsaved = !!saved && hasUnsavedChanges(saved, draft)
-  const live = !!saved && differsFromLive(saved, draft)
+  /* Applications Guided setup chose and nothing has saved yet count as an edit, as its rules do. */
+  const unsaved = !!saved && (hasUnsavedChanges(saved, draft) || !!pending)
+  const live = !!saved && (differsFromLive(saved, draft) || !!pending)
   const toPublish = live || saved?.status === 'draft'
   const hasDraft = !!saved?.pendingDraft
   /* The edits themselves, for the bar's status control; undefined when there
@@ -633,6 +731,9 @@ export function BoardBuilder({
     if (!saved) return false
     const latest = store.policyById(saved.id) ?? saved
     const facts = saveFacts(latest)
+    /* Applications Guided setup chose are a standing fact, not a rule: a saved draft holds rules only, so they are
+       saved to the policy itself, past the checks the Add rule already ran. */
+    if (pending) store.savePolicy({ ...latest, ...facts, appIds: [...pending] })
     store.saveDraft(saved.id, { rules: draft.rules, fallback: draft.fallback, checks: draft.checks })
     afterSave({ ...latest, ...facts })
     /* New marks a fix not saved yet. */
@@ -830,6 +931,11 @@ export function BoardBuilder({
     /* Everything below acts on the selected rule, or is a single key. Escape
        still reaches the board from the panel; it has its own test at the end. */
     if (owned && e.key !== 'Escape') return
+    /* A locked canvas (Guided setup on the left or the right) is the panel's output: the keys that edit a rule — ⌘D,
+       ⌥↑ / ⌥↓, [ and ], Delete, E — stand down as its buttons do. Bare ↑ / ↓ still move the selection, which is the
+       panel's context; undo, redo and Escape are above and below. */
+    const lockedKey = canvasLocked && (((cmd && e.key.toLowerCase() === 'd') || ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.altKey)) || e.key === '[' || e.key === ']' || e.key === 'Delete' || (e.key.toLowerCase() === 'e' && !cmd && !e.altKey))
+    if (lockedKey) return
 
     if (cmd && e.key.toLowerCase() === 'd') {
       if (at < 0) return
@@ -949,7 +1055,13 @@ export function BoardBuilder({
      `keep-off` because turning a draft on was the dialog's other button, and
      that lives on the status pill beside the name. */
   const saveNow = () => {
-    if (toPublish && !saveBlocked) checkThenPublish('keep-off')
+    if (!toPublish || saveBlocked) return
+    /* A live post sign-in policy is never saved back to draft for a rule left
+       without an action: the save is refused and the reason said under it
+       (post-board.ts `saveRefused`). A draft saves as a draft. */
+    const refused = post && saved ? saveRefused(saved, draft) : null
+    if (refused) return refuse(refused)
+    checkThenPublish('keep-off')
   }
 
   /* --- Before saving (final spec, D.5) ------------------------------------------
@@ -1047,8 +1159,10 @@ export function BoardBuilder({
      end with nothing on screen to explain it. Every caller, one handler. */
   const select = (s: Selection) => {
     /* While Describe it is open a card opens the answer it came from, not the
-       rule editor: the panel is what writes the cards (describe spec, §3.8). */
-    if (describeOpen) {
+       rule editor: the panel is what writes the cards (describe spec, §3.8).
+       Guided setup's panel takes the card as its context instead — the
+       selection itself, so beside the rule panel that panel opens on it too. */
+    if (describeOpen && !GUIDED_SETUP) {
       const key: AnswerKey | null = s.kind === 'rule' ? 'signIn' : s.kind === 'fallback' ? 'fallback' : s.kind === 'apps' ? 'apps' : null
       if (key) setDescribeFocus({ key, n: Date.now() })
       return
@@ -1069,6 +1183,23 @@ export function BoardBuilder({
     if (s.kind === 'rule') openOnly(s.id)
     else if (s.kind === 'fallback') openOnly('fallback')
   }
+  /* A post sign-in policy's refused save or Turn on (post-board.ts): the
+     card it is about is chosen, opened in the panel and shown on the chain,
+     marked while it stands, and focus lands on its Then — where the reason
+     is said, under the question it is about. Never a disabled button. */
+  const refuse = (r: Refusal) => {
+    setAttempted(true)
+    select(r.at === 'fallback' ? { kind: 'fallback' } : ruleAt(r.at, 'when'))
+    setFlash({ id: r.at, key: Date.now() })
+    focusSoon(() => document.querySelector<HTMLElement>('.bb__insp [role="radiogroup"] [role="radio"]'), true)
+  }
+  /* The status pill's Turn on, refused for the stored policy
+     (use-status-change.tsx), asks the board to show the rule: on this type
+     that is the card left without an action, as the draft holds it. */
+  const revealIssue = () => {
+    const r = issueTarget(draft)
+    if (r) refuse(r)
+  }
   /* The panel is on screen only when it has something to say AND has not been
      collapsed. One class for both, because the layout must not be able to tell
      them apart: either way the stage has the width back.
@@ -1079,7 +1210,9 @@ export function BoardBuilder({
      of the DOM. The panel is a track now, so collapsing the track is the whole
      of the adjustment and everything drawn inside the stage follows for
      free. */
-  const panelShown = hasSubject && inspOpen
+  /* Describe it closes the rule panel while it is open; Guided setup does too, except beside it. */
+  const inspBlocked = describeOpen && !guidedBeside
+  const panelShown = hasSubject && inspOpen && !inspBlocked
 
   /* The panel outlives its own close by one animation.
 
@@ -1138,8 +1271,16 @@ export function BoardBuilder({
     focusSoon(() => testButton.current?.querySelector<HTMLElement>('button') ?? null)
   }
   const toggleTest = () => (testOn ? closeTest() : startTest())
-  /* A view's button on the bar (Past sign-ins): its view in the panel, or the panel shut. */
-  const toggleView = (v: CheckView) => setCheckPanel((p) => (p === v ? null : v))
+  /* A view's button on the bar (Past sign-ins), a thing of its own (owner, 19 Oct 2026): from anywhere it opens its
+     view; pressed again it closes the whole check, since it was what opened it. */
+  const toggleView = (v: CheckView) => {
+    if (!testOn) enterTest(v)
+    else if (checkPanel === v) closeTest()
+    else setCheckPanel(v)
+  }
+  /* Check access while a view has the panel: back to Check access itself, not closed. */
+  const viewOn = testOn && checkPanel !== null && (views as readonly string[]).includes(checkPanel)
+  const pressTest = () => (viewOn ? setCheckPanel(null) : toggleTest())
   /* Read as text (describe spec, §7.2). It takes the column from whatever
      holds it — the rule editor, Describe it (closed as Done closes it), or
      Check access — and gives it back on close: a card that is selected gets
@@ -1210,8 +1351,11 @@ export function BoardBuilder({
     if (firstArrival(arrived, fixKey)) arrival.current()
   }, [fixKey])
 
-  /* Describe it's thread, reopened from the palette as from the door on the canvas. */
-  const describeDoorCmd = !!saved && describeOffered(features.describePolicy, saved) && describeState.turns.length > 0 && !describeOpen && !testOn
+  /* Describe it's thread, reopened from the palette as from the door on the canvas. Guided setup is offered there
+     whenever it is on the canvas: any App Access policy but the system one, draft or live. */
+  const describeDoorCmd = GUIDED_SETUP
+    ? guidedOffered(features.describePolicy, saved) && !describeOpen && !testOn
+    : !!saved && describeOffered(features.describePolicy, saved) && describeState.turns.length > 0 && !describeOpen && !testOn
   /* Under Check access the chain is hidden under its canvas, so the palette
      offers only what still means something there: the policy's save, the
      sheet, Check access itself, and its views. */
@@ -1219,7 +1363,7 @@ export function BoardBuilder({
   const boardCommands: Cmd[] = [
     /* Not while Describe it is open: the text writes the rules then. */
     ...(describeOpen || !editing ? [] : ([{ id: 'add', label: 'Add a rule', icon: Plus }] as Cmd[])),
-    ...(selAt >= 0 && editing
+    ...(selAt >= 0 && editing && !canvasLocked
       ? ([
           { id: 'dup', label: `Duplicate rule ${selAt + 1} · ${selName}`, kbd: chord(['mod'], 'D', MAC), icon: CopyPlus },
           { id: 'del', label: `Delete rule ${selAt + 1} · ${selName}`, kbd: 'Del', icon: Trash2, danger: true },
@@ -1233,7 +1377,7 @@ export function BoardBuilder({
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
     ...(canTest ? ([{ id: 'try', label: testOn ? `Close ${ACCESS_CHECK}` : ACCESS_CHECK, kbd: 'T', icon: LogIn }] as Cmd[]) : []),
     ...(testOn ? views.map((v) => ({ id: `view:${v}`, label: DOCK_TAB_LABEL[v], icon: VIEW_ICON[v] }) as Cmd) : []),
-    ...(describeDoorCmd ? ([{ id: 'describe', label: 'Describe it', icon: PenLine }] as Cmd[]) : []),
+    ...(describeDoorCmd ? ([{ id: 'describe', label: GUIDED_SETUP ? 'Start guided setup' : 'Describe it', icon: GUIDED_SETUP ? ListChecks : PenLine }] as Cmd[]) : []),
     ...(editing ? draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd) : []),
   ]
 
@@ -1242,7 +1386,12 @@ export function BoardBuilder({
   /* --- Edits -------------------------------------------------------------------- */
   const commitDraft = (next: Policy) => {
     lastCommitted.current = next
-    setHist((h) => commit(h, next))
+    setHist((h) => {
+      /* Applications Guided setup chose and nothing saved yet ride on to the next entry (`pendingApps`). */
+      const m = pendingApps.get(h.present)
+      if (m && !pendingApps.has(next)) pendingApps.set(next, m)
+      return commit(h, next)
+    })
   }
   /* Every removal says what went, with Undo, for six seconds (owner, 21 Sep
      2026). Undo steps back only while the removal is still the latest edit: a
@@ -1384,6 +1533,13 @@ export function BoardBuilder({
      Check access and Read as text; Check access closes it (`enterTest`). */
   const openDescribe = () => {
     if (testOn) leaveTest()
+    /* Guided setup keeps the selection — the card it opens on is its context — and writes nothing on opening. */
+    if (GUIDED_SETUP) {
+      setReading(false)
+      setReadHover(null)
+      setDescribing(true)
+      return
+    }
     const stored = store.policyById(saved.id) ?? saved
     session.current = describeSession(stored.audience, present.fallback, stored.appIds)
     /* A thread goes on keeping its cards' ids from opening to opening, so a
@@ -1399,6 +1555,21 @@ export function BoardBuilder({
     setReadHover(null)
     setDescribing(true)
   }
+  /* The canvas's door into Describe it (DescribeMagic.tsx): offered where Describe it is; the selected card is named
+     in it as the context it opens on (owner, 19 Oct 2026). It is also the way back to a closed thread. */
+  const describeBar =
+    DESCRIBE_BAR && !!saved && (GUIDED_SETUP ? guidedOffered(features.describePolicy, saved) : describeOffered(features.describePolicy, saved)) && !testOn && !readOpen && !describeOpen
+  const barContext: DescribeContext | null = (() => {
+    if (selection.kind === 'rule') {
+      const at = draft.rules.findIndex((x) => x.id === selection.id)
+      const rule = draft.rules[at]
+      return rule ? { label: `Rule ${at + 1} · ${rule.name.trim() || 'Untitled rule'}` } : null
+    }
+    /* Guided setup takes a rule as its context, never the last row (its Everyone else tiles are always at hand), so
+       the door names only what the panel opens on. */
+    if (selection.kind === 'fallback' && !GUIDED_SETUP) return { label: 'Nothing else matched' }
+    return null
+  })()
   /* A composed draft from the answers: the last row the thread found when it
      began, where the answers give none. The rules the admin added by hand
      stay (`describeWritten`). */
@@ -1442,14 +1613,30 @@ export function BoardBuilder({
     }
     markWrite(s, h.present, shown, { ...factsOf(latest), appIds })
   }
-  /* A message sent from the composer, an example or a follow-up chip. */
-  const sendDescribe = (message: string) => {
+  /* A message sent from the composer, an example or a follow-up chip.
+
+     `hold` (describe-stage.ts): the turn shows in the panel now, and the board is written when the panel's steps reach
+     the canvas (`commitDescribe`), so the cards arrive when the panel says they do. Closing the panel commits first. */
+  const sendDescribe = (message: string, hold = false) => {
     if (!session.current) return
     const latest = store.policyById(saved.id) ?? saved
     /* The applications are the store's: the draft's own copy goes stale when an answer saves them. */
     const board = { ...bodyOf(histNow.current.present), appIds: latest.appIds }
     const next = sendTurn(describeState, message, { dict: dictionaryOf(describeTenant), tenant: describeTenant, board, audience: latest.audience, view: describeBoard })
-    if (next !== describeState) writeDescribe(next, true)
+    if (next === describeState) return
+    if (!hold) {
+      writeDescribe(next, true)
+      return
+    }
+    heldDescribe.current = next
+    setCooking(true)
+    writeDescribe(next, false)
+  }
+  const commitDescribe = () => {
+    const held = heldDescribe.current
+    heldDescribe.current = null
+    setCooking(false)
+    if (held) writeDescribe(held, true)
   }
   /* The latest turn's Undo: the board, the text and the reading as they were
      before it — in the history as this opening's one entry (describe-session.ts).
@@ -1512,6 +1699,8 @@ export function BoardBuilder({
      everything, and saves the name and audience the thread gives. */
   const finishDescribe = (quiet = false) => {
     if (!describing) return
+    if (GUIDED_SETUP) return closeGuided()
+    commitDescribe()
     setDescribing(false)
     setTracing(null)
     setHoverLast(false)
@@ -1555,6 +1744,146 @@ export function BoardBuilder({
     const first = after.rules[0]
     focusSoon(first ? byId(`bb-rule-${first.id}-title`) : () => document.getElementById('bb-start'))
   }
+  /* --- Guided setup ------------------------------------------------------------
+
+     Every action is planned on the board as it stands (guided-setup.ts) and
+     held while the panel plays it; the panel's canvas beat writes it here as
+     ONE history entry (`commitGuided`) — an ordinary edit, unsaved until Save
+     policy, that the bar's Undo and Redo, Discard and the panel's Undo all
+     move through. Nothing is written before the beat, and nothing is written
+     to the stored policy at all: the audience never, and the applications an
+     Add rule chooses ride on the entry (`pendingApps`) until Save policy
+     stores them with the rules. On a policy that decides sign-ins the start
+     node's checks before saving applications run first, as its pane runs
+     them. */
+  const guidedCutoffs = () => {
+    if (guidedCut.current?.tenant !== describeTenant) guidedCut.current = { tenant: describeTenant, cut: dictionaryOf(describeTenant).cutoffs }
+    return guidedCut.current.cut
+  }
+  /* The board as a plan reads it: its rules and last row, the applications it shows, and the policy's audience. */
+  const guidedBoard = (p: Policy, stored: Policy) => ({ rules: p.rules, fallback: p.fallback, appIds: pendingOn(p, stored) ?? stored.appIds, audience: stored.audience })
+  const runGuided = (act: GuidedAct) => {
+    if (guidedHeld.current) return
+    const latest = store.policyById(saved.id) ?? saved
+    const appsBefore = [...guidedBoard(histNow.current.present, latest).appIds]
+    const go = (a: GuidedAct) => {
+      const base = histNow.current.present
+      const plan = planGuided(guidedBoard(base, store.policyById(saved.id) ?? saved), a, describeTenant, guidedCutoffs())
+      guidedSeq.current += 1
+      const entry: GuidedEntry = { id: guidedSeq.current, act: a, plan, base, after: null, wrote: false, appsBefore }
+      guidedHeld.current = entry
+      setCooking(true)
+      setGuidedLog((l) => [...l, entry])
+    }
+    if (act.kind !== 'add' || sameSet(act.pick.apps, appsBefore)) return go(act)
+    const proceed = (ids: readonly string[]) => go({ ...act, pick: { ...act.pick, apps: [...ids] } })
+    if (!appsGuard.guards(latest)) return proceed(act.pick.apps)
+    guidedApps.current = proceed
+    appsGuard.check(latest, [...act.pick.apps], (ids) => proceed(ids))
+  }
+  /* The canvas beat. A board that moved since the plan — an edit beside it, an Undo — is planned again first. */
+  const commitGuided = (id: number) => {
+    const held = guidedHeld.current
+    if (!held || held.id !== id) return
+    guidedHeld.current = null
+    setCooking(false)
+    const present = histNow.current.present
+    const stored = store.policyById(saved.id) ?? saved
+    const board = guidedBoard(present, stored)
+    const plan = present === held.base ? held.plan : planGuided(board, held.act, describeTenant, guidedCutoffs())
+    const appsChange = !sameSet(plan.appIds, board.appIds)
+    let after = present
+    let wrote = false
+    if (plan.changed || appsChange) {
+      const next: Policy = { ...present, rules: plan.rules, fallback: plan.fallback, ...(appsChange ? { appIds: [...plan.appIds] } : null) }
+      const mark = appsChange ? { apps: [...plan.appIds], over: [...stored.appIds] } : pendingApps.get(present)
+      if (mark) pendingApps.set(next, mark)
+      const h = commit(histNow.current, next)
+      if (h !== histNow.current) {
+        lastCommitted.current = h.present
+        histNow.current = h
+        setHist(h)
+        after = h.present
+        wrote = true
+        const ids = changedCards(bodyOf(present), bodyOf(h.present))
+        if (ids.length > 0) setFresh((f) => ({ ids, n: (f?.n ?? 0) + 1 }))
+      } else if (mark) pendingApps.set(present, mark)
+    }
+    setGuidedLog((l) => l.map((e) => (e.id === id ? { ...e, plan, after, wrote } : e)))
+    /* The rule it added or changed becomes the context, so its quick actions are the next step. */
+    if (plan.focus && plan.rules.some((r) => r.id === plan.focus)) {
+      setSelection(ruleAt(plan.focus))
+      openOnly(plan.focus)
+      setInspOpen(true)
+    } else if (held.act.kind === 'delete') setSelection({ kind: 'none' })
+  }
+  /* Whether an action's write is still on the board: it is the present, or under the present with no Discard since —
+     or it was saved. The toolbar's Undo and Redo move an action out of force and back, as the panel's Undo does. */
+  const guidedInForce = (e: GuidedEntry): boolean => {
+    if (!e.wrote || !e.after || e.kept) return true
+    if (hist.present === e.after) return true
+    const k = hist.past.indexOf(e.after)
+    return k >= 0 && ![...hist.past.slice(k + 1), hist.present].some((p) => discards.has(p))
+  }
+  const guidedUndone = new Set(guidedLog.filter((e) => !guidedInForce(e)).map((e) => e.id))
+  /* The panel's Undo, on its latest action while that action's write is still the present: one step back through the
+     board's history, so the bar's Redo brings it back. Its applications go back with it; nothing was saved. */
+  const undoGuided = (id: number) => {
+    const e = guidedLog.find((x) => x.id === id)
+    if (!e || !e.after || !e.wrote) return
+    if (histNow.current.present !== e.after) {
+      store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
+      return
+    }
+    moveHistory(undo(histNow.current))
+    setFresh(null)
+  }
+  /* The selected card is the panel's context; anything else, a new rule. */
+  const guidedContext = (() => {
+    if (selection.kind !== 'rule') return null
+    const label = ruleLabel(draft.rules, selection.id)
+    return label ? { ruleId: selection.id, label } : null
+  })()
+  const lastGuided = guidedLog.length > 0 ? guidedLog[guidedLog.length - 1] : null
+  const guidedUndoable = lastGuided && lastGuided.wrote && lastGuided.after && lastGuided.after === hist.present && !lastGuided.kept ? lastGuided.id : null
+  /* The checks before saving applications, when they open their page: confirmed, the Add rule goes on. */
+  const guidedAppsPage = GUIDED_SETUP ? appsGuard.page({ primaryLabel: 'Add rule', onConfirm: (ids) => guidedApps.current?.(ids) }) : null
+  /* × and Esc, Check access and Read as text: an action still playing is written first, and the door has the focus. */
+  const closeGuided = () => {
+    const held = guidedHeld.current
+    if (held) commitGuided(held.id)
+    setDescribing(false)
+    setCooking(false)
+    setFresh(null)
+    focusSoon(() => document.querySelector<HTMLElement>('.bb__magic') ?? document.getElementById('bb-start'))
+  }
+  const guidedPanel = guidedOpen ? (
+    <GuidedSetup
+      tenant={describeTenant}
+      draft={draft}
+      context={guidedContext}
+      side={guidedSide}
+      log={guidedLog}
+      undoable={guidedUndoable}
+      undone={guidedUndone}
+      cutoffs={guidedCutoffs()}
+      appsTaken={(id) => ownerOf(id, store.policies, saved.id)?.name}
+      onSide={(s) => {
+        /* Across the canvas the panel is drawn anew: an action still playing is written first. */
+        if (s === 'right' || guidedSide === 'right') {
+          const held = guidedHeld.current
+          if (held) commitGuided(held.id)
+        }
+        setGuidedSide(s)
+      }}
+      onContext={(id) => (id ? select(ruleAt(id)) : setSelection({ kind: 'none' }))}
+      onAct={runGuided}
+      onCommit={commitGuided}
+      onUndo={undoGuided}
+      onClose={closeGuided}
+    />
+  ) : null
+
   /* The name and audience the thread's answers give, as Done saves them —
      for a save made before they are on the policy: the panel still open, or
      a thread a Redo brought back. Null with no thread, or once the policy is
@@ -1563,7 +1892,12 @@ export function BoardBuilder({
     const st = describeNow.current
     if (st.turns.length === 0 || !describeOffered(features.describePolicy, p)) return null
     const taken = store.policies.filter((x) => x.id !== p.id).map((x) => x.name)
-    const facts = doneFacts(p, st.reading.answers, describeTenant, taken)
+    const found = doneFacts(p, st.reading.answers, describeTenant, taken)
+    /* The audience is the thread's only while nothing else has set it: the
+       start node's pane saves Who straight to the policy (13 Oct 2026), and a
+       later save must not put the thread's answer back over it. */
+    const ours = threadAudience.current ? JSON.stringify(p.audience) === JSON.stringify(threadAudience.current) : p.audience.everyone
+    const facts = ours ? found : { ...found, audience: p.audience }
     return facts.name === p.name && JSON.stringify(facts.audience) === JSON.stringify(p.audience) ? null : facts
   }
   /* Those facts saved straight to the policy, as Done does; the name it
@@ -1572,6 +1906,7 @@ export function BoardBuilder({
     const facts = factsToSave(p)
     if (!facts) return null
     if (facts.name !== p.name) describedName.current = { from: p.name, to: facts.name }
+    threadAudience.current = facts.audience
     store.savePolicy({ ...p, ...facts })
     return facts
   }
@@ -1588,6 +1923,8 @@ export function BoardBuilder({
     threadMarks.current.set(histNow.current.present, { thread: describeNow.current, facts: factsOf(p) })
     leftFacts.current = factsOf(p)
     if (!describingNow.current) return
+    /* Guided setup works on a live policy as on a draft: it stays open. */
+    if (GUIDED_SETUP) return
     if (describeOffered(features.describePolicy, p)) {
       session.current = describeSession(p.audience, histNow.current.present.fallback, p.appIds)
       openedWith.current = describeNow.current
@@ -1674,13 +2011,18 @@ export function BoardBuilder({
        saved them yet — Save policy pressed with it open. */
     const facts = factsToSave(store.policyById(saved.id) ?? saved)
     if (facts && facts.name !== saved.name) describedName.current = { from: saved.name, to: facts.name }
-    const next = committed(saved, facts ? { ...draft, ...facts } : draft, intent)
+    /* A post sign-in policy saves by its own rule: no application is no
+       reason to stay a draft, and a rule without an action is
+       (post-board.ts `committedPost`). */
+    const next = post ? committedPost(saved, facts ? { ...draft, ...facts } : draft, intent) : committed(saved, facts ? { ...draft, ...facts } : draft, intent)
     /* `next`, not `draft`, into both the store and the undo stack, so they
        agree about the record from the moment it is saved. The store stamps
        lastModified only when something besides the stamp changed. */
     store.savePolicy(next)
     /* Save and turn on: the policy goes live, with its own chime (sound.ts). */
     if (next.status === 'active' && saved.status !== 'active') playCue('publish')
+    /* Guided setup's actions on the board now are saved: in force from here, whatever the new history holds. */
+    if (GUIDED_SETUP) setGuidedLog((l) => l.map((e) => (!e.kept && guidedInForce(e) ? { ...e, kept: true } : e)))
     const h = historyOf(next)
     histNow.current = h
     setHist(h)
@@ -1689,6 +2031,9 @@ export function BoardBuilder({
     /* "From your text" stays on a card until the policy is saved, and a fix's New with it. */
     setSources({})
     setFixedNew([])
+    /* A post sign-in draft saved with a rule or the last row still without
+       an action stays a draft; why is said under that card's Then. */
+    if (post && next.status === 'draft' && issueTarget(next)) setAttempted(true)
     /* Draft → Monitoring goes through Save first (owner, 25 Sep 2026): a draft
        leaves draft only by being saved, so what is monitored is what was just
        on screen. The first save leaves it off, and the toast offers the one
@@ -1756,7 +2101,10 @@ export function BoardBuilder({
     /* The thread (and what it gave the policy) as it was saved comes back
        with its rules; ⌘Z brings both back again. */
     const h = revertTo(histNow.current, saved)
-    if (h !== histNow.current) threadMarks.current.set(h.present, savedMark.current)
+    if (h !== histNow.current) {
+      threadMarks.current.set(h.present, savedMark.current)
+      discards.add(h.present)
+    }
     moveHistory(h)
     store.showToast(`Changes discarded. Press ${chord(['mod'], 'Z', MAC)} to undo.`)
   }
@@ -1812,7 +2160,9 @@ export function BoardBuilder({
   }
 
   return (
-    <>
+    /* Which kind of policy the canvas, the cards and the panel are drawing,
+       and a refused Turn on's reason (post-board.ts). */
+    <PostBoardContext.Provider value={postBoard}>
       {/* The policy, above the work.
 
           A sibling of `.bb` rather than a child, so the shell's flex column
@@ -1831,7 +2181,7 @@ export function BoardBuilder({
           commitDraft({ ...draft, rules: next.rules, fallback: next.fallback })
           offerUndo(toast)
         }}
-        onRevealRule={revealRule}
+        onRevealRule={post ? revealIssue : revealRule}
         onOpenBreakIn={openBreakInPage}
         onLearn={() => setTour(true)}
         onWatchDemo={BAR_DEMO ? () => setDemo(true) : undefined}
@@ -1840,9 +2190,10 @@ export function BoardBuilder({
             reading={readOpen}
             onRead={toggleRead}
             readRef={readButton}
-            testing={testOn}
+            testing={testOn && !viewOn}
             canTest={canTest}
-            onTest={toggleTest}
+            offerTest={draft.rules.length > 0 || testOn}
+            onTest={pressTest}
             testRef={testButton}
             views={views.length > 0 ? <CheckBarViews views={views} panel={checkPanel} onToggle={toggleView} /> : undefined}
             quietSave={testOn && checkPanel === 'form'}
@@ -1854,6 +2205,7 @@ export function BoardBuilder({
             onDiscard={discard}
             saveBlocked={saveBlocked}
             checking={checking}
+            post={post}
             onSave={saveNow}
           />
         }
@@ -1868,14 +2220,18 @@ export function BoardBuilder({
          under Check access is only hidden (check-access.css). */
       /* Describe it opens its own leading track and keeps the right one
          closed (V4 §4.1): the inspector never stands beside it. */
-      className={`bb ${testOn ? 'is-checking' : ''} ${describeOpen ? 'is-left-open' : ''} ${(testOn ? checkPanel !== null : panelShown || readOpen || fixesShown) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}`}
-      style={{ '--bb-insp': `${colW}px` } as React.CSSProperties}
+      className={`bb ${testOn ? 'is-checking' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
+      style={{ '--bb-insp': `${guidedRight ? GUIDED_W : colW}px` } as React.CSSProperties}
     >
       {/* Describe it, on the left in its own track (V4 §4.1). The selection
           is cleared while it is open, so the rule editor is never beside it.
           First in the region, as it is drawn first: Tab goes from the bar to
           the panel, then the canvas (the grid places each by its column). */}
-      {describeOpen && (
+      {/* Guided setup (GUIDED_SETUP): left, right, or left beside the rule panel — its own placement (guided-setup.css).
+          Before the canvas on the left; after it on the right, so Tab goes the way the eye does. */}
+      {guidedOpen && guidedSide !== 'right' && guidedPanel}
+      {guidedAppsPage && createPortal(<GuardDrawer {...guidedAppsPage} />, portalRoot())}
+      {describeOpen && !GUIDED_SETUP && (
         <DescribePanel
           tenant={describeTenant}
           policyId={saved.id}
@@ -1883,6 +2239,7 @@ export function BoardBuilder({
           board={describeBoard}
           onState={writeDescribe}
           onSend={sendDescribe}
+          onCommit={commitDescribe}
           onUndoTurn={undoDescribeTurn}
           onDone={() => finishDescribe()}
           onGo={goFromDescribe}
@@ -1893,6 +2250,30 @@ export function BoardBuilder({
           onTryCheck={canTest ? tryCheck : undefined}
         />
       )}
+      {/* The permanent door on the canvas (DescribeMagic.tsx). */}
+      {describeBar && (draft.rules.length > 0 || scratch) && (
+        <div className="bb__magicat">
+          <DescribeDoor context={barContext} onOpen={openDescribe} />
+        </div>
+      )}
+      {/* While Describe it plays a message out, the canvas says it is being built: a pill over the stage, the chain
+          behind it eased back (`.bb.is-cooking`), until the panel's steps reach the canvas and the cards arrive. */}
+      <AnimatePresence>
+        {cooking && describeOpen && (
+          <motion.div
+            key="cooking"
+            className="bb__cooking"
+            aria-hidden
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
+          >
+            <span className="bb__cooking__spin" />
+            Building the policy
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* The canvas comes into existence when there is something on it.
 
@@ -1907,20 +2288,21 @@ export function BoardBuilder({
           its sentences are about the start node and the last row, so those
           are what sit beside it, and the chooser was too wide to share the
           width. */}
-      {draft.rules.length === 0 && !scratch && !describing && !readOpen ? (
+      {/* Not for a post sign-in policy: it has no template and nothing to
+          describe, so an empty one starts on the chain itself — the start
+          node, Add the first rule, Nothing else matched. */}
+      {draft.rules.length === 0 && !scratch && !describing && !readOpen && !post ? (
         <BoardEmpty
           /* "No rules" once the policy is live or had rules; the first-run
              question only for a new draft nobody has written in yet. */
           fresh={saved.status === 'draft' && saved.rules.length === 0 && !canUndo(hist)}
-          fallback={(draft.fallback ?? fallbackRule()).decision}
-          onEditDefault={() => select({ kind: 'fallback' })}
-          onUndo={canUndo(hist) ? () => moveHistory(undo(histNow.current)) : undefined}
-          undoLabel={`Undo (${chord(['mod'], 'Z', MAC)})`}
+          /* No line under the heading (owner, 19 Oct 2026: "remove all this, no need"): the default, Edit default and
+             Undo are on the chain and the bar once there is a chain; BoardEmpty still draws them when given. */
           onUseTemplate={() => setPicking(true)}
           /* Describe it on a new draft only: it saves the audience straight to
              the policy, and a direct write to one that decides sign-ins would
              skip the checks before saving (describe spec, §2). */
-          onDescribe={describeOffered(features.describePolicy, saved) ? openDescribe : undefined}
+          onDescribe={DESCRIBE_CARD && describeOffered(features.describePolicy, saved) ? openDescribe : undefined}
           onScratch={() => {
             /* The chooser goes and the empty chain comes up; focus lands on
                the one control on it that adds a rule. */
@@ -1940,8 +2322,11 @@ export function BoardBuilder({
            is what it now is. */
         destination={
           /* The chain's first node names ONE application, and says how many
-             more beside it — the bar no longer carries them. */
-          draft.appIds.length > 0
+             more beside it — the bar no longer carries them. A post sign-in
+             policy's are the applications linked to it (post-board.ts). */
+          post
+            ? (linkedAppsOf(draft, store.apps)[0]?.name ?? null)
+            : draft.appIds.length > 0
             ? (appsOf(draft, store.apps)[0]?.name ?? null)
             : draft.isSystem
               ? 'any application'
@@ -1949,14 +2334,27 @@ export function BoardBuilder({
         }
         /* The first application's id, for its logo in the start pill, so the
            logo and the name beside it are the same application. */
-        destinationAppId={draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
-        destinationMore={Math.max(appsOf(draft, store.apps).length - 1, 0)}
+        destinationAppId={post ? (linkedAppsOf(draft, store.apps)[0]?.id ?? null) : draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
+        destinationMore={Math.max((post ? linkedAppsOf(draft, store.apps) : appsOf(draft, store.apps)).length - 1, 0)}
+        /* Groups first, then people, as the pane lists them; a name the
+           directory no longer has reads "(deleted)". */
+        audienceNames={
+          draft.audience.everyone || draft.isSystem
+            ? null
+            : [
+                ...draft.audience.groupIds.map((id) => store.groups.find((g) => g.id === id)?.name ?? '(deleted)'),
+                ...draft.audience.userIds.map((id) => store.users.find((u) => u.id === id)?.name ?? '(deleted)'),
+              ]
+        }
         selection={selection}
         diagnostics={diagnostics}
         shadowed={shadowed}
         /* Not refitted for Check access: the board waits under its canvas as
            it was left, zoom and all, for the way back. */
-        fitKey={describeOpen ? 'describe' : 'edit'}
+        fitKey={describeOpen ? layout : 'edit'}
+        /* Beside the rule panel the canvas is never shrunk below its own size: it pans instead (12 px type floor). */
+        fitFloor={guidedBeside ? 1 : undefined}
+        locked={canvasLocked}
         flash={flash}
         fresh={fixedNew}
         resolve={resolve}
@@ -1967,19 +2365,21 @@ export function BoardBuilder({
            panel's output, and a card added, switched, moved or deleted by hand
            would be claimed by the turn and then written over by the next one.
            board.css hides the controls (`.bb.is-left-open`); these stand
-           down for the keys and a drag. */
+           down for the keys and a drag. Guided setup locks it the same way on
+           the left or the right (`.bb.is-guided-locked`), and leaves it
+           editable beside the rule panel, where the power admin works. */
         onInsert={(at) => {
-          if (describeOpen) return
+          if (canvasLocked) return
           /* The first rule of a scratch policy: its name is the first thing
              to fill in, as it was when the chooser inserted it. */
           const first = draft.rules.length === 0
-          insert(blankRule(), at)
+          insert(newRule(), at)
           if (first) focusSoon(() => document.querySelector<HTMLElement>('.bb__insp input[aria-label="Rule name"]'), true)
         }}
-        onMove={(from, to) => (describeOpen ? undefined : move(from, to))}
-        onToggle={(i, on) => (describeOpen ? undefined : patchRule(i, { enabled: on }))}
-        onDuplicate={(i) => (describeOpen ? undefined : duplicate(i))}
-        onDelete={(i) => (describeOpen ? undefined : remove(i))}
+        onMove={(from, to) => (canvasLocked ? undefined : move(from, to))}
+        onToggle={(i, on) => (canvasLocked ? undefined : patchRule(i, { enabled: on }))}
+        onDuplicate={(i) => (canvasLocked ? undefined : duplicate(i))}
+        onDelete={(i) => (canvasLocked ? undefined : remove(i))}
         onHover={setHover}
         onHoverLast={describeOpen ? setHoverLast : undefined}
         sources={sources}
@@ -2032,6 +2432,7 @@ export function BoardBuilder({
         }
       />
       )}
+      {guidedOpen && guidedSide === 'right' && guidedPanel}
 
 
       {/* The inspector's alone: Check access's panels take the page's two
@@ -2091,10 +2492,10 @@ export function BoardBuilder({
       )}
 
       {/* And the way back to it while it is closed: its thread is kept. */}
-      {describeDoor && (draft.rules.length > 0 || scratch) && (
+      {describeDoor && !DESCRIBE_BAR && (draft.rules.length > 0 || scratch) && (
         <button type="button" className="bdsc-door" onClick={openDescribe}>
-          <PenLine size={14} strokeWidth={2} aria-hidden />
-          Describe it
+          {GUIDED_SETUP ? <ListChecks size={14} strokeWidth={2} aria-hidden /> : <PenLine size={14} strokeWidth={2} aria-hidden />}
+          {GUIDED_SETUP ? 'Start guided setup' : 'Describe it'}
         </button>
       )}
 
@@ -2126,7 +2527,7 @@ export function BoardBuilder({
 
       {/* Not under Check access, whose panels take the track: the selection
           waits, and the editor is back as Check access shuts. */}
-      {!testOn && !describeOpen && !readOpen && !fixesShown && panelAlive && (
+      {!testOn && !inspBlocked && !readOpen && !fixesShown && panelAlive && (
         <Inspector
           leaving={panelLeaving}
           draft={draft}
@@ -2191,7 +2592,7 @@ export function BoardBuilder({
           onRun={(id) => {
             setCmd(false)
             if (id === 'add') {
-              if (!describeOpen) insert(blankRule(), draft.rules.length)
+              if (!describeOpen) insert(newRule(), draft.rules.length)
             } else if (id === 'undo') undoStep()
             else if (id === 'redo') redoStep()
             else if (id === 'publish') saveNow()
@@ -2218,7 +2619,7 @@ export function BoardBuilder({
           was reached. */}
       <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard shortcuts" width={480}>
         <dl className="bb__keys">
-          {keys && boardShortcuts({ mac: MAC, commands: features.commands, testing: features.trySignIn, publish: features.publish }).map(([k, what]) => (
+          {keys && boardShortcuts({ mac: MAC, commands: features.commands, testing: features.trySignIn && !post, publish: features.publish }).map(([k, what]) => (
             <div key={k}>
               <dt>
                 {k.split(' ').map((part) => (
@@ -2341,6 +2742,6 @@ export function BoardBuilder({
       </Modal>
 
     </div>
-    </>
+    </PostBoardContext.Provider>
   )
 }

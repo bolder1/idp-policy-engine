@@ -168,7 +168,7 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
                 <TipDot label="About the system policy" text="The system policy covers every application. It decides sign-ins no other policy matches." />
               </div>
             ) : (
-              <ApplicationField appIds={appIds} onChange={setAppIds} />
+              <ApplicationField appIds={appIds} onChange={setAppIds} policyId={saved?.id} />
             )}
             {/* "Stops deciding sign-ins" only where it was deciding them, as in
                 Review & save: an inactive policy decides nothing already. */}

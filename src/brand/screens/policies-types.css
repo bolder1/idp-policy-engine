@@ -1,0 +1,18 @@
+/* =============================================================================
+   Policies — the Sign-in and Post sign-in tabs under the page head
+   (screens/Policies.tsx; owner, 13 Oct 2026).
+
+   Only the tab bar's place on the page. The tabs are the kit's line tabs and
+   each tab's bar and table are the list page's own, so nothing else is here.
+
+   Imported by Policies.tsx rather than main.tsx: margins only, and the head
+   rule wins on specificity through `:has()`, so where the sheet lands in the
+   cascade decides nothing (see the comment at the import).
+   ========================================================================== */
+
+/* The tabs sit 20px under the head they belong to, as on a device profile's
+   page (owner, 15 Sep 2026): the head gives up its own margin, and the grid's
+   gap and the tabs' 4px make the 20. Under them, 28px to the bar, the space
+   the bar keeps from the list it filters. */
+.bpage__head:has(+ .bpol__types) { margin-bottom: 0; }
+.bpol__types { margin: var(--space-2) 0 var(--space-5); }

@@ -1,13 +1,11 @@
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEffect } from 'react'
 import {
   ArrowLeft,
   BellRing,
   Check,
-  ChevronDown,
   ChevronRight,
-  ChevronUp,
   Compass,
   CreditCard,
   Fingerprint,
@@ -27,7 +25,7 @@ import {
   Star,
 } from 'lucide-react'
 
-import { Badge, Button, Callout, CalloutIcon, Drawer, IconButton, MenuButton, Modal, SearchBox, TipDot, Toggle } from '../kit'
+import { Badge, Button, Callout, Drawer, IconButton, MenuButton, Modal, Note, SearchBox, TipDot, Toggle } from '../kit'
 import { MethodsTour } from '../tour/MethodsTour'
 import { NEW_LAYOUT, SETTING_WAS } from '../tour/methods-tour'
 import { methodBlocker, type AuthMethod } from '../methods'
@@ -262,8 +260,8 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   /* What moved (tour/methods-tour.ts), for admins who knew the five 2-Factor Authentication pages: open
      or shut. The announcement above the tabs starts it, and nothing else does. */
   const [touring, setTouring] = useState(false)
-  /* The announcement opens to its four points, and starts shut: one line and the tour until somebody asks. */
-  const [newsOpen, setNewsOpen] = useState(false)
+  /* The announcement opens to its four points, and starts shut: one line and the tour until somebody asks.
+     The kit's `Note` holds that open-or-shut itself, as its `more`. */
   /* The slider, as a stack of pages — a family, its settings, or a method's
      setup — deepest last. Empty closes it. See `PanelPage`. */
   const [panel, setPanel] = useState<PanelPage[]>([])
@@ -559,54 +557,29 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           of what has been done, and at the right side a tour — no need to add a hide option"). Always there
           for an admin, so the tour is never more than one press away; never started for them. */}
       {!isUser && (
-        <section className="bm8__news" aria-labelledby="bm8-news-title">
-          <CalloutIcon tone="info" />
-          <div className="bm8__newsbody">
-            {/* One row that never moves: the title and its line, Read more at the line's end, the tour at the
-                right (owner, 7 Oct 2026: "add a read more button, make the button position consistent"). The
-                points open under it, in the text's column. */}
-            <div className="bm8__newshead">
-              <div className="bm8__newstext">
-                <strong id="bm8-news-title">{NEW_LAYOUT.title}</strong>
-                <span className="bm8__newsline">
-                  {NEW_LAYOUT.line}
-                  <button
-                    type="button"
-                    className="bm8__newsmore-toggle"
-                    aria-expanded={newsOpen}
-                    aria-controls="bm8-news-points"
-                    onClick={() => setNewsOpen((o) => !o)}
-                  >
-                    {newsOpen ? 'Show less' : 'Read more'}
-                    {newsOpen ? <ChevronUp size={14} strokeWidth={2} aria-hidden /> : <ChevronDown size={14} strokeWidth={2} aria-hidden />}
-                  </button>
-                </span>
-              </div>
-              <Button variant="secondary" size="sm" icon={Compass} onClick={startTour}>
-                Take the tour
-              </Button>
-            </div>
-            <AnimatePresence initial={false}>
-              {newsOpen && (
-                <motion.div
-                  key="points"
-                  id="bm8-news-points"
-                  className="bm8__newsmore"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.22, ease: PAGE_EASE }}
-                >
-                  <ul className="bm8__newslist">
-                    {NEW_LAYOUT.points.map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
-                  </ul>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </section>
+        /* The kit's Note, which this card became (owner, 16 Oct 2026: "use this as a common note component").
+           One row that never moves: the title and its line, Read more at the line's end, the tour at the right
+           (owner, 7 Oct 2026: "add a read more button, make the button position consistent"). The points open
+           under it, in the text's column. */
+        <Note
+          as="h2"
+          className="bm8__news"
+          title={NEW_LAYOUT.title}
+          more={
+            <ul>
+              {NEW_LAYOUT.points.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          }
+          action={
+            <Button variant="secondary" size="sm" icon={Compass} onClick={startTour}>
+              Take the tour
+            </Button>
+          }
+        >
+          {NEW_LAYOUT.line}
+        </Note>
       )}
 
       {/* Recovery is a tenant policy rather than a personal setting, so a person
@@ -903,14 +876,14 @@ function SetupForm({ draft }: { draft: SetupDraft }) {
           and cannot tell why. First, and open by default — a checklist
           behind a disclosure is a checklist nobody reads. */}
       {cfg.prereqs && cfg.prereqs.length > 0 && (
-        <div className="bm8__prereqs">
-          <p className="bm8__prereqhead">Before you begin</p>
+        /* The kit's Note, static (owner, 16 Oct 2026: every note is the one note). */
+        <Note title="Before you begin" className="bm8__prereqs">
           <ol>
             {cfg.prereqs.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ol>
-        </div>
+        </Note>
       )}
 
       {/* One straight form, top to bottom. Grouped under plain headings when
@@ -2090,13 +2063,11 @@ function SettingsPane({
   return (
     <div className="bm8__settings" data-tour="drawer-settings">
       {notes.length > 0 && (
-        <section className="bm8__setnote" aria-label="Note">
-          <Callout tone="info" title="Note">
-            {notes.map((n) => (
-              <p key={n}>{n}</p>
-            ))}
-          </Callout>
-        </section>
+        <Note title="Note" className="bm8__setnote">
+          {notes.map((n) => (
+            <p key={n}>{n}</p>
+          ))}
+        </Note>
       )}
 
       {famSettings.length > 0 && (

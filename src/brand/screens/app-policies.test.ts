@@ -63,14 +63,14 @@ const SYSTEM = policies.find((p) => p.isSystem)!
 
 describe('policiesForApp', () => {
   it('returns every match in store order, not the first', () => {
-    /* Four policies really do name Google Workspace, and they are the
-       document's Scenario 5: one per group — Admin, DevOps, End-Users — plus
-       the application's own baseline. The relation is one-app-to-many-policies
-       and a screen that showed only the first would be hiding three sets of
-       rules that decide sign-ins. */
+    /* One policy names Google Workspace now (an app has at most one sign-in
+       policy, 14 Oct 2026). Scenario 5 was four: one per group (Admin, DevOps,
+       End-Users) plus the baseline, now one policy with a Who on each rule.
+       The relation stays many-to-many for policies, so a screen still reads
+       every match. */
     const on = policiesForApp('google-workspace', policiesAt('medium'))
-    expect(on.length).toBe(4)
-    expect(on.map((p) => p.id)).toEqual(['s5-admin', 's5-devops', 's5-endusers', 's5-baseline'])
+    expect(on.length).toBe(1)
+    expect(on.map((p) => p.id)).toEqual(['s5-workspace'])
   })
 
   it('returns an array, never undefined, for an app nothing names', () => {
@@ -223,14 +223,13 @@ describe('attachableTo', () => {
     expect(attachableTo('salesforce', policiesAt('medium')).some((p) => p.isSystem)).toBe(false)
   })
 
-  it('excludes policies already on this app and includes ones on another', () => {
-    const got = attachableTo('google-workspace', policiesAt('medium')).map((p) => p.id)
-    expect(got).not.toContain('s5-admin')
-    expect(got).toContain('uc3-country-allowlist')
+  it('offers nothing to an app that already has its one policy', () => {
+    expect(attachableTo('google-workspace', policiesAt('medium'))).toEqual([])
   })
 
-  it('sorts the unassigned above the ones already protecting something', () => {
-    const got = attachableTo('google-workspace', policiesAt('medium'))
+  it('offers an app with none the policies on other apps, and the unassigned ones first', () => {
+    const got = attachableTo('zoom', policiesAt('medium'))
+    expect(got.map((p) => p.id)).toContain('uc3-country-allowlist')
     const firstAlso = got.findIndex((p) => p.appIds.length > 0)
     const lastFresh = got.map((p) => p.appIds.length === 0).lastIndexOf(true)
     expect(lastFresh).toBeLessThan(firstAlso)
@@ -419,7 +418,8 @@ describe('summarise', () => {
   })
 
   it('says a lone policy that can never decide is never deciding', () => {
-    const s = summarise('workday', [policy({ appIds: ['workday'], type: 'Session' })])
+    /* Account Management: a Session policy is a post sign-in one, never summarised here (post-sign-in.ts). */
+    const s = summarise('workday', [policy({ appIds: ['workday'], type: 'Account Management' })])
     expect(s).toMatchObject({ own: 1, decides: 0, tag: 'Never decides', tone: 'off', title: 'Not an app access policy.' })
   })
 
@@ -537,20 +537,22 @@ describe('deleteDetail', () => {
     expect(deleteDetail(mine, [sys, mine], apps)).toBe(`Protects ${box.name}. Sign-ins there will use the Global Default Policy.`)
   })
 
-  it('says Payroll — Application baseline protects Payroll, as the app page numbers it', () => {
+  it('says Payroll access protects Payroll, as the app page numbers it', () => {
     const medium = tenantAt('medium')
-    const baseline = medium.policies.find((p) => p.id === 's9-baseline')!
+    const baseline = medium.policies.find((p) => p.id === 's9-finance')!
     const payroll = medium.apps.find((a) => a.id === 'payroll')!
     expect(deleteDetail(baseline, medium.policies, medium.apps, medium.directory.people, medium.groups)).toBe(
       `Protects ${payroll.name}. Sign-ins there will use the Global Default Policy.`,
     )
   })
 
-  it('says AWS production for DevOps decides no sign-ins: AWS for engineering teams decides for DevOps', () => {
+  it('says a second AWS policy for DevOps decides no sign-ins: AWS access decides for DevOps', () => {
+    /* One app has one policy in the showcase; the shadowed second one is built here from it. */
     const t = showcaseTenant()
-    const devops = t.policies.find((p) => p.name === 'AWS production for DevOps')!
+    const base = t.policies.find((p) => p.id === 'sc-aws-engineering')!
+    const devops: Policy = { ...base, id: 'p-aws-prod', name: 'AWS production for DevOps', audience: audienceOf(['devops']) }
     const aws = t.apps.find((a) => a.id === 'aws')!
-    expect(deleteDetail(devops, t.policies, t.apps, t.directory.people, t.groups)).toBe(`Assigned to ${aws.name}. It decides no sign-ins.`)
+    expect(deleteDetail(devops, [...t.policies, devops], t.apps, t.directory.people, t.groups)).toBe(`Assigned to ${aws.name}. It decides no sign-ins.`)
   })
 
   it('names only the applications it decides on after "Protects"', () => {
@@ -569,12 +571,13 @@ describe('decidedOnlyBy, on the showcase', () => {
   const byName = (name: string) => t.policies.find((p) => p.name === name)!
   const only = (name: string) => decidedOnlyBy(byName(name), t.policies, t.directory.people, t.groups)
 
-  it('leaves Box off for Box for engineering: Tanmay Joshi, in Design too, goes to Box for design', () => {
-    expect(only('Box for engineering')).toEqual([])
+  it('keeps Box for Box access: everyone it decides for goes to the Global Default', () => {
+    expect(only('Box access')).toEqual(['box'])
   })
 
-  it('keeps Box for Box for design: everyone it decides for goes to the Global Default', () => {
-    expect(only('Box for design')).toEqual(['box'])
+  it('leaves Box off for Box access when a second Box policy takes everyone it decides for', () => {
+    const copy: Policy = { ...byName('Box access'), id: 'p-box-2', name: 'Box for engineering and design' }
+    expect(decidedOnlyBy(byName('Box access'), [...t.policies, copy], t.directory.people, t.groups)).toEqual([])
   })
 })
 

@@ -31,6 +31,17 @@ describe('the testing session', () => {
     expect(sessionReducer(loaded, { type: 'replay' }).runId).toBe(3)
   })
 
+  /* An application's Check access (APP-POLICY-TAB.md §5): the form filled in for the page to open on, and no run —
+     the run id never moves, so nothing waits to play. A run spends it; the last run's form is left alone. */
+  it('holds a sign-in filled in from elsewhere without playing it, until a run spends it', () => {
+    const filled = { ...start().form, appId: 'box', personId: 'u-eng-1' }
+    const s = sessionReducer(start(), { type: 'prefill', form: filled })
+    expect([s.prefilled, s.runId, s.form]).toEqual([filled, 1, start().form])
+    expect(sessionReducer(s, { type: 'load', form: filled }).prefilled).toBeNull()
+    expect(sessionReducer(s, { type: 'replay' }).prefilled).toBeNull()
+    expect(start().prefilled).toBeNull()
+  })
+
   it('keeps one board form per policy, starting from its default', () => {
     let s = sessionReducer(start(), { type: 'patch-board', policyId: 'sc-hrms-office', base: hrmsBase, patch: { risk: '48' }, field: 'risk' })
     expect(s.boardForms['sc-hrms-office']).toEqual({ ...hrmsBase, risk: '48' })

@@ -35,6 +35,14 @@ const t = showcaseTenant()
 const people = t.directory.people
 const byName = (name: string) => t.policies.find((p) => p.name === name)!
 const rowOf = (rows: StandRow[], name: string) => rows.find((r) => r.policy.name === name)!
+/* One application has one policy in the showcase. The cases that need a second
+   policy on the same app are built from the merged one, as a copy with another
+   id, name and audience. */
+const copyOf = (id: string, over: Partial<Policy>): Policy => ({ ...t.policies.find((p) => p.id === id)!, ...over })
+const slackGroups = () => copyOf('sc-slack-everyone', { id: 'p-slack-groups', name: 'Slack for engineering and contractors', audience: audienceOf(['engineering', 'contractors']) })
+const awsDevops = () => copyOf('sc-aws-engineering', { id: 'p-aws-prod', name: 'AWS production for DevOps', audience: audienceOf(['devops']) })
+const awsBilling = () => copyOf('sc-aws-engineering', { id: 'p-aws-billing', name: 'AWS billing for Finance', audience: audienceOf(['finance']) })
+const boxDesign = () => copyOf('sc-box-engineering', { id: 'p-box-design', name: 'Box for design', audience: audienceOf(['design']) })
 const standing = (appId: string, list: readonly Policy[] = t.policies) => appStanding(appId, list, people)
 
 describe('deciderFor', () => {
@@ -50,68 +58,84 @@ describe('deciderFor', () => {
 })
 
 describe('appStanding on the showcase', () => {
-  it('numbers the group policy on Slack first, though Everyone is higher in the list', () => {
-    /* Slack for everyone is first in the store; the documented tier puts a
-       group's policy above it. Devon Rao (Contractors) and Leo Fernandes
-       (Engineering and Contractors) are the two the seed sends to Slack to show
-       it (showcase-seed.ts, people and saved sign-ins). */
+  it('numbers the one policy on Slack 1: it decides, in the Everyone band', () => {
     const { rows } = standing('slack')
+    expect(rows).toHaveLength(1)
+    expect(rowOf(rows, 'Slack access')).toMatchObject({ n: 1, state: 'decides', band: 'everyone' })
+  })
+
+  it('numbers a group policy on Slack first, though Everyone is higher in the list', () => {
+    /* The documented tier puts a group's policy above the Everyone one; the
+       second policy is built here. Devon Rao (Contractors) and Leo Fernandes
+       (Engineering and Contractors) are the two the seed sends to Slack. */
+    const list = [...t.policies, slackGroups()]
+    const { rows } = standing('slack', list)
     expect(rowOf(rows, 'Slack for engineering and contractors')).toMatchObject({ n: 1, state: 'decides', band: 'groups' })
-    expect(rowOf(rows, 'Slack for everyone')).toMatchObject({ n: 2, state: 'decides', band: 'everyone' })
+    expect(rowOf(rows, 'Slack access')).toMatchObject({ n: 2, state: 'decides', band: 'everyone' })
     for (const id of ['devon', 'u-leo']) {
       const person = people.find((u) => u.id === id)!
-      expect(deciderForUser(t.policies, 'slack', person)?.name).toBe('Slack for engineering and contractors')
+      expect(deciderForUser(list, 'slack', person)?.name).toBe('Slack for engineering and contractors')
     }
   })
 
-  it('says AWS production for DevOps never decides, and who decides for DevOps', () => {
-    const row = rowOf(standing('aws').rows, 'AWS production for DevOps')
+  it('says a second AWS policy for DevOps never decides, and who decides for DevOps', () => {
+    const row = rowOf(standing('aws', [...t.policies, awsDevops()]).rows, 'AWS production for DevOps')
     expect(row).toMatchObject({ state: 'never', n: null })
-    expect(row.lostTo).toEqual([{ key: { kind: 'group', id: 'devops' }, to: byName('AWS for engineering teams') }])
+    expect(row.lostTo).toEqual([{ key: { kind: 'group', id: 'devops' }, to: byName('AWS access') }])
   })
 
-  it('gives the Finance draft on GitHub no number', () => {
-    expect(rowOf(standing('github').rows, 'Code review for Finance')).toMatchObject({ state: 'draft', n: null })
+  it('gives a draft on GitHub no number', () => {
+    const draft = copyOf('sc-dev-tools', { id: 'p-code-review', name: 'Code review for Finance', status: 'draft', audience: audienceOf(['finance']) })
+    expect(rowOf(standing('github', [...t.policies, draft]).rows, 'Code review for Finance')).toMatchObject({ state: 'draft', n: null })
   })
 
   it('numbers a live Everyone policy with no rules: it decides by its last row', () => {
     const empty: Policy = { ...blankPolicy('Slack, nothing written yet', ['slack']), id: 'p-empty', status: 'active', audience: EVERYONE, rules: [] }
     const { rows } = standing('slack', [empty, ...t.policies])
-    expect(rowOf(rows, 'Slack, nothing written yet')).toMatchObject({ state: 'decides', n: 2 })
-    expect(rowOf(rows, 'Slack for everyone')).toMatchObject({ state: 'never', n: null })
+    expect(rowOf(rows, 'Slack, nothing written yet')).toMatchObject({ state: 'decides', n: 1 })
+    expect(rowOf(rows, 'Slack access')).toMatchObject({ state: 'never', n: null })
   })
 
+  /* Account Management, not Session: a Session policy is a post sign-in one
+     (post-sign-in.ts), never on an application's Policies tab at all. */
   it('gives a policy of another type no number', () => {
-    const session: Policy = { ...blankPolicy('Slack sessions', ['slack']), id: 'p-session', type: 'Session', status: 'active' }
-    expect(rowOf(standing('slack', [...t.policies, session]).rows, 'Slack sessions')).toMatchObject({ state: 'not-app-access', n: null })
+    const other: Policy = { ...blankPolicy('Slack accounts', ['slack']), id: 'p-account', type: 'Account Management', status: 'active' }
+    expect(rowOf(standing('slack', [...t.policies, other]).rows, 'Slack accounts')).toMatchObject({ state: 'not-app-access', n: null })
   })
 })
 
 /* Every move, as "key: from → to", for a whole-list comparison. */
 const said = (moves: Move[]) => moves.map((m) => `${keyName(m.key, t.groups, people)}: ${m.from?.name ?? '-'} → ${m.to?.name ?? '-'}`)
-const without = (name: string, appId: string) => t.policies.map((p) => (p.name === name ? detachFrom(p, appId) : p))
-const removing = (name: string, appId: string) =>
-  deciderChanges(appId, t.policies, without(name, appId), people, t.groups).filter((m) => m.from?.id === byName(name).id)
+const named = (list: readonly Policy[], name: string) => list.find((p) => p.name === name)!
+const without = (name: string, appId: string, list: readonly Policy[] = t.policies) => list.map((p) => (p.name === name ? detachFrom(p, appId) : p))
+const removing = (name: string, appId: string, list: readonly Policy[] = t.policies) =>
+  deciderChanges(appId, list, without(name, appId, list), people, t.groups).filter((m) => m.from?.id === named(list, name).id)
+/* The merged policies cut back to one team's audience, so that a second policy for another team can sit beside them. */
+const narrowed = (id: string, groupIds: string[]) => t.policies.map((p) => (p.id === id ? { ...p, audience: audienceOf(groupIds) } : p))
+/* Box: access for Engineering, then a policy for Design; Tanmay Joshi is in both. */
+const twoBox = [...narrowed('sc-box-engineering', ['engineering']), boxDesign()]
+/* AWS: access for Engineering, then billing for Finance; Maya Iyer is in both. */
+const engAndBilling = [...narrowed('sc-aws-engineering', ['engineering']), awsBilling()]
 
 describe('deciderChanges', () => {
-  it('moves Engineering on Box to the Global Default, not to Box for design, when Box for engineering goes', () => {
-    const moves = removing('Box for engineering', 'box')
+  it('moves Engineering on Box to the Global Default, not to Box for design, when Box access goes', () => {
+    const moves = removing('Box access', 'box', twoBox)
     const eng = moves.find((m) => m.key.kind === 'group' && m.key.id === 'engineering')
-    expect(eng?.from?.name).toBe('Box for engineering')
+    expect(eng?.from?.name).toBe('Box access')
     expect(eng?.to?.name).toBe('Global Default Policy')
     /* Design kept its own policy, so it does not move. */
     expect(moves.some((m) => m.key.kind === 'group' && m.key.id === 'design')).toBe(false)
   })
 
   it('says Tanmay Joshi, in Engineering and Design, goes to Box for design, and nobody in Engineering alone', () => {
-    expect(said(removing('Box for engineering', 'box'))).toEqual([
-      'Engineering: Box for engineering → Global Default Policy',
-      'Tanmay Joshi: Box for engineering → Box for design',
+    expect(said(removing('Box access', 'box', twoBox))).toEqual([
+      'Engineering: Box access → Global Default Policy',
+      'Tanmay Joshi: Box access → Box for design',
     ])
   })
 
-  it('says Maya Iyer, in Engineering and Finance, goes to AWS billing for Finance when AWS for engineering teams goes', () => {
-    const moves = removing('AWS for engineering teams', 'aws')
+  it('says Maya Iyer, in Engineering and Finance, goes to AWS billing for Finance when AWS access goes', () => {
+    const moves = removing('AWS access', 'aws', engAndBilling)
     const maya = moves.find((m) => m.key.kind === 'user' && m.key.id === 'u-maya')
     expect(maya?.to?.name).toBe('AWS billing for Finance')
     /* Every person listed moves somewhere their groups' rows do not say. */
@@ -126,28 +150,32 @@ describe('deciderChanges', () => {
 })
 
 describe('takenFrom', () => {
-  it('names Box for engineering too when AWS billing for Finance is added to Box', () => {
+  it('names Box access too when AWS billing for Finance is added to Box', () => {
     /* Finance moves off the Global Default; Maya Iyer, in Engineering and
-       Finance, moves off Box for engineering, which no group row says. */
-    const finance = byName('AWS billing for Finance')
-    const after = t.policies.map((p) => (p.id === finance.id ? attachTo(p, 'box', t.apps) : p))
-    const froms = takenFrom(deciderChanges('box', t.policies, after, people, t.groups), finance.id).map((p) => p.name)
-    expect(froms).toEqual(expect.arrayContaining(['Global Default Policy', 'Box for engineering']))
+       Finance, moves off Box access, which no group row says. */
+    const list = [awsBilling(), ...narrowed('sc-box-engineering', ['engineering'])]
+    const finance = named(list, 'AWS billing for Finance')
+    const after = list.map((p) => (p.id === finance.id ? attachTo(p, 'box', t.apps) : p))
+    const froms = takenFrom(deciderChanges('box', list, after, people, t.groups), finance.id).map((p) => p.name)
+    expect(froms).toEqual(expect.arrayContaining(['Global Default Policy', 'Box access']))
   })
 })
 
 describe('visibleMoves', () => {
   it('lists Everyone alone when Slack for everyone goes, not each group no Slack policy names', () => {
+    /* Slack access names Engineering and Contractors in its rules, so a copy without rules is used. */
     const name = 'Slack for everyone'
-    const moves = removing(name, 'slack')
+    const bare = copyOf('sc-slack-everyone', { id: 'p-slack-bare', name, rules: [] })
+    const all = [...t.policies.filter((p) => p.id !== 'sc-slack-everyone'), bare]
+    const moves = removing(name, 'slack', all)
     expect(moves.filter((m) => m.key.kind === 'group').length).toBeGreaterThan(1)
-    expect(said(visibleMoves(moves, 'slack', t.policies, without(name, 'slack')))).toEqual(['Everyone: Slack for everyone → Global Default Policy'])
+    expect(said(visibleMoves(moves, 'slack', all, without(name, 'slack', all)))).toEqual(['Everyone: Slack for everyone → Global Default Policy'])
   })
 
   it('keeps a group the app names, and a group whose move is not Everyone’s', () => {
-    expect(said(visibleMoves(removing('Box for engineering', 'box'), 'box', t.policies))).toEqual([
-      'Engineering: Box for engineering → Global Default Policy',
-      'Tanmay Joshi: Box for engineering → Box for design',
+    expect(said(visibleMoves(removing('Box access', 'box', twoBox), 'box', twoBox))).toEqual([
+      'Engineering: Box access → Global Default Policy',
+      'Tanmay Joshi: Box access → Box for design',
     ])
   })
 })
@@ -168,10 +196,9 @@ describe('appsChangedByMembership', () => {
   })
 
   it('does not flag an app whose deciding policy names the group only in a saved draft, or in rules turned off', () => {
-    /* Arun joins Contractors; "Slack for engineering and contractors" decides
-       for him before and after. Its rules name Contractors only where no
-       sign-in runs them. */
-    const slack = byName('Slack for engineering and contractors')
+    /* Arun joins Contractors; "Slack access" decides for him before and
+       after. Its rules name Contractors only where no sign-in runs them. */
+    const slack = byName('Slack access')
     const off: Policy = { ...slack, rules: slack.rules.map((r) => ({ ...r, enabled: false })) }
     const drafted: Policy = {
       ...slack,
@@ -192,7 +219,7 @@ describe('groupsNamed', () => {
        audience as well, so the case is made here: IT Admins excepted from the
        Engineering rule and named nowhere else. */
     const list = t.policies.map((p) =>
-      p.name === 'Slack for engineering and contractors'
+      p.name === 'Slack access'
         ? { ...p, rules: p.rules.map((r, i) => (i === 0 ? { ...r, who: { groupIds: ['engineering'], userIds: [], exceptGroupIds: ['contractors', 'it-admins'] } } : r)) }
         : p,
     )
@@ -220,7 +247,7 @@ describe('whoLabel', () => {
   })
 
   it('says Everyone, and Nobody chosen for an empty audience', () => {
-    expect(whoLabel(byName('Slack for everyone'), t.groups, people)).toBe('Everyone')
+    expect(whoLabel(byName('Slack access'), t.groups, people)).toBe('Everyone')
     expect(whoLabel({ ...blankPolicy('Nobody', ['slack']), audience: audienceOf([]) }, t.groups, people)).toBe('Nobody chosen')
   })
 })

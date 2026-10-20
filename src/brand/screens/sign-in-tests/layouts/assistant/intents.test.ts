@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../../../fixtures'
+import { splitAws } from '../conflict-fixture'
 import { runColumns, type ColumnSpec } from '../../../board/try-sign-in'
 import { envOf } from '../../../tenant-resolver'
 import { rowsRead } from '../../../testing/rows-read'
@@ -27,7 +28,7 @@ const t = showcaseTenant()
 const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const AS_IT_STANDS: ColumnSpec = { id: 'live', label: 'As the tenant stands', tip: 'Every policy as saved' }
-const deps: WhatIfDeps = { policies: t.policies, zones: t.zones, fingerprints: t.fingerprints, users: t.directory.people, apps: t.apps, methods: t.methods, defaultMethodId: undefined, env }
+const depsOf = (policies: typeof t.policies): WhatIfDeps => ({ policies, zones: t.zones, fingerprints: t.fingerprints, users: t.directory.people, apps: t.apps, methods: t.methods, defaultMethodId: undefined, env })
 const dict = { people: t.directory.people, groups: t.groups, apps: t.apps }
 
 interface Run {
@@ -36,18 +37,20 @@ interface Run {
   props: AskProps
 }
 
-function runOf(personName: string, appName: string, opts: { origin?: 'home' | 'tor'; patch?: Partial<SignInForm> } = {}): Run {
+function runOf(personName: string, appName: string, opts: { origin?: 'home' | 'tor'; patch?: Partial<SignInForm>; policies?: typeof t.policies } = {}): Run {
+  const policies = opts.policies ?? t.policies
+  const deps = depsOf(policies)
   const person = t.directory.people.find((p) => p.name === personName)
   const app = t.apps.find((a) => a.name === appName)
   if (!person || !app) throw new Error(`no ${personName} or ${appName} in the showcase`)
-  const rows = rowsRead(t.policies, null, app.id, lib)
+  const rows = rowsRead(policies, null, app.id, lib)
   const base: SignInForm = { ...emptyDraft(TODAY, '09:30'), ...(opts.origin ? originPatch(opts.origin) : {}), personId: person.id, appId: app.id }
   const form = { ...forRun(withDefaults(base, rows, [], TODAY, '09:30'), rows), ...(opts.patch ?? {}) } as SignInForm
   const { facts } = factsOf(form, t.zones)
-  const res = runColumns([AS_IT_STANDS], t.policies, facts, env)[0].resolution
+  const res = runColumns([AS_IT_STANDS], policies, facts, env)[0].resolution
   const ctx = { people: t.directory.people, apps: t.apps, zones: t.zones, rows }
-  const plan = engineRun({ res, policies: t.policies, form, facts, env, ctx, intro: 'none' })
-  const screens = screensOf(res, { policies: t.policies, methods: t.methods, defaultMethodId: undefined, person })
+  const plan = engineRun({ res, policies, form, facts, env, ctx, intro: 'none' })
+  const screens = screensOf(res, { policies, methods: t.methods, defaultMethodId: undefined, person })
   const whatIfs = rankWhatIfs(variationsOf(form, rows).flatMap((v) => previewOf(form, v.patch, deps, plan, v) ?? []), plan)
   const preview = (patch: Partial<SignInForm>) => previewOf(form, patch, deps, plan)
   const noop = () => {}
@@ -56,7 +59,8 @@ function runOf(personName: string, appName: string, opts: { origin?: 'home' | 't
 
 const A = runOf('Aisha Khan', 'Google Workspace')
 const B = runOf('Arun Patel', 'GitHub Enterprise', { origin: 'home' })
-const C = runOf('Maya Iyer', 'AWS Console')
+/* One policy per application in the showcase (14 Oct 2026): Maya's two covering policies are rebuilt (conflict-fixture.ts). */
+const C = runOf('Maya Iyer', 'AWS Console', { policies: splitAws(t.policies) })
 const GD = runOf('Ravi Menon', 'AWS Console')
 const DENY = runOf('Devon Rao', 'AWS Console', { origin: 'home' })
 const DEP = runOf('Arun Patel', 'GitHub Enterprise', { patch: { device: { kind: 'none' } } as Partial<SignInForm> })
@@ -231,7 +235,7 @@ describe('the answers: every word from the plan', () => {
 
   it('Devon Rao: why denied names the rule, its checks and the message', () => {
     const deny = press(DENY, 'Why denied?')
-    expect(plain(deny.sentence)).toBe('Devon Rao is denied: AWS for engineering teams is the first policy on AWS Console that covers Devon, and rule 1 · Contractors away from the office is its first rule that matches.')
+    expect(plain(deny.sentence)).toBe('Devon Rao is denied: AWS access is the first policy on AWS Console that covers Devon, and rule 1 · Contractors away from the office is its first rule that matches.')
     expect(deny.tone).toBe('negative')
     expect(words(deny)).toContain('Who: Devon Rao is in Contractors')
     expect(words(deny)).toContain('They see “Contractors reach AWS from a corporate office only.”')
@@ -249,11 +253,11 @@ describe('the answers: every word from the plan', () => {
     for (const a of [others, fin]) targetsReal(C, a)
   })
 
-  it('Ravi Menon: the Global Default, and the three policies he is outside of', () => {
+  it('Ravi Menon: the Global Default, and the one policy he is outside of', () => {
     const gd = press(GD, 'Why the Global Default?')
     expect(plain(gd.sentence)).toBe('No AWS Console policy covers Ravi Menon (IT Admins), so the tenant’s fallback, the Global Default Policy, decides.')
-    expect(words(gd)).toContain('1. AWS for engineering teams · Covers Engineering, DevOps, Contractors')
-    expect(gd.more).toHaveLength(3)
+    expect(words(gd)).toContain('1. AWS access · Covers Engineering, DevOps, Contractors, Finance')
+    expect(gd.more).toHaveLength(1)
     targetsReal(GD, gd)
     expect(plain(ask(A, 'why not the global default?').sentence)).toContain("Global Default Policy isn't used: Access the app through corporate devices only covers Aisha first")
   })

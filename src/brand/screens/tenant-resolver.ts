@@ -1,6 +1,7 @@
 import { enforces, memberGroupIds, type AccessDecision, type Policy, type User } from '../data'
 import { DECISION_PHRASE, strictestFirst } from '../decision-words'
 import type { Tenant } from '../fixtures'
+import { isPostSignIn } from '../post-sign-in'
 import { EMPTY_RISK_PROFILE, riskScale } from '../risk-signals'
 import { personOf, tracePolicy, type EvalLibrary, type FactKey, type PolicyTrace, type PossibleOutcome, type SignInFacts, type SimEnv } from './simulate'
 
@@ -216,7 +217,11 @@ export function evaluatedList(policies: readonly Policy[], substitute?: Policy |
 
 export function governingPolicy(policies: readonly Policy[], facts: SignInFacts, env: SimEnv, opts: ResolveOptions = {}): Governing {
   const sub = opts.substitute
-  const list = evaluatedList(policies, sub)
+  /* Without the post sign-in policies (post-sign-in.ts): they act during the
+     session and are never part of a sign-in, so they have no standing here —
+     not even "Not an app access policy" (owner, 13 Oct 2026: kept apart from
+     the sign-in engine and Access checks). */
+  const list = evaluatedList(policies, sub).filter((p) => !isPostSignIn(p))
   const appId = facts.appId ?? null
   const person = personOf(facts.personId, env)
   const missing: FactKey[] = [...(appId ? [] : (['app'] as const)), ...(person ? [] : (['person'] as const))]

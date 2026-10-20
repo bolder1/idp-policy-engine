@@ -834,7 +834,7 @@ function ConditionRow({
      that happen to match are not the same choice made twice. A value this row
      already holds stays pickable, so it can be taken off; one another row holds
      is shown and refused, with the reason on the row. */
-  const listed = t.valueKind !== 'time' && t.valueKind !== 'range' && t.valueKind !== 'text'
+  const listed = t.valueKind !== 'time' && t.valueKind !== 'range' && t.valueKind !== 'text' && t.valueKind !== 'number'
   /* Only a value chosen FROM a list can name something that is gone. A typed
      one — "12:00", a score of 70, "FTE" — is on no list, so it always read as
      missing: every time window and risk threshold drew the red "unset" frame
@@ -864,7 +864,11 @@ function ConditionRow({
         ? values[0]
           ? `${values[0]} ${t.id === 'trust-age' ? 'days' : t.id === 'coords' ? 'km' : ''}`.trim()
           : 'Choose…'
-        : summarise(names.length ? names : values, 'Choose…')
+        : t.valueKind === 'number'
+          ? values[0]
+            ? `${values[0]} ${t.unit ?? ''}`.trim()
+            : 'Choose…'
+          : summarise(names.length ? names : values, 'Choose…')
 
   return (
     /* No slide-in: every condition arrives from the empty row, which already

@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { ArrowRight, ArrowUp, ChevronDown, Clock, Gauge, MapPin, MonitorSmartphone, PenLine, Undo2, UserMinus, UserRound, Users, X } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
+import { ArrowRight, ArrowUp, ChevronDown, Square, Clock, Gauge, MapPin, MonitorSmartphone, PenLine, Undo2, UserMinus, UserRound, Users, X } from 'lucide-react'
 
 import { Button, Field, IconButton, NumberStepper, Tip, TipDot, TipMark } from '../../kit'
 import { CantTell, DecisionBadge } from '../../decision-badge'
@@ -41,6 +42,8 @@ import { WhoPicker } from '../who-picker'
 import { answerAsk, asksOf, composerSends, corrected, followUps, skipChoice, turnView, type Ask, type BoardBody, type DescribeState, type TurnView } from './describe-session'
 import { Seg } from './Section'
 import { DescribeQuick } from './DescribeQuick'
+import { DESCRIBE_STAGED, useDescribeStage, type StepLine } from './describe-stage'
+import { DoneLog, ReadingWords, WorkLog } from './DescribeStage'
 
 /* -----------------------------------------------------------------------------
    Describe it: the panel (V4 §4 and §4.1).
@@ -243,6 +246,7 @@ export function DescribePanel({
   board,
   onState,
   onSend,
+  onCommit,
   onUndoTurn,
   onDone,
   onGo,
@@ -259,8 +263,11 @@ export function DescribePanel({
   board: BoardBody
   /** The state changed. `write` is true when the answers changed and the board should follow. */
   onState: (next: DescribeState, write: boolean) => void
-  /** A message sent: the first, a follow-up, or a rewrite (`state.rewrite`). */
-  onSend: (message: string) => void
+  /** A message sent: the first, a follow-up, or a rewrite (`state.rewrite`). `hold`: read it and show the turn, but
+      keep the board as it is until `onCommit` (describe-stage.ts). */
+  onSend: (message: string, hold?: boolean) => void
+  /** The held turn's board write, now. Absent: no staging, the reply lands whole. */
+  onCommit?: () => void
   /** The latest turn's Undo. */
   onUndoTurn: () => void
   /** ×, Esc: close and keep everything. */
@@ -321,6 +328,48 @@ export function DescribePanel({
     [views, a, tenant],
   )
   const rowId = (turnId: number, key: AnswerKey) => `${uid}-t${turnId}-${key}`
+  /* Each turn's lines in the staged reply: the answers it said, as words (describe-stage.ts). */
+  const linesOf = (i: number): StepLine[] =>
+    (rowsOf[i] ?? []).filter((row) => !row.past).map((row) => ({ key: row.key, label: row.label, found: row.chips.map((c) => c.name).join(', ') }))
+  const reduced = useReducedMotion() ?? false
+  const play = useDescribeStage({
+    latestId: turns.at(-1)?.id ?? 0,
+    stepsOf: (turnId) => {
+      const i = turns.findIndex((t) => t.id === turnId)
+      return i < 0 ? 0 : linesOf(i).length
+    },
+    onSend,
+    onCommit,
+  })
+  const stage = play.stage
+  const lastId = turns.at(-1)?.id ?? 0
+  /* The turn on show as a working list: the steps' own, or one that has just arrived and not been picked up yet. */
+  const stagingId = stage?.phase === 'steps' ? stage.turnId : stage?.phase === 'await' && lastId !== stage.before ? lastId : null
+  const stagingStep = stage?.phase === 'steps' ? stage.step : 0
+  /* The message being read, before it is a turn. */
+  const pending = stage?.phase === 'read' ? stage.text : null
+  /* A finished turn's list, opened again. */
+  const [openLogs, setOpenLogs] = useState<ReadonlySet<number>>(new Set())
+  const toggleLog = (id: number) =>
+    setOpenLogs((cur) => {
+      const n = new Set(cur)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  /* × or Escape while it plays: finish first, close once it has landed. */
+  const [closeAfter, setCloseAfter] = useState(false)
+  useEffect(() => {
+    if (closeAfter && !play.busy) onDone()
+  }, [closeAfter, play.busy, onDone])
+  const close = () => {
+    if (!play.busy) {
+      onDone()
+      return
+    }
+    play.finish()
+    setCloseAfter(true)
+  }
   /* The row an answer is changed from: the newest live one. A card on the
      board, hovered or clicked, points at it. */
   const ownerOf = (key: AnswerKey): string | null => {
@@ -377,6 +426,13 @@ export function DescribePanel({
     if (ask) to = Math.min(to, top(ask) - 12)
     el.scrollTo({ top: Math.max(0, to), behavior: still ? 'auto' : 'smooth' })
   }, [latestId])
+  useEffect(() => {
+    if (!stage) return
+    const el = thread.current
+    if (!el) return
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    el.scrollTo({ top: el.scrollHeight, behavior: still ? 'auto' : 'smooth' })
+  }, [stage])
   const announced = useRef(latestId)
   useEffect(() => {
     if (announced.current === latestId || latestId === 0) return
@@ -439,8 +495,11 @@ export function DescribePanel({
       box.current?.focus()
       return
     }
+    if (play.busy) return
     setPop(null)
-    onSend(text)
+    /* The box empties as the message goes, as a sent message does; the reply follows on its own time. */
+    if (DESCRIBE_STAGED && !reduced && onCommit && state.box !== '') onState({ ...state, box: '' }, false)
+    play.send(text)
     box.current?.focus()
   }
   const rewrite = (i: number) => {
@@ -468,7 +527,8 @@ export function DescribePanel({
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return
     e.preventDefault()
-    if (state.rewrite !== null) cancelRewrite()
+    if (play.busy) play.finish()
+    else if (state.rewrite !== null) cancelRewrite()
     else onDone()
   }
 
@@ -752,12 +812,27 @@ export function DescribePanel({
     const rows = rowsOf[i] ?? []
     const fixes = [...new Set(view.notAdded.flatMap((n) => (n.action ? [n.action] : [])))]
     const boldRow = bold ? ownerOf(bold) : null
+    if (turn.id === stagingId)
+      return (
+        <div className="bdsc__reply">
+          <WorkLog lines={linesOf(i)} step={stagingStep} />
+        </div>
+      )
+    /* Just played: its rows, the change line and Undo come in under the folded list, in turn. */
+    const fresh = play.arrived === turn.id && !reduced
+    const enter = (order: number) =>
+      fresh ? { initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.28, delay: 0.1 + order * 0.08, ease: [0.2, 0, 0, 1] as const } } : {}
     return (
       <div className="bdsc__reply">
-        {rows.length > 0 && <p className="bdsc__understood">Understood</p>}
+        {rows.length > 0 &&
+          (DESCRIBE_STAGED ? (
+            <DoneLog lines={linesOf(i)} open={openLogs.has(turn.id)} onToggle={() => toggleLog(turn.id)} animate={!reduced} />
+          ) : (
+            <p className="bdsc__understood">Understood</p>
+          ))}
         {rows.length > 0 && (
           <div className="bdsc__rows">
-            {rows.map(({ key, label, chips, past }) => {
+            {rows.map(({ key, label, chips, past }, k) => {
               const id = rowId(turn.id, key)
               const flashing = flash?.id === id ? ` is-flash${flash.n % 2}` : ''
               const art = (c: ChipSpec) => (
@@ -768,7 +843,8 @@ export function DescribePanel({
               )
               const chipClass = (c: ChipSpec) => `bdsc__chip${c.muted ? ' is-muted' : ''}${c.outcome ? ' is-outcome' : ''}`
               return (
-                <div
+                <motion.div
+                  {...enter(k)}
                   key={key}
                   id={id}
                   className={`bdsc__row${past ? ' is-past' : ''}${boldRow === id ? ' is-bold' : ''}${flashing}`}
@@ -805,7 +881,7 @@ export function DescribePanel({
                       )
                     })}
                   </span>
-                </div>
+                </motion.div>
               )
             })}
           </div>
@@ -845,7 +921,7 @@ export function DescribePanel({
           </div>
         )}
 
-        <p className="bdsc__change">
+        <motion.p className="bdsc__change" {...enter(rows.length)}>
           <span className="bdsc__changeline">
             <Parts text={view.change} />
           </span>
@@ -854,7 +930,7 @@ export function DescribePanel({
               Undo
             </Button>
           )}
-        </p>
+        </motion.p>
 
         {/* Only once there is something to check: while no application is
             chosen, the question card is already asking for one. */}
@@ -880,12 +956,12 @@ export function DescribePanel({
           text="Prototype: phrases are matched against this tenant's apps, groups, zones and profiles. The product would use a backend model with the same checks."
         />
         <span className="bdsc__barend">
-          <IconButton icon={X} size="sm" tone="ghost" label="Close Describe the policy" onClick={onDone} />
+          <IconButton icon={X} size="sm" tone="ghost" label="Close Describe the policy" onClick={close} />
         </span>
       </div>
 
       <div className="bdsc__thread" ref={thread}>
-        {turns.length === 0 ? (
+        {turns.length === 0 && pending === null ? (
           <div className="bdsc__empty">
             <DescribeQuick tenant={tenant} onSend={send} />
           </div>
@@ -902,6 +978,19 @@ export function DescribePanel({
                 {reply(i, views[i])}
               </li>
             ))}
+            {/* The message being read: the bubble lights up word by word while the list says so. */}
+            {pending !== null && (
+              <li className="bdsc__turn">
+                <div className="bdsc__msg">
+                  <p className="bdsc__bubble">
+                    <ReadingWords text={pending} />
+                  </p>
+                </div>
+                <div className="bdsc__reply">
+                  <WorkLog lines={[]} step={0} reading />
+                </div>
+              </li>
+            )}
           </ol>
         )}
         <p role="status" className="u-sr-only">
@@ -910,7 +999,7 @@ export function DescribePanel({
       </div>
 
       <div className="bdsc__foot">
-        {suggestions.length > 0 && !rewriting && (
+        {suggestions.length > 0 && !rewriting && !play.busy && (
           <div className="bdsc__suggest" role="group" aria-label="Suggestions" ref={suggestRow}>
             {suggestions.slice(0, fits).map((s) => (
               <button key={s} type="button" className="bdsc__suggestion" onClick={() => send(s)}>
@@ -944,15 +1033,24 @@ export function DescribePanel({
               onKeyDown={(e) => {
                 if (composerSends({ key: e.key, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing })) {
                   e.preventDefault()
-                  send(state.box)
+                  if (!play.busy) send(state.box)
                 }
               }}
             />
-            <Tip text="Send (Enter)" placement="top">
-              <button type="button" className={`bdsc__send${hasText ? ' has-text' : ''}`} aria-label="Send" aria-keyshortcuts="Enter" onClick={() => send(state.box)}>
-                <ArrowUp size={16} strokeWidth={2.2} aria-hidden />
-              </button>
-            </Tip>
+            {play.busy ? (
+              /* While it plays, the send button stops it: the answer lands whole, now. */
+              <Tip text="Finish now (Esc)" placement="top">
+                <button type="button" className="bdsc__send is-stop" aria-label="Finish now" aria-keyshortcuts="Escape" onClick={play.finish}>
+                  <Square size={11} strokeWidth={0} fill="currentColor" aria-hidden />
+                </button>
+              </Tip>
+            ) : (
+              <Tip text="Send (Enter)" placement="top">
+                <button type="button" className={`bdsc__send${hasText ? ' has-text' : ''}`} aria-label="Send" aria-keyshortcuts="Enter" onClick={() => send(state.box)}>
+                  <ArrowUp size={16} strokeWidth={2.2} aria-hidden />
+                </button>
+              </Tip>
+            )}
           </div>
         </div>
       </div>

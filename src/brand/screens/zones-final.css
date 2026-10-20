@@ -593,53 +593,34 @@ fieldset.bz7__rangecol:has(.bx-picker__trigger.is-open) {
 
 /* --- The note beside the form ----------------------------------------------------
 
-   A heading and its lines on a neutral card. It was a filled blue panel, which
-   made the part nobody has to read the loudest thing on the page. The blue that
-   survives is on LINKS inside the note; a note that genuinely warns uses
-   `--fb-notice-*` instead. */
-.bz7__side {
-  /* A card, not the left rule it had (owner, 16 Sep 2026): with only a 1px
-     rule the note ran into the form beside it. */
-  padding: var(--space-6);
-  background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  color: var(--text-secondary);
-}
-.bz7__sidehead {
-  display: flex; align-items: center; gap: 8px;
-  margin: 0 0 var(--space-5);
-  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bz7__sidehead svg { flex: none; }
+   The kit's `Note` (owner, 16 Oct 2026: "whatever content we have on the right
+   can be static, no accordion"): its card, its mark and its one heading in the
+   info blue are kit.css `.bx-note*`. What is here is only what a side note
+   holds — the lines, the named options and the closing note — set inside the
+   note's body. It was a neutral card with a grey heading before that, and a
+   filled blue panel before THAT, which made the part nobody has to read the
+   loudest thing on the page; a note that genuinely warns uses `--fb-notice-*`
+   instead. `.bz7__side` is the class `SidePanel` gives its note. */
 .bz7__sidelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-5); }
 /* Stacked, not side by side: a sample and its gloss on one line wrap
    mid-phrase, and a wrapped gloss under a monospace sample reads as a second
    sample. */
-.bz7__sidelist li { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-/* Classic's samples, in the monospace of a typed value. The paper versions
-   drop it, because it is what made the old note read as the admin's own
-   entries; Classic is the old note exactly, so it keeps it (1 Oct 2026). */
-.bz7__sidelist code {
-  font-family: var(--font-mono); font-size: var(--fs-xs);
-  color: inherit; overflow-wrap: anywhere;
-}
+.bz7__sidelist li { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 /* The gloss is its own element rather than a bare text node, so it can be
-   dimmed without dimming the sample above it — opacity on the row would take
-   both, since a child cannot be more opaque than its parent. */
-.bz7__sidelist em { font-style: normal; font-size: var(--fs-xs); opacity: 0.72; }
-/* The same list for named options rather than samples: a word, not a value, so
-   it is set in the panel's own face at the label weight instead of the
-   monospace a sample needs (device profiles, 18 Sep 2026). */
+   set a step quieter than the word above it. A text token, not opacity:
+   dimmed to 0.72 the 12px gloss fell under 4.5:1 on white (16 Oct 2026). */
+.bz7__sidelist em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+/* Named options rather than samples: a word, not a value, so it is set in the
+   note's own face at the label weight (device profiles, 18 Sep 2026). */
 .bz7__sidelist--words strong { font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
 .bz7__sidelist--words.is-under { margin-top: var(--space-5); }
 
 .bz7__sidep {
-  margin: 12px 0 0; padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-  font-size: var(--fs-xs); line-height: 1.55; opacity: 0.78;
+  margin: var(--space-5) 0 0; padding-top: var(--space-4);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-xs); line-height: 1.55; color: var(--text-tertiary);
 }
-.bz7__sidep + .bz7__sidep { margin-top: 8px; padding-top: 8px; }
+.bz7__sidep + .bz7__sidep { margin-top: var(--space-4); padding-top: var(--space-4); }
 
 /* --- Adding another row -------------------------------------------------------
    A link under the list, not a box: the page has one primary decision and it
@@ -672,20 +653,19 @@ fieldset.bz7__rangecol:has(.bx-picker__trigger.is-open) {
   display: flex; flex-direction: column; align-items: center; gap: 14px;
 }
 
-/* --- The side note, four ways (`zone-notes.tsx`) -------------------------------
+/* --- The side note, two ways (`zone-notes.tsx`) --------------------------------
 
    Owner, 1 Oct 2026, after four versions went up that morning: "I only like
    the sticky note, so have the old one as a classic as we used to have, and
    the sticky note. Remove the rest of them and give me some more good options
-   like the sticky note." Classic is `.bz7__side` above, as it always was. The
-   sticky note stays. Two more paper notes join it, each from something real
-   products do (Mobbin, 1 Oct 2026): a clipboard and a pointer. Colours,
-   Example rows and Inline tip went, with `.bz7n-kind`, `.bz7n-legend`,
-   `.bz7n-eg`, `.bz7n-ghost*` and `.bz7n-tip*`; Note pile and Index card went
-   the next day, with `.bz7n-pile*` and `.bz7n-card*` (owner, 2 Oct 2026:
-   "Remove Note pile, Index card").
+   like the sticky note." Colours, Example rows and Inline tip went, with
+   `.bz7n-kind`, `.bz7n-legend`, `.bz7n-eg`, `.bz7n-ghost*` and `.bz7n-tip*`;
+   Note pile and Index card went the next day, with `.bz7n-pile*` and
+   `.bz7n-card*` (owner, 2 Oct 2026: "Remove Note pile, Index card"). On
+   16 Oct 2026 Classic and Blue became the kit's one note (`.bz7n-note` below),
+   and `.bz7n-blue*` and Classic's monospace samples went with them.
 
-   What the paper versions share: the places in the UI face, never the
+   What the paper version keeps: the places in the UI face, never the
    monospace of a typed value; the example in the primary ink and its kind in
    the secondary one, never the tertiary, which is too faint on tinted paper;
    no edge dashed or dotted (owner, 14 Sep 2026); and no stylesheet transform,
@@ -753,42 +733,27 @@ fieldset.bz7__rangecol:has(.bx-picker__trigger.is-open) {
 }
 .bz7n-sticky__fact + .bz7n-sticky__fact { margin-top: var(--space-3); padding-top: 0; border-top: 0; }
 
-/* --- Blue note (zone-notes.tsx `BlueNote`) --------------------------------------------------------------------------
-   Classic's card in the info blue: the kind on the left in the UI face, the example on the right in monospace on a white
-   chip, a rule, then the facts. Static, so no motion and no transform. Tokens only. */
-.bz7n-blue {
-  padding: var(--space-6);
-  background: var(--fb-info-bg);
-  border: var(--bw-thin) solid var(--fb-info-border);
-  border-radius: var(--radius-lg);
-  color: var(--text-primary);
-}
-.bz7n-blue__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-5);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--fb-info-fg);
-}
-.bz7n-blue__rows { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; }
-.bz7n-blue__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
-.bz7n-blue__row dt { min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bz7n-blue__row dd { flex: none; margin: 0; max-width: 60%; }
-.bz7n-blue__row code {
+/* --- Note (zone-notes.tsx `AddNote`) ------------------------------------------------------------------------------
+   The kit's `Note` holds the card, the mark and the heading; this is what Blue held, inside it: the kind on the left
+   in the UI face, the example on the right in monospace on a sunken chip, a rule, then the facts. Static, so no motion
+   and no transform. Tokens only. */
+.bz7n-note__rows { display: flex; flex-direction: column; gap: var(--space-4); margin: var(--space-4) 0 0; }
+.bz7n-note__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
+.bz7n-note__row dt { min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bz7n-note__row dd { flex: none; margin: 0; max-width: 60%; }
+.bz7n-note__row code {
   display: inline-block;
   max-width: 100%;
   padding: var(--space-1) var(--space-4);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: var(--bw-thin) solid var(--fb-info-border);
+  border: var(--bw-thin) solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--surface-sunken);
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--text-primary);
 }
-.bz7n-blue__facts { margin: var(--space-5) 0 0; padding: var(--space-5) 0 0 var(--space-6); border-top: var(--bw-thin) solid var(--fb-info-border); font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
-.bz7n-blue__facts li + li { margin-top: var(--space-2); }
+.bz7n-note__facts { margin: var(--space-5) 0 0; padding: var(--space-5) 0 0 var(--space-6); border-top: var(--bw-thin) solid var(--border-subtle); font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+.bz7n-note__facts li + li { margin-top: var(--space-2); }

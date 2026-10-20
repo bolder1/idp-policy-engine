@@ -1,52 +1,50 @@
 import { motion, useReducedMotion } from 'motion/react'
-import { Info } from 'lucide-react'
 
+import { Note } from '../kit'
 import { FilterTabs } from './page-bar'
 import { NOTE_STYLES, examplesOf, factsOf, useNoteStyle, type Example, type NoteStyle, type ZoneHalf } from './zone-notes-model'
 
 /* -----------------------------------------------------------------------------
-   The zone page's side note, in four versions behind one switch.
+   The zone page's side note, in two versions behind one switch.
 
    Owner, 1 Oct 2026, on "What you can add": "I need multiple iterations for
    this, either with colours or with an actual note with a roll-out animation,
    a sticky-note type thing, so it feels like these are examples — as of now it
-   feels like it's what the user added." Four versions went up that day:
-   Colours, Sticky note, Example rows and Inline tip.
+   feels like it's what the user added." Four versions went up that day, then
+   Classic came back beside the sticky note, then the paper notes thinned out
+   (2 Oct 2026: "Remove Note pile, Index card"), then Blue joined and became
+   the default (5 and 9 Oct 2026).
 
-   Then, the same day: "I only like the sticky note, so have the old one as a
-   classic as we used to have, and the sticky note. Remove the rest of them and
-   give me some more good options like the sticky note. Check Mobbin and come
-   up with some more iterations." So Colours, Example rows and Inline tip are
-   gone, the original note is back as Classic, and more paper notes joined the
-   sticky one, each from something real products do (Mobbin, 1 Oct 2026). Two
-   of those went the next day (owner, 2 Oct 2026: "Remove Note pile, Index
-   card"), which leaves:
+   On 16 Oct 2026 the owner made the What's new card on Authentication methods
+   the one note ("use this as a common note component … change this
+   globally"), so Classic and Blue are that note now, one version called Note:
 
-     Classic       the note as it was: a card, "What you can add", the zone's
-                   kind of places in monospace (India, Maharashtra, Pune)
+     Note          the kit's `Note`: the white card, the info mark, "What you
+                   can add" in the info blue, then one row per kind — the kind
+                   on the left, the example in monospace on the right — and, on
+                   Locations, the two facts under a rule. Static.
      Sticky note   a paper note taped to the page, that unrolls once
 
    What made the old note read as the admin's own entries was two things
    together: the examples were set in the monospace of a typed value, one per
    line, the way the list beside them is; and they were the zone's own places.
-   So every version but Classic drops the monospace for the places and uses
-   the SAME four, picked to be plainly someone else's — Japan, California,
-   Toronto, 50 km round Berlin. Classic is the original exactly, so it keeps
-   its own.
+   So both versions use the SAME four, picked to be plainly someone else's —
+   Japan, California, Toronto, 50 km round Berlin — and the Note sets each
+   beside its kind, so it reads as a sample rather than an entry.
 
-   The IP networks tab has its own note, so it gets all four, and the switch
-   flips both tabs together.
+   The IP networks tab has its own note, and the switch flips both tabs
+   together.
 
-   Every paper version arrives once per page visit, tab and version
-   (`rollOut`), with motion props only: no stylesheet transform or transition
-   is ever on a motion element, because motion writes `transform` inline and a
-   stylesheet one would fight it. Under reduced motion, or on a second
-   showing, each is drawn in its final state, still. The app's own face
-   throughout — a handwriting face would be a costume.
+   The sticky note arrives once per page visit, tab and version (`rollOut`),
+   with motion props only: no stylesheet transform or transition is ever on a
+   motion element, because motion writes `transform` inline and a stylesheet
+   one would fight it. Under reduced motion, or on a second showing, it is
+   drawn in its final state, still. The app's own face throughout — a
+   handwriting face would be a costume.
 
    PREVIEW. The switch is a pending decision, so it shows in the showcase build
    too, where every other comparison switch is hidden (showcase.ts). It and
-   the versions not chosen go once the owner picks one.
+   the version not chosen go once the owner picks one.
 
    What the notes say, and which version is on, is zone-notes-model.ts.
    -------------------------------------------------------------------------- */
@@ -84,10 +82,8 @@ export function ZoneNote({
   rollOut?: boolean
   onRolled?: () => void
 }) {
-  const props = { half, rollOut, onRolled }
-  if (style === 'blue') return <BlueNote half={half} />
-  if (style === 'sticky') return <StickyNote {...props} />
-  return half === 'net' ? <AcceptsNote /> : <PlacesNote />
+  if (style === 'sticky') return <StickyNote half={half} rollOut={rollOut} onRolled={onRolled} />
+  return <AddNote half={half} />
 }
 
 /* Every arrival eases out on the same curve the console's other motion uses. */
@@ -107,75 +103,42 @@ function Said({ e, glossClass }: { e: Example; glossClass?: string }) {
   )
 }
 
-/* Classic. The note as it stood until 1 Oct 2026, restored as it was: a card,
-   "What you can add", the samples in monospace one per line with their kind
-   under each. The owner asked for it back beside the sticky note, so these are
-   its own words and examples, not the shared set the paper versions use. */
-export function AcceptsNote() {
+/* Note. The kit's one note (owner, 16 Oct 2026), holding what Blue held (owner,
+   5 Oct 2026: "a revamped classic style featuring better text … an example of
+   static text"): the heading, then one row per kind — the kind in the UI face
+   on the left, the example in monospace on the right — and, on Locations, the
+   two facts as a short list under a rule. Static: no motion, nothing to press.
+   `AcceptsNote`, `PlacesNote` and `BlueNote` stood here: Classic's two cards
+   and the blue-tinted one, both folded into this on the same day. */
+function AddNote({ half }: { half: ZoneHalf }) {
+  const facts = factsOf(half)
   return (
-    <div className="bz7__side">
-      <h3 className="bz7__sidehead">
-        <Info size={14} strokeWidth={2} aria-hidden />
-        What you can add
-      </h3>
-      <ul className="bz7__sidelist">
-        <li>
-          <code>10.0.0.1</code>
-          <em>An IPv4 or IPv6 address</em>
-        </li>
-        <li>
-          <code>192.168.0.0/24</code>
-          <em>A CIDR block</em>
-        </li>
-        <li>
-          <code>192.168.0.1-192.168.0.254</code>
-          <em>An IPv4 range</em>
-        </li>
-        <li>
-          <code>AS15169</code>
-          <em>An ASN</em>
-        </li>
-      </ul>
-      {/* The paste line stood here — "Paste a list to add several at once…"
-          (owner, 23 Sep 2026: "remove"). The examples are what the note is
-          for; pasting is something the field does whether or not it is
-          announced. */}
-    </div>
+    <Note title="What you can add" className="bz7n-note">
+      <dl className="bz7n-note__rows">
+        {examplesOf(half).map((e) => (
+          <div key={e.text} className="bz7n-note__row">
+            <dt>{kindOf(e.gloss)}</dt>
+            <dd>
+              <code>{e.text}</code>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {facts.length > 0 && (
+        <ul className="bz7n-note__facts">
+          {facts.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+      )}
+    </Note>
   )
 }
 
-export function PlacesNote() {
-  return (
-    <div className="bz7__side">
-      <h3 className="bz7__sidehead">
-        <Info size={14} strokeWidth={2} aria-hidden />
-        What you can add
-      </h3>
-      <ul className="bz7__sidelist">
-        <li>
-          <code>India</code>
-          <em>A country</em>
-        </li>
-        <li>
-          <code>Maharashtra</code>
-          <em>A state or region</em>
-        </li>
-        <li>
-          <code>Pune</code>
-          <em>A city</em>
-        </li>
-        <li>
-          <code>Within 25 km of Pune</code>
-          <em>A city with a range</em>
-        </li>
-      </ul>
-      <p className="bz7__sidep">
-        A country covers its states and cities, and a state covers its cities. The narrower ones stay
-        in the list, marked as covered.
-      </p>
-      <p className="bz7__sidep">Matched on the sign-in's IP address. A VPN shows where it exits.</p>
-    </div>
-  )
+/** "an IPv4 or IPv6 address" → "IPv4 or IPv6 address": the kind without its article, for a row's label. */
+const kindOf = (gloss: string): string => {
+  const bare = gloss.replace(/^(an?|the)\s+/i, '')
+  return bare.charAt(0).toUpperCase() + bare.slice(1)
 }
 
 /* Sticky note. A paper note, taped on, that unrolls from the tape once per
@@ -223,44 +186,3 @@ function StickyNote({ half, rollOut, onRolled }: NoteProps) {
    withdrawn on 1 Oct 2026 (owner: "I only like the sticky note … remove the
    rest of them"). `NotePile` and `IndexCard` followed them on 2 Oct 2026
    (owner: "Remove Note pile, Index card"). */
-
-/* Blue (owner, 5 Oct 2026: "add another version with a blue-tinted background, a revamped classic style featuring better
-   text, and an improved experience so it can be distinguished — an example of static text"). Classic's card, tinted with
-   the info blue, its words set so they read at a glance: the head, then one row per kind — the kind in the UI face on
-   the left, the example in monospace on a white chip on the right — and, on Locations, the two facts as a short list
-   under a rule. Static: no motion, nothing to press. It reads the shared examples, as the paper versions do. */
-function BlueNote({ half }: { half: ZoneHalf }) {
-  const examples = examplesOf(half)
-  const facts = factsOf(half)
-  return (
-    <div className="bz7n-blue">
-      <h3 className="bz7n-blue__head">
-        <Info size={14} strokeWidth={2.2} aria-hidden />
-        What you can add
-      </h3>
-      <dl className="bz7n-blue__rows">
-        {examples.map((e) => (
-          <div key={e.text} className="bz7n-blue__row">
-            <dt>{kindOf(e.gloss)}</dt>
-            <dd>
-              <code>{e.text}</code>
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {facts.length > 0 && (
-        <ul className="bz7n-blue__facts">
-          {facts.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-/** "an IPv4 or IPv6 address" → "IPv4 or IPv6 address": the kind without its article, for a row's label. */
-const kindOf = (gloss: string): string => {
-  const bare = gloss.replace(/^(an?|the)\s+/i, '')
-  return bare.charAt(0).toUpperCase() + bare.slice(1)
-}

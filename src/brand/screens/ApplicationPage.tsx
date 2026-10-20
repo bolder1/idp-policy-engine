@@ -1,110 +1,141 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  Activity,
   AppWindow,
   ArrowLeft,
-  Eye,
-  EyeOff,
+  Check,
+  FileCode2,
+  KeyRound,
   ListPlus,
-  PanelRight,
   Pencil,
   Plus,
-  Power,
-  PowerOff,
-  Radar,
+  Settings2,
   ShieldCheck,
   ShieldPlus,
   Sliders,
-  Trash2,
-  Unlink,
+  Tags,
   UserRound,
   Users,
+  Waypoints,
   type LucideIcon,
 } from 'lucide-react'
 
-import { Badge, Button, IconButton, NameField, SaveBar, Tabs, type MenuItem, type ReviewRow } from '../kit'
+import { Badge, Button, IconButton, NameField, SaveBar, Tabs, type ReviewRow } from '../kit'
+import { AppNoPolicyView, AppPolicyView } from './app-policy-view'
+import type { StatusMenuId } from './app-policy-model'
 import { EmptyState } from '../empty'
 import { DocsLink } from '../Shell'
 import { AppLogo } from '../logos/AppLogo'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
-import { useBrand } from '../store'
+import { useBrand, type AppTab } from '../store'
 import { blankPolicy, nameTaken, type App, type Policy } from '../data'
+import { APP_NAME_MAX, basicIssues, cleanSetup, randomHex, type AppSetup } from '../app-setup'
 import { freeName } from '../policy-name'
 import { playCue } from '../sound'
 import { AddExistingPolicy } from './AddExistingPolicy'
-import { FallbackRow, PolicyRow, RemoveDialog } from './AppProtection'
+import { AppPostSignInTab } from './AppPostSignIn'
+import { FallbackRow, RemoveDialog } from './AppProtection'
+import { appTypeOf, buildApp, catalogEntry, newAppId, newAppName, startingSetup, type CatalogApp } from './app-catalog'
+import {
+  TAB_LABEL,
+  appTabs,
+  draftChanges,
+  draftOf,
+  firstIssue,
+  isSetupTab,
+  landingTab,
+  newDraftChanged,
+  shownIssues,
+  type AppDraft,
+  type NewDraft,
+} from './app-page-model'
 import { AppGroupsTab, AppUsersTab } from './app-people-tabs'
 import { attachTo, attachableTo, deleteDetail, detachFrom } from './app-policies'
-import { appStanding, rowTip, whoLabel, type StandRow } from './app-standing'
-import { addToApp, removeFromApp } from './applications-model'
+import { SetupTabBody, type SetupPatch } from './app-setup-forms'
+import { appStanding, type StandRow } from './app-standing'
+import { addToApp, removeFromApp, replaceOnApp } from './applications-model'
 import { useAppsGuard } from './board/apps-guard'
-import { arriveFromBoard, sendToBoard, type SentToBoard } from './board-return'
+import { SENT_TO_BOARD, arriveFromBoard, sendToBoard } from './board-return'
 import { ConfirmDelete } from './confirm-delete'
-import { SidePanel } from './device-profile-parts'
 import { GuardDrawer } from './guard-page'
-import { PageBar } from './page-bar'
-import { PolicyDetailsDrawer } from './policy-details-drawer'
-import { APP_BASIC_NOTE } from './profile-notes'
-import { CopyText } from './sign-in-tests/CopyText'
-import { portalRoot, statusOptions, type StatusTarget } from './status-options'
+import { WidthSwitch } from './page-bar'
+import { SHOWCASE } from '../showcase'
+import { portalRoot } from './status-options'
 import { useStatusChange } from './use-status-change'
+import { footerEdge } from '../footer-edge'
 
 /* -----------------------------------------------------------------------------
-   One application's own page: the live console's app page (Basic, Policies)
-   with the two tabs its Show Associated Entities page holds (Users, Groups).
+   One application's own page: the live console's app page — Basic, Advanced,
+   Sign-in options, Attributes, Policies, and Metadata or Endpoints — with the
+   two tabs its Show Associated Entities page holds (Users, Groups) before the
+   last (spec docs/specs/APP-CREATE-AND-ACCESS.md §4).
 
    The head is a library detail page's (a zone's, a device profile's): the way
    back, the logo and the name with its rename pencil, the app type as a pill.
-   A rename saves at once; Basic's Description and App secret go through the
-   save footer, which stays up on every tab — a tab is a place on this page,
-   not a way off it.
+   A rename saves at once. Basic, Advanced, Sign-in options and Attributes edit
+   one draft through the save footer, which stays up on every tab — a tab is a
+   place on this page, not a way off it — and is held while Basic has a
+   problem, said under the field it is about.
 
-   Policies leads, because it is where policies get attached. Its list is the
-   engine's (app-standing.ts): numbered by who each policy actually decides
-   for, the shadowed ones said so, the tenant default under them. Users and
+   Policies leads, because it is where policies get attached. An application
+   has one sign-in policy (14 Oct 2026), and the tab is that policy read in the
+   page (app-policy-view.tsx, spec APP-POLICY-TAB.md): its chain of rules down
+   to the Global Default behind it, the application's sign-ins and the
+   policy's changes. With none, the Global Default's own rules. Users and
    Groups are read from the same model (app-people-tabs.tsx).
+
+   `NewApplicationPage` is the same page for an application not stored yet,
+   picked from the catalogue (§3.2): one form for create and edit, not a
+   wizard beside the page it ends on. Its tabs, its draft's changes and what
+   Basic still needs are app-page-model.ts's; its fields are app-setup-forms.tsx's.
    -------------------------------------------------------------------------- */
 
-type Tab = 'basic' | 'policies' | 'users' | 'groups'
+const TAB_ICON: Record<AppTab, LucideIcon> = {
+  basic: Sliders,
+  advanced: Settings2,
+  'sign-in': KeyRound,
+  attributes: Tags,
+  policies: ShieldCheck,
+  /* A pulse: what goes on in the session after the sign-in, not the gate. */
+  'post-sign-in': Activity,
+  users: UserRound,
+  groups: Users,
+  metadata: FileCode2,
+  endpoints: Waypoints,
+}
 
-const TABS: { value: Tab; label: string; icon: LucideIcon }[] = [
-  { value: 'basic', label: 'Basic', icon: Sliders },
-  { value: 'policies', label: 'Policies', icon: ShieldCheck },
-  { value: 'users', label: 'Users', icon: UserRound },
-  { value: 'groups', label: 'Groups', icon: Users },
-]
+const tabOptions = (tabs: readonly AppTab[]) => tabs.map((t) => ({ value: t, label: TAB_LABEL[t], icon: TAB_ICON[t] }))
 
-const NAME_MAX = 50
-const DESCRIPTION_MAX = 250
-/* The count appears once the description is close to its cap, not from the first character. */
-const DESCRIPTION_COUNT_FROM = 200
-
-/* The status items' marks, the Policies row menu's own (Policies.tsx). */
-const STATUS_ICON: Record<StatusTarget, LucideIcon> = { active: Power, monitor: Radar, inactive: PowerOff }
-
-/* Policies this page sent to the board — New policy, Add a copy — and whether
-   the application had a deciding policy when they left. Spent by the next
-   arrival at any application's page, and read only when that arrival is the
-   board's way back with the policy flashed: the first policy that decides on
-   an application gets the celebration rather than silence (board-return.ts).
-   Module state, because the page is unmounted while the board is open. */
-const sentToBoard: SentToBoard = new Map()
+/* Policies sent to the board from an application — New policy, Add a copy,
+   and the unsaved application's New policy — go through `SENT_TO_BOARD`
+   (board-return.ts), with whether the application had a deciding policy when
+   they left. Spent by the next arrival at any application's page, and read
+   only when that arrival is the board's way back with the policy flashed: the
+   first policy that decides on an application gets the celebration rather
+   than silence, whichever door sent it. */
 
 export function ApplicationPage({
   appId,
   tab,
   group,
+  policy,
   flash,
   from,
+  open,
 }: {
   appId: string
-  tab?: Tab
+  tab?: AppTab
   /** The Users tab's group filter, from a Groups-tab count. */
   group?: string
+  /** The Users tab's policy filter, from the Policies tab's "{n} people". */
+  policy?: string
   /** The policy the board just came back from: lit and focused in the list. */
   flash?: string
   /** The group page this was opened from, which the way back names. */
   from?: { groupId: string }
+  /** One-shot: a drawer to open on Policies on arrival (the unsaved application's Add existing policy). */
+  open?: 'add-existing'
 }) {
   const store = useBrand()
   /* `apps.find`, never `appById`: that resolves an unknown id to the first
@@ -126,50 +157,76 @@ export function ApplicationPage({
       </div>
     )
   }
-  return <AppPage app={app} routeTab={tab} group={group} flash={flash} from={from} />
-}
-
-interface BasicDraft {
-  description: string
-  secret: string
+  return <AppPage app={app} routeTab={tab} group={group} policy={policy} flash={flash} from={from} open={open} />
 }
 
 function AppPage({
   app,
   routeTab,
   group,
+  policy,
   flash,
   from,
+  open,
 }: {
   app: App
-  routeTab?: Tab
+  routeTab?: AppTab
   group?: string
+  policy?: string
   flash?: string
   from?: { groupId: string }
+  open?: 'add-existing'
 }) {
   const store = useBrand()
+  const tabs = appTabs(app.protocol, 'saved')
 
   /* The route owns the tab (SignInTests.tsx): a link can land on one, and a
-     new tab from outside moves the page that is already open. */
-  const [tab, setTab] = useState<Tab>(routeTab ?? 'policies')
+     new tab from outside moves the page that is already open. A tab this
+     application does not have — Endpoints on a SAML one — lands on Policies. */
+  const [tab, setTab] = useState<AppTab>(landingTab(routeTab, tabs))
   const [seen, setSeen] = useState(routeTab)
   if (seen !== routeTab) {
     setSeen(routeTab)
-    if (routeTab) setTab(routeTab)
+    if (routeTab) setTab(landingTab(routeTab, tabs))
   }
 
-  /* --- Basic's draft, held here so it outlives a tab switch ------------------- */
-  const [draft, setDraft] = useState<BasicDraft>({ description: app.description ?? '', secret: app.secret ?? '' })
-  const descriptionChanged = draft.description.trim() !== (app.description ?? '')
-  const secretChanged = draft.secret !== (app.secret ?? '')
-  const dirty = descriptionChanged || secretChanged
+  /* The route's drawer, opened once: the unsaved application's Add existing
+     policy saved the application and came here to carry on. Spent when
+     Policies opens it, so a tab switch and back does not open it again. */
+  const [pendingOpen, setPendingOpen] = useState(open)
+  const [seenOpen, setSeenOpen] = useState(open)
+  if (seenOpen !== open) {
+    setSeenOpen(open)
+    setPendingOpen(open)
+  }
 
-  const saveBasic = () => {
-    const stored = store.apps.find((a) => a.id === app.id) ?? app
+  /* --- The setup's draft, held here so it outlives a tab switch -------------------
+
+     Measured against what is stored, through `setupOf`, so a seed application
+     — which has no setup of its own — opens clean. */
+  const stored = draftOf(app)
+  const [draft, setDraft] = useState<AppDraft>(stored)
+  const changes = draftChanges(stored, draft)
+  const dirty = changes.length > 0
+  /* The name is not Basic's here — it is renamed in the head, which refuses a
+     taken one — so only the setup's own problems hold the save. */
+  const issues = basicIssues(draft.setup, app.name, [], draft.secret)
+  const problem = firstIssue(issues)
+
+  const patchSetup: SetupPatch = (p) => setDraft((d) => ({ ...d, setup: { ...d.setup, ...p } as AppSetup }))
+  const patchDraft = (p: Partial<Pick<AppDraft, 'description' | 'secret'>>) => setDraft((d) => ({ ...d, ...p }))
+
+  /* Blank rows dropped and text trimmed (`cleanSetup`), and the draft set to
+     what was stored, so the page is clean again with the same values. */
+  const saveSetup = (): boolean => {
+    if (problem) return false
+    const live = store.apps.find((a) => a.id === app.id) ?? app
     const description = draft.description.trim()
-    store.saveApp({ ...stored, description: description || undefined, secret: draft.secret || undefined })
-    setDraft({ description, secret: draft.secret })
-    store.showToast(`${stored.name} saved`)
+    const setup = cleanSetup(draft.setup)
+    store.saveApp({ ...live, description: description || undefined, secret: draft.secret || undefined, setup })
+    setDraft({ description, secret: draft.secret, setup })
+    store.showToast(`${live.name} saved`)
+    return true
   }
 
   /* A tab press is a move inside this page, and `go` asks the leave guard
@@ -180,14 +237,12 @@ function AppPage({
     get dirty() {
       return dirty && !tabbing.current
     },
-    save: () => {
-      saveBasic()
-      return true
-    },
+    save: saveSetup,
     saveLabel: 'Save changes',
+    blocked: problem,
   })
 
-  const show = (t: Tab, extra?: { group?: string }) => {
+  const show = (t: AppTab, extra?: { group?: string; policy?: string }) => {
     /* The tab already open, pressed again, keeps its filters. */
     if (t === tab && !extra) return
     setTab(t)
@@ -221,7 +276,7 @@ function AppPage({
   useEffect(() => {
     const decides = (id: string) =>
       appStanding(app.id, store.policies, store.users).rows.some((r) => r.policy.id === id && r.state === 'decides')
-    if (arriveFromBoard(sentToBoard, flash, decides)) playCue('celebrate')
+    if (arriveFromBoard(SENT_TO_BOARD, flash, decides)) playCue('celebrate')
     // Arrival only: a later flash is an attach, which sounds for itself.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -274,17 +329,12 @@ function AppPage({
     focusRename()
   }
 
-  /* --- What the save footer reviews ------------------------------------------------ */
-  const changes = [...(descriptionChanged ? ['Description'] : []), ...(secretChanged ? ['App secret'] : [])]
-  /* The secret's value is never printed, here or anywhere: the review says that it changes. */
-  const review: ReviewRow[] = [
-    ...(descriptionChanged
-      ? [{ label: 'Description', before: app.description || 'None', after: draft.description.trim() || 'None', kind: 'changed' as const }]
-      : []),
-    ...(secretChanged ? [{ label: 'App secret', before: 'Current secret', after: 'New secret', kind: 'changed' as const }] : []),
-  ]
+  /* --- What the save footer reviews ------------------------------------------------
 
-  const label = TABS.find((t) => t.value === tab)?.label ?? 'Policies'
+     One row per changed field, filed under the tab it was changed on. The
+     secret's value is never printed, here or anywhere: its row says that it
+     changes (`draftChanges`). */
+  const review: ReviewRow[] = changes.map((c) => ({ ...c, kind: 'changed' as const }))
 
   return (
     <div className="bpage bapp">
@@ -303,7 +353,7 @@ function AppPage({
             {renaming ? (
               <NameField
                 value={draftName}
-                max={NAME_MAX}
+                max={APP_NAME_MAX}
                 label="Application name"
                 errorId={nameErr ? 'bapp-name-err' : undefined}
                 invalid={!!nameErr}
@@ -362,26 +412,60 @@ function AppPage({
         </div>
         {/* No status pill and no action trail: an application is not switched
             on or off, and Delete is on the list's row menu. */}
-        <DocsLink />
+        <div className="bpage__preview">
+          {!SHOWCASE && <WidthSwitch />}
+          <DocsLink />
+        </div>
       </header>
 
-      <Tabs
-        className="bx-tabs--line bapp__tabs"
-        name="Application sections"
-        panelId="bapp-panel"
-        value={tab}
-        onChange={(t) => show(t)}
-        options={TABS}
-      />
-
-      <div id="bapp-panel" role="tabpanel" aria-label={label} className="bapp__panel">
-        {tab === 'basic' && <BasicTab app={app} draft={draft} onDraft={(patch) => setDraft((d) => ({ ...d, ...patch }))} />}
-        {tab === 'policies' && <PoliciesTab app={app} flash={flash} confirmLeave={confirmLeave} saving={dirty} />}
-        {tab === 'users' && <AppUsersTab appId={app.id} group={group} />}
-        {tab === 'groups' && <AppGroupsTab appId={app.id} onShowUsers={(g) => show('users', g ? { group: g } : undefined)} />}
+      {/* In a strip of its own, which scrolls sideways when eight tabs are
+          wider than the page (900 and 720): the page itself never does. */}
+      <div className="bapp__tabbar">
+        <Tabs
+          className="bx-tabs--line"
+          name="Application sections"
+          panelId="bapp-panel"
+          value={tab}
+          onChange={(t) => show(t)}
+          options={tabOptions(tabs)}
+        />
       </div>
 
-      <SaveBar open={dirty} changes={changes} review={review} saveLabel="Save changes" onSave={saveBasic} />
+      <div id="bapp-panel" role="tabpanel" aria-label={TAB_LABEL[tab]} className="bapp__panel">
+        {(isSetupTab(tab) || tab === 'metadata' || tab === 'endpoints') && (
+          <SetupTabBody tab={tab} draft={draft} onPatch={patchSetup} onDraft={patchDraft} issues={shownIssues(issues, draft, true)} appId={app.id} />
+        )}
+        {tab === 'policies' && (
+          <PoliciesTab
+            app={app}
+            flash={flash}
+            confirmLeave={confirmLeave}
+            saving={dirty}
+            openAdd={pendingOpen === 'add-existing'}
+            onOpened={() => setPendingOpen(undefined)}
+            onTab={show}
+          />
+        )}
+        {/* `saving`: while the footer is up it holds the view's one orange
+            button, so any primary of the tab's own turns secondary. */}
+        {tab === 'post-sign-in' && <AppPostSignInTab app={app} saving={dirty} confirmLeave={confirmLeave} flash={flash} />}
+        {tab === 'users' && <AppUsersTab appId={app.id} group={group} policy={policy} saving={dirty} />}
+        {tab === 'groups' && (
+          <AppGroupsTab appId={app.id} saving={dirty} onShowUsers={(g) => show('users', g ? { group: g } : undefined)} />
+        )}
+      </div>
+
+      {/* Held while Basic has a problem: the reason is the footer's words, and
+          the field it is about says it too. */}
+      <SaveBar
+        open={dirty}
+        changes={changes.map((c) => c.label)}
+        review={review}
+        saveLabel="Save changes"
+        onSave={saveSetup}
+        blocked={!!problem}
+        blockedReason={problem ?? undefined}
+      />
     </div>
   )
 }
@@ -393,41 +477,68 @@ function PoliciesTab({
   flash,
   confirmLeave,
   saving,
+  openAdd = false,
+  onOpened,
+  onTab,
 }: {
   app: App
   flash?: string
   confirmLeave: (run: () => void) => void
-  /** The Basic draft is unsaved, so the save bar holds this view's one orange button. */
+  /** The page's draft is unsaved, so the save bar holds this view's one orange button. */
   saving: boolean
+  /** Open Add existing policy on arrival: the route asked for it (`open: 'add-existing'`). */
+  openAdd?: boolean
+  /** Told once it is open, so the page spends the route's request. */
+  onOpened?: () => void
+  /** Another tab of this page — Users filtered to a group or to this policy, Post sign-in — as a place on it, not a way off it. */
+  onTab: (tab: AppTab, extra?: { group?: string; policy?: string }) => void
 }) {
   const store = useBrand()
-  const { policies, users, groups } = store
+  const { policies, users } = store
   const standing = useMemo(() => appStanding(app.id, policies, users), [app.id, policies, users])
   const { rows, fallback, everyoneElse } = standing
+  /* One application, one policy (14 Oct 2026): the one that decides here, else
+     the first on it. Any other is data the ruling bars, said on the view's
+     state line with the way to clean it up. */
+  const shown = rows.find((r) => r.state === 'decides') ?? rows[0]
+  const others = rows.filter((r) => r !== shown)
   /* App access only: the drawer shows the rest, greyed with the reason, but a
      button that opens on nothing to pick is a dead end. */
   const attachable = attachableTo(app.id, policies).filter((p) => p.type === 'App Access')
 
-  const [flashed, setFlashed] = useState<string | null>(flash ?? null)
   const [adding, setAdding] = useState(false)
+  /* Replace policy: the one the application has now, which the pick takes the place of. */
+  const [replacing, setReplacing] = useState<Policy | null>(null)
   const [removing, setRemoving] = useState<Policy | null>(null)
   const [deleting, setDeleting] = useState<{ policy: Policy; open: boolean } | null>(null)
-  const [details, setDetails] = useState<{ id: string; open: boolean } | null>(null)
   const statusChange = useStatusChange()
   const appsGuard = useAppsGuard()
-  const list = useRef<HTMLOListElement | null>(null)
+  const view = useRef<HTMLDivElement | null>(null)
 
-  const nameButton = (id: string) => list.current?.querySelector<HTMLElement>(`[data-policy-id="${CSS.escape(id)}"]`)
+  /* The policy's heading (app-policy-view.tsx), which carries its id. */
+  const nameButton = (id: string) => view.current?.querySelector<HTMLElement>(`[data-policy-id="${CSS.escape(id)}"]`)
   /* After the drawer has handed focus back to what opened it. */
   const focusRow = (id: string) => window.setTimeout(() => nameButton(id)?.focus(), 0)
+  /* A policy taken off or deleted takes its status menu with it — the trigger a confirm hands focus back to — so the
+     view's heading takes it instead: the next policy's name, or "No policy on {app}". */
+  const focusHead = () => window.setTimeout(() => view.current?.querySelector<HTMLElement>('[data-tab-head]')?.focus(), 0)
 
-  /* Back from the board: the row it was about takes focus. Its celebration,
+  /* Back from the board: the policy it was about takes focus. Its celebration,
      when it has one, is the page's (AppPage). */
   useEffect(() => {
     if (flash) nameButton(flash)?.focus()
     // Arrival only: a later flash is an attach, which focuses its own row.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /* The unsaved application's Add existing policy, carried on here once the
+     application is stored: the drawer opens over the list it will add to, and
+     the add then runs Before saving: applications as every attach does. */
+  useEffect(() => {
+    if (!openAdd) return
+    setAdding(true)
+    onOpened?.()
+  }, [openAdd, onOpened])
 
   const hasDecider = () => rows.some((r) => r.state === 'decides')
 
@@ -438,7 +549,7 @@ function PoliciesTab({
     confirmLeave(() => {
       const had = hasDecider()
       const id = store.addPolicy(blankPolicy(freeName('Untitled policy', store.policies.map((p) => p.name)), [app.id]))
-      sendToBoard(sentToBoard, id, had)
+      sendToBoard(SENT_TO_BOARD, id, had)
       store.go({ name: 'board', policyId: id, from: { appId: app.id } })
     })
 
@@ -455,10 +566,13 @@ function PoliciesTab({
     const after = store.policies.map((p) => (p.id === live.id ? attachTo(live, app.id, store.apps) : p))
     const decidesNow = appStanding(app.id, after, store.users).rows.some((r) => r.policy.id === live.id && r.state === 'decides')
     const had = hasDecider()
-    if (!addToApp(store, policyId, app, store.apps)) return false
+    /* Replace policy: the one it had comes off as the new one goes on, so it never holds two — one write, one toast,
+       one Undo that puts both back (applications-model.ts `replaceOnApp`). */
+    const wrote = replacing ? replaceOnApp(store, replacing.id, policyId, app, store.apps) : addToApp(store, policyId, app, store.apps)
+    if (!wrote) return false
+    if (replacing) setReplacing(null)
     /* Before the toast, which then stays quiet under it (sound.ts). */
     playCue(!had && decidesNow ? 'celebrate' : 'attach')
-    setFlashed(policyId)
     focusRow(policyId)
     return true
   }
@@ -475,7 +589,7 @@ function PoliciesTab({
     return 'checking'
   }
   const takeOff = (policyId: string) => {
-    removeFromApp(store, policyId, app)
+    if (removeFromApp(store, policyId, app)) focusHead()
   }
   const detach = (policyId: string) => {
     const live = store.policyById(policyId)
@@ -500,7 +614,7 @@ function PoliciesTab({
       const had = hasDecider()
       const id = store.duplicatePolicy(policyId, { appIds: [app.id] })
       if (!id) return
-      sendToBoard(sentToBoard, id, had)
+      sendToBoard(SENT_TO_BOARD, id, had)
       store.showToast(`${store.policyById(id)?.name ?? 'Copy'} created as a draft`)
       store.go({ name: 'board', policyId: id, from: { appId: app.id } })
     })
@@ -518,86 +632,65 @@ function PoliciesTab({
      draft on this application alone. A live delete stays on Policies. */
   const deletable = (p: Policy) => p.status === 'draft' && p.appIds.length === 1 && p.appIds[0] === app.id
 
-  const menuFor = (p: Policy): MenuItem[] => [
-    { id: 'open', label: 'Open policy', icon: PanelRight },
-    { id: 'edit', label: 'Edit policy', icon: Pencil },
-    /* None for a draft: it goes live from the builder, with its rules in view. */
-    ...statusOptions(p, { monitor: store.features.monitorMode }).map((s) => ({ id: s.target, label: s.label, icon: STATUS_ICON[s.target] })),
-    { id: 'remove', label: `Remove from ${app.name}`, icon: Unlink, danger: true, divide: true },
-    ...(deletable(p) ? [{ id: 'delete', label: 'Delete policy', icon: Trash2, danger: true }] : []),
-  ]
-
-  const onMenu = (row: StandRow) => (id: string) => {
+  /* The status pill's menu (app-policy-model.ts `statusMenu`) and the state
+     line's links: a switch asks first where it should and offers Undo
+     (use-status-change.tsx); Remove asks only when the policy decides here;
+     Delete draft is the one delete on this page. */
+  const onMenu = (row: StandRow) => (id: StatusMenuId) => {
     const p = row.policy
-    if (id === 'open') setDetails({ id: p.id, open: true })
-    else if (id === 'edit') store.go({ name: 'board', policyId: p.id, from: { appId: app.id } })
-    else if (id === 'active' || id === 'monitor' || id === 'inactive') statusChange.request(p, id)
+    if (id === 'active' || id === 'monitor' || id === 'inactive') statusChange.request(p, id)
+    else if (id === 'view-monitoring') statusChange.viewMonitoring(p.id)
     else if (id === 'remove') remove(row)
     else if (id === 'delete') setDeleting({ policy: p, open: true })
   }
 
-  const addExisting =
-    attachable.length > 0 ? (
-      <Button variant="secondary" icon={ListPlus} onClick={() => setAdding(true)}>
-        Add existing policy
-      </Button>
-    ) : null
-  const newButton = (
-    <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={newPolicy}>
-      New policy
-    </Button>
-  )
-
   return (
     <>
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={ShieldPlus}
-          title="No policies on this application"
-          action={
-            <>
-              {newButton}
-              {addExisting}
-            </>
-          }
-        />
-      ) : (
-        <>
-          <PageBar
-            right={
-              <>
-                {addExisting}
-                {newButton}
-              </>
-            }
+      <div ref={view} className="apol__wrap">
+        {shown ? (
+          /* One application, one policy (owner, 14 Oct 2026): the tab IS the policy, read in the page. Who it
+             covers is changed in the policy; two buttons here, the rest on the status pill. */
+          <AppPolicyView
+            app={app}
+            row={shown}
+            others={others}
+            globalDefault={fallback}
+            everyoneElse={everyoneElse}
+            saving={saving}
+            flash={flash}
+            deletable={deletable(shown.policy)}
+            onReplace={() => {
+              setReplacing(shown.policy)
+              setAdding(true)
+            }}
+            onMenu={onMenu(shown)}
+            onRemoveOther={remove}
+            onTab={onTab}
           />
-          <ol className="bapr__stack" ref={list}>
-            {rows.map((row) => (
-              <PolicyRow
-                key={row.policy.id}
-                row={row}
-                tip={rowTip(row, groups, users)}
-                who={whoLabel(row.policy, groups, users)}
-                fresh={flashed === row.policy.id}
-                onOpen={() => setDetails({ id: row.policy.id, open: true })}
-                menu={menuFor(row.policy)}
-                onSelect={onMenu(row)}
-              />
-            ))}
-          </ol>
-        </>
-      )}
-
-      {/* Always, empty list or not: it is what decides when nothing above does. */}
-      {fallback && <FallbackRow fallback={fallback} everyoneElse={everyoneElse} />}
+        ) : (
+          /* Nothing of its own: the Global Default's rules are what it gets, and the two ways to give it a policy. */
+          <AppNoPolicyView
+            app={app}
+            globalDefault={fallback}
+            saving={saving}
+            onNew={newPolicy}
+            onAdd={attachable.length > 0 ? () => setAdding(true) : undefined}
+            onTab={onTab}
+          />
+        )}
+      </div>
 
       <AddExistingPolicy
         open={adding}
         app={app}
         checking={appsGuard.checking}
-        onClose={() => setAdding(false)}
+        onClose={() => {
+          setAdding(false)
+          setReplacing(null)
+        }}
         onAdd={attach}
         onCopy={addCopy}
+        replacing={replacing}
       />
       <RemoveDialog
         policy={removing}
@@ -619,99 +712,297 @@ function PoliciesTab({
             setDeleting({ ...deleting, open: false })
             store.deletePolicy(deleting.policy.id)
             store.showToast(`${deleting.policy.name} deleted`)
+            focusHead()
           }}
         />
       )}
       {statusChange.dialog}
       {/* Portalled, so it opens over the add drawer as well as over the page. */}
       {guardPage && createPortal(<GuardDrawer {...guardPage} />, portalRoot())}
-      {details && store.policies.some((p) => p.id === details.id) && (
-        <PolicyDetailsDrawer
-          open={details.open}
-          policyId={details.id}
-          onClose={() => setDetails({ ...details, open: false })}
-          boardFrom={{ appId: app.id }}
-        />
-      )}
     </>
   )
 }
 
-/* --- Basic ---------------------------------------------------------------------- */
+/* `BasicTab` stood here — Description and the App secret, the whole of Basic
+   before an application had a setup. Basic is app-setup-forms.tsx's now,
+   shared with the unsaved application below, and the secret is the Client
+   secret, the live OAuth form's word. */
 
-/* The live console's Basic, less the name (renamed in the head): Description,
-   and the App secret where the application has one. A SAML application signs
-   with a certificate, so it has no secret, and a question with one answer is
-   not asked — nor is its note shown beside a form that does not hold it.
+/* --- The application not stored yet ---------------------------------------------
 
-   Both fields are the method forms' (`.bmc__field`): the App secret is the
-   Display token form's secret field, and a Description in another field
-   grammar would have put two label styles in one form. */
-function BasicTab({ app, draft, onDraft }: { app: App; draft: BasicDraft; onDraft: (patch: Partial<BasicDraft>) => void }) {
-  const uid = useId()
-  const [reveal, setReveal] = useState(false)
-  const n = draft.description.length
-  const hasSecret = app.protocol === 'OIDC'
+   Add application's second step (spec §3.2): the application page for the
+   catalogue entry just picked, before it exists. The same head, tabs and
+   forms, less Users and Groups, with the live console's footer — Cancel ·
+   Back · Next · Save — and Save orange on every tab.
 
-  /* 32 hex characters, into the draft: the save footer's review is the confirm. */
-  const regenerate = () => {
-    const bytes = new Uint8Array(16)
-    crypto.getRandomValues(bytes)
-    onDraft({ secret: Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('') })
+   Two things the live console locks until Save are open here, which is the gap
+   the spec set out to close: Policies, whose buttons save the application
+   first and then carry on, and Metadata or Endpoints, readable for the id the
+   application will be stored under.
+
+   Nothing is ever disabled. Save with Basic incomplete opens Basic and says
+   each problem under its field; Next is just the next tab. */
+export function NewApplicationPage({ catalogId }: { catalogId: string }) {
+  const store = useBrand()
+  const entry = catalogEntry(catalogId)
+  if (!entry) {
+    return (
+      <div className="bpage">
+        <EmptyState
+          icon={AppWindow}
+          title="Application not found"
+          action={
+            <Button variant="brand" onClick={() => store.go({ name: 'application-new' })}>
+              Choose application
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
+  return <NewAppPage entry={entry} />
+}
+
+function NewAppPage({ entry }: { entry: CatalogApp }) {
+  const store = useBrand()
+  const tabs = appTabs(entry.protocol, 'new')
+  /* The live form opens on Basic: it is the one tab with questions to answer. */
+  const [tab, setTab] = useState<AppTab>('basic')
+
+  /* What the page starts with, kept to measure against: the catalogue name,
+     freed when the tenant has it ("Salesforce 2"); the live form's defaults;
+     on an OAuth application a client id and secret made for it. */
+  const [start] = useState<NewDraft>(() => ({
+    name: newAppName(entry, store.apps),
+    description: '',
+    secret: entry.protocol === 'OIDC' ? randomHex(32) : '',
+    setup: startingSetup(entry),
+  }))
+  const [draft, setDraft] = useState<NewDraft>(start)
+  /* Save was pressed with Basic incomplete: from then on a missing answer is
+     said under its field, not only a wrong one. */
+  const [tried, setTried] = useState(false)
+  /* Set the moment the application is stored, before any move off the page,
+     so the leave guard never stops the move the save itself makes. */
+  const done = useRef(false)
+
+  /* The id it will be stored under: Metadata names it before it exists. */
+  const id = newAppId(entry, store.apps)
+  const issues = basicIssues(
+    draft.setup,
+    draft.name,
+    store.apps.map((a) => a.name),
+    draft.secret,
+  )
+  const problem = firstIssue(issues)
+  const changed = newDraftChanged(start, draft)
+
+  const patchSetup: SetupPatch = (p) => setDraft((d) => ({ ...d, setup: { ...d.setup, ...p } as AppSetup }))
+  const patchDraft = (p: Partial<Pick<AppDraft, 'description' | 'secret'>>) => setDraft((d) => ({ ...d, ...p }))
+
+  /* After a refused Save: the first field with a problem takes the focus, on
+     Basic, once Basic has drawn. */
+  const panel = useRef<HTMLDivElement | null>(null)
+  const focusProblem = useRef(false)
+  useEffect(() => {
+    if (!focusProblem.current) return
+    focusProblem.current = false
+    panel.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+  })
+
+  /* Stores the application and says so, or — with Basic incomplete — opens
+     Basic with each problem under its field and stores nothing. Returns the
+     stored id. Every door that saves comes through here: Save, the leave
+     dialog's Save application, and Policies' two buttons. */
+  const create = (): string | null => {
+    if (problem) {
+      setTried(true)
+      /* Already on Basic, nothing re-renders, so the focus moves now. */
+      if (tried && tab === 'basic') panel.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+      else focusProblem.current = true
+      setTab('basic')
+      return null
+    }
+    const stored = store.addApp(buildApp(entry, newAppId(entry, store.apps), { ...draft, setup: cleanSetup(draft.setup) }))
+    done.current = true
+    store.showToast(`${draft.name.trim()} added.`, undefined, { tone: 'success' })
+    return stored
   }
 
-  return (
-    <div className="bz7__cols">
-      <div className="bz7__work">
-        <div className="bmc__fields">
-          <div className="bmc__field">
-            <div className="bmc__label bdt__labelrow">
-              <label htmlFor={`${uid}-description`}>Description</label>
-              {n > DESCRIPTION_COUNT_FROM && <span className="bdt__count">{DESCRIPTION_MAX - n} left</span>}
-            </div>
-            <div className="bmc__control">
-              <textarea
-                id={`${uid}-description`}
-                rows={4}
-                maxLength={DESCRIPTION_MAX}
-                value={draft.description}
-                onChange={(e) => onDraft({ description: e.target.value })}
-              />
-            </div>
-          </div>
+  /* Leaving with anything changed from the start asks first. Its Save is
+     offered only while Basic is complete, and it stores the application
+     without moving: the admin goes where they were going. */
+  useLeaveGuard({
+    get dirty() {
+      return changed && !done.current
+    },
+    save: problem ? undefined : () => create() !== null,
+    saveLabel: 'Save application',
+  })
 
-          {hasSecret && (
-            <div className="bmc__field">
-              <div className="bmc__label">
-                <label htmlFor={`${uid}-secret`}>
-                  App secret
-                  <b aria-hidden>*</b>
-                </label>
-              </div>
-              <div className="bmc__control bapp__secret">
-                <span className="bmc__secret">
-                  <input
-                    id={`${uid}-secret`}
-                    type={reveal ? 'text' : 'password'}
-                    value={draft.secret}
-                    readOnly
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <button type="button" onClick={() => setReveal((v) => !v)} aria-label={reveal ? 'Hide app secret' : 'Show app secret'}>
-                    {reveal ? <EyeOff size={14} strokeWidth={1.9} /> : <Eye size={14} strokeWidth={1.9} />}
-                  </button>
-                </span>
-                <CopyText text={draft.secret} label="Copy secret" className="bx-btn bx-btn--ghost bx-btn--sm" />
-                <Button variant="link" onClick={regenerate}>
-                  Regenerate
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+  /* Save lands on the stored application's Policies, where the Global Default
+     row says what decides until a policy is added (the live OAuth Save goes to
+     Policies too). */
+  const save = () => {
+    const appId = create()
+    if (appId) store.go({ name: 'application', appId, tab: 'policies' })
+  }
+
+  /* New policy: the stored page's own — an Untitled draft for everyone,
+     straight into the board (23 Sep 2026) — once the application exists. It
+     had no deciding policy a moment ago, so a first one is celebrated on the
+     board's way back. */
+  const newPolicy = () => {
+    const appId = create()
+    if (!appId) return
+    const pid = store.addPolicy(blankPolicy(freeName('Untitled policy', store.policies.map((p) => p.name)), [appId]))
+    sendToBoard(SENT_TO_BOARD, pid, false)
+    store.go({ name: 'board', policyId: pid, from: { appId } })
+  }
+
+  /* Add existing policy: the stored page's drawer, opened there, so the add
+     runs Before saving: applications against an application that exists. */
+  const addExisting = () => {
+    const appId = create()
+    if (appId) store.go({ name: 'application', appId, tab: 'policies', open: 'add-existing' })
+  }
+
+  const back = () => store.go({ name: 'application-new' })
+
+  /* A tab is a place on this page, and the column starts at its top. */
+  const move = (to: AppTab) => {
+    setTab(to)
+    document.querySelector('.bshell__main')?.scrollTo({ top: 0 })
+  }
+
+  /* The heading takes focus on arrival — the catalogue tile that opened the
+     page has gone with the catalogue — and when a tab took the focus away. */
+  const heading = useRef<HTMLHeadingElement | null>(null)
+  useEffect(() => {
+    const active = document.activeElement
+    if (!active || active === document.body) heading.current?.focus({ preventScroll: true })
+  }, [tab])
+
+  const [host, setHost] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setHost(document.querySelector<HTMLElement>('.bshell__main'))
+  }, [])
+
+  const at = tabs.indexOf(tab)
+  /* The device profile wizard's footer (buttons only): leaving on the left,
+     moving on the right, and Save the one orange button, on every tab. */
+  const footer = (
+    <div className="bx-savebar bdpw__foot" ref={footerEdge}>
+      <Button variant="ghost" onClick={back}>
+        Cancel
+      </Button>
+      <div className="bdpw__acts">
+        {at > 0 && (
+          <Button variant="ghost" onClick={() => move(tabs[at - 1])}>
+            Back
+          </Button>
+        )}
+        {at < tabs.length - 1 && (
+          <Button variant="secondary" onClick={() => move(tabs[at + 1])}>
+            Next
+          </Button>
+        )}
+        <Button variant="brand" icon={Check} onClick={save}>
+          Save
+        </Button>
       </div>
-      {hasSecret && <SidePanel note={APP_BASIC_NOTE} />}
+    </div>
+  )
+
+  return (
+    <div className="bpage bapp">
+      <button type="button" className="bz7__back" onClick={back}>
+        <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+        Choose application
+      </button>
+
+      <header className="bz7__pagehead">
+        <div className="bz7__namewrap">
+          <div className="bz7__titleline">
+            <span className="bapp__logo" aria-hidden>
+              <AppLogo appId={entry.logoId} name={entry.name} size={28} />
+            </span>
+            {/* The Display name as it is typed: the page is named what it will be called. */}
+            <h1 ref={heading} tabIndex={-1}>
+              {draft.name.trim() || entry.name}
+            </h1>
+            <Badge tone="neutral">{appTypeOf(entry.protocol)}</Badge>
+          </div>
+        </div>
+        <div className="bpage__preview">
+          {!SHOWCASE && <WidthSwitch />}
+          <DocsLink />
+        </div>
+      </header>
+
+      <div className="bapp__tabbar">
+        <Tabs
+          className="bx-tabs--line"
+          name="Application sections"
+          panelId="bapp-panel"
+          value={tab}
+          onChange={move}
+          options={tabOptions(tabs)}
+        />
+      </div>
+
+      <div id="bapp-panel" role="tabpanel" aria-label={TAB_LABEL[tab]} className="bapp__panel" ref={panel}>
+        {tab === 'policies' ? (
+          <NewAppPolicies appId={id} onNew={newPolicy} onExisting={addExisting} />
+        ) : (
+          <SetupTabBody
+            tab={tab}
+            draft={draft}
+            onPatch={patchSetup}
+            onDraft={patchDraft}
+            name={draft.name}
+            onName={(name) => setDraft((d) => ({ ...d, name }))}
+            issues={shownIssues(issues, draft, tried)}
+            appId={id}
+          />
+        )}
+      </div>
+
+      {host ? createPortal(footer, host) : footer}
+    </div>
+  )
+}
+
+/* The stored page's Policies with no policy on it — the same empty state and
+   the Global Default row under it — before the application exists. Both
+   buttons secondary: Save is this view's one orange button. The fallback is
+   read for the id the application will take, which no policy names yet, so
+   it is the tenant's own answer for everyone. */
+function NewAppPolicies({ appId, onNew, onExisting }: { appId: string; onNew: () => void; onExisting: () => void }) {
+  const store = useBrand()
+  const { policies, users } = store
+  const { fallback, everyoneElse } = useMemo(() => appStanding(appId, policies, users), [appId, policies, users])
+  /* As on the stored page: a button that would open on nothing to pick is not drawn. */
+  const attachable = attachableTo(appId, policies).some((p) => p.type === 'App Access')
+  return (
+    <div className="bapr__frame">
+      <EmptyState
+        icon={ShieldPlus}
+        title="No policies on this application"
+        action={
+          <>
+            <Button variant="secondary" icon={Plus} onClick={onNew}>
+              Create new policy
+            </Button>
+            {attachable && (
+              <Button variant="secondary" icon={ListPlus} onClick={onExisting}>
+                Add existing policy
+              </Button>
+            )}
+          </>
+        }
+      />
+      {fallback && <FallbackRow fallback={fallback} everyoneElse={everyoneElse} />}
     </div>
   )
 }

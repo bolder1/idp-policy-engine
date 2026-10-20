@@ -26,6 +26,8 @@ import { CHECK_PANEL_NARROW, CHECK_PANEL_WIDE, PEOPLE_AND_BREAK_IN, checkViews, 
 import builderSrc from './BoardBuilder.tsx?raw'
 import checkSrc from './PolicyCheck.tsx?raw'
 import checkCss from './check-access.css?raw'
+import dockPastSrc from '../testing/DockPast.tsx?raw'
+import { OPEN_AT_ONCE } from '../sign-in-tests/phase'
 
 /* Check access inside a policy (owner, 1 Oct 2026: "Now change the try a
    sign in inside policy builder with the current sign in tests we have" —
@@ -55,6 +57,7 @@ const sessionWith = (over: Partial<TestingSession>): TestingSession => ({
   patchBoard: noop,
   loadBoard: noop,
   load: noop,
+  prefill: noop,
   replay: noop,
   setView: noop,
   openBreakIn: noop,
@@ -108,8 +111,10 @@ describe('Check access on the board', () => {
 
   it('plays the policy’s own sign-in as it opens, when the session holds one — the page’s Open policy, a Describe it check', () => {
     const played = draw(<BoardBuilder policyId="sc-hrms-office" openTest />, sessionWith({ boardForms: { 'sc-hrms-office': kavya } }))
-    expect(played).toContain('tj-engine is-running')
-    expect(text(played)).toContain('Finding the policy for HRMS')
+    /* On the Access checks page's own canvas since 19 Oct 2026 (run-layout.ts IN_POLICY_LAYOUT): a run, not the
+       canvas's how-it-works. The layout loads lazily, so a server render holds its frame only. */
+    expect(played).toContain('tj-canvas is-layout is-focus2')
+    expect(text(played)).not.toContain('Check what access someone gets')
   })
 
   it('opens every route — People, Saved sign-ins, the Break-in test — on the sign-in, drawing neither People nor the Break-in test', () => {
@@ -291,11 +296,18 @@ describe('Past sign-ins, a button of its own on the bar', () => {
       />,
     )
 
-  it('stands before Check access while it is on, and is not there otherwise', () => {
+  /* Owner, 19 Oct 2026: "Check access and Past sign-ins are two different things", and neither on an empty policy. */
+  it('stands before Check access, quieter, a hairline between, whether or not Check access is on; neither on an empty policy', () => {
     const on = bar(true)
-    expect(on).toMatch(/<button type="button" data-check-view="past" class="bx-btn bx-btn--neutral bx-btn--sm sit__savedbtn" aria-expanded="false">/)
+    expect(on).toMatch(/<button type="button" data-check-view="past" class="bx-btn bx-btn--ghost bx-btn--sm sit__savedbtn" aria-expanded="false">/)
     expect(text(on)).toMatch(/Past sign-ins Check access/)
-    expect(text(bar(false))).not.toContain('Past sign-ins')
+    expect(on).toContain('<span class="bbtop__sep" aria-hidden="true"></span>')
+    expect(text(bar(false))).toContain('Past sign-ins')
+    const empty = draw(
+      <BoardBarActions reading={false} onRead={noop} testing={false} canTest offerTest={false} onTest={noop} views={<CheckBarViews views={['past']} panel={null} onToggle={noop} />} toPublish unsaved canDiscard blockers={0} saveBlocked={false} onSaveDraft={noop} onDiscard={noop} onSave={noop} />,
+    )
+    expect(text(empty)).not.toContain('Past sign-ins')
+    expect(text(empty)).not.toContain('Check access')
   })
 
   it('names Check access on the bar, its key in the title', () => {
@@ -306,13 +318,33 @@ describe('Past sign-ins, a button of its own on the bar', () => {
 
   it('opens its view in the right-hand panel, pressed while it is open; a row fills the sign-in and opens it, for Run', () => {
     const open = draw(<CheckBarViews views={['past']} panel="past" onToggle={noop} />)
-    expect(open).toContain('class="bx-btn bx-btn--neutral bx-btn--sm sit__savedbtn is-on" aria-expanded="true" aria-controls="bbchk-past"')
+    expect(open).toContain('class="bx-btn bx-btn--ghost bx-btn--sm sit__savedbtn is-on" aria-expanded="true" aria-controls="bbchk-past"')
     expect(checkSrc).toMatch(/\{panel === 'past' && \(\s+<ViewPanel key="past" view="past"/)
-    expect(checkSrc).toContain('<DockPast draft={draft} apps={mine} version={version} onLoad={(f) => tryWhole(f, null)} />')
+    /* A row runs its sign-in at once beside the list, the row marked (phase.ts OPEN_AT_ONCE, owner, 20 Oct 2026: "it
+       should open immediately — no need to showcase the free-field form"); off, it fills the form and waits for Run. */
+    expect(checkSrc).toContain('<DockPast draft={draft} apps={mine} version={version} picked={OPEN_AT_ONCE ? pickedPast : undefined} onLoad={OPEN_AT_ONCE ? playPast : (f) => tryWhole(f, null)} />')
+    /* `tryWhole` is still the fill that waits for Run — what the flag off keeps, and a saved sign-in's way in. */
     const whole = checkSrc.slice(checkSrc.indexOf('const tryWhole = '), checkSrc.indexOf('const trySaved = '))
     expect(whole).toContain('setPage((pg) => ({ ...pg, draft: f, touched: [], identities: picksOf(f) }))')
     expect(whole).toContain('openForm(() => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(RUN_BUTTON)?.focus()))')
     expect(whole).not.toContain('begin(')
+  })
+
+  it('plays a past sign-in at once beside the list, the row marked, and shuts the Why or the form back to it (OPEN_AT_ONCE, 20 Oct 2026)', () => {
+    expect(OPEN_AT_ONCE).toBe(true)
+    const past = checkSrc.slice(checkSrc.indexOf('const playPast = '), checkSrc.indexOf('/* Reset (TryPanel'))
+    expect(past).toContain("begin(f, 'full', { draft: f, touched: [], identities: picksOf(f) })")
+    expect(past).toContain('setPickedPast(id ?? null)')
+    /* No form shown: the run starts, and the list keeps the panel. */
+    expect(past).not.toContain('openForm(')
+    expect(past).not.toContain('onPanel(')
+    /* A new run lets the old mark go; the Why or the form opened over the list goes back to it. */
+    expect(checkSrc).toMatch(/const begin = [\s\S]*?setPickedPast\(null\)[\s\S]*?setRunId/)
+    expect(checkSrc).toContain("else if (OPEN_AT_ONCE && was === 'past') backTo.current = 'past'")
+    expect(checkSrc).toMatch(/if \(OPEN_AT_ONCE && backTo\.current && \(panel === 'why' \|\| panel === 'form'\)\) \{\s+const back = backTo\.current\s+backTo\.current = null\s+onPanel\(back\)/)
+    /* The list marks the row: aria-current and the accent's soft ground (DockPast.tsx, test-panel.css). */
+    expect(dockPastSrc).toContain("aria-current={keys && pickedRow === r.id ? 'true' : undefined}")
+    expect(dockPastSrc).toContain("className={`tpanel-row${keys && pickedRow === r.id ? ' is-picked' : ''}`}")
   })
 
   it('leaves Run the one orange while the sign-in’s panel is open: the policy’s save steps down', () => {
@@ -347,11 +379,17 @@ describe('the way back, and the keys', () => {
     const enter = builderSrc.slice(builderSrc.indexOf('const enterTest = ('), builderSrc.indexOf('const startTest = '))
     expect(enter).not.toContain('setSelection')
     expect(enter).not.toContain('setFolds')
-    expect(builderSrc).toContain("fitKey={describeOpen ? 'describe' : 'edit'}")
+    /* Refitted only for Describe it or Guided setup (by the side it stands on); never for Check access, which is
+       not `describeOpen`. */
+    expect(builderSrc).toContain("fitKey={describeOpen ? layout : 'edit'}")
+    /* Beside the rule panel, also as that panel opens and closes (`besideInsp`). */
+    expect(builderSrc).toContain("const layout = testOn ? 'test' : describeOpen ? `describe-${GUIDED_SETUP ? guidedSide : 'left'}${besideInsp ? '-insp' : ''}` : 'edit'")
     /* The ground's dots are the board's again as Check access shuts. */
     expect(builderSrc).toMatch(/const groundBefore = useRef[\s\S]*?if \(before\[v\]\) el\.style\.setProperty\(v, before\[v\]\)/)
-    /* The editor waits, and is back as Check access shuts (and while the Fixes panel holds the column, 7 Oct 2026). */
-    expect(builderSrc).toContain('{!testOn && !describeOpen && !readOpen && !fixesShown && panelAlive && (')
+    /* The editor waits, and is back as Check access shuts (and while the Fixes panel holds the column, 7 Oct 2026);
+       Describe it closes it, and Guided setup does too except beside it (`inspBlocked`). */
+    expect(builderSrc).toContain('{!testOn && !inspBlocked && !readOpen && !fixesShown && panelAlive && (')
+    expect(builderSrc).toContain('const inspBlocked = describeOpen && !guidedBeside')
   })
 
   it('Open policy on this policy, or Open rule, goes back to the builder — on that rule', () => {

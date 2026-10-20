@@ -18,7 +18,7 @@ export function GrantForm({ today, person, onGrant }: { today: string; person: s
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
         Let in for a while
       </Button>
     )

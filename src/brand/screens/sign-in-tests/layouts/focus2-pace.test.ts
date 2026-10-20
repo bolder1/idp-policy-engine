@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant } from '../../../fixtures'
+import { splitAws } from './conflict-fixture'
 import { runColumns, type ColumnSpec } from '../../board/try-sign-in'
 import { envOf } from '../../tenant-resolver'
 import { rowsRead } from '../../testing/rows-read'
@@ -13,6 +14,9 @@ import {
   CHECK_MIN,
   NOTICE_MS,
   OFF_RULE_MIN,
+  ONE_POLICY_GD_MIN,
+  ONE_POLICY_MIN,
+  ONE_PRESENT_MS,
   PRESENT_CAP_MS,
   READ_HOLD,
   READ_HOLD_MIN,
@@ -56,26 +60,29 @@ const env = envOf(t)
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
 const AS_IT_STANDS: ColumnSpec = { id: 'live', label: 'As the tenant stands', tip: 'Every policy as saved' }
 
-function planOf(personName: string, appName: string, opts: { origin?: 'home' | 'tor'; patch?: Partial<SignInForm>; intro?: Intro } = {}): EngineRun {
+function planOf(personName: string, appName: string, opts: { origin?: 'home' | 'tor'; patch?: Partial<SignInForm>; intro?: Intro; policies?: typeof t.policies } = {}): EngineRun {
+  const policies = opts.policies ?? t.policies
   const person = t.directory.people.find((p) => p.name === personName)
   const app = t.apps.find((a) => a.name === appName)
   if (!person || !app) throw new Error(`no ${personName} or ${appName} in the showcase`)
-  const rows = rowsRead(t.policies, null, app.id, lib)
+  const rows = rowsRead(policies, null, app.id, lib)
   const base: SignInForm = { ...emptyDraft(TODAY, '09:30'), ...(opts.origin ? originPatch(opts.origin) : {}), personId: person.id, appId: app.id }
   const form = { ...forRun(withDefaults(base, rows, [], TODAY, '09:30'), rows), ...(opts.patch ?? {}) } as SignInForm
   const { facts } = factsOf(form, t.zones)
-  const res = runColumns([AS_IT_STANDS], t.policies, facts, env)[0].resolution
+  const res = runColumns([AS_IT_STANDS], policies, facts, env)[0].resolution
   const ctx = { people: t.directory.people, apps: t.apps, zones: t.zones, rows }
-  return engineRun({ res, policies: t.policies, form, facts, env, ctx, intro: opts.intro ?? 'none' })
+  return engineRun({ res, policies, form, facts, env, ctx, intro: opts.intro ?? 'none' })
 }
 
 /* Maya Iyer on AWS: rule 1 (contractors away from the office) misses, rule 2
    (engineers on a compliant device) matches — two rules read, and an Allow. */
-const MAYA = planOf('Maya Iyer', 'AWS Console')
+/* The showcase has one policy per application (14 Oct 2026); the old pair, whose timings these tables are, is rebuilt (conflict-fixture.ts). */
+const AWS_PAIR = splitAws(t.policies)
+const MAYA = planOf('Maya Iyer', 'AWS Console', { policies: AWS_PAIR })
 /* Devon on a Windows 10 laptop: nothing matches, so the run reads every rule
    and falls to "Nothing else matched" — the longest of the real stories, and
    the one the 16 s cap actually binds on. */
-const DENY = planOf('Devon Rao', 'AWS Console', { patch: { device: { kind: 'preset', id: 'win10' } } as Partial<SignInForm> })
+const DENY = planOf('Devon Rao', 'AWS Console', { patch: { device: { kind: 'preset', id: 'win10' } } as Partial<SignInForm>, policies: AWS_PAIR })
 /* HRMS's own policy is Inactive in the seed, so Kavya's run passes over it
    and the Global Default Policy decides. */
 const KAVYA = planOf('Kavya Menon', 'HRMS')
@@ -352,7 +359,7 @@ describe('presentTimeline: a pace a person can read', () => {
   /* 7 Oct 2026: both used to sit on the sign-in's floor, which made them equal. With the find at 700 neither does
      (find plus the read hold is 1000, over the 800), so the fold is drawn on its own step and adds that step only. */
   it('the sign-in is read for the same time whether the card folds into the run or not; the fold adds only its own step', () => {
-    const run = planOf('Maya Iyer', 'AWS Console', { intro: 'collapse' })
+    const run = planOf('Maya Iyer', 'AWS Console', { intro: 'collapse', policies: AWS_PAIR })
     expect(run.steps[0].kind).toBe('collapse')
     const folded = msOf(run)
     const plain = msOf(MAYA)
@@ -690,5 +697,61 @@ describe('the rail’s fill', () => {
     expect(fillOf(at2, tl, 1)).toBe(1)
     /* A beat that is not there has no fill, rather than NaN. */
     expect(fillOf(at2, tl, 99)).toBe(0)
+  })
+})
+
+/* ONE POLICY, ONE CARD (phase.ts ONE_POLICY_CARD; owner, 20 Oct 2026: "only one policy per app, mostly … so maybe one
+   card"). The merged Policy card's story: no beat for the policies passed over — with one policy on an application
+   there is no search to watch — the covering beat named for the card ("Policy"), the find and the scans a breath each,
+   and the card held long enough to read its name (longer when the Global Default decides, for the line that says why).
+   The default calls above are unchanged: these are the option's own. */
+describe('the merged Policy card: a shorter story', () => {
+  const ONE = { onePolicy: true }
+  /* Aisha Khan on Google Workspace, the run the owner pointed at: rule 1 of three decides, on one factor. */
+  const AISHA = planOf('Aisha Khan', 'Google Workspace')
+  /* Sanjay Bhatt on HRMS: its policy is inactive, so the Global Default decides. */
+  const SANJAY = planOf('Sanjay Bhatt', 'HRMS')
+
+  it('names the covering beat "Policy", and has no Policies beat', () => {
+    const beats = storyOf(AISHA, ONE)
+    expect(beats.map((b) => b.kind)).not.toContain('policies')
+    expect(beats.map((b) => b.label)).not.toContain('Policies')
+    const labels = beats.map((b) => b.label)
+    expect(labels[0]).toBe('Sign-in')
+    expect(labels[1]).toBe('Policy')
+    expect(labels[2]).toMatch(/^Rule 1 of \d+$/)
+    expect(labels.slice(-2)).toEqual(['Then', 'Outcome'])
+    expect(beats.find((b) => b.kind === 'covers')).toMatchObject({ short: 'Policy', name: 'Access the app through corporate devices only' })
+    /* Off: the story as it was. */
+    expect(storyOf(AISHA).map((b) => b.label).slice(0, 3)).toEqual(['Sign-in', 'Policies', 'Covering policy'])
+  })
+
+  it('holds the card long enough to read its name, and longer when the Global Default decides', () => {
+    for (const [plan, least] of [
+      [AISHA, ONE_POLICY_MIN],
+      [SANJAY, ONE_POLICY_GD_MIN],
+    ] as const) {
+      const tl = presentTimeline(plan, storyOf(plan, ONE), ONE)
+      const covers = tl.beats.find((b) => b.beat.kind === 'covers')
+      expect(covers?.dur, plan.appName).toBeGreaterThanOrEqual(least)
+    }
+    expect(SANJAY.decider?.isGlobalDefault).toBe(true)
+  })
+
+  it('the find and the scans take a breath each: the step table is the option\'s', () => {
+    const tl = presentTimeline(AISHA, storyOf(AISHA, ONE), ONE)
+    const find = AISHA.steps.findIndex((st) => st.kind === 'find')
+    expect(tl.dur[find]).toBe(ONE_PRESENT_MS.find)
+    expect(ONE_PRESENT_MS).toEqual({ find: 200, scan: 160, found: 360, decides: 200, expand: 240 })
+  })
+
+  it('reads Aisha\'s run to the answer in at most 7 s, against about 9 s with the search; never past the cap', () => {
+    const one = presentTimeline(AISHA, storyOf(AISHA, ONE), ONE)
+    const before = presentTimeline(AISHA, storyOf(AISHA))
+    expect(one.total).toBeLessThanOrEqual(7000)
+    expect(one.total).toBeLessThan(before.total)
+    for (const plan of [AISHA, SANJAY, MAYA, planOf('Devon Rao', 'AWS Console', { policies: AWS_PAIR, patch: { device: { kind: 'preset', id: 'win10' } } as Partial<SignInForm> })]) {
+      expect(presentTimeline(plan, storyOf(plan, ONE), ONE).total, plan.appName).toBeLessThanOrEqual(PRESENT_CAP_MS)
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { showcaseTenant, showcaseTenantHrmsOn, tenantAt } from './fixtures'
+import { isPostSignIn } from './post-sign-in'
 import { LEVEL_LABEL, LEVEL_PICKER_ORDER, SAVED_NAME_MAX, SIGN_IN_LEVELS } from './saved-sign-ins'
 import { envOf, resolveSignIn } from './screens/tenant-resolver'
 
@@ -85,10 +86,12 @@ describe('the showcase saved sign-ins', () => {
   /* So no policy's Saved sign-ins tab opens empty in the demo: two to four on every
      scenario policy's applications (V4 §5). More where the troubleshooting
      cases gather (§13): seven on GitHub and Jira (Developer tools, and the
-     Code review draft beside it), five on AWS, which three policies share. */
+     Code review draft beside it), five on AWS, which three policies share.
+     Sign-in policies only: a saved sign-in is a sign-in, and a post sign-in
+     policy decides none (post-sign-in.ts). */
   it('give every policy two or more of its own, and no more than the troubleshooting cases add', () => {
-    const MOST: Record<string, number> = { 'sc-dev-tools': 7, 'sc-code-review-finance': 7, 'sc-aws-engineering': 5, 'sc-aws-finance': 5, 'sc-aws-devops': 5 }
-    for (const p of t.policies.filter((x) => !x.isSystem)) {
+    const MOST: Record<string, number> = { 'sc-dev-tools': 7, 'sc-aws-engineering': 5 }
+    for (const p of t.policies.filter((x) => !x.isSystem && !isPostSignIn(x))) {
       const own = t.savedSignIns.filter((s) => s.facts.appId !== undefined && p.appIds.includes(s.facts.appId))
       expect(own.length, p.id).toBeGreaterThanOrEqual(2)
       expect(own.length, p.id).toBeLessThanOrEqual(MOST[p.id] ?? 4)
@@ -153,15 +156,15 @@ describe('the showcase saved sign-ins', () => {
     expect(by('ssi-maya-london')).toEqual(['sc-dev-tools', 1])
     expect(by('ssi-maya-aws')).toEqual(['sc-aws-engineering', 1])
     expect(by('ssi-tom-aws')).toEqual(['sc-aws-engineering', 1])
-    expect(by('ssi-devon-slack')).toEqual(['sc-slack-engineering', 1])
-    expect(by('ssi-leo-slack')).toEqual(['sc-slack-engineering', 1])
+    expect(by('ssi-devon-slack')).toEqual(['sc-slack-everyone', 1])
+    expect(by('ssi-leo-slack')).toEqual(['sc-slack-everyone', 1])
     expect(by('ssi-leo-aws')).toEqual(['sc-aws-engineering', 0])
-    expect(by('ssi-thomas-aws')).toEqual(['sc-aws-finance', 0])
+    expect(by('ssi-thomas-aws')).toEqual(['sc-aws-engineering', 3])
     expect(by('ssi-priya-github')).toEqual(['sc-dev-tools', 2])
     expect(by('ssi-ravi-aws')).toEqual(['global-default', 0])
     /* The owner's case: Engineering's Box policy is higher in the list; Design alone gets Design's. */
     expect(by('ssi-tanmay-box')).toEqual(['sc-box-engineering', 0])
-    expect(by('ssi-ishita-box')).toEqual(['sc-box-design', 0])
+    expect(by('ssi-ishita-box')).toEqual(['sc-box-engineering', 1])
   })
 
   it('use every level, and state every fact they give', () => {

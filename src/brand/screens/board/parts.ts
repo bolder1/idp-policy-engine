@@ -65,15 +65,20 @@ export function copyName(name: string, taken: readonly string[]): string {
   return next
 }
 
-const STATE_LABEL: Record<RuleState, string> = { ready: 'Ready', setup: 'Needs setup', warn: 'Check' }
+/* Plain opposites (owner, 19 Oct 2026: "make the naming better, can't understand what each means"): a rule is Complete
+   or Incomplete. A rule with a warning says the warning itself on the card (RuleCard: the finding's title, e.g.
+   "Shadows 1 rule below it"), so this word is only the fallback. Was Ready / Needs setup / Check. */
+const STATE_LABEL: Record<RuleState, string> = { ready: 'Complete', setup: 'Incomplete', warn: 'Has a warning' }
 
 /** Findings that mean another rule always matches first, so this one never runs. */
 export const UNREACHABLE_CODES: readonly string[] = ['PE101', 'PE102', 'PE103']
 
 /** The pill beside a rule's name. A rule another rule always catches first is unreachable, not unfinished. */
-export function stateLabel(state: RuleState, enabled: boolean, unreachable: boolean): string {
+export function stateLabel(state: RuleState, enabled: boolean, unreachable: boolean, note?: string): string {
   if (!enabled) return 'Off'
-  if (state === 'setup' && unreachable) return 'Unreachable'
+  if (state === 'setup' && unreachable) return 'Never reached'
+  /* A warning is named, not labelled (owner, 19 Oct 2026: "what does needs review mean?"). */
+  if (state === 'warn' && note) return note
   return STATE_LABEL[state]
 }
 

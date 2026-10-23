@@ -907,6 +907,10 @@ export function ZoneDetail({
         onSave={commit}
         blocked={!!blockedReason}
         blockedReason={blockedReason ?? undefined}
+        onDiscard={() => {
+          setDraft(zone)
+          setDraftName(zone.name)
+        }}
         review={zoneReviewRows(isNew ? { ...zone, name: '' } : zone, draft)}
         guard={library.guard}
       />

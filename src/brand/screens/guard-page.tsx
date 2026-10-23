@@ -603,9 +603,12 @@ export function GuardDrawer({
       width={680}
       actions={
         <>
-          <Button variant="ghost" onClick={onClose}>
-            {cancelWord}
-          </Button>
+          {/* Two buttons at most (owner, 23 Oct 2026). With Monitor instead on offer the cancel is the × and Escape. */}
+          {!onMonitorInstead && (
+            <Button variant="ghost" onClick={onClose}>
+              {cancelWord}
+            </Button>
+          )}
           {onMonitorInstead && (
             <Button variant="secondary" onClick={onMonitorInstead}>
               Monitor instead

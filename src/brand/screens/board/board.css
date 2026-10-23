@@ -46,7 +46,7 @@
    the row below refuses to wrap in any case, so a longer name than anything
    here ellipsizes rather than folding. */
 .bb {
-  --bb-insp: 560px;
+  --bb-insp: 600px;
   --bb-card-edit: 520px;
   --bb-card: var(--bb-card-edit);
   --bb-dot: #d3dae1;
@@ -493,7 +493,7 @@
   .bb__start2:hover .bb__ill__back { transform: none; }
 }
 
-.bb__chain { display: flex; flex-direction: column; align-items: stretch; width: var(--bb-card); }
+.bb__chain { position: relative; display: flex; flex-direction: column; align-items: stretch; width: var(--bb-card); }
 
 /* The start node. A sign-in arrives here; everything below decides it. */
 .bb__start {
@@ -3904,3 +3904,40 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 /* The applications picker is a form, not a rule's parts: no guide rule down its left (owner, 21 Oct 2026: "the line is
    overlapped with the content and not aligned"), so the search, the chips and the list share the heading's own edge. */
 .bb__insp .bb__apps__sec > .bb__sec__body { margin-left: 0; padding-left: 0; border-left: 0; }
+
+/* The password field the builder's version switch asks for while it is locked
+   (builder-version.ts). One small input in the bar's action row; nothing about
+   it says what it unlocks. */
+.bb__vlock input {
+  width: 140px;
+  height: var(--space-8);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.bb__vlock input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__vlock input[aria-invalid='true'] { border-color: var(--fb-negative-fg); }
+
+/* The note on the canvas about a shared policy or a copy (PolicyNotice.tsx): the stage's own column, top centre,
+   clear of the panel and of the bar. The kit's Note, un-restyled; this only places it. */
+.bb__notice {
+  --bz7n-paper: color-mix(in srgb, var(--fb-notice-bg) 60%, var(--tint-amber-bg));
+  /* Inside the chain, so it moves with the canvas: beside the start node, its top on the node's, a gap off the cards'
+     left edge. The nudge is the note's own small offset (owner, 23 Oct 2026: "top aligned with the first node"). */
+  position: absolute; right: calc(100% + var(--space-8)); top: var(--bb-nudge, 0);
+  z-index: 4; width: 220px;
+}
+.bb__notice .bz7n-sticky { margin: 0; pointer-events: auto; }
+.bb__sticky__text { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+/* A copy's name, highlighted. */
+.bbtop__title.is-copy { background: var(--fb-info-bg); border-radius: var(--radius-md); padding: 0 var(--space-3); }
+
+/* The applications on the sticky note, as logos in a row. */
+.bb__sticky__logos { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bb__sticky__logos li { display: inline-flex; }
+.bb__sticky__more { font-size: var(--fs-sm); color: var(--text-secondary); }
+.bb__sticky__app { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--fw-medium); color: var(--text-primary); vertical-align: bottom; }

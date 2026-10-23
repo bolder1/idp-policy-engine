@@ -26,3 +26,16 @@ export const BAR_TOUR: boolean = false
 
 /** Read as text on the builder's bar. */
 export const BAR_READ: boolean = false
+
+/* The rule on/off switch, hidden (owner, 23 Oct 2026: "Hide the toggle and
+   remove this active inactive rule function as of now"). It sat on the rule
+   card and in the panel's rule head. Hidden, not deleted: the card still reads
+   `rule.enabled`, so turning this on brings the switch back as it was. */
+export const RULE_ON_OFF: boolean = false
+
+/* The panel's Narrow / Widen button, hidden (owner, 23 Oct 2026: "Remove this
+   function as well, hide it ... a better, bigger, single-stack form size"). The
+   panel is one width now, 640 to start, and the grip in the gutter still drags
+   it between 480 and 880. Hidden, not deleted: turning this on brings the
+   button back, though the narrow end it steps to is now only 380 wide. */
+export const PANEL_WIDTH_BUTTON: boolean = false

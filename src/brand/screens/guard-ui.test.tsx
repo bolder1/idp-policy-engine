@@ -99,7 +99,7 @@ describe('Before turning on', () => {
     const out = html(
       <GuardDrawer open kind="turn-on" policyName={HRMS.name} result={r} run={0} primaryLabel="Turn on" onConfirm={noop} onClose={noop} onApplyFix={noop} onMonitorInstead={noop} />,
     )
-    expect(text(footOf(out))).toBe('Cancel Monitor instead Turn on')
+    expect(text(footOf(out))).toBe('Monitor instead Turn on')
     expect(footOf(out)).toMatch(/bx-btn--neutral[^"]*"[^>]*>Monitor instead/)
     expect(text(out)).toContain('Who it starts deciding for HRMS')
     expect(text(out)).not.toContain('While monitoring')

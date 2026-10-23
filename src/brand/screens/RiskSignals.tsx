@@ -915,6 +915,7 @@ function RiskProfileDetail({
         }}
         blocked={!!problem}
         blockedReason={problem ?? undefined}
+        onDiscard={() => setDraft(profile)}
       />
     </>
   )

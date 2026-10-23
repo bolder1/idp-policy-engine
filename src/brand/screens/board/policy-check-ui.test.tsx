@@ -270,7 +270,7 @@ describe('the panel is the page’s form, scoped to the policy', () => {
 
   it('takes the page’s two widths from its own button', () => {
     expect([CHECK_PANEL_WIDE, CHECK_PANEL_NARROW]).toEqual([560, 380])
-    expect(builderSrc).toContain('const colW = testOn ? (checkWide ? CHECK_PANEL_WIDE : CHECK_PANEL_NARROW) : inspW')
+    expect(builderSrc).toContain('const colW = testOn ? (checkWide ? CHECK_PANEL_WIDE : CHECK_PANEL_NARROW) : appsSmall ? 400 : inspW')
   })
 })
 

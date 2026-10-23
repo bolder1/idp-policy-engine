@@ -1999,8 +1999,13 @@ html[data-theme='dark'] {
    badge and dies into the card, so there is no seam where a tinted header would
    have stopped — which is the difference between the owner's reference and the
    first attempt at it. */
-.bx-confirm--hero { padding: 0 var(--space-8) var(--space-8); text-align: center; }
-.bx-confirm--hero .bx-confirm__text { max-width: 30ch; margin-inline: auto; }
+/* More room (owner, 23 Oct 2026: "give some more space, it feels very compacted, cluttered, make things two lines if
+   possible, and make it global"): wider side gutters, a text column wide enough that a one-sentence body sets in
+   two or three lines rather than four, and more air between the title, the body and the buttons. */
+.bx-confirm--hero { padding: 0 var(--space-10) var(--space-9); text-align: center; }
+.bx-confirm--hero .bx-confirm__text { max-width: 46ch; margin-inline: auto; }
+.bx-confirm--hero .bx-confirm__title { margin-bottom: var(--space-5); }
+.bx-confirm--hero .bx-confirm__body { line-height: 1.65; }
 
 /* The template band's own treatment (owner, 22 Oct 2026: "remember we did
    something for the templates, that gradient"), lifted from create.css
@@ -2027,7 +2032,8 @@ html[data-theme='dark'] {
 .bx-confirm__hero {
   position: relative; display: grid; place-items: center;
   height: 176px;
-  margin-inline: calc(-1 * var(--space-8));
+  margin-inline: calc(-1 * var(--space-10));
+  margin-bottom: var(--space-2);
   overflow: hidden;
   background:
     radial-gradient(circle 150px at 50% 54%, color-mix(in oklab, var(--dlg-glow) 12%, transparent) 0%, transparent 72%),
@@ -2087,7 +2093,7 @@ html[data-theme='dark'] {
 .bx-modal:has(.bx-confirm--hero) .bx-modal__foot {
   justify-content: center;
   gap: var(--space-5);
-  padding: 0 var(--space-8) var(--space-8);
+  padding: var(--space-2) var(--space-10) var(--space-9);
   border-top: 0;
   background: none;
 }
@@ -2182,4 +2188,41 @@ html[data-theme='dark'] {
 
 @media (prefers-reduced-motion: reduce) {
   .bx-confirm__open { transition: none; }
+}
+
+/* The footer's buttons share the row equally (owner, 23 Oct 2026: "make the buttons equal width, not hug content, it
+   looks weird"). Two answers of different lengths — Discard and Save — were two different-sized buttons side by side;
+   now each takes half the row, and one alone stays a sensible width rather than spanning it. */
+.bx-modal:has(.bx-confirm--hero) .bx-modal__foot > .bx-btn { flex: 1 1 0; min-width: 0; max-width: 200px; justify-content: center; }
+
+/* The hero's glow breathes (owner, 23 Oct 2026: "add some animation to the gradient as well"): a second wash over the
+   spotlight that swells and settles on a slow loop. A pseudo-element on a plain div, animating opacity and scale, so
+   nothing here can fight Motion; the rings and badge are later siblings and stay above it. Still under reduced motion. */
+.bx-confirm__hero::before {
+  content: ''; position: absolute; inset: -25%; pointer-events: none;
+  background: radial-gradient(circle at 50% 54%, color-mix(in oklab, var(--dlg-glow) 20%, transparent) 0%, transparent 58%);
+  animation: bx-hero-glow 4.8s ease-in-out infinite alternate;
+}
+@keyframes bx-hero-glow { from { opacity: 0.35; scale: 0.9; } to { opacity: 1; scale: 1.1; } }
+@media (prefers-reduced-motion: reduce) { .bx-confirm__hero::before { animation: none; opacity: 0.7; } }
+
+/* ICON MICRO-MOTION, AND DELETE THAT READS AS DELETE (owner, 23 Oct 2026: "for all the action items and icons on hover
+   add some micro interaction, the Lottie-like motion", "in delete use red, change it globally, so the user feels it").
+   Small, short and on the icon only: a lift on icon buttons, a nudge on menu items, a shake on a trash can. Plain CSS
+   on the svg, never on an element Motion drives, and none of it under reduced motion. */
+.bx-iconbtn svg, .bx-rowmenu svg, .bx-menu__item svg { transition: transform 200ms var(--ease-standard), color 150ms var(--ease-standard); }
+.bx-iconbtn:not(:disabled):hover svg { transform: scale(1.14); }
+.bx-rowmenu:not(:disabled):hover svg { transform: scale(1.18); }
+.bx-menu__item:not(:disabled):hover svg { transform: translateX(1px) rotate(-6deg) scale(1.1); }
+.bx-btn:not(:disabled):not([aria-busy='true']):hover > svg:first-child { transform: translateY(-1px); transition: transform 180ms var(--ease-standard); }
+
+/* A trash can goes red under the pointer, as a button and as a menu row, whatever variant it is. */
+.bx-iconbtn:not(:disabled):has(svg.lucide-trash-2):hover { color: var(--fb-negative-fg); background: var(--fb-negative-bg); border-color: var(--fb-negative-border); }
+.bx-iconbtn:not(:disabled):has(svg.lucide-trash-2):hover svg { animation: bx-shake 380ms ease-in-out; }
+.bx-menu__item.is-danger:not(:disabled):hover svg { color: var(--fb-negative-fg); }
+.bx-menu__item.is-danger:not(:disabled):hover svg.lucide-trash-2 { animation: bx-shake 380ms ease-in-out; }
+@keyframes bx-shake { 20% { rotate: -10deg; } 40% { rotate: 8deg; } 60% { rotate: -5deg; } 80% { rotate: 3deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .bx-iconbtn svg, .bx-rowmenu svg, .bx-menu__item svg, .bx-btn > svg { transition: none; }
+  .bx-iconbtn:hover svg, .bx-rowmenu:hover svg, .bx-menu__item:hover svg, .bx-btn:hover > svg:first-child { transform: none; animation: none; }
 }

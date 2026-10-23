@@ -23,6 +23,7 @@ import { BOARD_SKINS, readBoardSkin, writeBoardSkin, type BoardSkin } from './bo
 import { usePostBoard } from './post-board'
 import { SHOWCASE } from '../../showcase'
 import { Tip } from '../../kit'
+import { useShows } from './builder-version'
 
 /* -----------------------------------------------------------------------------
    The stage, and the chain on it.
@@ -157,6 +158,7 @@ export function Board({
   destinationAppId,
   destinationMore = 0,
   audienceNames = null,
+  note,
   selection,
   diagnostics,
   shadowed,
@@ -209,6 +211,8 @@ export function Board({
      null for everyone, which the sentence leaves unsaid (owner, 13 Oct 2026:
      the policy's groups are read and changed at the start node). */
   audienceNames?: string[] | null
+  /** A sticky note drawn on the canvas beside the start node, so it pans and zooms with the rules (PolicyNotice.tsx). */
+  note?: ReactNode
   selection: Selection
   diagnostics: Diagnostic[]
   /** Rules dimmed because the hovered rule puts them out of reach. */
@@ -269,6 +273,9 @@ export function Board({
   /** Check access v3: the chain read by a run (`BoardRunView`). Absent, the builder's canvas. */
   run?: BoardRunView
 }) {
+  const showHistory = useShows('history')
+  const showZoom = useShows('zoom')
+  const showStartWho = useShows('startWho')
   const stage = useRef<HTMLDivElement | null>(null)
   const world = useRef<HTMLDivElement | null>(null)
   /* Each card's element, by RULE ID — not by index.
@@ -785,7 +792,7 @@ export function Board({
         )?.title
   /* Who the policy is narrowed to, before where it is narrowed — "A sign-in
      from Finance arrives at …", "An event from Finance in …". */
-  const fromWhom = audienceNames && audienceNames.length > 0 && (
+  const fromWhom = showStartWho && audienceNames && audienceNames.length > 0 && (
     <>
       from <b className="bb__start__at">{audienceNames[0]}</b>
       {audienceNames.length === 2 && (
@@ -966,6 +973,7 @@ export function Board({
               mounts with NO rules — the start node, one inviting connector and
               the default — and the first rule is added from that `+`. */}
           <div className="bb__chain">
+            {note}
             {/* The application, said where the sign-in arrives.
 
                 The pill opened the chain with "a sign-in arrives" and never
@@ -1331,15 +1339,15 @@ export function Board({
         <div className="bb__float bb__dockbar" role="toolbar" aria-label="View">
           {aside}
           {aside && <span className="bb__float__sep" />}
-          {tools}
-          {tools && <span className="bb__float__sep" />}
+          {showHistory && tools}
+          {showHistory && tools && <span className="bb__float__sep" />}
           {/* Three buttons and no level (owner, 22 Sep 2026: "the % value is no
               use — use three options, fit, − and +, simple and to the point").
               It was the level alone at rest, with zoom out, zoom in and Reset
               sliding out of it on hover and the dock nudged 12px to keep the
               level still. Fit is the width fit the canvas opens at, so it is
               also the way back after zooming; there is no separate Reset. */}
-          <div className="bb__zoomgrp">
+          {showZoom && <div className="bb__zoomgrp">
             <Tip text="Fit to width" placement="top">
               <button type="button" className="bb__act" aria-label="Fit to width" onClick={fit}>
                 <Maximize size={14} strokeWidth={2} />
@@ -1356,7 +1364,7 @@ export function Board({
                 <ZoomIn size={15} strokeWidth={2} />
               </button>
             </Tip>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

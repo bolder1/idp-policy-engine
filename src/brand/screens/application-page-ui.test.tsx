@@ -104,12 +104,11 @@ describe('the Policies tab', () => {
   const acts = (html: string) => html.slice(html.indexOf('apol__acts'), html.indexOf('</div>', html.indexOf('apol__acts')))
   const buttonsIn = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
 
-  it('heads the policy with one split button, Edit policy and its chevron, and nothing else orange in the view', () => {
+  it('heads the policy with a primary, a secondary and a ⋯ trail, and nothing else orange in the view', () => {
     expect(box).toMatch(/<h2[^>]*>Box access<\/h2>/)
-    /* The action, then its chevron, which carries a glyph and no words. Replace policy is inside that chevron's
-       menu, which static markup never opens (owner, 21 Oct 2026: "move the options inside the dropdown button"). */
-    expect(buttonsIn(acts(box))).toEqual(['Edit policy', ''])
-    expect(acts(box)).toContain('bx-split')
+    /* Edit policy is the one orange button, Replace policy the secondary, and the ⋯ holds the rest, which static
+       markup never opens (owner, 23 Oct 2026: "a primary, a secondary and a 3 dot button trail"). */
+    expect(buttonsIn(acts(box))).toEqual(['Edit policy', 'Replace policy', ''])
     expect(acts(box)).toContain('aria-label="More for this policy"')
     expect(orange(box)).toBe(1)
     expect(orange(acts(box))).toBe(1)
@@ -214,7 +213,8 @@ describe('the Policies tab', () => {
     expect(n).not.toContain('Edit rule')
     expect(n).not.toContain('Outside')
     expect(count(none, 'bx-btn--brand')).toBe(1)
-    expect(buttonsIn(acts(none)).at(-1)).toBe('Create new policy')
+    /* A primary, a secondary and a ⋯ (owner, 23 Oct 2026): Create new policy leads. */
+    expect(buttonsIn(acts(none))[0]).toBe('Create new policy')
   })
 
   it('keeps counts off the tabs', () => {
@@ -375,16 +375,14 @@ describe.runIf(APP_POLICY_GLANCE)('the Policies tab at a glance', () => {
   })
 
   it('draws an application with no policy in the same frame, with no Global Default foot and the rail under it', () => {
-    /* The same grammar as with a policy: nothing is outside the Global Default, so its panel has no foot. */
+    /* The same canvas as a policy's tab (owner, 23 Oct 2026: remove sign-in activity, use the current canvas for the
+       Global Default as well): wide, with nothing beside it, and no Global Default foot. */
     const none = render(<ApplicationPage appId="salesforce" />)
-    expect(none).toContain('class="apol__pair is-glance"')
-    expect(none).toContain('insp__canvas is-framed')
-    const rules = rulesOf(none)
-    expect(rules).not.toContain('apol__gdstrip')
-    expect(rules).not.toContain('apol__foot')
-    const post = none.indexOf('id="apol-post"')
-    if (post > -1) expect(post).toBeGreaterThan(none.indexOf('id="apol-activity"'))
-    expect(box.indexOf('id="apol-rules"')).toBeLessThan(box.indexOf('id="apol-activity"'))
+    expect(none).toContain('class="apol__focus"')
+    expect(none).not.toContain('apol__pair')
+    expect(none).not.toContain('id="apol-activity"')
+    expect(none).not.toContain('apol__gdstrip')
+    expect(none).not.toContain('apol__foot')
   })
 })
 
@@ -581,13 +579,11 @@ describe('Add existing policy', () => {
 describe('the Policies tab on the policy alone', () => {
   const box = renderIn(true, <ApplicationPage appId="box" />)
 
-  it('heads the policy with Edit policy and one chevron holding the rest, still the view’s one orange control', () => {
+  it('heads the policy with Edit policy, Replace policy and a ⋯ holding the rest, still the view’s one orange control', () => {
     const acts = box.slice(box.indexOf('apol__acts'), box.indexOf('</div>', box.indexOf('apol__acts')))
-    /* Sign-in activity, Check access and Replace policy are all inside the chevron's menu now; this head draws
-       nothing beside it. */
-    expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', ''])
+    /* Sign-in activity and Check access are inside the ⋯ menu; Replace policy is the secondary beside Edit. */
+    expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', 'Replace policy', ''])
     expect(acts).toContain('aria-label="More for this policy"')
-    expect(acts).not.toContain('Replace policy')
     expect(orange(box)).toBe(1)
   })
 

@@ -878,6 +878,9 @@ export function memberGroupIds(u: { groupId: string; alsoGroupIds?: readonly str
 export interface Policy {
   id: string
   name: string
+  /** The name of the policy this one was copied from, while it is a copy nobody has finished: the builder says so on the
+      name and on the canvas (board/PolicyNotice.tsx). Set by duplicatePolicy; nothing else reads it. */
+  copiedFrom?: string
   type: PolicyType
   /* The applications this policy protects. Empty means nobody has assigned one.
 

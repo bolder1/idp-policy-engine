@@ -31,6 +31,7 @@ import { METHODS } from '../rule-form'
 import { METHOD_PREFIX, firstFactorPatch, firstFactorValue } from './first-factor'
 import { isPristine } from './parts'
 import { Prop } from './Section'
+import { useShows } from './builder-version'
 
 /* -----------------------------------------------------------------------------
    THEN — what happens when the rule matches.
@@ -539,6 +540,7 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
    what a blank field sends; typing replaces it. Written as typed, like the
    rule's name, and an emptied field stores nothing rather than "". */
 function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  const denyExtras = useShows('denyExtras')
   const id = useId()
   const value = rule.denyMessage ?? ''
   return (
@@ -561,7 +563,7 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
       <span className="bb__denycount" id={`${id}-count`}>
         {value.length}/{DENY_MESSAGE_MAX}
       </span>
-      {DENIAL_REASONS && (
+      {DENIAL_REASONS && denyExtras && (
         <>
           <label className="bb__thenlabel" htmlFor={`${id}-action`}>
             Next step

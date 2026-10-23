@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Ban, ChevronDown, ChevronUp, Download, MonitorSmartphone } from 'lucide-react'
 import { Button, Note } from '../kit'
@@ -315,6 +315,25 @@ function AgentDownload(): ReactNode {
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement | null>(null)
   const reduce = useReducedMotion()
+  /* Where the panel goes, measured when it opens (owner, 23 Oct 2026: "fix this, half of it I can't even see"). It was
+     absolute and right-aligned under a button near the left of the page, so its left half ran under the sidebar and
+     the page column's overflow. Fixed, it is clipped by neither: right-aligned to the button when there is room, else
+     left-aligned to it, and never past the page column's own left edge or the window's right. */
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!open) {
+      setAt(null)
+      return
+    }
+    const b = wrap.current?.getBoundingClientRect()
+    if (!b) return
+    const W = Math.min(420, window.innerWidth - 40)
+    const floor = (wrap.current?.closest('main')?.getBoundingClientRect().left ?? 0) + 8
+    let left = b.right - W
+    if (left < floor) left = b.left
+    left = Math.max(floor, Math.min(left, window.innerWidth - W - 8))
+    setAt({ top: b.bottom + 8, left })
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -347,6 +366,7 @@ function AgentDownload(): ReactNode {
             role="dialog"
             aria-label="Download the Device Agent"
             className="bagent__pop"
+            style={at ? { position: 'fixed', top: at.top, left: at.left, right: 'auto' } : { visibility: 'hidden' }}
             initial={{ opacity: 0, y: reduce ? 0 : -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: reduce ? 0 : -4 }}

@@ -33,6 +33,8 @@ import { ACCESS_CHECK } from '../sign-in-tests/names'
 import type { SignInFacts } from '../sign-in-facts'
 import { Board } from './Board'
 import { BAR_DEMO, BAR_TOUR } from './bar-tools'
+import { useShows } from './builder-version'
+import { PolicyNotice } from './PolicyNotice'
 import { DescribePanel } from './DescribePanel'
 import { DESCRIBE_BAR, DESCRIBE_CARD, GUIDED_SETUP } from './describe-stage'
 import { DescribeDoor, type DescribeContext } from './DescribeMagic'
@@ -184,6 +186,8 @@ export function BoardBuilder({
   /** Access checks' "Fix in policy ↗": a break-in card and its application, fixed in the draft on arrival (arrive-fix.ts). */
   arriveFix?: ArriveFix
 }) {
+  const guideMe = useShows('guideMe')
+  const panelResize = useShows('arrange')
   const store = useBrand()
   /* The edition, which this surface ignored entirely.
 
@@ -397,7 +401,7 @@ export function BoardBuilder({
      to two deliberate lines instead of crushing — that is what the named grid
      areas at the foot of board.css are for. The grip moves it 320 to 720, and
      closing the panel gives the canvas the whole region. */
-  const [inspW, setInspW] = useState(560)
+  const [inspW, setInspW] = useState(600)
   /* How much of itself every card shows, and the per-card exceptions.
 
      Two pieces of state rather than one, because they answer different
@@ -448,7 +452,7 @@ export function BoardBuilder({
   /* The inspector's alone: Check access's panels have the page's two widths
      and their own button between them, and no grip. */
   const setW = useCallback((w: number) => {
-    const next = Math.max(320, Math.min(720, w))
+    const next = Math.max(480, Math.min(600, w))
     shell.current?.style.setProperty('--bb-insp', `${next}px`)
     return next
   }, [])
@@ -648,7 +652,11 @@ export function BoardBuilder({
   }, [snapping, layout])
   /* The right-hand column's width: Check access's panel's while it is on —
      the page's two widths — the inspector's otherwise. */
-  const colW = testOn ? (checkWide ? CHECK_PANEL_WIDE : CHECK_PANEL_NARROW) : inspW
+  /* The Applications panel is a short list and a Save, so in the first build it is a small panel of its own that does
+     not resize (owner, 23 Oct 2026: "remove the drag function from here and make the slider smaller, why such a big
+     one for applications"). The rule panel's size, 600, is the largest the panel goes ("this size looks good as a max"). */
+  const appsSmall = !panelResize && selection.kind === 'apps'
+  const colW = testOn ? (checkWide ? CHECK_PANEL_WIDE : CHECK_PANEL_NARROW) : appsSmall ? 400 : inspW
   /* Check access takes the board first: `T` closes the panel as × does (`describeOpen`, above). */
   /* Read as text gives the column up to either of them. */
   const readOpen = reading && !testOn && !describeOpen
@@ -2250,8 +2258,9 @@ export function BoardBuilder({
           onTryCheck={canTest ? tryCheck : undefined}
         />
       )}
+      {/* What editing a shared policy reaches, or what a copy is (PolicyNotice.tsx). */}
       {/* The permanent door on the canvas (DescribeMagic.tsx). */}
-      {describeBar && (draft.rules.length > 0 || scratch) && (
+      {describeBar && guideMe && (draft.rules.length > 0 || scratch) && (
         <div className="bb__magicat">
           <DescribeDoor context={barContext} onOpen={openDescribe} />
         </div>
@@ -2338,6 +2347,21 @@ export function BoardBuilder({
         destinationMore={Math.max((post ? linkedAppsOf(draft, store.apps) : appsOf(draft, store.apps)).length - 1, 0)}
         /* Groups first, then people, as the pane lists them; a name the
            directory no longer has reads "(deleted)". */
+        note={
+          !post && !testOn ? (
+            <PolicyNotice
+              policy={draft}
+              audience={
+                draft.audience.everyone || draft.isSystem
+                  ? null
+                  : [
+                      ...draft.audience.groupIds.map((id) => store.groups.find((g) => g.id === id)?.name ?? '(deleted)'),
+                      ...draft.audience.userIds.map((id) => store.users.find((u) => u.id === id)?.name ?? '(deleted)'),
+                    ]
+              }
+            />
+          ) : null
+        }
         audienceNames={
           draft.audience.everyone || draft.isSystem
             ? null
@@ -2437,15 +2461,15 @@ export function BoardBuilder({
 
       {/* The inspector's alone: Check access's panels take the page's two
           widths from their own button, and no grip. */}
-      {!testOn && (panelShown || readOpen || fixesShown) && (
+      {!testOn && !appsSmall && (panelShown || readOpen || fixesShown) && (
         <div
           className="bb__grip"
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize the inspector"
           aria-valuenow={colW}
-          aria-valuemin={320}
-          aria-valuemax={720}
+          aria-valuemin={480}
+          aria-valuemax={600}
           tabIndex={0}
           onPointerDown={onGrab}
           onPointerMove={onDrag}
@@ -2571,7 +2595,7 @@ export function BoardBuilder({
             )
           }}
           wide={wide}
-          onToggleWidth={() => setInspW(setW(wide ? NARROW : 560))}
+          onToggleWidth={() => setInspW(setW(wide ? NARROW : 600))}
           onMoveRule={move}
           onDuplicateRule={duplicate}
           onDeleteRule={remove}

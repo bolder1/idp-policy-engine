@@ -1187,6 +1187,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           ...(opts?.appIds ? { appIds: [...opts.appIds] } : null),
           id: newId('p', all.map((p) => p.id), name),
           name,
+          copiedFrom: src.name,
           status: 'draft',
           rules: from.rules.map(reidRule),
           fallback: from.fallback && reidRule(from.fallback),

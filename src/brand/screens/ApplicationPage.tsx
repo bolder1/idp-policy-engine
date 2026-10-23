@@ -465,6 +465,7 @@ function AppPage({
         onSave={saveSetup}
         blocked={!!problem}
         blockedReason={problem ?? undefined}
+        onDiscard={() => setDraft(stored)}
       />
     </div>
   )

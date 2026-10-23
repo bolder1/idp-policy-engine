@@ -26,7 +26,7 @@ import {
 import { appsOf, enforces, memberGroupIds, ruleExpired, type App, type Policy } from '../data'
 import { DecisionBadge } from '../decision-badge'
 import { Face, FaceStack, type FaceItem } from '../faces'
-import { Badge, Button, Chip, Drawer, Note, SplitButton, StatusPill } from '../kit'
+import { Badge, Button, Chip, Drawer, Note, RowMenu, StatusPill } from '../kit'
 import { linkedTo } from '../post-sign-in'
 import { normaliseWho } from '../rule-who'
 import { useBrand, useNameLookup, type AppTab } from '../store'
@@ -56,6 +56,7 @@ import {
 import type { StandRow } from './app-standing'
 import { AppsPeek } from './apps-peek'
 import { SharedPolicyFork } from './shared-policy-fork'
+import { StatusScopeDialog } from './status-scope-dialog'
 import { STATUS_WORD, storedVersions } from './board/read-as-text'
 import { useDraftDiff } from './board/use-lines'
 import { checkAccessFrom } from './guarded-moves'
@@ -1202,6 +1203,7 @@ export function AppPolicyView({
   const [activityOpen, setActivityOpen] = useState(false)
   /* Edit stops to ask only where the policy is on more than this application (shared-policy-fork.tsx). */
   const [forkOpen, setForkOpen] = useState(false)
+  const [scopeOpen, setScopeOpen] = useState(false)
   const check = useAppCheck(app)
   const FOCUS = (useContext(AppPolicyFocusOverride) ?? FOCUS_ON) && GLANCE
   const { policies, apps, users, groups, features } = store
@@ -1256,34 +1258,47 @@ export function AppPolicyView({
             it acts on, the same noun. Replace policy leads the menu, and the two reads are announced under it
             (HEAD_READS, 22 Oct 2026). */}
         <div className="apol__acts">
-          <SplitButton
-            label="Edit policy"
-            icon={Pencil}
-            onPress={() => (policy.appIds.length > 1 ? setForkOpen(true) : toBoard(policy.id))}
-            menuLabel="More for this policy"
-            /* The page's save bar holds the view's one orange button while it is up, so the head stands down. */
+          {/* A primary, a secondary and a ⋯ trail (owner, 23 Oct 2026: "give a primary, a secondary and a
+              3 dot button trail here"). It was one split button. Edit policy is the one orange button; what
+              the policy is on this application, Replace, is the secondary; the status switches, the two reads
+              and Remove are in the ⋯. The page's save bar holds the view's one orange button while it is up,
+              so the head stands down then. */}
+          <Button
             variant={saving ? 'secondary' : 'brand'}
-            /* EVERY verb on this tab, in groups (owner, 22 Oct 2026: "move the action to the main action
-               button; we will think how we can categorise all the actions"). What the policy is on this
-               application first, then what it is doing — the status switches, which used to hide inside the
-               pill — then the two reads, then what takes it off. `statusMenu` writes its own rule above
-               Remove, so only the group heads need one here. */
+            icon={Pencil}
+            onClick={() => (policy.appIds.length > 1 ? setForkOpen(true) : toBoard(policy.id))}
+          >
+            Edit policy
+          </Button>
+          <Button variant="secondary" icon={Replace} onClick={onReplace}>
+            Replace policy
+          </Button>
+          <RowMenu
+            label="More for this policy"
+            size="md"
+            /* Only what can be done, with no sentence under any row (owner, 23 Oct 2026: "remove this sub heading … show only
+               Inactive … make the Remove red"): the coming-soon rows and the hints are gone, Remove is red, and on a shared
+               policy Inactive asks its scope in a dialog instead of two rows. */
             items={[
-              { id: 'replace', label: 'Replace policy', icon: Replace },
-              ...menu.map((i, n) => ({ ...i, icon: STATUS_ICON[i.id as StatusMenuId], ...(n === 0 ? { divide: true } : null) })),
-              ...(FOCUS
+              ...menu
+                .filter((i) => !i.disabled)
+                .map(({ hint: _hint, ...i }) => ({
+                  ...i,
+                  icon: STATUS_ICON[i.id as StatusMenuId],
+                  ...(i.id === 'remove' || i.id === 'delete' ? { danger: true } : null),
+                })),
+              /* The two reads, kept behind HEAD_READS (flags are kept, not dead): off, they are not on the menu at all. */
+              ...(FOCUS && HEAD_READS
                 ? [
-                    /* The rule is already above Monitoring where the menu announces it (app-policy-model.ts), and
-                       one group does not need two. */
-                    { id: 'activity', label: 'Sign-in activity', icon: Activity, divide: !menu.some((i) => i.disabled), hint: SOON, disabled: !HEAD_READS },
-                    { id: 'check', label: ACCESS_CHECK, icon: ListChecks, hint: SOON, disabled: !HEAD_READS },
+                    { id: 'activity', label: 'Sign-in activity', icon: Activity, divide: true, hint: SOON },
+                    { id: 'check', label: ACCESS_CHECK, icon: ListChecks, hint: SOON },
                   ]
                 : []),
             ]}
             onSelect={(id) => {
               if (id === 'check') check()
-              else if (id === 'replace') onReplace()
               else if (id === 'activity') setActivityOpen(true)
+              else if (policy.appIds.length > 1 && id === 'inactive') setScopeOpen(true)
               else onMenu(id as StatusMenuId)
             }}
           />
@@ -1373,6 +1388,15 @@ export function AppPolicyView({
       )}
 
       {/* Outside both layouts: the question is about the policy, not about how this tab happens to draw it. */}
+      <StatusScopeDialog
+        open={scopeOpen}
+        policy={policy}
+        app={app}
+        apps={appsOf(policy, store.apps)}
+        onClose={() => setScopeOpen(false)}
+        onEverywhere={() => onMenu('inactive')}
+        onHere={() => onMenu('remove')}
+      />
       <SharedPolicyFork
         open={forkOpen}
         policy={policy}
@@ -1409,11 +1433,9 @@ export function AppNoPolicyView({
   const store = useBrand()
   const chain = useChainOpen(null)
   const glance = useGlance(null, globalDefault)
-  const stacked = useMedia(STACKED)
-  const stage = useGlanceRows(stacked)
   const hasRail = linkedTo(app.id, store.policies).length > 0
   return (
-    <div className={GLANCE ? 'apol is-glance' : 'apol'} style={GLANCE ? ({ '--apol-rows': stage.rows } as CSSProperties) : undefined}>
+    <div className={GLANCE ? 'apol is-glance' : 'apol'} style={GLANCE ? ({ '--apol-rows': FOCUS_ROWS } as CSSProperties) : undefined}>
       <header className="apol__head">
         <div className="apol__title">
           <div className="apol__nameline">
@@ -1426,53 +1448,43 @@ export function AppNoPolicyView({
             <p className="apol__gdhead">
               <span>{globalDefault.name}</span>
               <Badge tone="system">System</Badge>
-              <button type="button" className="apol__link" onClick={() => store.go({ name: 'board', policyId: globalDefault.id, from: { appId: app.id } })}>
-                Open Global Default
-                <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden />
-              </button>
             </p>
           )}
         </div>
+        {/* The same trail as a policy's head: a primary, a secondary and a ⋯ (owner, 23 Oct 2026: "match the new header
+            trail"). Open Global Default moved from the line under the name into the ⋯. */}
         <div className="apol__acts">
+          <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={onNew}>
+            Create new policy
+          </Button>
           {onAdd && (
             <Button variant="secondary" icon={ListPlus} onClick={onAdd}>
               Add existing policy
             </Button>
           )}
-          <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={onNew}>
-            Create new policy
-          </Button>
+          {globalDefault && (
+            <RowMenu
+              label="More for this application"
+              size="md"
+              items={[{ id: 'global', label: 'Open Global Default', icon: ArrowUpRight }]}
+              onSelect={() => store.go({ name: 'board', policyId: globalDefault.id, from: { appId: app.id } })}
+            />
+          )}
         </div>
       </header>
 
       {GLANCE ? (
-        /* The same stage as with a policy (20 Oct 2026): the Global Default's own rules as the canvas, with no foot —
-           nothing is outside it — and the sign-ins beside them. Post sign-in leaves the band it shared with the
-           activity for the band under the stage, so the tab has one grammar. */
-        <>
-          <div className="apol__pair is-glance" ref={stage.ref}>
-            <RulesPanel app={app} policy={null} globalDefault={globalDefault} everyoneElse={null} everyoneElseCount={0} glance={glance} />
-            <GlanceActivity
-              app={app}
-              policy={null}
-              globalDefault={globalDefault}
-              rule={glance.rule}
-              onRule={glance.setRule}
-              picked={glance.picked}
-              onPick={glance.pick}
-              size={stage.rows}
-              onShowRule={stacked ? showRuleOf(glance, null, globalDefault) : undefined}
-              reduced={glance.reduced}
-            />
-          </div>
+        /* The same canvas as a policy's tab (owner, 23 Oct 2026: "remove sign-in activity and use the current canvas
+           for global as well"): the Global Default's own rules, wide, under the head, with nothing beside them. The
+           sign-in activity that shared the band is gone from here. Post sign-in keeps its link under the canvas. */
+        <div className="apol__focus">
+          <RulesPanel app={app} policy={null} globalDefault={globalDefault} everyoneElse={null} everyoneElseCount={0} glance={glance} plain />
           {hasRail && (
-            <div className="apol__band is-solo">
-              <div className="apol__rail">
-                <PostSignInLinks app={app} onTab={onTab} />
-              </div>
+            <div className="apol__rail">
+              <PostSignInLinks app={app} onTab={onTab} />
             </div>
           )}
-        </>
+        </div>
       ) : (
         <>
           <PolicyChain

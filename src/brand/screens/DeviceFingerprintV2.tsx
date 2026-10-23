@@ -48,7 +48,6 @@ import {
   reachLabel,
   tierOf,
   withReach,
-  type Attribute,
   type AttrConfigValue,
   type FingerprintProfile,
   type ProfileMode,
@@ -1199,6 +1198,7 @@ function ProfilePage({
         blocked={issue !== null}
         blockedReason={issue ?? undefined}
         onSave={save}
+        onDiscard={() => setDraft(profile)}
       />
 
       <ChecksDrawer
@@ -1439,13 +1439,6 @@ function BasicDetailsForm({
   const [pendingReach, setPendingReach] = useState<ProfileReach | null>(null)
 
   const reachId = useId()
-  const dropped =
-    pendingReach === null
-      ? []
-      : profile.enabled
-          .map((id) => attrOf(profile.mode, id))
-          .filter((a): a is Attribute => Boolean(a?.needsAgent && pendingReach !== 'agent'))
-
   /* Both confirmation buttons take away the panel they sit in, so without this
      a keyboard user is dropped at the top of the form. Focus goes back to the
      tile that is now the answer — the one kept, or the one switched to — which
@@ -1507,18 +1500,14 @@ function BasicDetailsForm({
             labelledBy={reachId}
             options={reachChoices()}
             value={profile.reach}
-            pending={pendingReach}
             onPick={pressReach}
           />
 
-          {/* Named, not counted, and before it happens rather than after.
-              "4 signals" is a number nobody can act on; the names are what say
-              whether the ones going are ones you wanted. */}
-          {/* The first adopter of the kit's Confirm (owner, 22 Oct 2026). It
-              lists what goes, so it takes the `rows` shape; a hero cannot hold
-              six names. `warning` rather than `removed` because nothing is
-              deleted — the signals stop being checked, and the profile and its
-              roster survive unless the roster note below says otherwise. */}
+          {/* A hard stop with the reason and nothing to count (owner, 23 Oct
+              2026: "they need all these numbers and the list removed. They
+              just need to know because of agent-based signals"). It was the
+              rows shape, naming each signal going and the policies affected;
+              now one sentence, the `hero` shape. */}
           <Confirm
             open={pendingReach !== null}
             onClose={() => {
@@ -1526,28 +1515,17 @@ function BasicDetailsForm({
               setPendingReach(null)
             }}
             tone="warning"
-            shape="rows"
+            shape="hero"
             title={`Switch to ${reachLabel(pendingReach ?? profile.reach).toLowerCase()}?`}
-            rows={dropped.map((a) => ({ id: a.id, name: a.name, mark: 'Removed', kind: 'gone' as const }))}
-            more={
-              [
-                profile.registration === 'pre-approved' ? 'the approved device roster is deleted too' : null,
-                profile.usedIn > 0
-                  ? `${profile.usedIn === 1 ? 'one policy checks' : `${profile.usedIn} policies check`} fewer signals from the next sign-in`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(' · ') || undefined
-            }
             cancelLabel={`Keep ${reachLabel(profile.reach).toLowerCase()}`}
-            confirmLabel={`Switch and remove ${dropped.length}`}
+            confirmLabel={`Switch to ${reachLabel(pendingReach ?? profile.reach).toLowerCase()}`}
             onConfirm={() => {
               refocusReach.current = true
               if (pendingReach) commitReach(pendingReach)
             }}
           >
-            {reachLabel(pendingReach ?? profile.reach)} cannot read these signals, so they are removed from{' '}
-            <b>{profile.name.trim() || 'this profile'}</b> along with everything they are set to.
+            Agent-based signals need the Device Agent. Switching removes them from{' '}
+            <b>{profile.name.trim() || 'this profile'}</b>, along with their settings.
           </Confirm>
 
           {/* The agent's prerequisites, under the answer that incurs them. Not

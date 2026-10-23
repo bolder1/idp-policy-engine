@@ -13,6 +13,8 @@ import { useBrand } from '../../store'
 import { ACCESS_CHECK } from '../sign-in-tests/names'
 import { StatusControl } from '../status-control'
 import { BAR_DEMO, BAR_READ, BAR_TOUR } from './bar-tools'
+import { BuilderVersionSwitch } from './BuilderVersionSwitch'
+import { useShows } from './builder-version'
 
 /* -----------------------------------------------------------------------------
    The board's top row.
@@ -111,6 +113,10 @@ export function BoardBar({
      rescued when it actually landed on <body> after a leave: a click or Tab to
      a real control keeps it. */
   const pencil = useRef<HTMLSpanElement | null>(null)
+  /* The name the policy arrived with. A copy's name is highlighted only while it is still this one: once it is
+     renamed the admin has made it their own (owner, 23 Oct 2026: "if the user renamed it once, we can remove the
+     color"). */
+  const arrivedAs = useRef(policy.name)
   const focusPencil = (onlyIfLost = false) =>
     requestAnimationFrame(() => {
       const at = document.activeElement
@@ -213,7 +219,10 @@ export function BoardBar({
           </div>
         ) : (
           <>
-            <h1 className="bbtop__title" title={policy.name}>
+            {/* A copy nobody has finished says so on its name: highlighted (owner, 23 Oct 2026: "add a highlighter on the
+                policy name so the user gets it that it is copied"; the Copy tag beside it was removed the same day). It goes
+                when the copy is turned on. */}
+            <h1 className={policy.copiedFrom && policy.status === 'draft' && policy.name === arrivedAs.current ? 'bbtop__title is-copy' : 'bbtop__title'} title={policy.name}>
               {policy.name}
             </h1>
             <span className="bbtop__pencil" ref={pencil}>
@@ -260,6 +269,7 @@ export function BoardBar({
             <GraduationCap size={16} strokeWidth={1.9} aria-hidden />
           </button>
         )}
+        <BuilderVersionSwitch />
         {actions}
       </div>
     </header>
@@ -380,6 +390,8 @@ export function BoardBarActions({
   onDiscard: () => void
   onSave: () => void
 }) {
+  const showTesting = useShows('testing')
+  const discard = useShows('discard')
   const features = useBrand().features
   return (
     <>
@@ -398,7 +410,7 @@ export function BoardBarActions({
           )}
         </>
       )}
-      {offerTest && !post && views && (
+      {showTesting && offerTest && !post && views && (
         <>
           {views}
           {features.trySignIn && <span className="bbtop__sep" aria-hidden />}
@@ -407,7 +419,7 @@ export function BoardBarActions({
       {/* On a wrapper, for the reason the review button's anchor is: `Button`
           passes no extra props, and the walkthrough and the focus return both
           need a real box to find. */}
-      {features.trySignIn && !post && offerTest && (
+      {showTesting && features.trySignIn && !post && offerTest && (
         <span className="bbtop__try" data-tour="try-sign-in" ref={testRef}>
           <Button
             variant="secondary"
@@ -427,9 +439,9 @@ export function BoardBarActions({
       {/* Always present, as in the trail; enabled only with something to throw away. */}
       {/* A disabled button says why. Discard is destructive, so it is the
           kit's danger outline. */}
-      <Button variant="danger" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
+      {discard && <Button variant="danger" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
         Discard
-      </Button>
+      </Button>}
       <Button variant="secondary" size="sm" disabled={!unsaved} title={unsaved ? undefined : 'No changes to save'} onClick={onSaveDraft}>
         Save draft
       </Button>

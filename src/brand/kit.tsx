@@ -1536,6 +1536,23 @@ export function NumberStepper({
 const TIP_GAP = 7
 const TIP_MARGIN = 8
 
+/* WHEN A TIP SHOWS (owner, 23 Oct 2026: "hover on any button gives a tooltip instantly — if the user holds the
+   cursor there, then after 2 seconds show the first, and after that, if he keeps going, let him see them instantly,
+   because he clearly wants to read all the buttons' names").
+
+   The pointer waits TIP_DELAY on the first control, so passing over a toolbar on the way to something else shows
+   nothing. Once one has shown, the group is warm: the next control the pointer lands on within TIP_WARM of the last
+   tip closing shows at once, and each one extends the window, so reading along a row costs one wait, not ten. Left
+   alone for longer than TIP_WARM it goes cold and the wait comes back. The state is the module's, not a
+   component's, because "the last tip" is a fact about the pointer, not about any one button.
+
+   Keyboard focus is not made to wait: somebody tabbing along has asked for the name already. Only focus that
+   :focus-visible calls keyboard opens a tip; a click's focus does not, so pressing a button does not throw its own
+   tip over the thing it just opened. */
+const TIP_DELAY = 2000
+const TIP_WARM = 1000
+let tipWarmUntil = 0
+
 export function Tip({
   text,
   children,
@@ -1557,6 +1574,32 @@ export function Tip({
   const pop = useRef<HTMLSpanElement | null>(null)
   const id = useId()
   const restId = `${id}-rest`
+  const wait = useRef<number | null>(null)
+  const cancelWait = useCallback(() => {
+    if (wait.current !== null) window.clearTimeout(wait.current)
+    wait.current = null
+  }, [])
+  useEffect(() => cancelWait, [cancelWait])
+  /* Open now when the group is warm, after the delay when it is cold. */
+  const hover = useCallback(() => {
+    cancelWait()
+    if (Date.now() < tipWarmUntil) setOpen(true)
+    else
+      wait.current = window.setTimeout(() => {
+        wait.current = null
+        setOpen(true)
+      }, TIP_DELAY)
+  }, [cancelWait])
+  /* Close, and keep the group warm for a moment if a tip was actually showing. */
+  const shown = useRef(false)
+  useEffect(() => {
+    shown.current = open
+  }, [open])
+  const leave = useCallback(() => {
+    cancelWait()
+    if (shown.current) tipWarmUntil = Date.now() + TIP_WARM
+    setOpen(false)
+  }, [cancelWait])
 
   const place = useCallback(() => {
     const a = anchor.current?.getBoundingClientRect()
@@ -1631,10 +1674,13 @@ export function Tip({
     <span
       ref={anchor}
       className="bx-tip"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocusCapture={() => setOpen(true)}
-      onBlurCapture={() => setOpen(false)}
+      onMouseEnter={hover}
+      onMouseLeave={leave}
+      onMouseDown={leave}
+      onFocusCapture={(e) => {
+        if ((e.target as HTMLElement).matches?.(':focus-visible')) setOpen(true)
+      }}
+      onBlurCapture={leave}
       onTouchStart={() => setOpen((v) => !v)}
     >
       {children}
@@ -1861,7 +1907,9 @@ export function Drawer({
   const panel = useRef<HTMLElement | null>(null)
   useDialogChrome(open, onClose, panel)
 
-  return (
+  /* Portalled to the app root, as Modal is. Rendered in place, a drawer opened from inside a page column was stacked
+     by that column and slid in UNDER the top bar, which hid its own title. */
+  const tree = (
     <AnimatePresence>
       {open && (
         <>
@@ -1916,6 +1964,8 @@ export function Drawer({
       )}
     </AnimatePresence>
   )
+  /* In place on the server, where there is no document to portal into (the tests draw static markup). */
+  return typeof document === 'undefined' ? tree : createPortal(tree, appRoot())
 }
 
 const clampWidth = (want: number, min: number, max: number) =>
@@ -2170,12 +2220,9 @@ export function Confirm({
   confirmLabel?: string
   confirmIcon?: LucideIcon
   onConfirm?: () => void
-  /* A third way out, between cancelling and confirming — the leave guard's
-     "Save as draft", which is neither staying put nor losing the work. Rare by
-     design: a confirm with two escapes usually means the question is wrong, so
-     this exists for the one genuine three-way decision in the product rather
-     than as a general footer slot. It carries its own disabled reason, because
-     the leave guard can offer a save it cannot currently perform. */
+  /* A second answer instead of cancelling — the leave guard's Save beside Discard, where staying put is the ×. A
+     popup carries two buttons at most, so with this set the cancel button is not drawn. It carries its own disabled
+     reason, because the leave guard can offer a save it cannot currently perform. */
   alt?: { label: string; onClick: () => void; disabled?: boolean; title?: string }
   /** False when the confirm destroys nothing: the primary is the brand button. */
   destructive?: boolean
@@ -2238,9 +2285,13 @@ export function Confirm({
     </Button>
   ) : (
     <>
-      <Button variant="ghost" onClick={onClose}>
-        {cancelLabel}
-      </Button>
+      {/* A confirm never has three buttons (owner, 23 Oct 2026: "don't use 3 buttons in the popups, 2 max, 3 looks very
+          bad"). With a third way out the cancel button goes: the × and Escape already say "stay where I was". */}
+      {!alt && (
+        <Button variant="ghost" onClick={onClose}>
+          {cancelLabel}
+        </Button>
+      )}
       {/* `blocked` rather than `disabled`: there IS a reason, so the button
           stays reachable by keyboard and the reason is announced with it. The
           reason is also printed in the dialog (`__why`) instead of hidden in a
@@ -2721,7 +2772,6 @@ function footerHost(): HTMLElement | null {
      opens the review, where the reason can be read. */
 export function SaveBar({
   open,
-  changes,
   onSave,
   saveLabel = 'Save changes',
   /** Blocks the save without hiding the footer — for a draft that is not valid yet. */
@@ -2729,10 +2779,11 @@ export function SaveBar({
   blockedReason,
   review,
   guard,
+  onDiscard,
 }: {
   open: boolean
-  /** Short names for what changed: "Name", "IP networks". The first two are shown. */
-  changes: string[]
+  /** Short names for what changed. No longer drawn in the footer (it carries no words now); callers still say it. */
+  changes?: string[]
   onSave: () => void
   /** The commit's label: on the button when there is nothing to review, in Review changes otherwise. */
   saveLabel?: string
@@ -2743,6 +2794,8 @@ export function SaveBar({
   review?: ReviewRow[]
   /** The checks on what the save would do, read while the review is open. A new function is a new reading. */
   guard?: () => ReviewGuard | null
+  /** Throws the unsaved edits away: the footer's Discard, beside the save (owner, 23 Oct 2026). */
+  onDiscard?: () => void
 }) {
   const [reviewing, setReviewing] = useState(false)
   const bar = useRef<HTMLDivElement | null>(null)
@@ -2780,8 +2833,6 @@ export function SaveBar({
     else focusPageHeading(el)
   }, [open])
 
-  const parts = changes.filter(Boolean)
-  const shown = parts.slice(0, 2).join(' · ') + (parts.length > 2 ? ` · +${parts.length - 2} more` : '')
   const reason = blocked && blockedReason ? blockedReason : null
   const reviews = !!review && review.length > 0
 
@@ -2814,19 +2865,16 @@ export function SaveBar({
             if (from && !e.currentTarget.contains(from) && !from.closest('.bx-scrim--center')) cameFrom.current = from
           }}
         >
-          {/* `status`, not `alert`, and on the words only. It reports a state
-              the reader caused; an alert would interrupt a screen reader on
-              every keystroke that made a form dirty, and a status region
-              around the button would read its label out with it. */}
-          {/* No "Unsaved changes" heading (owner, 21 Sep 2026: "not needed"). The
-              footer only exists while something is unsaved, and the page head's
-              ChangeState pill already says so; what is left is the one line
-              worth reading — WHAT changed, or why Save is off. */}
-          <span className="bx-savebar__text" role="status">
-            {reason ? <span className="is-blocked">{reason}</span> : shown && <span>{shown}</span>}
-          </span>
-          {/* Blocked, the one button is off and the reason is the footer's
-              words: a review that ends on a disabled Save is a dead end. */}
+          {/* No words in the footer (owner, 23 Oct 2026: "don't use this kind of lines in the footer, use it inside the form
+or the element, and add a Discard or Cancel button"). It used to say WHAT changed, or why Save was off; the form
+says why a field is wrong where the field is, the page head's pill says something is unsaved, and the review lists
+what changed. What is left is two buttons: throw it away, or save it. */}
+          {onDiscard && (
+            <Button variant="secondary" onClick={onDiscard}>
+              Discard
+            </Button>
+          )}
+          {/* Blocked, the one button is off; its reason is under the field that caused it and in the button's title. */}
           <Button
             variant="brand"
             icon={Check}

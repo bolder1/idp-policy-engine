@@ -99,9 +99,11 @@ describe('the description, while the tip is open', () => {
     expect(tip).toContain("if (adds.kind === 'none') return")
     expect(tip).toContain("describeBy(trigger, adds.kind === 'rest' ? restId : id)")
     expect(tip).toMatch(/<span id=\{restId\} hidden>/)
-    /* Opened by focus, closed by blur: the description lives exactly as long. */
-    expect(tip).toContain('onFocusCapture={() => setOpen(true)}')
-    expect(tip).toContain('onBlurCapture={() => setOpen(false)}')
+    /* Opened by keyboard focus at once and by the pointer after its delay (23 Oct 2026), closed by blur: the
+       description lives exactly as long. */
+    expect(tip).toContain("matches?.(':focus-visible')) setOpen(true)")
+    expect(tip).toContain('onBlurCapture={leave}')
+    expect(tip).toContain('onMouseEnter={hover}')
     /* The icon button's tip is its label: described by nothing. */
     const icon = kitSrc.slice(kitSrc.indexOf('export function IconButton('), kitSrc.indexOf('export function IconButton(') + 1200)
     expect(icon).toContain('<Tip text={label}>')

@@ -32,6 +32,8 @@ import { ActionRow, CondReadout, IfBlock, IfChip, IfKw } from './IfBlock'
 import { isPristine, stateLabel } from './parts'
 import { postActionLabel } from '../../post-sign-in'
 import { postTone, usePostBoard } from './post-board'
+import { RULE_ON_OFF } from './bar-tools'
+import { useShows } from './builder-version'
 
 /* -----------------------------------------------------------------------------
    A card on the chain — one rule, read whole, or read short.
@@ -325,6 +327,7 @@ export function RuleCard({
   /** Before every id the card draws, so a run's copy never collides with the edit board mounted under it. */
   idPrefix?: string
 }) {
+  const arrange = useShows('arrange')
   /* On a post sign-in policy the card wears its action's tone, none until one
      is chosen, and is marked while a refused Turn on is about it (post-board.ts). */
   const postBoard = usePostBoard()
@@ -397,7 +400,7 @@ export function RuleCard({
             application's Policies tab) moves nothing, so its number is the
             number alone: no Reorder for a screen reader, no grab for a pointer,
             and a swipe that starts on it scrolls. */}
-        {foldOnPress ? (
+        {foldOnPress || !arrange ? (
           <span className="bb__idx is-still" aria-hidden>
             <span className="bb__idx__n">{index + 1}</span>
           </span>
@@ -430,9 +433,9 @@ export function RuleCard({
           }}
         >
           <span className="bb__idx__n">{index + 1}</span>
-          <span className="bb__idx__grip" aria-hidden>
+          {arrange && <span className="bb__idx__grip" aria-hidden>
             <GripVertical size={14} strokeWidth={2} />
-          </span>
+          </span>}
         </button>
         )}
 
@@ -548,7 +551,7 @@ export function RuleCard({
                 On/off is the kit's switch — the one the panel's rule head
                 carries — rather than the toggle GLYPH that stood here, so the
                 card and the panel show the same control for the same fact. */}
-            {!run && (
+            {!run && RULE_ON_OFF && (
             <Toggle
               size="sm"
               checked={rule.enabled}
@@ -564,7 +567,7 @@ export function RuleCard({
             {!run && (
             <RowMenu
               label={`Actions for rule ${index + 1}`}
-              items={ruleMenu(canUp, canDown)}
+              items={ruleMenu(canUp, canDown).filter((i) => arrange || (i.id !== 'up' && i.id !== 'down'))}
               onOpenChange={setMenuOpen}
               onSelect={(id) => {
                 if (id === 'up') onMove(-1)

@@ -9,6 +9,7 @@ import { EVERYONE, type Audience, type Rule, type RuleWho } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { outsideAudience } from '../../audience-ops'
 import { normaliseWho, type WhoKind, type WhoList } from '../../rule-who'
+import { useShows } from './builder-version'
 
 /* -----------------------------------------------------------------------------
    WHO — the people a rule applies to.
@@ -79,6 +80,7 @@ export function WhoEditor({
   audience: Audience
   onPatch: (p: Partial<Rule>) => void
 }) {
+  const copyWho = useShows('copyWho')
   const store = useBrand()
   const resolve = useNameLookup()
   /* Which list the dialog is open on, and which of its two views it opens in:
@@ -167,7 +169,7 @@ export function WhoEditor({
       {pair}
 
       {/* Copy, not link: the same people and groups as another rule, then this rule's own to change. */}
-      {others.length > 0 && (
+      {others.length > 0 && copyWho && (
         <div className="bb__whocopy">
           <Picker
             label="Copy who from another rule"

@@ -198,6 +198,10 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
         }}
         blocked={!!blocked}
         blockedReason={blocked ?? undefined}
+        onDiscard={() => {
+          setName(saved?.name ?? '')
+          setAppIds(saved?.appIds ?? [])
+        }}
         review={diff?.rows}
       />
     </div>

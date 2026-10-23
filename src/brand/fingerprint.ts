@@ -1329,7 +1329,10 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
   /* The section is the same noun the label leads with, so "Signals: added TPM
      ID" files as "TPM ID" under Signals. */
   const noun = capital(ITEM_NOUN[after.mode].many)
-  const was = chosenAttributes(before)
+  /* Signals an agent-only reach could read are not listed as removed when the reach itself is what changed: that is
+     one Basic details row, "Device restriction type", and the admin has already confirmed what it takes with it (owner,
+     23 Oct 2026: "no need to add this in review as well … just add it as a basic details change"). */
+  const was = chosenAttributes(before).filter((a) => !goneWithReach(before, after, a))
   const now = chosenAttributes(after)
   for (const a of now) {
     if (!was.some((x) => x.id === a.id)) {
@@ -1350,6 +1353,10 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
 }
 
 /** The save bar's short list: what kinds of thing changed. */
+/** An agent-only signal that stops being read because the reach moved to agentless: it goes with the switch, not on its own. */
+const goneWithReach = (before: FingerprintProfile, after: FingerprintProfile, a: Attribute): boolean =>
+  before.reach !== after.reach && after.reach === 'agentless' && !!a.needsAgent
+
 export function profileChangeParts(before: FingerprintProfile, after: FingerprintProfile): string[] {
   const parts: string[] = []
   if (before.name !== after.name) parts.push('Name')
@@ -1360,7 +1367,7 @@ export function profileChangeParts(before: FingerprintProfile, after: Fingerprin
      beside "Basic details" says one change twice in a two-item footer. */
   const basicNamed = parts.includes('Device restriction type') || parts.includes('Device registration')
   if (asksReach(after.mode) && before.restrictionSet !== after.restrictionSet && !basicNamed) parts.push('Basic details')
-  const was = chosenAttributes(before).map((a) => a.id)
+  const was = chosenAttributes(before).filter((a) => !goneWithReach(before, after, a)).map((a) => a.id)
   const now = chosenAttributes(after)
   const added = now.filter((a) => !was.includes(a.id)).length
   const removed = was.filter((id) => !now.some((a) => a.id === id)).length

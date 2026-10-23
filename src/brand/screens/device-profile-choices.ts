@@ -4,8 +4,6 @@ import { Fingerprint, Globe, type LucideIcon, Microchip } from 'lucide-react'
 import {
   MODES,
   REACHES,
-  attributesFor,
-  countLabel,
   isRuleValue,
   isVersionText,
   type Attribute,
@@ -73,10 +71,6 @@ export const kindChoices = (): Choice<ProfileMode>[] =>
     label: m.label,
     icon: MODE_ICON[m.id],
     summary: m.summary,
-    /* How much there is to choose from on the step this answer leads to. A
-       figure, not part of the description — so it sits on the name line as
-       metadata rather than trailing the sentence it has nothing to do with. */
-    meta: countLabel(m.id, attributesFor(m.id).length),
     tip: m.blurb,
   }))
 

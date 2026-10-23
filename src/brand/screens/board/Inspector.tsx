@@ -28,6 +28,8 @@ import { WhenEditor } from './WhenEditor'
 import { WhoEditor } from './WhoEditor'
 import { normaliseWho } from '../../rule-who'
 import { ruleMenu } from './rule-menu'
+import { PANEL_WIDTH_BUTTON, RULE_ON_OFF } from './bar-tools'
+import { useShows } from './builder-version'
 
 /* -----------------------------------------------------------------------------
    The inspector — the right pane, for whatever is selected on the board.
@@ -109,6 +111,7 @@ export function Inspector({
   /** Stores the policy. The same call the bar's Save makes. */
   onSave?: () => void
 }) {
+  const arrange = useShows('arrange')
   /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted,
      discarded — but the board no longer mounts this component in that case, so
      the -1 is a guard rather than a state anybody sees. */
@@ -143,7 +146,7 @@ export function Inspector({
             {onMoveRule && onDuplicateRule && onDeleteRule && (
               <RowMenu
                 label={`Actions for rule ${at + 1}`}
-                items={ruleMenu(at > 0, at < draft.rules.length - 1)}
+                items={ruleMenu(at > 0, at < draft.rules.length - 1).filter((i) => arrange || (i.id !== 'up' && i.id !== 'down'))}
                 onSelect={(id) => {
                   if (id === 'up') onMoveRule(at, at - 1)
                   else if (id === 'down') onMoveRule(at, at + 1)
@@ -175,7 +178,7 @@ export function Inspector({
 
             The grip in the gutter still sets any width between; this is the
             two ends of it without the drag. */}
-        {!testing && (
+        {!testing && PANEL_WIDTH_BUTTON && (
           <button
             type="button"
             className="bb__act"
@@ -469,7 +472,7 @@ function RuleHead({
           }}
         />
       </div>
-      <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />
+      {RULE_ON_OFF && <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />}
     </>
   )
 }

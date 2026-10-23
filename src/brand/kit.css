@@ -2226,3 +2226,24 @@ html[data-theme='dark'] {
   .bx-iconbtn svg, .bx-rowmenu svg, .bx-menu__item svg, .bx-btn > svg { transition: none; }
   .bx-iconbtn:hover svg, .bx-rowmenu:hover svg, .bx-menu__item:hover svg, .bx-btn:hover > svg:first-child { transform: none; animation: none; }
 }
+
+/* READABLE POPUPS (owner, 23 Oct 2026: "make things more readable for all the popups … hierarchy in the type, logos
+   and icons … scannable; right now it feels like just a bold line, where should I focus?"). The title is the one
+   strong line, the sentence under it is quieter and shorter, and what the dialog touches sits in a sunken card of
+   chips the eye can take in at once. */
+.bx-confirm--hero .bx-confirm__title { font-size: var(--fs-xl, 18px); line-height: 1.35; letter-spacing: -0.005em; }
+.bx-confirm__body b, .bx-confirm__body strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
+.bx-confirm__peek {
+  list-style: none; margin: var(--space-5) auto 0; padding: var(--space-4);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2);
+  background: var(--surface-sunken); border-radius: var(--radius-lg);
+}
+.bx-confirm__peek li {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 2px var(--space-3); border-radius: var(--radius-full, 9999px);
+  background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-sm); color: var(--text-primary);
+}
+.bx-confirm__peek li.is-more { background: none; border-color: transparent; color: var(--text-secondary); }
+/* A fact line in a confirm's body: a logo or icon, then the words — for the dialogs that name applications. */
+.bx-confirm__fact { display: inline-flex; align-items: center; gap: var(--space-2); vertical-align: bottom; font-weight: var(--fw-semibold); color: var(--text-primary); }

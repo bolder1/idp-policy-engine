@@ -619,6 +619,9 @@ const keyId = (k: Key) => (k.kind === 'everyone' ? 'everyone' : `${k.kind}:${k.i
    person's face. A group no policy on the app names moves exactly as everyone
    else does, so its row would repeat Everyone's: `visibleMoves` drops it, and
    the list names the groups the app's Groups tab names. */
+/** The per-person list of who moves where, in the Remove dialog. Kept, and off: the card says it in one line. */
+const MOVES_LIST: boolean = false
+
 export function RemoveDialog({
   policy,
   app,
@@ -639,23 +642,49 @@ export function RemoveDialog({
   }, [policy, app.id, store.policies, store.users, store.groups])
   const copy = policy ? removeCopy(policy, app) : null
 
+  /* Who goes where, said once: the policy (or policies) the moved sign-ins land on. */
+  const targets = [...new Set(moves.map((m) => m.to?.name ?? 'No policy'))]
+  const others = policy ? appsOf(policy, store.apps).filter((a) => a.id !== app.id) : []
+
   return (
-    /* Shell only. The `moves` block below — who moves to which policy — is the
-       obvious next thing to become real `rows`, but that is a redesign rather
-       than a migration, and this dialog sits in the Replace flow another session
-       is currently debugging for a hang. Its insides are left alone on purpose. */
+    /* A simple card with context (owner, 23 Oct 2026: "make it more readable … add logos and icons … simple card with
+       context"). The title is short and names the application with its logo; the sentence names the policy once; where
+       the sign-ins go is one line; the applications that keep it are their logos. The per-person list of moves is kept
+       behind MOVES_LIST, off. */
     <Confirm
       open={!!policy}
       onClose={onCancel}
       tone="removed"
-      title={`Remove ${policy?.name ?? 'this policy'} from ${app.name}?`}
+      shape="hero"
+      title={`Remove from ${app.name}?`}
       confirmLabel="Remove"
       onConfirm={onConfirm}
     >
-      {copy && (
-        <div className="bapr__confirm">
-          <p>{copy.policy}</p>
-          {moves.length > 0 && (
+      {policy && (
+        <div className="bapr__confirm is-card">
+          <p>
+            <b>{policy.name}</b> stops deciding sign-ins on{' '}
+            <span className="bx-confirm__fact">
+              <AppLogo appId={app.id} name="" size={16} />
+              {app.name}
+            </span>
+            .
+          </p>
+          {targets.length > 0 && (
+            <p>
+              Its sign-ins go to <b>{targets.join(', ')}</b>.
+            </p>
+          )}
+          {others.length > 0 && (
+            <p className="bapr__keeps">
+              <span>Still on</span>
+              {others.slice(0, 5).map((o) => (
+                <AppLogo key={o.id} appId={o.id} name={o.name} size={18} />
+              ))}
+              {others.length > 5 && <span>+{others.length - 5}</span>}
+            </p>
+          )}
+          {MOVES_LIST && copy && moves.length > 0 && (
             <div>
               <span className="u-label">Sign-ins move to</span>
               <dl className="bapp__moves">

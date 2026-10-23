@@ -1172,7 +1172,7 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
 /* The shared-policy slider (shared-policy-fork.tsx): one sentence, a search past a screenful, and the applications
    as plain rows that scroll with the drawer. */
 .bfork { display: flex; flex-direction: column; gap: var(--space-4); }
-.bfork__said { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
+.bfork__said { margin: var(--space-2) 0 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bfork__said em { font-style: normal; font-weight: var(--fw-medium); color: var(--text-primary); }
 .bfork__search { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); padding-bottom: var(--space-2); }
 .bfork__list { list-style: none; margin: 0; padding: 0; }
@@ -1185,19 +1185,28 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
 .bfork__list .bfork__none { display: block; color: var(--text-tertiary); }
 .bfork__btnapp { display: inline-flex; align-items: center; gap: var(--space-2); }
 
-/* What each button would touch, previewed on the list (shared-policy-fork.tsx). Duplicate lifts the current application
-   and lets the rest fall back, and its \"Current\" tag appears only then; Edit for all tints every row and shows its
-   one line. Opacity, background and a small scale only, and none of it under reduced motion. */
-.bfork__btnwrap { display: inline-flex; }
-.bfork__list li { padding-inline: var(--space-3); border-radius: var(--radius-md); transition: background-color 180ms var(--ease-standard), opacity 180ms var(--ease-standard); }
-.bfork__mark { display: inline-flex; min-width: 1px; opacity: 0; scale: 0.9; transition: opacity 180ms var(--ease-standard), scale 180ms var(--ease-standard); }
-.bfork.is-duplicate .bfork__list li.is-here { background: var(--fb-info-bg); }
-.bfork.is-duplicate .bfork__list li:not(.is-here) { opacity: 0.4; }
-.bfork.is-duplicate .bfork__list li.is-here .bfork__mark { opacity: 1; scale: 1; }
-.bfork.is-edit .bfork__list li { background: var(--fb-notice-bg); }
-.bfork__note { margin: 0; min-height: 1.5em; font-size: var(--fs-sm); color: var(--text-secondary); opacity: 0; transition: opacity 180ms var(--ease-standard); }
-.bfork.is-edit .bfork__note { opacity: 1; }
-@media (prefers-reduced-motion: reduce) { .bfork__list li, .bfork__mark, .bfork__note { transition: none; } }
+/* The slider's choice and what it changes (shared-policy-fork.tsx). Two option cards, one picked, selection in blue;
+   each row says what the picked option does to it, and the rows a copy leaves alone fade back. */
+.bfork__ways { display: flex; flex-direction: column; gap: var(--space-3); }
+.bfork__way {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: var(--space-4);
+  width: 100%; padding: var(--space-4) var(--space-5); text-align: left; cursor: pointer;
+  background: var(--surface-raised); color: var(--text-primary);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg);
+  transition: border-color 160ms var(--ease-standard), background-color 160ms var(--ease-standard), box-shadow 160ms var(--ease-standard);
+}
+.bfork__way:hover { border-color: var(--border-strong); }
+.bfork__way:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bfork__way.is-on { border-color: var(--fb-info-fg); background: var(--fb-info-bg); box-shadow: inset 0 0 0 1px var(--fb-info-fg); }
+.bfork__wayicon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-secondary); }
+.bfork__way.is-on .bfork__wayicon { background: var(--surface-raised); color: var(--fb-info-fg); }
+.bfork__waytext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bfork__waytext strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.bfork__waytext em { font-style: normal; font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.45; }
+.bfork__list li { padding-inline: var(--space-3); border-radius: var(--radius-md); transition: opacity 180ms var(--ease-standard); }
+.bfork.is-duplicate .bfork__list li:not(.is-here) { opacity: 0.55; }
+.bfork__keeps { font-size: var(--fs-sm); color: var(--text-tertiary); }
+@media (prefers-reduced-motion: reduce) { .bfork__way, .bfork__list li { transition: none; } }
 
 /* The scope dialog's illustration (status-scope-dialog.tsx): the applications as logos, this one ringed. */
 .bscope { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); padding: var(--space-4) 0; text-align: center; }
@@ -1206,3 +1215,8 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
 .bscope__logos li.is-here { box-shadow: 0 0 0 2px var(--fb-info-dot, var(--tint-blue-fg)); background: var(--fb-info-bg); }
 .bscope__more { font-size: var(--fs-sm); color: var(--text-secondary); }
 .bscope__said { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
+
+/* The Remove dialog as a card (AppProtection.tsx RemoveDialog): centred lines, the keepers as logos. */
+.bapr__confirm.is-card { align-items: center; gap: var(--space-3); }
+.bapr__confirm.is-card p { margin: 0; }
+.bapr__confirm.is-card .bapr__keeps { display: inline-flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--surface-sunken); border-radius: var(--radius-lg); font-size: var(--fs-sm); color: var(--text-secondary); }

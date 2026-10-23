@@ -2165,6 +2165,9 @@ export interface ConfirmSection {
   more?: ReactNode
 }
 
+/** The confirm's lists of rows, drawn (true) or summed up as chips on the hero card (false). See `Confirm`. */
+const CONFIRM_LISTS: boolean = false
+
 export function Confirm({
   open,
   onClose,
@@ -2276,8 +2279,14 @@ export function Confirm({
   const labelId = `${fieldId}-label`
 
   /* One section from `rows`, so the simple case does not have to build one. */
-  const groups: readonly ConfirmSection[] =
-    shape === 'hero' ? [] : (sections ?? (rows && rows.length > 0 ? [{ id: 'only', rows }] : []))
+  const listed: readonly ConfirmSection[] = sections ?? (rows && rows.length > 0 ? [{ id: 'only', rows }] : [])
+  /* LISTS HIDDEN, A SIMPLE CARD INSTEAD (owner, 23 Oct 2026: "discard this style of popup where we showcase the full
+     list — keep it but hide, and replace with how we did for agent-based: simple card with context"). With
+     CONFIRM_LISTS off every confirm is drawn as the hero; what the list named is summed up as up to three chips and a
+     count, under the sentence, so the dialog still says what it touches. Turn the flag on for the lists as they were. */
+  const drawn = shape === 'rows' && !CONFIRM_LISTS ? 'hero' : shape
+  const peek = drawn !== shape ? listed.flatMap((g) => g.rows) : []
+  const groups: readonly ConfirmSection[] = drawn === 'hero' ? [] : listed
 
   const foot = blocked ? (
     <Button variant="secondary" onClick={onClose}>
@@ -2318,8 +2327,8 @@ export function Confirm({
        the badge and the rows beside the mark, so Modal's head row would state it
        a second time. `title` still reaches the panel's `aria-label`. */
     <Modal open={open} onClose={onClose} title={title} width={width ?? DIALOG_W.confirm} padded={false} bare footer={foot}>
-      <div className={`bx-confirm bx-confirm--${shape} is-${tone}`}>
-        {shape === 'hero' ? (
+      <div className={`bx-confirm bx-confirm--${drawn} is-${tone}`}>
+        {drawn === 'hero' ? (
           <div className="bx-confirm__hero">
             {/* The rings ripple outward and the badge springs in, once, on open
                 (owner, 22 Oct 2026: "add a lottie style svg for the icons … a
@@ -2383,6 +2392,14 @@ export function Confirm({
               who moves where — and a `p` inside a `p` is invalid markup that
               browsers silently reparent. The style is the same either way. */}
           {children && <div className="bx-confirm__body">{children}</div>}
+          {peek.length > 0 && (
+            <ul className="bx-confirm__peek">
+              {peek.slice(0, 3).map((r) => (
+                <li key={r.id}>{r.name}</li>
+              ))}
+              {peek.length > 3 && <li className="is-more">+{peek.length - 3} more</li>}
+            </ul>
+          )}
 
           {groups.map((g) => {
             const listed = g.rows.slice(0, CONFIRM_ROWS)

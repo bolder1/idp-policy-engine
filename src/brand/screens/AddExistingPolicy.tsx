@@ -9,7 +9,7 @@ import { isPostSignIn } from '../post-sign-in'
 import { listNames } from '../rule-who'
 import { AlsoNote } from './AppProtection'
 import { policyOption } from './policy-option'
-import { attachKind, attachTo, detachFrom, type AttachKind } from './app-policies'
+import { REPLACE_MAKES_DRAFT, attachKind, attachTo, detachFrom, type AttachKind } from './app-policies'
 import { appStanding, deciderChanges, rowTip, takenFrom } from './app-standing'
 import { SliderActions } from './select-rows'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
@@ -117,6 +117,14 @@ export function AddExistingPolicy({
   /* Where it would stand here: the list with the attach applied, asked of the engine. */
   const placement = useMemo(() => {
     if (!picked) return null
+    /* A replace copies the pick as a draft (app-policies.ts `REPLACE_MAKES_DRAFT`), so none of the readings
+       below apply: a draft holds no position, takes over from nobody and decides nothing yet. Saying
+       "Position 1 · Takes over from …" here was wrong twice over — it described a swap that no longer happens,
+       and it named the wrong policy while doing it, because `policies` has the current one already detached,
+       so the engine answered about the tenant default instead of the policy actually being replaced. */
+    if (replacing && REPLACE_MAKES_DRAFT) {
+      return { pill: 'Draft', text: `Takes over from ${replacing.name} when you turn it on`, tip: null }
+    }
     const after = policies.map((p) => (p.id === picked.id ? attachTo(p, app.id, apps) : p))
     const row = appStanding(app.id, after, users).rows.find((r) => r.policy.id === picked.id)
     if (!row) return null
@@ -130,7 +138,7 @@ export function AddExistingPolicy({
     if (row.state === 'never') return { pill: 'Never decides', text: '', tip: rowTip(row, groups, users) }
     if (row.state === 'monitor') return { pill: 'Monitoring', text: 'Watches sign-ins, decides none', tip: null }
     return { pill: 'Not on', text: 'Decides nothing until turned on', tip: null }
-  }, [picked, policies, app.id, apps, users, groups])
+  }, [picked, policies, app.id, apps, users, groups, replacing])
 
   const others = picked ? appsOf(picked, apps).filter((a) => a.id !== app.id) : []
   const named = picked ? namedApp(picked, others) : null
@@ -168,8 +176,16 @@ export function AddExistingPolicy({
       actions={
         <SliderActions
           onCancel={onClose}
+          /* Not while replacing: since a replace IS a draft copy, a second button offering one would be the same
+             press twice under two names. */
           another={kind === 'also' && !replacing ? { label: 'Duplicate and add', run: copy } : null}
-          primary={{ label: checking ? 'Checking…' : replacing ? 'Replace with this policy' : 'Add this policy', run: add, disabled: !picked || checking }}
+          primary={{
+            /* "Replace with this policy" promised an immediate swap. The press makes a draft now, and a button
+               is a verb for what it does, not for what it is a step towards. */
+            label: checking ? 'Checking…' : replacing ? (REPLACE_MAKES_DRAFT ? 'Add as a draft' : 'Replace with this policy') : 'Add this policy',
+            run: add,
+            disabled: !picked || checking,
+          }}
         />
       }
     >
@@ -231,8 +247,11 @@ export function AddExistingPolicy({
                 {placement.tip && <TipDot text={placement.tip} label={`About ${picked.name}`} />}
               </div>
             )}
-            {/* Said first: they change what adding it means (owner, 13 Oct 2026). */}
-            {kind === 'also' && <AlsoNote picked={picked} />}
+            {/* Said first: they change what adding it means (owner, 13 Oct 2026). Not while replacing: the note
+                warns that edits to a shared policy reach every application it is on, which is true of the pick
+                and beside the point here — what lands is an independent copy, and the original keeps its
+                applications untouched. */}
+            {kind === 'also' && !(replacing && REPLACE_MAKES_DRAFT) && <AlsoNote picked={picked} />}
             {named && (
               <Callout tone="notice" title="Names another application">
                 {named.name} appears in its name or a deny message.

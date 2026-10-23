@@ -22,10 +22,13 @@ import {
   ShieldCheck,
   Settings,
   Smartphone,
+  SlidersHorizontal,
   Star,
 } from 'lucide-react'
 
 import { Badge, Button, Callout, Drawer, IconButton, MenuButton, Modal, Note, SearchBox, TipDot, Toggle } from '../kit'
+import { AUTH_GENERAL_SEED, VERIFICATION_RULES_DRAWER, type AuthGeneral } from './auth-general'
+import { GeneralSettings, GeneralSettingsDrawer } from './auth-general-settings'
 import { MethodsTour } from '../tour/MethodsTour'
 import { NEW_LAYOUT, SETTING_WAS } from '../tour/methods-tour'
 import { methodBlocker, type AuthMethod } from '../methods'
@@ -97,12 +100,17 @@ import { useCaChains } from './ca-chains'
    V5's component unchanged.
    -------------------------------------------------------------------------- */
 
-type Tab = 'methods' | 'recovery'
+type Tab = 'methods' | 'recovery' | 'general'
 
-/* Each tab carries an icon, as the zone page's tabs do: one tab spec across the product. */
+/* Each tab carries an icon, as the zone page's tabs do: one tab spec across the product.
+
+   General settings is the third (owner, 21 Oct 2026: "also add a general settings tab side by side to compare our
+   choices"): the tenant's verification rules on the page itself, beside the slide-over that held them
+   (VERIFICATION_RULES_DRAWER in auth-general.ts, off, so the tab is the way in). */
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'methods', label: 'Methods', icon: ShieldCheck },
   { id: 'recovery', label: 'Recovery', icon: LifeBuoy },
+  { id: 'general', label: 'General settings', icon: SlidersHorizontal },
 ]
 
 /* The eleven families, in the order the shipping console's rail lists them, so
@@ -454,6 +462,28 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     if (shown) store.showToast(`${shown.name} is now your active method`)
   }
 
+  /* The person's switches ask first (owner, 21 Oct 2026: "a confirmation for every toggle, so nobody enables or disables a
+     method by an accidental click"). The press only opens the question; Turn on or Turn off is what changes the method.
+     Nothing to ask where nothing can change: switching off the one method that is left says so at once. */
+  const [useAsk, setUseAsk] = useState<{ id: string; on: boolean } | null>(null)
+  const askActivate = (id: string, on: boolean) => {
+    if (!isUser) return activate(id, on)
+    const handover = [...readyIds.filter((x) => configuredIds.includes(x)), ...readyIds.filter((x) => !configuredIds.includes(x))]
+    if (activateIn(enrolment, id, on, handover).kept) return store.showToast('Turn on another method first')
+    setUseAsk({ id, on })
+  }
+  const useMethod = useAsk ? methods.find((x) => x.id === useAsk.id) : undefined
+  const useLines = (() => {
+    if (!useAsk || !useMethod) return [] as string[]
+    const handover = [...readyIds.filter((x) => configuredIds.includes(x)), ...readyIds.filter((x) => !configuredIds.includes(x))]
+    if (useAsk.on) {
+      const now = enrolment.active && enrolment.active !== useAsk.id ? methods.find((x) => x.id === enrolment.active) : undefined
+      return [`${useMethod.name} becomes your active method. You will use it to verify it is you when you sign in.`, ...(now ? [`${now.name} stops being used.`] : [])]
+    }
+    const to = methods.find((x) => x.id === activateIn(enrolment, useAsk.id, false, handover).handedTo)
+    return [to ? `${to.name} becomes your active method instead.` : `${useMethod.name} is no longer used to verify it is you.`]
+  })()
+
   const saveEnrolment = (id: string, values: Record<string, string>) => {
     const first = !enrolment.configured.includes(id)
     setEnrolment((e) => ({
@@ -486,15 +516,26 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
       setCardDraft(id ? (enrolment.values[id] ?? {}) : {})
     })
   }
+  /* A row that is one method opens its setup form in the panel; the panel has nothing else to show, so leaving the form
+     leaves it (owner, 21 Oct 2026: "remove this, go straight to the list"). */
+  const [fromRow, setFromRow] = useState(false)
   const cancelEnrol = () => {
     setOpenCard(null)
     setCardDraft({})
+    if (fromRow) {
+      setPanel([])
+      setFromRow(false)
+    }
   }
   const saveCard = (): boolean => {
     if (!openCard || cardIssue) return false
     saveEnrolment(openCard, cardDraft)
     setOpenCard(null)
     setCardDraft({})
+    if (fromRow) {
+      setPanel([])
+      setFromRow(false)
+    }
     return true
   }
   const enrol: EnrolBinding = {
@@ -510,7 +551,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     onSave: () => {
       saveCard()
     },
-    onActivate: activate,
+    onActivate: askActivate,
     active: enrolment.active,
     guard: {
       dirty: cardDirty,
@@ -519,7 +560,12 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     },
   }
 
+  /* The tenant's general rules for two-step verification, kept for the session (owner, 21 Oct 2026). */
+  const [general, setGeneral] = useState<AuthGeneral>(AUTH_GENERAL_SEED)
+  const [generalOpen, setGeneralOpen] = useState(false)
+
   const closePanel = () => {
+    setFromRow(false)
     setPanel([])
     setOpenCard(null)
     setCardDraft({})
@@ -542,6 +588,14 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           </h1>
           <p>{isUser ? 'How you prove it is you.' : 'How people prove who they are.'}</p>
         </div>
+
+        {/* Who must verify, and the rules around it, for the whole tenant (owner, 21 Oct 2026: beside the heading).
+            Behind its flag since he asked for it hidden; the General settings tab says the same thing on the page. */}
+        {!isUser && VERIFICATION_RULES_DRAWER && (
+          <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setGeneralOpen(true)}>
+            Verification rules
+          </Button>
+        )}
 
         {/* The preview switches, together against the right edge — the same
             slot `PageHead` gives the other library pages. */}
@@ -605,11 +659,20 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           ))}
         </div>
       )}
+      {!isUser && VERIFICATION_RULES_DRAWER && <GeneralSettingsDrawer open={generalOpen} value={general} onClose={() => setGeneralOpen(false)} onSave={setGeneral} />}
 
       {/* Inside a `bv5` wrapper: recovery.css writes some rules as `.bv5 .bv5__x`. */}
       {tab === 'recovery' && !isUser && (
         <div className="bv5" data-tour="methods-recovery">
           <RecoveryTab methods={methods} />
+        </div>
+      )}
+
+      {/* The same rows the slide-over holds, inline on the page: a column, so a switch never ends up a page's width
+          from the label it belongs to. Each one saves as it is flicked (auth-general-settings.tsx). */}
+      {tab === 'general' && !isUser && (
+        <div className="bm8__genpane">
+          <GeneralSettings value={general} onChange={setGeneral} />
         </div>
       )}
 
@@ -636,9 +699,10 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             enrolment={enrolment}
             configuredIds={configuredIds}
             readyIds={readyIds}
-            onActivate={activate}
+            onActivate={askActivate}
             onConfigure={(m) => {
               setPanel([{ kind: 'family', channel: m.channel }])
+              setFromRow(true)
               openEnrol(m.id)
             }}
           />
@@ -667,6 +731,35 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           )}
         </>
       )}
+
+      <Modal
+        open={!!useAsk && !!useMethod}
+        onClose={() => setUseAsk(null)}
+        title={useMethod ? (useAsk?.on ? `Use ${useMethod.name}?` : `Turn off ${useMethod.name}?`) : ''}
+        width={440}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setUseAsk(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="brand"
+              onClick={() => {
+                if (useAsk) activate(useAsk.id, useAsk.on)
+                setUseAsk(null)
+              }}
+            >
+              {useAsk?.on ? 'Turn on' : 'Turn off'}
+            </Button>
+          </>
+        }
+      >
+        <div className="bx-confirm">
+          {useLines.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </div>
+      </Modal>
 
       <Modal
         open={offOpen}
@@ -1095,6 +1188,7 @@ function CategoryList({
                   isUser={isUser}
                   defaultMethod={defaultMethod}
                   activeId={isUser ? enrolment.active : null}
+                  userEnabled={isUser ? item.row.inside.filter((m) => readyIds.includes(m.id)).length : undefined}
                   me={
                     isUser && item.row.inside.length === 1
                       ? { m: item.row.inside[0], ready: readyIds.includes(item.row.inside[0].id), active: enrolment.active === item.row.inside[0].id, onActivate, onConfigure }
@@ -1218,6 +1312,7 @@ function FamilyListRow({
   isUser,
   defaultMethod,
   activeId = null,
+  userEnabled,
   me,
   onOpen,
   onSettings,
@@ -1232,6 +1327,8 @@ function FamilyListRow({
   /** The person has set up a method in this family. */
   /** The person's side: the method that runs, so its row can say so. */
   activeId?: string | null
+  /** The person's side: how many methods in a family they can use now (set up, or needing nothing). */
+  userEnabled?: number
   /** The person's side, a family of one: its method and what the row needs to set it up and switch it on, as the card inside would. */
   me?: { m: AuthMethod; ready: boolean; active: boolean; onActivate: (id: string, on: boolean) => void; onConfigure: (m: AuthMethod) => void }
   onOpen: (channel: string) => void
@@ -1367,12 +1464,19 @@ function FamilyListRow({
               looks like the whole SMS is disabled — remove or rename").
               "0 of 3 enabled" says what is true — the methods inside are
               off — in the same words as every other row. */}
-          {!isUser && !single && (
+          {!isUser && !single && live > 0 && (
             /* Green while something inside is on, grey at zero (owner, 23 Sep
                2026): the colour then marks the rows that are actually doing
                something, and a family with nothing on stays quiet. */
             <Badge tone={live > 0 ? 'positive' : 'neutral'} className="bm8__state">
               {`${live} of ${inside.length} enabled`}
+            </Badge>
+          )}
+          {/* The same chip on the person's side, on a family with several to choose from (owner, 21 Oct 2026). */}
+          {/* Grey, and not said at zero (owner, 21 Oct 2026: no "0 of 3" on either side). */}
+          {isUser && !single && !me && userEnabled !== undefined && userEnabled > 0 && inside.length > 1 && (
+            <Badge tone="info" className="bm8__state">
+              {`${userEnabled} of ${inside.length} configured`}
             </Badge>
           )}
           {caChains && <CaChainCount />}
@@ -1594,7 +1698,8 @@ function CategoryDrawer({
      configure. A Settings tab on the other six would be a tab onto an empty
      page, which is worse than no tab: it implies the configuration exists and
      you failed to find it. */
-  const hasSettings = famSettings.length > 0 || ownSettings.length > 0
+  /* The person has no settings to change here (owner, 21 Oct 2026): those are the admin's. */
+  const hasSettings = !isUser && (famSettings.length > 0 || ownSettings.length > 0)
 
   /* A settings row that is a way through to another screen: token assignment
      opens the Display tokens page on its Assignments tab. Through `go`, so the
@@ -1764,8 +1869,8 @@ function CategoryDrawer({
              branches on `pageSetup` but the guard watches the CARD's draft, so
              once setup moved into the card (18 Sep 2026) this button sat on
              screen beside a dirty form and threw it away without asking. */
-          <Button variant="brand" onClick={() => leaveThen(onClose, false)}>
-            Done
+          <Button variant="secondary" onClick={() => leaveThen(onClose, false)}>
+            Close
           </Button>
         )
       }

@@ -19,19 +19,19 @@ const targets = (...args: Parameters<typeof statusOptions>) => statusOptions(...
 
 describe('statusOptions', () => {
   it('lists the switches by how much they enforce, leaving out the current status', () => {
-    expect(targets({ status: 'active' })).toEqual(['Monitor', 'Turn off'])
-    expect(targets({ status: 'inactive' })).toEqual(['Turn on', 'Monitor'])
-    expect(targets({ status: 'monitor' })).toEqual(['Turn on', 'Turn off'])
+    expect(targets({ status: 'active' })).toEqual(['Monitoring', 'Inactive'])
+    expect(targets({ status: 'inactive' })).toEqual(['Active', 'Monitoring'])
+    expect(targets({ status: 'monitor' })).toEqual(['Active', 'Inactive'])
   })
 
   it('pairs each label with the status it switches to', () => {
     expect(statusOptions({ status: 'active' })).toEqual([
-      { target: 'monitor', label: 'Monitor' },
-      { target: 'inactive', label: 'Turn off' },
+      { target: 'monitor', label: 'Monitoring' },
+      { target: 'inactive', label: 'Inactive' },
     ])
     expect(statusOptions({ status: 'monitor' })).toEqual([
-      { target: 'active', label: 'Turn on' },
-      { target: 'inactive', label: 'Turn off' },
+      { target: 'active', label: 'Active' },
+      { target: 'inactive', label: 'Inactive' },
     ])
   })
 
@@ -42,18 +42,18 @@ describe('statusOptions', () => {
   })
 
   it('offers no Monitor where the edition has none', () => {
-    expect(targets({ status: 'active' }, { monitor: false })).toEqual(['Turn off'])
-    expect(targets({ status: 'inactive' }, { monitor: false })).toEqual(['Turn on'])
+    expect(targets({ status: 'active' }, { monitor: false })).toEqual(['Inactive'])
+    expect(targets({ status: 'inactive' }, { monitor: false })).toEqual(['Active'])
   })
 
   it('offers no Monitor on a policy that decides no sign-in', () => {
     /* Session and Account Management policies have no sign-in decision to watch. */
-    expect(targets({ status: 'active', type: 'Session' })).toEqual(['Turn off'])
-    expect(targets({ status: 'inactive', type: 'Account Management' })).toEqual(['Turn on'])
+    expect(targets({ status: 'active', type: 'Session' })).toEqual(['Inactive'])
+    expect(targets({ status: 'inactive', type: 'Account Management' })).toEqual(['Active'])
   })
 
   it('still lets a monitoring policy be switched either way when Monitor is withheld', () => {
-    expect(targets({ status: 'monitor' }, { monitor: false })).toEqual(['Turn on', 'Turn off'])
+    expect(targets({ status: 'monitor' }, { monitor: false })).toEqual(['Active', 'Inactive'])
   })
 })
 
@@ -266,25 +266,25 @@ describe('rowMenu', () => {
   const labels = (p: Policy, opts = showcase) => rowMenu(p, opts).map((i) => i.label)
 
   it('reads Edit policy, Check access, Monitor, Turn off, … for an active policy (check 3)', () => {
-    expect(labels(as('active'))).toEqual(['Edit policy', 'Check access', 'Monitor', 'Turn off', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(labels(as('active'))).toEqual(['Edit policy', 'Check access', 'Monitoring', 'Inactive', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
   })
 
   it('reads Turn on, Turn off, View monitoring for a monitoring policy (check 4)', () => {
     expect(rowMenu(as('monitor'), showcase).map((i) => i.id)).toEqual(['edit', 'test', 'active', 'inactive', 'monitoring', 'text', 'template', 'duplicate', 'delete'])
-    expect(labels(as('monitor'))).toEqual(['Edit policy', 'Check access', 'Turn on', 'Turn off', 'View monitoring', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(labels(as('monitor'))).toEqual(['Edit policy', 'Check access', 'Active', 'Inactive', 'View monitoring', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
   })
 
   it('offers View monitoring for no other status, and nowhere the edition has no Monitoring status', () => {
     for (const status of ['draft', 'active', 'inactive'] as const) expect(labels(as(status))).not.toContain('View monitoring')
-    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(['Edit policy', 'Check access', 'Turn on', 'Turn off', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(['Edit policy', 'Check access', 'Active', 'Inactive', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
   })
 
   it('offers the trail builder outside the showcase, after the switches', () => {
     expect(labels(as('inactive'), { ...showcase, trail: true })).toEqual([
       'Edit policy',
       'Check access',
-      'Turn on',
-      'Monitor',
+      'Active',
+      'Monitoring',
       'Open in trail',
       'Read as text',
       'Save as template',

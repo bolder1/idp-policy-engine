@@ -42,6 +42,11 @@ export interface AppsGuardRun {
   /* The audience it read, when the change carries one (the start node's pane,
      13 Oct 2026): the page's write then stores it with the applications. */
   audience?: Audience
+  /* Other policies the same press also changes, for the tenant's after-state
+     (guard.ts `alsoAfter`). Held with the run so Run again reads the same
+     press: dropped on a re-run, a replace would re-check itself as a plain
+     add, which is the state it is checked to avoid. */
+  alsoAfter?: readonly Policy[]
 }
 
 export interface AppsGuardPage {
@@ -74,7 +79,14 @@ export function useAppsGuard() {
   const guards = (p: Policy) => store.features.beforeTurningOn && engineDecides(p)
 
   const stampNow = (): GuardStamp => ({ policies: store.policies, zones: store.zones, fingerprints: store.fingerprints, riskScale: store.riskScale })
-  const inputFor = (p: Policy, ids: string[], signIns: readonly SavedSignIn[] = store.savedSignIns, audience?: Audience): GuardInput => ({
+  const inputFor = (
+    p: Policy,
+    ids: string[],
+    signIns: readonly SavedSignIn[] = store.savedSignIns,
+    audience?: Audience,
+    alsoAfter?: readonly Policy[],
+  ): GuardInput => ({
+    ...(alsoAfter && alsoAfter.length > 0 ? { alsoAfter } : {}),
     kind: 'apps',
     before: p,
     after: { ...p, appIds: ids, ...(audience ? { audience } : {}), status: changesOf(p, ids, audience).becomesDraft ? 'draft' : p.status },
@@ -88,19 +100,33 @@ export function useAppsGuard() {
     breakIn: store.features.breakInTest ? (store.breakInAccepted[p.id] ?? {}) : null,
     resolve,
   })
-  const hold = (p: Policy, ids: string[], result: GuardResult | 'error', run: number, audience?: Audience) =>
-    setHeld({ policyId: p.id, result, stamp: stampNow(), run, appIds: ids, ...(audience ? { audience } : {}) })
+  const hold = (p: Policy, ids: string[], result: GuardResult | 'error', run: number, audience?: Audience, alsoAfter?: readonly Policy[]) =>
+    setHeld({
+      policyId: p.id,
+      result,
+      stamp: stampNow(),
+      run,
+      appIds: ids,
+      ...(audience ? { audience } : {}),
+      ...(alsoAfter && alsoAfter.length > 0 ? { alsoAfter } : {}),
+    })
 
   /* Runs the checks on `ids` once "Checking…" has painted. A clean result
      commits in the same press; anything else holds the result and opens the page. */
-  const check = (p: Policy, ids: string[], commit: (ids: string[], audience?: Audience) => void, audience?: Audience) => {
+  const check = (
+    p: Policy,
+    ids: string[],
+    commit: (ids: string[], audience?: Audience) => void,
+    audience?: Audience,
+    alsoAfter?: readonly Policy[],
+  ) => {
     if (checking) return
     setChecking(true)
     afterPaint(() => {
-      const result = tryRunGuard(inputFor(p, ids, store.savedSignIns, audience))
+      const result = tryRunGuard(inputFor(p, ids, store.savedSignIns, audience, alsoAfter))
       setChecking(false)
       if (result !== 'error' && !guardOpens(result)) return commit(ids, audience)
-      hold(p, ids, result, 0, audience)
+      hold(p, ids, result, 0, audience, alsoAfter)
       setOpen(true)
     })
   }
@@ -108,7 +134,7 @@ export function useAppsGuard() {
   /** The checks again, on `ids`, for the page that is held. */
   const rerun = (ids: string[], signIns?: readonly SavedSignIn[]) => {
     if (!held || !stored) return
-    hold(stored, ids, tryRunGuard(inputFor(stored, ids, signIns, held.audience)), held.run + 1, held.audience)
+    hold(stored, ids, tryRunGuard(inputFor(stored, ids, signIns, held.audience, held.alsoAfter)), held.run + 1, held.audience, held.alsoAfter)
   }
 
   const close = () => setOpen(false)

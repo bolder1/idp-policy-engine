@@ -1,6 +1,7 @@
 import { motion, useIsPresent } from 'motion/react'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
+  ArrowRight,
   ArrowUpRight,
   Check,
   ChevronDown,
@@ -12,6 +13,7 @@ import {
   Copy,
   CornerDownRight,
   Minus,
+  MonitorPlay,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -32,12 +34,17 @@ import { useDraftDiff } from '../board/use-lines'
 import { containWhileScrolling } from '../scroll-contain'
 import { readFoot, storedVersions } from '../board/read-as-text'
 import type { EngineRun } from './engine-run'
-import { FATE_WORDS, PEEK_FALLBACK, evidenceOf, isPeek, ruleList, ruleOf, targetLabel, type Evidence, type InspectTarget, type PeekTarget, type RuleFate, type RuleListRow } from './inspect-model'
+import { FATE_WORDS, PEEK_FALLBACK, SEE_TITLE, evidenceOf, isPeek, ruleList, ruleOf, targetLabel, type Evidence, type InspectTarget, type PeekTarget, type RuleFate, type RuleListRow, type SeeRun } from './inspect-model'
 import { factsOf } from './inspect-facts'
 import { objectsOfRule, peekNames, PEEK_LIBRARY } from './peek-model'
 import { AppsPeek } from '../apps-peek'
 import { Block, CountTip, Facts, Hero, KindMark, PeekPage } from './PeekViews'
 import { PANEL_SLIDE as SLIDE } from './sign-in-card'
+import { seeSteps } from './see-model'
+import { Face } from '../../faces'
+import { AppLogo } from '../../logos/AppLogo'
+import { WhatTheySee } from '../testing/WhatTheySee'
+import type { SignInScreens } from '../testing/screens-of'
 import './inspect.css'
 
 /* -----------------------------------------------------------------------------
@@ -85,15 +92,24 @@ export interface InspectPanelProps {
   onClose: () => void
   /** Edit in builder ↗ for a policy or a rule; the library page for anything else. The only ways out. */
   onEdit: (t: InspectTarget) => void
+  /** The sign-in the run on screen is of, for What they see (20 Oct 2026); null where it has no page to show. */
+  see?: SeeRun | null
+  /** A name pressed inside the page: that thing's page takes this one's place (one page, no way back; 6 Oct 2026). */
+  onOpen?: (t: InspectTarget) => void
 }
 
 /** What the panel's bar says it is showing. */
 function kindOf(t: InspectTarget): string {
+  if (t.kind === 'see') return SEE_TITLE
   if (isPeek(t)) return PEEK_FALLBACK[t.kind]
   return 'Policy'
 }
 
-export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClose, onEdit }: InspectPanelProps) {
+/** "Aisha Khan", or "Anyone in Finance". */
+const whoOf = (see: SeeRun, users: readonly { id: string; name: string }[]): string =>
+  see.group ? `Anyone in ${see.group}` : (users.find((u) => u.id === see.personId)?.name ?? 'Choose a person')
+
+export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClose, onEdit, see = null, onOpen }: InspectPanelProps) {
   const present = useIsPresent()
   const lib = useBrand()
   const { policies, zones, fingerprints, hooks, riskProfiles, users, apps, showToast } = lib
@@ -103,8 +119,9 @@ export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClo
   const titleRef = useRef<HTMLHeadingElement | null>(null)
   /* A rule is shown as its policy's page; the key is the page, so a new thing starts it afresh (its open rules too). */
   const page: InspectTarget = target.kind === 'rule' ? { kind: 'policy', policyId: target.policyId } : target
-  const pageKey = `${page.kind}:${isPeek(page) ? page.id : page.policyId}:${target.kind === 'rule' ? String(target.ruleId) : ''}`
-  const name = targetLabel(page, policies, names)
+  const pageKey = `${page.kind}:${page.kind === 'see' ? '' : isPeek(page) ? page.id : page.policyId}:${target.kind === 'rule' ? String(target.ruleId) : ''}`
+  /* What they see names the sign-in it is of: "Aisha Khan to Google Workspace". */
+  const name = page.kind === 'see' ? (see ? `${whoOf(see, users)} to ${apps.find((a) => a.id === see.appId)?.name ?? plan.appName}` : SEE_TITLE) : targetLabel(page, policies, names)
   /* The rule the policy's footer opens the builder on: the one open, where exactly one is. */
   const [openOne, setOpenOne] = useState<string | null | undefined>(undefined)
   useEffect(() => {
@@ -112,20 +129,30 @@ export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClo
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as it opens
   }, [])
+  /* A page that takes another's place (a name pressed inside it, 20 Oct 2026) hands the focus to the bar's title: the
+     press that opened it has gone with the page it was on. */
+  const firstKey = useRef(pageKey)
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 })
+    if (pageKey !== firstKey.current) titleRef.current?.focus({ preventScroll: true })
   }, [pageKey])
   const copy = () => {
     const text = bodyRef.current?.innerText ?? ''
     if (!navigator.clipboard) return showToast('Could not copy the text')
     navigator.clipboard.writeText(`${kindOf(page)}: ${name}\n\n${text}`).then(() => showToast('Copied'), () => showToast('Could not copy the text'))
   }
+  /* What they see's way out: the builder on the rule that decided it, or its policy where none did (a run that Depends). */
+  const seeOut = page.kind === 'see' ? seeExit(plan, policies) : null
   /* The foot's way out: the builder for a policy (on its open rule, where one is), a library page for the rest; a person has none. */
-  const out = page.kind === 'person' ? null : isPeek(page) ? `Open in ${PEEK_LIBRARY[page.kind]}` : 'Edit in builder'
+  const out = page.kind === 'person' ? null : page.kind === 'see' ? (seeOut ? 'Edit in builder' : null) : isPeek(page) ? `Open in ${PEEK_LIBRARY[page.kind]}` : 'Edit in builder'
   const edit = () => {
-    if (page.kind === 'policy' && openOne !== undefined) onEdit({ kind: 'rule', policyId: page.policyId, ruleId: openOne })
+    if (page.kind === 'see') {
+      if (seeOut) onEdit(seeOut)
+    } else if (page.kind === 'policy' && openOne !== undefined) onEdit({ kind: 'rule', policyId: page.policyId, ruleId: openOne })
     else onEdit(page)
   }
+  /* What they see, from the policy that decided this sign-in (its "Decided this sign-in"): only where there is a page to show. */
+  const preview = see && see.screens.length > 0 && onOpen ? () => onOpen({ kind: 'see' }) : undefined
 
   return (
     <motion.aside
@@ -139,7 +166,8 @@ export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClo
     >
       <div className="bb__inspbar is-rule insp__bar">
         <h2 ref={titleRef} id={heading} className="insp__bartitle" tabIndex={-1}>
-          {kindOf(page)} details<span className="u-sr-only">: {name}</span>
+          {page.kind === 'see' ? SEE_TITLE : `${kindOf(page)} details`}
+          <span className="u-sr-only">: {name}</span>
         </h2>
         <button type="button" className="bb__act" aria-label="Copy this view" title="Copy" onClick={copy}>
           <Copy size={14} strokeWidth={2} />
@@ -154,7 +182,13 @@ export function InspectPanel({ target, plan, reduced, wide, onToggleWidth, onClo
       </div>
 
       <div className="bb__inspbody insp__body" ref={bodyRef} key={pageKey}>
-        {isPeek(page) ? <PeekPage target={page} plan={plan} /> : <PolicyPage policyId={page.policyId} focus={target.kind === 'rule' ? target.ruleId : undefined} plan={plan} onEdit={onEdit} onOpenOne={setOpenOne} />}
+        {page.kind === 'see' ? (
+          <SeePage see={see} plan={plan} onOpen={onOpen} />
+        ) : isPeek(page) ? (
+          <PeekPage target={page} plan={plan} />
+        ) : (
+          <PolicyPage policyId={page.policyId} focus={target.kind === 'rule' ? target.ruleId : undefined} plan={plan} onEdit={onEdit} onOpenOne={setOpenOne} onPreview={preview} />
+        )}
       </div>
 
       {out && (
@@ -177,7 +211,7 @@ const DECISION_MARK: Record<AccessDecision, LucideIcon> = { '1fa': ShieldCheck, 
 const DECISION_KEY: Record<AccessDecision, string> = { '1fa': 'allow', '2fa': 'mfa', deny: 'deny' }
 
 /** The strip at the overview card's foot: how this thing met the sign-in on the canvas, in the outcome's own tone. */
-function Verdict({ tone, icon: Icon, title, line }: { tone: Tone; icon: LucideIcon; title: string; line?: string }) {
+function Verdict({ tone, icon: Icon, title, line, onPreview }: { tone: Tone; icon: LucideIcon; title: string; line?: string; onPreview?: () => void }) {
   return (
     <div className={`insp__verdict is-${tone}`} role="status">
       <span className="insp__verdictmark" aria-hidden>
@@ -187,6 +221,14 @@ function Verdict({ tone, icon: Icon, title, line }: { tone: Tone; icon: LucideIc
         <b>{title}</b>
         {line && <span>{line}</span>}
       </span>
+      {/* What they see, as a page of this panel (owner, 20 Oct 2026: "here we can open the preview part"): a quiet link,
+          never a second orange. */}
+      {onPreview && (
+        <button type="button" className="insp__link insp__preview" aria-label="Preview what they see" title={SEE_TITLE} onClick={onPreview}>
+          <MonitorPlay size={14} strokeWidth={2} aria-hidden />
+          Preview
+        </button>
+      )}
     </div>
   )
 }
@@ -241,7 +283,24 @@ const NO_RUN: Pick<EngineRun, 'decider' | 'rules'> = { decider: null, rules: [] 
 
 /* The policy's page. `plan` null is the page without a sign-in — the Policies list's details panel (owner, 6 Oct 2026:
    "add the Policy details view here as well, with an Open in builder"): the overview card and the rules, no verdict. */
-export function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne, canvas = false }: { policyId: string; focus: string | null | undefined; plan: EngineRun | null; onEdit: (t: InspectTarget) => void; onOpenOne: (id: string | null | undefined) => void; canvas?: boolean }) {
+export function PolicyPage({
+  policyId,
+  focus,
+  plan,
+  onEdit,
+  onOpenOne,
+  canvas = false,
+  onPreview,
+}: {
+  policyId: string
+  focus: string | null | undefined
+  plan: EngineRun | null
+  onEdit: (t: InspectTarget) => void
+  onOpenOne: (id: string | null | undefined) => void
+  canvas?: boolean
+  /** What they see for this sign-in, from the strip of the policy that decided it (20 Oct 2026); absent, no Preview. */
+  onPreview?: () => void
+}) {
   const { policies, apps, groups, users } = useBrand()
   const policy = policies.find((p) => p.id === policyId)
   const versions = useMemo(() => (policy ? storedVersions(policy) : { draft: blankPolicy(''), live: null }), [policy])
@@ -310,9 +369,9 @@ export function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne, canvas = 
         ]}
         strip={
           !plan ? undefined : depends ? (
-            <Verdict tone="notice" icon={CircleHelp} title="Depends" line={dependsLine(waitingOn(list), plan.outcome.view.needs)} />
+            <Verdict tone="notice" icon={CircleHelp} title="Depends" line={dependsLine(waitingOn(list), plan.outcome.view.needs)} onPreview={onPreview} />
           ) : decided && by ? (
-            <Verdict tone={DECISION_TONE[by.decision]} icon={DECISION_MARK[by.decision]} title="Decided this sign-in" line={`${by.n === null ? by.name : `Rule ${by.n} · ${by.name}`} · ${DECISION_WORDS[by.decision]}`} />
+            <Verdict tone={DECISION_TONE[by.decision]} icon={DECISION_MARK[by.decision]} title="Decided this sign-in" line={`${by.n === null ? by.name : `Rule ${by.n} · ${by.name}`} · ${DECISION_WORDS[by.decision]}`} onPreview={onPreview} />
           ) : (
             <Verdict tone="neutral" icon={CircleDashed} title="Did not decide this sign-in" line={plan.decider ? `${plan.decider.name} did` : undefined} />
           )
@@ -379,6 +438,149 @@ export function PolicyPage({ policyId, focus, plan, onEdit, onOpenOne, canvas = 
         )}
       </Block>
     </>
+  )
+}
+
+/* --- What they see, on one page ---------------------------------------------------------------------------------- */
+
+/* The way out of What they see: the builder on the rule that decided the sign-in, or its policy where none did (a run
+   that Depends); none when no policy decides. */
+function seeExit(plan: EngineRun, policies: readonly Policy[]): InspectTarget | null {
+  const policy = plan.decider ? policies.find((p) => p.id === plan.decider?.id) : undefined
+  if (!policy) return null
+  const by = dependsIn(plan, policy.id) ? undefined : ruleList(policy, plan).find((r) => r.fate === 'decided')
+  return by ? { kind: 'rule', policyId: policy.id, ruleId: by.id } : { kind: 'policy', policyId: policy.id }
+}
+
+/* WHAT THEY SEE (owner, 20 Oct 2026, on the Preview's popover: "open in the right side panel as a specific view, with
+   context and the important information that we can show"). In the panel's own grammar:
+
+     ┌ What they see                                   ⧉ | >< × ┐
+     │ ┌ Sign-in                                               ┐ │
+     │ │ (AK) Aisha Khan → [G] Google Workspace  [Allow on 1 …] │ │  the sign-in, and its answer
+     │ │ Decided by  Access the app … · Rule 2 · Managed laptops│ │  each name opens its own page here
+     │ └───────────────────────────────────────────────────────┘ │
+     │ [ the sign-in page, played ]  Password · Signed in  ↻     │  the player, its chips and replay
+     │ Steps         1 Password · 2 Signed in                   │  what each page asks for
+     │ What they are asked for / told                           │  the factors, or the deny message
+     │ Reason   Admins only                                     │  a Deny's cause and Ref — never on their page
+     ├───────────────────────────────────────────────────────────┤
+     │                                     [Edit in builder ↗]  │
+     └───────────────────────────────────────────────────────────┘
+
+   The player plays as the page arrives (testing/player/SignInPlayer.tsx: in view, a beat after), and under reduced
+   motion stands on its end. A run that Depends shows each way it could go: the player's own switch, and a list each. */
+function SeePage({ see, plan, onOpen }: { see: SeeRun | null; plan: EngineRun; onOpen?: (t: InspectTarget) => void }) {
+  const { users, apps, policies } = useBrand()
+  if (!see || see.screens.length === 0) return <p className="insp__gone">No sign-in page to show.</p>
+  const app = apps.find((a) => a.id === see.appId)
+  const appName = app?.name ?? plan.appName
+  const who = whoOf(see, users)
+  const person = see.group ? null : (users.find((u) => u.id === see.personId) ?? null)
+  const policy = plan.decider ? policies.find((p) => p.id === plan.decider?.id) : undefined
+  const depends = policy ? dependsIn(plan, policy.id) : plan.outcome.status === 'depends'
+  const list = policy ? ruleList(policy, plan) : []
+  const by = policy && !depends ? list.find((r) => r.fate === 'decided') : undefined
+  const decision = plan.outcome.status === 'decided' ? plan.outcome.decision : null
+  const ways = see.screens
+  const many = ways.length > 1
+  /* A name inside the page opens that thing's page in this one's place, as a name on the canvas does. */
+  const name = (label: string, t: InspectTarget | null, cls = '') =>
+    t && onOpen ? (
+      <button type="button" className={`insp__name${cls ? ` ${cls}` : ''}`} title={label} onClick={() => onOpen(t)}>
+        {label}
+      </button>
+    ) : (
+      <span className={`insp__name is-static${cls ? ` ${cls}` : ''}`} title={label}>
+        {label}
+      </span>
+    )
+  const ruleTarget: InspectTarget | null = policy && by ? { kind: 'rule', policyId: policy.id, ruleId: by.id } : null
+  return (
+    <>
+      <section className="insp__hero" aria-label={`Sign-in: ${who} to ${appName}`}>
+        <div className="insp__herohead">
+          <div className="insp__heroname">
+            <span className="insp__kicker">Sign-in</span>
+            <span className="insp__signin">
+              <span className="insp__signer">
+                <Face kind={see.group ? 'group' : 'user'} name={see.group ?? who} size="sm" decorative />
+                {name(who, person ? { kind: 'person', id: person.id } : null)}
+              </span>
+              <ArrowRight size={12} strokeWidth={2.2} aria-hidden className="insp__signarrow" />
+              <span className="insp__signer">
+                <AppLogo appId={see.appId} name={appName} size={16} />
+                {name(appName, app ? { kind: 'app', id: app.id } : null)}
+              </span>
+            </span>
+          </div>
+          {decision ? <DecisionBadge decision={decision} /> : <span className="insp__rowmeta">Depends</span>}
+        </div>
+        {policy && (
+          <dl className="insp__herogrid">
+            <div className="insp__herofact is-wide">
+              <dt>{depends ? 'Policy' : 'Decided by'}</dt>
+              <dd className="insp__by">
+                {name(policy.name, { kind: 'policy', policyId: policy.id })}
+                {by && (
+                  <>
+                    <span aria-hidden> · </span>
+                    {name(by.n === null ? by.name : `Rule ${by.n} · ${by.name}`, ruleTarget)}
+                  </>
+                )}
+              </dd>
+            </div>
+            {depends && (
+              <div className="insp__herofact is-wide">
+                <dt>{FATE_WORDS['cant-tell']}</dt>
+                <dd>{dependsLine(waitingOn(list), plan.outcome.view.needs)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+      </section>
+
+      {/* The person's page, played, full width: its chips, its replay, its caption. Its own title is the bar's. */}
+      <div className="insp__see">
+        <WhatTheySee screens={ways} appId={see.appId} collapsible={false} />
+      </div>
+
+      <Block title="Steps">
+        {many ? (
+          ways.map((w, i) => (
+            <div key={`${w.decision}-${i}`} className="insp__part">
+              <h4>
+                {DECISION_WORDS[w.decision]} · {w.ruleName}
+              </h4>
+              <SeeStepList screens={w} appName={appName} />
+            </div>
+          ))
+        ) : (
+          <SeeStepList screens={ways[0]} appName={appName} />
+        )}
+      </Block>
+
+    </>
+  )
+}
+
+/** The steps of one way, numbered as the player's chips run: the step, and what its page asks for. */
+function SeeStepList({ screens, appName }: { screens: SignInScreens; appName: string }) {
+  const steps = seeSteps(screens, appName)
+  return (
+    <ol className="insp__steps">
+      {steps.map((s) => (
+        <li key={`${s.n}-${s.label}`}>
+          <span className="insp__n" aria-hidden>
+            {s.n}
+          </span>
+          <span className="insp__steptext">
+            <b>{s.label}</b>
+            {s.asks && <span>{s.asks}</span>}
+          </span>
+        </li>
+      ))}
+    </ol>
   )
 }
 
@@ -510,17 +712,24 @@ export function ReadOnlyCanvas({
   open: openId,
   onOpen,
   cardHead,
+  appFirst,
 }: {
   policy: Policy
   traced: readonly string[]
+  /** The application whose page this is: the start pill names it first (21 Oct 2026), the others after it. */
+  appFirst?: string
   framed?: boolean
-  open?: string | null
+  /* Which cards are open, when the caller holds that itself. ONE id is the accordion the framed panel and the
+     details slider want: the canvas closes whatever else was open. A SET is for a caller that lets several stand
+     open at once — the app's Policies tab since 22 Oct, which has an Expand all — and such a caller is handed the
+     id that was pressed and does its own adding and removing. */
+  open?: string | null | ReadonlySet<string>
   onOpen?: (id: string | null) => void
   cardHead?: (id: string) => ReactNode
 }) {
   const { apps } = useBrand()
   const resolve = useNameLookup()
-  const mine = policy.appIds.flatMap((id) => apps.find((a) => a.id === id) ?? [])
+  const mine = policy.appIds.flatMap((id) => apps.find((a) => a.id === id) ?? []).sort((a, b) => Number(b.id === appFirst) - Number(a.id === appFirst))
   /* An overview, not a canvas: the chain at its own size in the page, no pan or zoom; a card unfolds to read its rule. */
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
   /* The board's wheel handler zooms and cancels the scroll; here the wheel belongs to the slider, so it never gets there. */
@@ -539,8 +748,11 @@ export function ReadOnlyCanvas({
     return containWhileScrolling(el, stage ? [stage] : [])
   }, [framed])
   const held = openId !== undefined
+  const isHeldOpen = (id: string) => (openId instanceof Set ? openId.has(id) : openId === id)
   const toggle = (id: string) => {
-    if (held) onOpen?.(openId === id ? null : id)
+    /* A set-holding caller toggles for itself, so it is always told which card was pressed; a single-id one is
+       told what to open, and null to close the one that was. */
+    if (held) onOpen?.(openId instanceof Set ? id : isHeldOpen(id) ? null : id)
     else setOpen((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
   /* Text being selected inside the canvas is somebody reading, not pressing. */
@@ -573,7 +785,7 @@ export function ReadOnlyCanvas({
         onDuplicate={noop}
         onDelete={noop}
         onHover={noop}
-        expandedOf={held ? (id) => id === openId : (id) => open.has(id)}
+        expandedOf={held ? isHeldOpen : (id) => open.has(id)}
         onToggleExpand={toggle}
         locked={framed}
         foldOnPress={framed || undefined}

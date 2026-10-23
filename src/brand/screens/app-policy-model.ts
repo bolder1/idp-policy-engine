@@ -13,7 +13,7 @@ import { fallbackOf, type SimEnv } from './simulate'
 import { signInActivity, type ActivityRow } from './sign-in-tests/activity'
 import { askOfRule } from './sign-in-tests/conflicts'
 import { emptyDraft } from './sign-in-tests/sign-in-card'
-import { offersMonitoringView, statusOptions } from './status-options'
+import { MONITOR_MODE, offersMonitoringView, statusOptions } from './status-options'
 import { DENY_REASON_WORD } from './testing/deny-reason'
 import { patchFor } from './testing/prefill'
 import type { TestingSessionState } from './testing/session-state'
@@ -246,21 +246,37 @@ export function coverageOf(
 }
 
 export type TabNotice =
+  | { kind: 'waiting'; draft: Policy; replaces: Policy | null }
   | { kind: 'also'; others: Policy[] }
   | { kind: 'pending'; added: string[]; removed: string[] }
   | { kind: 'draft' | 'inactive' | 'monitor'; said: string; plan: string | null }
 
-/* The one thing the state line says, or null (spec B): another policy on the
-   application first — the ruling bars it, so it is the thing to clean up —
-   then a live policy's unpublished changes, then why the policy decides
-   nothing. `plan` is the monitoring plan line ("If turned on: …"), kept for a
-   monitoring policy only. */
+/* The one thing the state line says, or null (spec B): a draft waiting to take
+   over first, then another policy on the application — the ruling bars that
+   one, so it is the thing to clean up — then a live policy's unpublished
+   changes, then why the policy decides nothing. `plan` is the monitoring plan
+   line ("If turned on: …"), kept for a monitoring policy only.
+
+   WAITING OUTRANKS ALSO because the two look identical to `appStanding` and
+   mean opposite things. Since Replace makes a draft copy (app-policies.ts
+   `REPLACE_MAKES_DRAFT`), a second policy on the application is the normal
+   end of a replace, not stray data: it is the admin's own next step, sitting
+   where they left it. Read as "Also on {app}" it came with Remove as its one
+   labelled exit — housekeeping for a mistake — which is the opposite of what
+   it is. The match is deliberately narrow: the one other policy, and a draft.
+   Anything else is still a stray and still reads as one. */
 export function tabNotice(
   row: StandRow,
   others: readonly StandRow[],
   diff: { added: string[]; removed: string[] } | null,
   plan: string | null,
 ): TabNotice | null {
+  if (others.length === 1 && others[0].policy.status === 'draft') {
+    /* What it takes over from is derived, never stored: whatever decides here now. Nothing on the draft says
+       "I replace X", so the line stays true when the live policy changes under it, and a draft made any other
+       way — New policy, a duplicate — reads the same because it means the same. */
+    return { kind: 'waiting', draft: others[0].policy, replaces: row.state === 'decides' ? row.policy : null }
+  }
   if (others.length > 0) return { kind: 'also', others: others.map((o) => o.policy) }
   if (diff && (diff.added.length > 0 || diff.removed.length > 0)) return { kind: 'pending', added: [...diff.added], removed: [...diff.removed] }
   if (row.state === 'draft' || row.state === 'inactive' || row.state === 'monitor') {
@@ -288,11 +304,45 @@ export function statusMenu(
   const remove: MenuItem = { id: 'remove', label: `Remove from ${app.name}` }
   if (policy.status === 'draft') return [remove, ...(opts.deletable ? [{ id: 'delete', label: 'Delete draft' }] : [])]
   const others = appsOf(policy, [...apps]).filter((a) => a.id !== app.id)
-  const hint = others.length > 0 ? `With ${listPhrase(others.map((a) => a.name))}` : undefined
-  const switches: MenuItem[] = statusOptions(policy, { monitor: opts.monitor }).map((o) => ({ id: o.target, label: o.label, ...(hint ? { hint } : null) }))
+
+  /* TWO SCOPES, SAID AS TWO (owner, 22 Oct 2026: "why don't we have 2 options by default — show that inactive
+     for this app, where we remove the app from the policy, or inactive for all").
+
+     Both already existed and neither said so. A status belongs to the POLICY, so Inactive stopped it on every
+     application it is on, and the only per-application off switch was Remove, sitting in another group under a
+     name that reads as housekeeping rather than as the other half of the same decision. An admin standing on
+     Google Workspace, wanting Google Workspace off, had the choice but no way to see it.
+
+     So where the policy is shared the two are named along the axis that separates them — everywhere, or here —
+     and each says what becomes of the rest. Removing IS the per-application off switch: the application stops
+     using the policy and falls to whatever decides next; nothing is deleted. Where the policy is on one
+     application the distinction does not exist, and the labels stay plain. */
+  const shared = others.length > 0
+  const alsoOn = `${listPhrase(others.map((a) => a.name))} too`
+  const switches: MenuItem[] = statusOptions(policy, { monitor: opts.monitor }).map((o) => ({
+    id: o.target,
+    label: shared ? `${o.label} everywhere` : o.label,
+    ...(shared ? { hint: alsoOn } : null),
+  }))
+  if (shared) remove.hint = `Only ${app.name}; the rest keep it`
+  /* Monitoring is off for now (owner, 22 Oct 2026: "Monitor should go to coming soon ... just add coming soon and
+     hide the function"), and the edition flag that hides it is `monitorMode` in edition.ts. It stays on the menu,
+     disabled, so the state is announced rather than quietly missing: a switch that vanishes reads as a switch
+     that never existed. Everything behind it is kept — flip the flag and it is a live option again. */
+  /* Announced only where there is no real switch to offer: the phase hides monitoring (MONITOR_MODE) and the
+     caller has already folded that into `opts.monitor` (monitorOffered). Where a caller does offer monitoring —
+     a build with the phase on, or a test that asks for it — statusOptions supplies the live switch above and
+     there is nothing to announce. */
+  const soon: MenuItem[] = !MONITOR_MODE && !opts.monitor ? [{ id: 'monitor', label: 'Monitoring', hint: 'Coming soon', disabled: true }] : []
   const view: MenuItem[] = offersMonitoringView(policy, { monitor: opts.monitor }) ? [{ id: 'view-monitoring', label: 'View monitoring' }] : []
+  /* WHAT IS COMING SITS TOGETHER, AT THE END (owner, 22 Oct 2026, of Monitoring: "move it down with the other
+     coming soon items"). It sat between Inactive and Remove, so the one item on the menu that cannot be pressed
+     was in the middle of the ones that can, breaking the run of live switches to announce a phase. The reads the
+     tab adds after this list are announced the same way, so the tail is one group with one rule above it: what
+     this policy can do now, then what it will be able to do. */
   const before = [...switches, ...view]
-  return [...before, { ...remove, ...(before.length > 0 ? { divide: true } : null) }]
+  const later = soon.map((i, n) => ({ ...i, ...(n === 0 ? { divide: true } : null) }))
+  return [...before, { ...remove, ...(before.length > 0 ? { divide: true } : null) }, ...later]
 }
 
 /* The rule a change-log line quotes, by its name as it stands — "Added

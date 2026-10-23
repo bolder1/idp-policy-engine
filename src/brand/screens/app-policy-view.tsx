@@ -1,11 +1,16 @@
+import { monitorOffered } from './status-options'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import {
+  Activity,
   ArrowUpRight,
   ChevronDown,
   ChevronUp,
+  ChevronsDownUp,
+  ChevronsUpDown,
   CornerDownRight,
   Eye,
+  ListChecks,
   ListPlus,
   Pencil,
   Plus,
@@ -21,17 +26,17 @@ import {
 import { appsOf, enforces, memberGroupIds, ruleExpired, type App, type Policy } from '../data'
 import { DecisionBadge } from '../decision-badge'
 import { Face, FaceStack, type FaceItem } from '../faces'
-import { Badge, Button, Chip, MenuButton, Note, StatusPill, type MenuItem } from '../kit'
+import { Badge, Button, Chip, Drawer, Note, SplitButton, StatusPill } from '../kit'
 import { linkedTo } from '../post-sign-in'
 import { normaliseWho } from '../rule-who'
 import { useBrand, useNameLookup, type AppTab } from '../store'
+import { AppPolicyFocusOverride } from './app-policy-focus'
 import { AppActivity, AppBreakIn, GlanceActivity } from './app-activity'
 import { rulesLabel } from './app-policies'
 import {
   GLANCE_ROWS,
   appCheckForm,
   canvasTarget,
-  cardOutcome,
   chainKeyOf,
   chainRows,
   coverageOf,
@@ -50,6 +55,7 @@ import {
 } from './app-policy-model'
 import type { StandRow } from './app-standing'
 import { AppsPeek } from './apps-peek'
+import { SharedPolicyFork } from './shared-policy-fork'
 import { STATUS_WORD, storedVersions } from './board/read-as-text'
 import { useDraftDiff } from './board/use-lines'
 import { checkAccessFrom } from './guarded-moves'
@@ -117,21 +123,19 @@ const people = (n: number) => `${formatCount(n)} ${n === 1 ? 'person' : 'people'
 /** One motion for every open and close on the tab: about a fifth of a second, none under reduced motion. */
 const ease = (reduced: boolean) => ({ duration: reduced ? 0 : 0.18, ease: [0.2, 0, 0, 1] as const })
 
-/* --- A1 · The status pill, as the menu of what can be switched ---------------------- */
+/* --- A1 · The status, as a chip and nothing else ------------------------------------
 
-export function StatusMenu({ policy, items, onSelect }: { policy: Policy; items: MenuItem[]; onSelect: (id: StatusMenuId) => void }) {
-  if (items.length === 0) return <StatusPill status={policy.status} />
+   It was the menu of what could be switched: the pill WAS the trigger, with a chevron beside it. Three passes at
+   making that read as pressable did not take (owner, 22 Oct 2026, of the last one: "fuck it, make it a chip only
+   now, no action, and move the action to the main action button"). A tinted pill is a fact about the policy, and
+   a fact is a poor place to hide a verb — whatever it wears, people read the colour and move on.
+
+   So the status says what it is, and everything that CHANGES it has gone to the head's one action button with
+   the rest of the actions. One place to look for a verb on this tab. */
+export function StatusChip({ policy }: { policy: Policy }) {
   return (
     <span className="apol__status">
-      <MenuButton
-        label={`Status: ${STATUS_WORD[policy.status]}. Change status`}
-        face={<StatusPill status={policy.status} />}
-        items={items.map((i) => ({ ...i, icon: STATUS_ICON[i.id as StatusMenuId] }))}
-        onSelect={(id) => onSelect(id as StatusMenuId)}
-        variant="ghost"
-        size="sm"
-        align="start"
-      />
+      <StatusPill status={policy.status} />
     </span>
   )
 }
@@ -265,6 +269,34 @@ function StateLine({
         })}
       </ul>
     )
+  } else if (notice.kind === 'waiting') {
+    /* A draft parked on this application, which is where a replace now ends (app-policies.ts
+       `REPLACE_MAKES_DRAFT`). The heading is the state and the body is the consequence, so the admin reads what
+       will happen rather than what is. No Turn on link here: a draft goes live from the builder, where its
+       rules are in front of you and Before turning on runs — the one press that moves sign-ins should not be a
+       link in a note on a page that is not showing you the rules. */
+    const row = others.find((r) => r.policy.id === notice.draft.id)
+    title = 'Draft waiting'
+    body = (
+      <>
+        <span className="apol__notetext">
+          {notice.replaces
+            ? `${notice.draft.name} takes over from ${notice.replaces.name} here when you turn it on.`
+            : `${notice.draft.name} decides nothing until you turn it on.`}
+        </span>
+        <span className="apol__notelinks">
+          <button type="button" className="apol__link" onClick={() => onEditOther(notice.draft.id)}>
+            Review in builder
+            <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden />
+          </button>
+          {row && (
+            <button type="button" className="apol__link" onClick={() => onRemoveOther(row)}>
+              Remove from {app.name}
+            </button>
+          )}
+        </span>
+      </>
+    )
   } else if (notice.kind === 'pending') {
     title = 'Draft changes not published'
     const lines = [...notice.removed.map((t) => ({ word: 'Removed' as const, t })), ...notice.added.map((t) => ({ word: 'Added' as const, t }))]
@@ -340,11 +372,30 @@ const domKey = (k: ChainKey) => `apol-row-${k.replace(/[^A-Za-z0-9_-]/g, '-')}`
 /* The policy's own rules drawn as the builder's read-only canvas (19 Oct 2026); off = the rules table. */
 export const RULES_CANVAS = true
 
+/* The two reads in the policy head's menu — Sign-in activity and Check access — open what they name. Off (owner,
+   22 Oct 2026, of that menu: "Replace policy on top, and for the rest we can tell coming soon, will work on this two
+   later"): both are still listed, in the house's announced-not-offered shape (RiskSignals, ConditionPopover) — the
+   label, "Coming soon" under it, and the row disabled, so neither the pointer nor the arrow keys can reach it.
+   Everything behind them is kept and still wired: flip this and the same two items open the panel and the run. */
+export const HEAD_READS: boolean = false
+
+/** What an announced-but-unbuilt row says under its name, in the console's own wording (Applications.tsx, RiskSignals). */
+const SOON = HEAD_READS ? undefined : 'Coming soon'
+
 /* The app tab as one fixed stage: rules and Sign-in activity at one height, paged (20 Oct 2026); off = the 19 Oct
    layout. */
 export const APP_POLICY_GLANCE = true
 /* The glance is the canvas's frame, so with the canvas off the tab is the 15 Oct table layout as a whole. */
 const GLANCE = APP_POLICY_GLANCE && RULES_CANVAS
+
+/* The tab on the policy alone (owner, 21 Oct 2026: "they want to remove the sign-in activity from here, so focus on the
+   policy; move the sign-in activity into a button"). The rules canvas takes the room, a details card and the post
+   sign-in links stand beside it, and Sign-in activity is a button in the head that opens it in a panel. Off: the tab
+   at a glance, as it was on 20 Oct. */
+export const APP_POLICY_FOCUS = true
+const FOCUS_ON = APP_POLICY_FOCUS && GLANCE
+/** The rules frame's height in rows: with no table beside it the canvas can be taller than the glance's. */
+const FOCUS_ROWS = 9
 
 export function PolicyChain({
   app,
@@ -699,7 +750,9 @@ function useGlance(policy: Policy | null, globalDefault: Policy | null) {
   const reduced = useReducedMotion() ?? false
   const [picked, setPicked] = useState<ActivityRow | null>(null)
   const [rule, setRuleState] = useState<RuleFilter>('all')
-  const [openId, setOpenId] = useState<string | null>(null)
+  /* A SET since 22 Oct, for Expand all. A sign-in picked in the activity still answers with exactly ONE card —
+     the one that decided it — so picking replaces the set rather than adding to it. */
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(new Set())
   const [gdOpen, setGdOpen] = useState(false)
   /* A new object on every ask, so the same card can be brought in twice; `wait` while its fold is still opening. */
   const [reveal, setReveal] = useState<{ id: string; wait: boolean } | null>(null)
@@ -713,14 +766,14 @@ function useGlance(policy: Policy | null, globalDefault: Policy | null) {
     const key = chainKeyOf(r, policy, globalDefault)
     const t = canvasTarget(key)
     if (t) {
-      setReveal({ id: t, wait: openId !== t })
-      setOpenId(t)
+      setReveal({ id: t, wait: !openIds.has(t) })
+      setOpenIds(new Set([t]))
       setGdOpen(false)
     } else if (key === 'default') setGdOpen(true)
     else {
       /* Can't tell: nothing decided it, so the last pick's answer — an open card, the sheet — goes rather than stand
          beside a row it does not answer. */
-      setOpenId(null)
+      setOpenIds(new Set())
       setGdOpen(false)
     }
   }
@@ -735,10 +788,22 @@ function useGlance(policy: Policy | null, globalDefault: Policy | null) {
       setReveal({ id: t, wait: false })
     }
   }
-  /* A card opened by hand is read in the open, so the sheet goes down too. */
+  /* A card opened by hand is read in the open, so the sheet goes down too. The canvas hands over the card that was
+     pressed and this decides; null closes the lot (a pick that nothing decided).
+
+     ONE AT A TIME by hand (owner, 22 Oct 2026: "open one card at a time, or we have expand/collapse"). Pressing a
+     card opens it and shuts whatever else was open, which is how this chain has always read — a rule is read
+     against the one above it, not alongside five others. Expand all is the deliberate exception, and it is the
+     reason the set exists at all: the only way to see every rule at once is now to ask for it. */
   const openCard = (id: string | null) => {
-    setOpenId(id)
-    if (id) setGdOpen(false)
+    if (id === null) return setOpenIds(new Set())
+    setOpenIds((cur) => (cur.has(id) && cur.size === 1 ? new Set() : new Set([id])))
+    setGdOpen(false)
+  }
+  /* Every card at once, or none: the canvas's own control (FoldAll). */
+  const foldAll = (ids: readonly string[]) => {
+    setOpenIds(new Set(ids))
+    if (ids.length) setGdOpen(false)
   }
   return {
     reduced,
@@ -746,8 +811,9 @@ function useGlance(policy: Policy | null, globalDefault: Policy | null) {
     pick,
     rule,
     setRule,
-    openId,
+    openIds,
     openCard,
+    foldAll,
     gdOpen,
     setGdOpen,
     rulesBody,
@@ -883,14 +949,6 @@ function revealCard(body: HTMLElement, id: string, wait: boolean, reduced: boole
   return stop
 }
 
-/* Each card's outcome where its state pill was (`cardOutcome`): none where a card keeps its own word (Off, Not set up). */
-const outcomeOf =
-  (own: Policy) =>
-  (id: string): ReactNode => {
-    const d = cardOutcome(own, id)
-    return d ? <DecisionBadge decision={d} /> : undefined
-  }
-
 /* The rules panel's foot: who the policy leaves to the Global Default, and what that decides — two lines, the second
    the old row's (spec C). It opens the Global Default's lines in a sheet over the canvas; the canvas stays under it,
    scrolled where it was. Not reached (the policy covers everyone), it is a still line that says so. */
@@ -967,6 +1025,26 @@ function GdStrip({
 /* The rules panel: its head, then the frame — the canvas scrolling in its body and, behind a policy of the
    application's own, the Global Default's strip as its foot. With no policy the Global Default's own rules are the
    canvas, and nothing is outside it, so there is no foot. */
+/* Every rule open, or every rule shut (owner, 22 Oct 2026: "add an expand and collapse all button here as well").
+
+   The rules fold one by one, which is right for reading one of them and wrong for reading the policy: an admin
+   checking what this application actually does opened five cards by hand to do it. One control does the lot, and
+   it is the chain's own last card ('fallback') included, because "all" that leaves one shut is a lie.
+
+   It names the next state rather than the current one — Expand all while anything is shut — so a press always
+   does what the label says. Pinned to the FRAME and not to the body, because the body is the scroller: inside it
+   the control would ride up and down with the chain. Bottom right, over the canvas's own ground, where nothing
+   else lives (his pick). */
+function FoldAll({ ids, open, onFold }: { ids: readonly string[]; open: ReadonlySet<string>; onFold: (ids: readonly string[]) => void }) {
+  const all = ids.length > 0 && ids.every((id) => open.has(id))
+  return (
+    <button type="button" className="apol__foldall" onClick={() => onFold(all ? [] : ids)}>
+      {all ? <ChevronsDownUp size={13} strokeWidth={2} aria-hidden /> : <ChevronsUpDown size={13} strokeWidth={2} aria-hidden />}
+      {all ? 'Collapse all' : 'Expand all'}
+    </button>
+  )
+}
+
 function RulesPanel({
   app,
   policy,
@@ -974,6 +1052,7 @@ function RulesPanel({
   everyoneElse,
   everyoneElseCount,
   glance,
+  plain = false,
 }: {
   app: App
   policy: Policy | null
@@ -981,19 +1060,24 @@ function RulesPanel({
   everyoneElse: Policy | null
   everyoneElseCount: number
   glance: Glance
+  /** The builder's chain at its own size, centred, start pill and all (21 Oct 2026), not the glance's scrolling frame. */
+  plain?: boolean
 }) {
   const store = useBrand()
   const { groups, users } = store
   const resolve = useNameLookup()
   const check = useAppCheck(app)
   const own = policy ?? globalDefault
-  const strip = policy && globalDefault && !policy.isSystem ? globalDefault : null
+  /* The policy alone shows no Global Default under it (owner, 21 Oct 2026); the Default is drawn only for an app with no policy. */
+  const strip = !plain && policy && globalDefault && !policy.isSystem ? globalDefault : null
   /* Whether the Global Default decides for anybody here: the chain's own answer, so the two layouts cannot disagree. */
   const reached = useMemo(
     () => (strip ? (chainRows(policy, strip, everyoneElse, { resolve, groups, users, appName: app.name }).find((r) => r.kind === 'default')?.reached ?? false) : false),
     [strip, policy, everyoneElse, resolve, groups, users, app.name],
   )
-  const cardHead = useMemo(() => (own ? outcomeOf(own) : undefined), [own])
+  /* No head chip: the card wears its decision as a colour instead (applications.css). The owner, 22 Oct 2026:
+     "anyway the user can open and see the result, so I don't want to showcase that twice; maybe add colours to
+     let the user understand what the result will be." */
   const stripButton = useRef<HTMLButtonElement>(null)
   const { gdOpen, setGdOpen } = glance
   const sheetUp = gdOpen && reached
@@ -1019,20 +1103,23 @@ function RulesPanel({
   }, [sheetUp])
 
   return (
-    <section className="apol__panel apol__rules" aria-labelledby="apol-rules">
-      <div className="apol__sechead apol__panelhead">
-        <h3 id="apol-rules">Rules</h3>
-        <span className="apol__aside">In order</span>
-        <span className="apol__push">
-          <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={check}>
-            {ACCESS_CHECK}
-          </Button>
-        </span>
-      </div>
-      <div className={`btable-wrap apol__frame${strip && policy ? ' has-foot' : ''}`}>
-        <div className="apol__body apol__rulesbody" ref={glance.rulesBody} onFocus={intoCanvas} onPointerDown={intoCanvas}>
-          {own && <ReadOnlyCanvas policy={own} traced={glance.target ? [glance.target] : []} framed open={glance.openId} onOpen={glance.openCard} cardHead={cardHead} />}
+    <section className="apol__panel apol__rules" aria-label="Rules, in order">
+      {!plain && (
+        <div className="apol__sechead apol__panelhead">
+          <h3 id="apol-rules">Rules</h3>
+          <span className="apol__aside">In order</span>
+          <span className="apol__push">
+            <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={check}>
+              {ACCESS_CHECK}
+            </Button>
+          </span>
         </div>
+      )}
+      <div className={`btable-wrap apol__frame${strip && policy ? ' has-foot' : ''}`}>
+        <div className={plain ? 'apol__body apol__rulesbody is-plain' : 'apol__body apol__rulesbody'} ref={glance.rulesBody} onFocus={intoCanvas} onPointerDown={intoCanvas}>
+          {own && <ReadOnlyCanvas policy={own} traced={glance.target ? [glance.target] : []} framed={!plain} appFirst={plain ? app.id : undefined} open={glance.openIds} onOpen={glance.openCard} />}
+        </div>
+        {plain && own && <FoldAll ids={[...own.rules.map((r) => r.id), 'fallback']} open={glance.openIds} onFold={glance.foldAll} />}
         {strip && policy && (
           <>
             <div className="apol__foot apol__rulesfoot">
@@ -1086,6 +1173,7 @@ export function AppPolicyView({
   flash,
   deletable,
   onReplace,
+  onDuplicate,
   onMenu,
   onRemoveOther,
   onTab,
@@ -1103,12 +1191,19 @@ export function AppPolicyView({
   flash?: string
   deletable: boolean
   onReplace: () => void
+  /** A copy of this policy on this application alone, when more than one shares it (shared-policy-fork.tsx). */
+  onDuplicate: () => void
   /** The status pill's menu, and B's Turn on and View monitoring. */
   onMenu: (id: StatusMenuId) => void
   onRemoveOther: (row: StandRow) => void
   onTab: Tab
 }) {
   const store = useBrand()
+  const [activityOpen, setActivityOpen] = useState(false)
+  /* Edit stops to ask only where the policy is on more than this application (shared-policy-fork.tsx). */
+  const [forkOpen, setForkOpen] = useState(false)
+  const check = useAppCheck(app)
+  const FOCUS = (useContext(AppPolicyFocusOverride) ?? FOCUS_ON) && GLANCE
   const { policies, apps, users, groups, features } = store
   const env = useSimEnv()
   const policy = row.policy
@@ -1128,12 +1223,12 @@ export function AppPolicyView({
   const plan = useMemo(() => (policy.status === 'monitor' ? planLine(planOf(monitorRows(policy, policies, env, monitorSamples(policy, env, SAMPLE_DAY)))) : null), [policy, policies, env])
   const notice = tabNotice(row, others, diff, plan)
   const coverage = useMemo(() => coverageOf(app.id, policy, policies, users, groups), [app.id, policy, policies, users, groups])
-  const menu = statusMenu(policy, app, apps, { monitor: features.monitorMode, deletable })
+  const menu = statusMenu(policy, app, apps, { monitor: monitorOffered(features), deletable })
 
   const toBoard = (policyId: string) => store.go({ name: 'board', policyId, from: { appId: app.id } })
 
   return (
-    <div className={GLANCE ? 'apol is-glance' : 'apol'} style={GLANCE ? ({ '--apol-rows': stage.rows } as CSSProperties) : undefined}>
+    <div className={GLANCE ? 'apol is-glance' : 'apol'} style={GLANCE ? ({ '--apol-rows': FOCUS ? FOCUS_ROWS : stage.rows } as CSSProperties) : undefined}>
       <header className="apol__head">
         <div className="apol__title">
           <div className="apol__nameline">
@@ -1141,17 +1236,57 @@ export function AppPolicyView({
             <h2 tabIndex={-1} data-policy-id={policy.id} data-tab-head>
               {policy.name}
             </h2>
-            <StatusMenu policy={policy} items={menu} onSelect={onMenu} />
+            <StatusChip policy={policy} />
           </div>
-          <CoversLine app={app} policy={policy} covered={coverage.covered} onTab={onTab} />
+          {!FOCUS && <CoversLine app={app} policy={policy} covered={coverage.covered} onTab={onTab} />}
         </div>
+        {/* ONE control (owner, 21 Oct 2026, of this row: "a better way to execute this"; then, of Edit: "make it a
+            dropdown button and add a good button label for both edit and replace, and move the options inside the
+            dropdown button").
+
+            It drew three — a kebab, Replace policy and Edit — so the head carried two named buttons of the same
+            weight for two jobs of very different weight: the policy an admin edits, and the one they swap out once.
+            All of it is now Edit policy's own menu, and the head reads as the status pill and one button.
+
+            A SPLIT button, not a plain dropdown: Edit policy is why an admin comes to this head, and collapsing it
+            into a menu would have charged a press for the most common thing on the page to save a control the head
+            had room for. The chevron is where everything else lives, Replace policy under the two reads.
+
+            "Edit policy" and "Replace policy", not "Edit": the two are a pair and read as one — a verb and the noun
+            it acts on, the same noun. Replace policy leads the menu, and the two reads are announced under it
+            (HEAD_READS, 22 Oct 2026). */}
         <div className="apol__acts">
-          <Button variant="secondary" icon={Replace} onClick={onReplace}>
-            Replace policy
-          </Button>
-          <Button variant={saving ? 'secondary' : 'brand'} icon={Pencil} onClick={() => toBoard(policy.id)}>
-            Edit
-          </Button>
+          <SplitButton
+            label="Edit policy"
+            icon={Pencil}
+            onPress={() => (policy.appIds.length > 1 ? setForkOpen(true) : toBoard(policy.id))}
+            menuLabel="More for this policy"
+            /* The page's save bar holds the view's one orange button while it is up, so the head stands down. */
+            variant={saving ? 'secondary' : 'brand'}
+            /* EVERY verb on this tab, in groups (owner, 22 Oct 2026: "move the action to the main action
+               button; we will think how we can categorise all the actions"). What the policy is on this
+               application first, then what it is doing — the status switches, which used to hide inside the
+               pill — then the two reads, then what takes it off. `statusMenu` writes its own rule above
+               Remove, so only the group heads need one here. */
+            items={[
+              { id: 'replace', label: 'Replace policy', icon: Replace },
+              ...menu.map((i, n) => ({ ...i, icon: STATUS_ICON[i.id as StatusMenuId], ...(n === 0 ? { divide: true } : null) })),
+              ...(FOCUS
+                ? [
+                    /* The rule is already above Monitoring where the menu announces it (app-policy-model.ts), and
+                       one group does not need two. */
+                    { id: 'activity', label: 'Sign-in activity', icon: Activity, divide: !menu.some((i) => i.disabled), hint: SOON, disabled: !HEAD_READS },
+                    { id: 'check', label: ACCESS_CHECK, icon: ListChecks, hint: SOON, disabled: !HEAD_READS },
+                  ]
+                : []),
+            ]}
+            onSelect={(id) => {
+              if (id === 'check') check()
+              else if (id === 'replace') onReplace()
+              else if (id === 'activity') setActivityOpen(true)
+              else onMenu(id as StatusMenuId)
+            }}
+          />
         </div>
       </header>
 
@@ -1169,7 +1304,30 @@ export function AppPolicyView({
         />
       )}
 
-      {GLANCE ? (
+      {FOCUS ? (
+        <div className="apol__focus">
+          <RulesPanel app={app} policy={policy} globalDefault={globalDefault} everyoneElse={everyoneElse} everyoneElseCount={coverage.everyoneElse} glance={glance} plain />
+          <div className="apol__rail">
+            {hasRail && <PostSignInLinks app={app} onTab={onTab} />}
+            {BREAK_IN_ON_APP && <AppBreakIn appId={app.id} appName={app.name} />}
+          </div>
+          <Drawer open={activityOpen} onClose={() => setActivityOpen(false)} title="Sign-in activity" caption="Sample" width={760} resizable>
+            <div className="apol is-glance" style={{ '--apol-rows': 8 } as CSSProperties}>
+              <GlanceActivity
+                app={app}
+                policy={policy}
+                globalDefault={globalDefault}
+                rule={glance.rule}
+                onRule={glance.setRule}
+                picked={glance.picked}
+                onPick={glance.pick}
+                size={8}
+                reduced={glance.reduced}
+              />
+            </div>
+          </Drawer>
+        </div>
+      ) : GLANCE ? (
         /* One stage, two panels of one height (20 Oct 2026): the rules, Global Default as their foot, and the sign-ins
            paged beside them. `--apol-rows` on the tab is the page size the frame height is drawn from. */
         <div className="apol__pair is-glance" ref={stage.ref}>
@@ -1205,7 +1363,7 @@ export function AppPolicyView({
         </div>
       )}
 
-      {hasRail && (
+      {hasRail && !FOCUS && (
         <div className="apol__band is-solo">
           <div className="apol__rail">
             <PostSignInLinks app={app} onTab={onTab} />
@@ -1213,6 +1371,16 @@ export function AppPolicyView({
           </div>
         </div>
       )}
+
+      {/* Outside both layouts: the question is about the policy, not about how this tab happens to draw it. */}
+      <SharedPolicyFork
+        open={forkOpen}
+        policy={policy}
+        app={app}
+        onClose={() => setForkOpen(false)}
+        onEdit={() => toBoard(policy.id)}
+        onDuplicate={onDuplicate}
+      />
     </div>
   )
 }

@@ -65,6 +65,8 @@ export interface EngineClockInput {
   /** A run started by editing the sign-in plays quicker. */
   pace: 'full' | 'edit'
   reduced: boolean
+  /** The front steps at the brisk pace (engine-run.ts BRISK_FRONT_MS): Focus on v3, which draws no search of the policies to watch (RUN_MOTION, 20 Oct 2026). */
+  brisk?: boolean
   /** The status region: the stages as they start, the answer as it lands. Injected — the page and the board each have their own. */
   say: (text: string) => void
   /** The answer in one sentence, said as the run lands (`liveSentence`). */
@@ -100,7 +102,7 @@ export interface EngineClock {
   onShowAll: () => void
 }
 
-export function useEngineRun({ live, pending, runId, replay, pace, reduced, say, sentence, onStart }: EngineClockInput): EngineClock {
+export function useEngineRun({ live, pending, runId, replay, pace, brisk = false, reduced, say, sentence, onStart }: EngineClockInput): EngineClock {
   const [playing, setPlaying] = useState<Playing | null>(null)
   const [step, setStep] = useState(0)
   const shown = playing?.plan ?? pending ?? live
@@ -130,7 +132,7 @@ export function useEngineRun({ live, pending, runId, replay, pace, reduced, say,
       sayAfresh(say, replay ? `Replay. ${said}` : said)
       return
     }
-    const tl = timeline(pending.steps, pace === 'edit' ? 'edit' : 'full')
+    const tl = timeline(pending.steps, pace === 'edit' ? 'edit' : 'full', { brisk })
     PLAYED.set(pending, tl)
     setPlaying({ id, plan: pending, tl, replay, t0: performance.now() })
     setStep(0)

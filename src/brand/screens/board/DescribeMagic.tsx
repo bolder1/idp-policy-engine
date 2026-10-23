@@ -1,4 +1,4 @@
-import { ListChecks, MessageSquareText, SquareDashedMousePointer } from 'lucide-react'
+import { ListChecks, MessageSquareText } from 'lucide-react'
 
 import { GUIDED_SETUP } from './describe-stage'
 
@@ -23,12 +23,22 @@ export interface DescribeContext {
   label: string
 }
 
-/* Guided setup (GUIDED_SETUP, 19 Oct 2026): the same door, renamed — "Start guided setup", opening the panel on the
-   selected card. Off, it is Describe it as before. */
+/* Guided setup (GUIDED_SETUP, 19 Oct 2026): the same door, opening the panel on the selected card. Off, it is
+   Describe it as before.
+
+   "Guide me", not "Start guided setup" (owner, 22 Oct 2026: "rethink the Start guided setup button, change the
+   name and the button style"). Three words of label on a pill that floats over the canvas is a sentence asking
+   for attention; two is an offer. The verb is the user's, not the product's — they are asking to be guided.
+
+   THE SELECTED-CARD CHIP IS GONE (same day: "I don't think the Claude-style selection inside the button — we can
+   remove that completely from the product, no use as of now"). The button named the card it would open on, which
+   made it grow and shrink as the selection changed and put a second, competing label inside one control. The
+   CONTEXT itself is kept: `context` still arrives, the panel still opens on that card, and the accessible name
+   still says which — only the chip is gone. */
 export function DescribeDoor({ context, onOpen }: { context?: DescribeContext | null; onOpen: () => void }) {
   const Mark = GUIDED_SETUP ? ListChecks : MessageSquareText
-  const word = GUIDED_SETUP ? 'Start guided setup' : 'Describe it'
-  const named = context ? (GUIDED_SETUP ? `Start guided setup for ${context.label}` : `Describe a change to ${context.label}`) : word
+  const word = GUIDED_SETUP ? 'Guide me' : 'Describe it'
+  const named = context ? (GUIDED_SETUP ? `Guide me through ${context.label}` : `Describe a change to ${context.label}`) : word
   return (
     <button
       type="button"
@@ -39,12 +49,6 @@ export function DescribeDoor({ context, onOpen }: { context?: DescribeContext | 
     >
       <Mark size={16} strokeWidth={2} className="bb__magic__mark" aria-hidden />
       <span className="bb__magic__word">{word}</span>
-      {context && (
-        <span className="bb__magic__ctx">
-          <SquareDashedMousePointer size={12} strokeWidth={2} aria-hidden />
-          <span className="bb__magic__ctxname">{context.label}</span>
-        </span>
-      )}
     </button>
   )
 }

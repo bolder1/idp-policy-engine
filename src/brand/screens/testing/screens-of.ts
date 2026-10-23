@@ -185,6 +185,8 @@ export function promptText(step: ScreenStep): string {
           return 'Use your passkey'
         case 'questions':
           return 'Answer your security questions'
+        case 'grid':
+          return 'Enter the numbers on your pattern tiles, in order'
         case 'token':
         case 'assigned':
           return 'Enter the code from your token'

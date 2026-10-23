@@ -206,6 +206,37 @@ export interface CardRoute {
 const routeClass = (route: CardRoute | undefined): string =>
   !route ? '' : `is-routed${route.marker ? ' is-marked' : ''}${route.tone ? ` is-${route.tone}` : ''}`
 
+/* CHECK ACCESS V3 (20 Oct 2026; owner: "the v3 is mainly based on how we have it in the builder's edit part … the same
+   policy rule cards in the whole canvas"): the very same card, read by a run (Board `run`, board-run.tsx). The head
+   says what the sign-in made of the rule on a second line under its name (20 Oct 2026, evening: "What if the rules get
+   bigger? … put it under it" — the state pill's place beside the name is empty under a run, and no rule card carries
+   its outcome any more); the body is the builder's own IfBlock with each row's mark; the trail is the fold alone.
+   Nothing here keeps time or moves anything: the host hands the words and the marks for the step it draws, and the
+   card wears its standing as classes (`is-run is-r-{state}`, `is-r-lock` while the deciding card's lock plays,
+   board-run.css). Absent, the card is the builder's, byte for byte (board-markup.test.tsx). */
+export interface RunCard {
+  /** Its standing in the run: `is-r-{state}` (board-run-model.ts `RunState`). */
+  state: string
+  /** What the sign-in made of it, its second line under the name; null while the run has not reached it. */
+  word: ReactNode
+  /** Each row's mark at its right end (IfBlock `mark`). */
+  mark?: (row: string) => ReactNode
+  /** The engine's own id for the rule: what an answer or the brief finds it by (`data-rule-row`). */
+  row: string
+  /** The camera follows it (`data-follow`). */
+  follow: boolean
+  /** The deciding card's lock is playing. */
+  lock: boolean
+  /** It is the card that decided: its body's decision chip keeps its tone. */
+  decided: boolean
+  /** Its run words for a screen reader, said after its name (the title's `aria-describedby`). */
+  describe: string
+}
+
+/* The run's classes on a card (never `is-trace`, `is-off`, `is-shadowed`, `is-selected` or a route's). */
+const runClass = (tone: string, run: RunCard, open: boolean, ringed: boolean, terminal = false): string =>
+  `bb__card${terminal ? ' is-terminal' : ''} is-${tone} is-run is-r-${run.state}${open ? ' is-open' : ''}${run.lock ? ' is-r-lock' : ''}${run.decided ? ' is-r-decided' : ''}${ringed ? ' is-traced' : ''}`
+
 export function RuleCard({
   rule,
   index,
@@ -237,6 +268,8 @@ export function RuleCard({
   highlight,
   head,
   foldOnPress = false,
+  run,
+  idPrefix = '',
 }: {
   rule: Rule
   index: number
@@ -287,13 +320,19 @@ export function RuleCard({
   /* A press folds the card (a read-only canvas, ReadOnlyCanvas `framed`): the title is then the card's one keyboard
      stop and says what it opens, and the fold mark is for the pointer only. The press itself is the host's. */
   foldOnPress?: boolean
+  /** Check access v3: the card read by a run (`RunCard`). Absent, the builder's card. */
+  run?: RunCard
+  /** Before every id the card draws, so a run's copy never collides with the edit board mounted under it. */
+  idPrefix?: string
 }) {
   /* On a post sign-in policy the card wears its action's tone, none until one
      is chosen, and is marked while a refused Turn on is about it (post-board.ts). */
   const postBoard = usePostBoard()
   const tone = postBoard.on ? postTone(rule.action) : TONE[rule.decision]
   const refused = postBoard.refusal?.at === rule.id
-  const titleId = `bb-rule-${rule.id}-title`
+  const titleId = `${idPrefix}bb-rule-${rule.id}-title`
+  const bodyId = `${idPrefix}bb-rule-${rule.id}-body`
+  const saidId = `${idPrefix}bb-rule-${rule.id}-said`
   const ringed = useCardHighlighted(highlight, rule.id) || traced
   const selected = openPart !== null
   /* The ⋯ menu is open: holds the trail out while the pointer is in the menu. */
@@ -308,7 +347,7 @@ export function RuleCard({
          the first — each measured a position the other was mid-way through
          changing, which is the small shiver a reorder used to end on. One
          element animates the move, and it is the one that moves. */
-      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${refused ? 'is-refused' : ''} ${kindClass}`}
+      className={run ? runClass(tone, run, expanded, ringed) : `bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${refused ? 'is-refused' : ''} ${kindClass}`}
       /* No style prop while dragging, deliberately. Board writes this element's
          transform directly on every pointer move; a `style` React manages would
          be reset to a stale offset on the next re-render, which is the classic
@@ -339,6 +378,8 @@ export function RuleCard({
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       data-index={index}
+      data-rule-row={run?.row}
+      data-follow={run?.follow ? '' : undefined}
     >
       {route?.marker}
       <div className="bb__cardhead">
@@ -424,7 +465,8 @@ export function RuleCard({
               id={titleId}
               className="bb__titlebtn"
               aria-expanded={foldOnPress ? expanded : selected}
-              aria-controls={foldOnPress ? `bb-rule-${rule.id}-body` : undefined}
+              aria-controls={foldOnPress ? bodyId : undefined}
+              aria-describedby={run ? saidId : undefined}
               title={foldOnPress ? rule.name.trim() || 'Untitled rule' : undefined}
               /* The same place the body click goes. This is the keyboard path
                  to the rule, and a keyboard path landing somewhere different
@@ -447,7 +489,7 @@ export function RuleCard({
                 sign-in is being read against it, and Ready is not news. */}
             {route ? (
               <span className="bb__tout">{route.head}</span>
-            ) : head != null ? (
+            ) : run ? null : head != null ? (
               <span className="bb__said">{head}</span>
             ) : (
               /* An untouched rule is not Complete: it says so in grey (19 Oct 2026), beside its "Nothing set yet". */
@@ -465,10 +507,18 @@ export function RuleCard({
               </Badge>
             )}
           </span>
+          {/* Check access v3: what the sign-in made of the rule, on a line of its own under the name (owner, 20 Oct
+              2026, evening: "What if the rules get bigger? … put it under it"); nothing before the run reaches it. */}
+          {run?.word}
           {source && (
             <p className="bb__card__from" title={`From your text: “${source}”`}>
               From your text: “{source}”
             </p>
+          )}
+          {run && (
+            <span id={saidId} className="u-sr-only">
+              {run.describe}
+            </span>
           )}
         </div>
 
@@ -481,7 +531,7 @@ export function RuleCard({
               className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
               tabIndex={foldOnPress ? -1 : undefined}
               aria-expanded={expanded}
-              aria-controls={`bb-rule-${rule.id}-body`}
+              aria-controls={bodyId}
               aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
               title={expanded ? 'Fold this rule' : 'Show what it checks'}
               onClick={(e) => {
@@ -498,17 +548,20 @@ export function RuleCard({
                 On/off is the kit's switch — the one the panel's rule head
                 carries — rather than the toggle GLYPH that stood here, so the
                 card and the panel show the same control for the same fact. */}
+            {!run && (
             <Toggle
               size="sm"
               checked={rule.enabled}
               onChange={onToggle}
               label={`Rule ${index + 1} ${rule.enabled ? 'on' : 'off'}`}
             />
+            )}
             {/* Move, duplicate and delete: the things done to a rule less
                 often, in the kit's row menu. It portals, so the trail is held
                 open by `is-menu` on the card while it is up — the pointer
                 leaving the card for the menu would otherwise fold the trail
                 away under it. */}
+            {!run && (
             <RowMenu
               label={`Actions for rule ${index + 1}`}
               items={ruleMenu(canUp, canDown)}
@@ -520,6 +573,7 @@ export function RuleCard({
                 else if (id === 'del') onDelete()
               }}
             />
+            )}
           </span>
         </div>
       </div>
@@ -557,14 +611,14 @@ export function RuleCard({
           and treats as FALSE, so the folded half kept every one of its buttons
           in the tab order: Tab walked into a zero-height region and focus went
           somewhere invisible. */}
-      <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
+      <div className="bb__fold bb__fold--body" id={bodyId} inert={!expanded}>
         <div>
           {/* Not in test mode: every card is folded there and cannot be
               unfolded (the chevron is hidden), so a rule's body is drawn for
               nobody — and it was most of what a marker's hop redrew. It is
               back, still at zero height, the moment test mode closes, so the
               first press of the chevron after it still glides. */}
-          <div className="bb__cardbody">{!route && <IfBlock rule={rule} resolve={resolve} />}</div>
+          <div className="bb__cardbody">{!route && <IfBlock rule={rule} resolve={resolve} mark={run?.mark} />}</div>
         </div>
       </div>
 
@@ -592,6 +646,8 @@ export function TerminalCard({
   onHover,
   head,
   foldOnPress = false,
+  run,
+  idPrefix = '',
 }: {
   rule: Rule
   resolve: NameLookup
@@ -614,29 +670,40 @@ export function TerminalCard({
   head?: ReactNode
   /** A press folds the card, and the title is its one keyboard stop (RuleCard's `foldOnPress`). */
   foldOnPress?: boolean
+  /** Check access v3: the last row read by a run (RuleCard's `run`). */
+  run?: RunCard
+  /** Before every id the card draws (RuleCard's `idPrefix`). */
+  idPrefix?: string
 }) {
   const postBoard = usePostBoard()
   const tone = postBoard.on ? postTone(rule.action) : TONE[rule.decision]
   const refused = postBoard.refusal?.at === 'fallback'
   const ringed = useCardHighlighted(highlight, 'fallback') || traced
+  const titleId = `${idPrefix}bb-terminal-title`
+  const bodyId = `${idPrefix}bb-terminal-body`
+  const saidId = `${idPrefix}bb-terminal-said`
   return (
     <motion.div
       ref={cardRef}
       /* Position only while a route is read: the evidence under the head
-         changes the card's height, and a size animation stretches its text. */
-      layout={route ? 'position' : true}
+         changes the card's height, and a size animation stretches its text.
+         None under a run (Check access v3): it opens and folds in the flow, by
+         the body's own CSS, and a projection measured mid-fold would fight it. */
+      layout={run ? false : route ? 'position' : true}
       transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${refused ? 'is-refused' : ''} ${routeClass(route)}`}
+      className={run ? runClass(tone, run, expanded, ringed, true) : `bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${refused ? 'is-refused' : ''} ${routeClass(route)}`}
       /* The same shape as every other card: a group named by its title
          button. It has no inner controls to hide, so the old whole-card button
          cost nothing here — but `aria-pressed` is a toggle's attribute and
          this is not a toggle, and two kinds of card that behave differently
          under the keyboard is one kind too many. */
       role="group"
-      aria-labelledby="bb-terminal-title"
+      aria-labelledby={titleId}
       onClick={onSelect}
       onMouseEnter={onHover && (() => onHover(true))}
       onMouseLeave={onHover && (() => onHover(false))}
+      data-rule-row={run?.row}
+      data-follow={run?.follow ? '' : undefined}
     >
       {route?.marker}
       <div className="bb__cardhead">
@@ -662,10 +729,11 @@ export function TerminalCard({
           <div className="bb__titlerow">
             <button
               type="button"
-              id="bb-terminal-title"
+              id={titleId}
               className="bb__titlebtn"
               aria-expanded={foldOnPress ? expanded : selected}
-              aria-controls={foldOnPress ? 'bb-terminal-body' : undefined}
+              aria-controls={foldOnPress ? bodyId : undefined}
+              aria-describedby={run ? saidId : undefined}
               title={foldOnPress ? 'Nothing else matched' : undefined}
               onClick={(e) => {
                 e.stopPropagation()
@@ -674,6 +742,7 @@ export function TerminalCard({
             >
               <strong>Nothing else matched</strong>
             </button>
+            {!run && (
             <div className="bb__cardmeta">
               {/* Says the two things that are true of this row and of no other:
                   it always runs, and it cannot be removed. The rest of the card's
@@ -699,7 +768,8 @@ export function TerminalCard({
 
                   `role="img"` with an `aria-label`, because a bare `title` is
                   unreachable by keyboard and this is not a control that can take
-                  focus. */}
+                  focus. Absent under a run (Check access v3), with the rest of this
+                  cluster: the run's words are the card's second line. */}
               <span
                 className="bb__lockmark"
                 role="img"
@@ -709,7 +779,15 @@ export function TerminalCard({
                 <Lock size={11} strokeWidth={2.2} aria-hidden />
               </span>
             </div>
+            )}
           </div>
+          {/* Check access v3: what the sign-in made of the last row, on a line of its own under the name (RuleCard's). */}
+          {run?.word}
+          {run && (
+            <span id={saidId} className="u-sr-only">
+              {run.describe}
+            </span>
+          )}
         </div>
 
         {/* One mark, in the same trail and at the same x as every other card's.
@@ -721,7 +799,7 @@ export function TerminalCard({
               className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
               tabIndex={foldOnPress ? -1 : undefined}
               aria-expanded={expanded}
-              aria-controls="bb-terminal-body"
+              aria-controls={bodyId}
               aria-label={expanded ? 'Hide what the default does' : 'Show what the default does'}
               title={expanded ? 'Fold this rule' : 'Show what it does'}
               onClick={(e) => {
@@ -734,9 +812,9 @@ export function TerminalCard({
           </span>
         </div>
       </div>
-      <div className="bb__fold bb__fold--body" id="bb-terminal-body" inert={!expanded}>
+      <div className="bb__fold bb__fold--body" id={bodyId} inert={!expanded}>
         <div>
-          <div className="bb__cardbody">{!route && <IfBlock terminal rule={rule} resolve={resolve} />}</div>
+          <div className="bb__cardbody">{!route && <IfBlock terminal rule={rule} resolve={resolve} mark={run?.mark} />}</div>
         </div>
       </div>
       {route?.checks}

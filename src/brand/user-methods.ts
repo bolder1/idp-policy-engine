@@ -51,6 +51,8 @@ export type EnrolKind =
   | 'assigned'
   /** The browser's own credential ceremony — Face ID, a security key. */
   | 'passkey'
+  /** Pick four tiles on a grid, then type back the numbers on them, in order. */
+  | 'grid'
   /** Nothing to fill in. The card has a toggle and no Edit. */
   | 'none'
 
@@ -127,10 +129,22 @@ const SHAPES: Record<string, EnrolShape> = {
      all — the certificate comes off the card, so there is no question to ask. */
   cac: { kind: 'none', note: 'Nothing to set up. Tap your card when you are asked for it.' },
 
-  /* Not on the live end-user page — this tenant has it switched off — so the
-     shape is inferred from what the method is rather than measured. */
-  grid: { kind: 'none', note: 'Your grid is issued to you. There is nothing to fill in here.' },
+  /* Grid Pattern is configured by the person (owner, 21 Oct 2026, from the live console's screen): select four tiles on a
+     grid, then enter their numbers in the order picked. */
+  grid: { kind: 'grid' },
 }
+
+/** The 4 x 4 grid of numbers a person picks a pattern from (the live console's, read 21 Oct 2026). */
+export const GRID_NUMBERS: readonly string[] = ['5', '8', '9', '0', '1', '4', '5', '1', '0', '6', '0', '9', '9', '2', '7', '3']
+/** Tiles to pick for a pattern. */
+export const GRID_PICKS = 4
+/** The numbers on the picked tiles, in the order they were picked. */
+export const gridSequence = (tiles: string): string =>
+  tiles
+    .split(',')
+    .filter(Boolean)
+    .map((i) => GRID_NUMBERS[Number(i)] ?? '')
+    .join('')
 
 export const enrolShapeFor = (methodId: string): EnrolShape => SHAPES[methodId] ?? { kind: 'none' }
 
@@ -264,6 +278,11 @@ export function enrolIssue(kind: EnrolKind, draft: Record<string, string>, quest
       return v('code').length === 6 ? null : blank('code')
     case 'passkey':
       return v('device') ? null : blank('device')
+    case 'grid': {
+      if (v('tiles').split(',').filter(Boolean).length < GRID_PICKS) return blank('tiles')
+      if (!v('sequence')) return blank('sequence')
+      return v('sequence').replace(/\s/g, '') === gridSequence(v('tiles')) ? null : { field: 'sequence', message: 'Enter the numbers in the order you selected the tiles.' }
+    }
     case 'questions': {
       const { presets, custom } = questionPlan(questions)
       const asked: string[] = []

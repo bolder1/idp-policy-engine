@@ -16,9 +16,12 @@ import { AnimatePresence, motion } from 'motion/react'
    -------------------------------------------------------------------------- */
 
 import {
+  BellRing,
   Check,
   CreditCard,
   Fingerprint,
+  Grid3x3,
+  Hash,
   HelpCircle,
   KeyRound,
   Layers,
@@ -27,6 +30,7 @@ import {
   Mail,
   MessageSquare,
   Phone,
+  QrCode,
   ShieldCheck,
   Smartphone,
   Ticket,
@@ -88,13 +92,17 @@ const CHANNEL_ICON: { match: RegExp; icon: LucideIcon }[] = [
   { match: /sms|text/i, icon: MessageSquare },
   { match: /email|mail/i, icon: Mail },
   { match: /call|voice|phone/i, icon: Phone },
-  { match: /question|kba|grid/i, icon: HelpCircle },
+  { match: /grid/i, icon: Grid3x3 },
+  { match: /question|kba/i, icon: HelpCircle },
   { match: /token|yubikey|display|hardware/i, icon: KeyRound },
+  { match: /qr/i, icon: QrCode },
+  { match: /push/i, icon: BellRing },
+  { match: /mo otp|minioranges? otp|totp/i, icon: Hash },
   { match: /push|authenticator|otp|totp|qr/i, icon: Smartphone },
 ]
 
-export function MethodIcon({ name, size = 24 }: { name: string; size?: number }) {
-  const vendor = VENDOR_LOGO.find((v) => v.match.test(name))
+export function MethodIcon({ name, size = 24, plain = false }: { name: string; size?: number; /** An icon for the channel, never the vendor's logo (owner, 21 Oct 2026, on the person's methods). */ plain?: boolean }) {
+  const vendor = plain ? undefined : VENDOR_LOGO.find((v) => v.match.test(name))
   if (vendor) {
     return (
       <img

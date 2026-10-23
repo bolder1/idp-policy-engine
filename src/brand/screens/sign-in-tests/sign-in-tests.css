@@ -644,6 +644,8 @@
 }
 .sit__canvassw .bseg::-webkit-scrollbar { display: none; }
 .sit__canvassw .bseg > button { flex: none; }
+/* Classic or v3 (CheckVersionSwitch.tsx, 20 Oct 2026): the page head's preview switch, its two words on one line. */
+.sit-version .bseg { flex-wrap: nowrap; }
 
 /* --- The why panel, in the Policy details' grammar (owner, 14 Oct 2026: "all AI generic, no hierarchy, can't see the
    button, the boxed card looks bad"). One heading, then sections told apart by a hairline and a heading — never a box in

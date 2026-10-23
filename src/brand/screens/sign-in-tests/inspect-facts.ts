@@ -72,7 +72,7 @@ export function factsOf(t: InspectTarget, lib: Library, say?: SayRule): Fact[] |
       ['Rules', String(p.rules.length)],
     ]
   }
-  return peekFacts(t, lib)
+  return t.kind === 'see' ? null : peekFacts(t, lib)
 }
 
 function peekFacts(t: PeekTarget, lib: Library): Fact[] | null {

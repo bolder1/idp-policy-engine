@@ -190,7 +190,7 @@ describe('the other pages: a zone, a device profile, a person, an application', 
 describe('the way in, and the rules it keeps', () => {
   it('the page puts one thing in the panel, fresh; the canvas bar has no Details, kept behind its flag', () => {
     expect(pageSrc).toContain('onInspect={INSPECTOR ? onInspect : undefined}')
-    expect(pageSrc).toContain('setInspect({ target: t, plan })')
+    expect(pageSrc).toContain('setInspect({ target: t, plan, see: see ?? null })')
     expect(DETAILS_IN_BAR).toBe(false)
     expect(focusSrc).toContain('details={DETAILS_IN_BAR && landed')
     expect(barSrc).toContain('data-fn="details"')

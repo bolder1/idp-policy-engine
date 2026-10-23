@@ -376,8 +376,9 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
    Classic v2 draws the rule that passed "exactly as the builder draws it",
    plus what the sign-in made of each row): given, it is called once for the
    who row (`'who'`) and once per condition (its id), and what it returns
-   stands at that row's right end. The builder never passes it, so its card
-   is drawn exactly as before. */
+   stands at that row's right end — and, on the last row, once for its
+   `always` (Check access v3, 20 Oct 2026). The builder never passes it, so
+   its card is drawn exactly as before. */
 export function IfBlock({
   rule,
   resolve,
@@ -406,6 +407,8 @@ export function IfBlock({
           </span>
           <IfKw>always</IfKw>
           <span className="bb__ifjourney">— whatever reached this far</span>
+          {/* Check access v3 (20 Oct 2026) marks the row as the walk reaches it; the builder passes no `mark`. */}
+          {mark?.('always')}
         </div>
         <ActionRow rule={rule} token={token} />
       </div>

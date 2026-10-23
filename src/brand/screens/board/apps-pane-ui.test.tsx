@@ -26,9 +26,9 @@ describe('the start node pane', () => {
     const out = pane('sc-device-compliance')
     expect(out).toContain('Applications')
     expect(out).not.toContain('Who')
-    /* All applications on the left, the ones in this policy on the right. */
-    expect(out).toContain('All applications')
-    expect(out).toContain('In this policy')
+    /* The chips (21 Oct 2026: the picker the owner kept): a search, then the chips, then what can be added. */
+    expect(out).toContain('Save applications')
+    expect(out).toContain('Microsoft Outlook')
   })
 
   it('leaves the system policy as it was: every application, everyone', () => {

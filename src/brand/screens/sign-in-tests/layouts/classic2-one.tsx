@@ -39,11 +39,13 @@ function Name({ id, name, open }: { id: string; name: string; open?: (policyId: 
   )
 }
 
-export function OneReason({ why, appName, open }: { why: OneWhy; appName: string; open?: (policyId: string) => void }) {
+/* `notice` (Check access v3 in the builder, 20 Oct 2026): the person is outside the policy being built — said in the
+   notice tone, since the canvas then shows another policy's cards than the one open. */
+export function OneReason({ why, appName, open, notice = false }: { why: OneWhy; appName: string; open?: (policyId: string) => void; notice?: boolean }) {
   const words = oneReasonWords(why, appName)
   if (!words) return null
   return (
-    <div className="rl-c2__under rl-c2__onereason" onClick={(e) => e.stopPropagation()}>
+    <div className={`rl-c2__under rl-c2__onereason${notice ? ' is-notice' : ''}`} onClick={(e) => e.stopPropagation()}>
       <span className="bb__idx rl-c2__idx rl-c2__whyspace" aria-hidden />
       <span className="rl-c2__onewhy">
         <CornerDownRight size={12} strokeWidth={2.2} aria-hidden />
@@ -57,15 +59,10 @@ export function OneReason({ why, appName, open }: { why: OneWhy; appName: string
   )
 }
 
-export function OneFoot({ also, gd, open, animate }: { also: OneLine | null; gd: OneLine | null; open?: (policyId: string) => void; animate: boolean }) {
+export function OneFoot({ also, gd, open, animate, motion: moving = false }: { also: OneLine | null; gd: OneLine | null; open?: (policyId: string) => void; animate: boolean; motion?: boolean }) {
   if (!also && !gd) return null
-  return (
-    <motion.div
-      className="rl-c2__onefoot"
-      initial={animate ? { opacity: 0 } : false}
-      animate={{ opacity: 1 }}
-      transition={animate ? { duration: 0.2, delay: 0.12, ease: EASE_OUT } : { duration: 0 }}
-    >
+  const lines = (
+    <>
       {also && (
         <p className={`rl-c2__oneline${also.conflict ? ' is-conflict' : ''}`}>
           <Layers size={12} strokeWidth={2.2} aria-hidden />
@@ -81,6 +78,53 @@ export function OneFoot({ also, gd, open, animate }: { also: OneLine | null; gd:
           <span className="rl-c2__onewords">· {gd.words}</span>
         </p>
       )}
+    </>
+  )
+  /* The run's motion (phase.ts RUN_MOTION, 20 Oct 2026): the foot is drawn in as the walk ends — its dashed rule left to
+     right, then its words — the card's last beat before it reads complete. Drawn settled, it is simply there. */
+  if (animate && moving)
+    return (
+      <div className="rl-c2__onefoot is-drawing">
+        <motion.span className="rl-c2__onerule" aria-hidden initial={{ clipPath: 'inset(0 100% 0 0)' }} animate={{ clipPath: 'inset(0 0% 0 0)' }} transition={{ duration: 0.24, delay: 0.12, ease: EASE_OUT }} />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, delay: 0.2, ease: EASE_OUT }}>
+          {lines}
+        </motion.div>
+      </div>
+    )
+  return (
+    <motion.div
+      className="rl-c2__onefoot"
+      initial={animate ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      transition={animate ? { duration: 0.2, delay: 0.12, ease: EASE_OUT } : { duration: 0 }}
+    >
+      {lines}
+    </motion.div>
+  )
+}
+
+/* CHECK ACCESS V3 (20 Oct 2026): a foot line said on the policy's head instead, as its one ↳ line — the Global Default
+   under the application's own policy once the walk is over (`gd`: "Outside this policy, Global Default Policy · Not
+   reached"), or another policy on the application. In the reason's own shape, so the head is one grammar whichever it
+   says; it fades in as the walk ends. */
+export function OneHeadLine({ line, open, animate, gd = false }: { line: OneLine; open?: (policyId: string) => void; animate: boolean; gd?: boolean }) {
+  return (
+    <motion.div
+      className={`rl-c2__under rl-c2__onereason${line.conflict ? ' is-conflict' : ''}`}
+      onClick={(e) => e.stopPropagation()}
+      initial={animate ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      transition={animate ? { duration: 0.16, delay: 0.12, ease: EASE_OUT } : { duration: 0 }}
+    >
+      <span className="bb__idx rl-c2__idx rl-c2__whyspace" aria-hidden />
+      <span className="rl-c2__onewhy">
+        {gd ? <CornerDownRight size={12} strokeWidth={2.2} aria-hidden /> : <Layers size={12} strokeWidth={2.2} aria-hidden />}
+        <span className="rl-c2__onetext">
+          {gd && <>{ONE_OUTSIDE_HERE}, </>}
+          <Name id={line.policyId} name={line.name} open={open} />
+          {` · ${line.words}`}
+        </span>
+      </span>
     </motion.div>
   )
 }

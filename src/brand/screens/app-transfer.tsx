@@ -1,5 +1,5 @@
-import { LayoutGroup, motion } from 'motion/react'
-import { ArrowRight, Check, ChevronDown, X } from 'lucide-react'
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
+import { ArrowRight, Check, ChevronDown, Plus, X } from 'lucide-react'
 import { useState, type DragEvent } from 'react'
 
 import type { App } from '../data'
@@ -234,42 +234,74 @@ function AppChecklist({ apps, picked, onChange, takenBy }: PickerProps) {
   )
 }
 
-/* --- Version 2, chips: what the policy protects as removable chips; a search that adds. ------- */
+/* --- The chips (owner, 21 Oct 2026: the version they agreed on, made the default and polished). ------------------
+   Search first, then what the policy protects as removable chips right under it, then the applications that can still be
+   added, each with its own Add. An added application leaves the list and lands as a chip, so the two never show the same
+   thing twice; the ones in use on another policy are not offered (Two lists says why). */
 function AppChips({ apps, picked, onChange, takenBy }: PickerProps) {
   const [q, setQ] = useState('')
+  const reduced = useReducedMotion()
   const on = new Set(picked)
   const needle = q.trim().toLowerCase()
   const add = (id: string) => onChange(apps.filter((a) => a.id === id || on.has(a.id)).map((a) => a.id))
   const remove = (id: string) => onChange(picked.filter((x) => x !== id))
   const chosen = apps.filter((a) => on.has(a.id))
   const options = apps.filter((a) => !on.has(a.id) && !takenBy(a.id) && (!needle || a.name.toLowerCase().includes(needle)))
+  const ease = { duration: reduced ? 0 : 0.16, ease: [0.2, 0, 0, 1] as const }
   return (
     <div className="bxc">
-      <div className="bxc__chosen" aria-label="Applications in this policy">
-        {chosen.length === 0 && <p className="bxc__none">No applications yet. Search below to add one.</p>}
-        {chosen.map((a) => (
-          <span key={a.id} className="bxc__chip">
-            <AppLogo appId={a.id} name={a.name} size={16} />
-            {a.name}
-            <button type="button" aria-label={`Remove ${a.name}`} onClick={() => remove(a.id)}>
-              <X size={12} strokeWidth={2.4} aria-hidden />
-            </button>
-          </span>
-        ))}
+      <SearchBox block value={q} onChange={setQ} placeholder="Search applications" label="Search applications" />
+      <div className="bxc__part">
+        <p className="bxc__lab" id="bxc-in">
+          In this policy
+        </p>
+        <div className="bxc__chosen" role="group" aria-labelledby="bxc-in">
+          <AnimatePresence initial={false} mode="popLayout">
+            {chosen.map((a) => (
+              <motion.span key={a.id} layout={!reduced} className="bxc__chip" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={ease}>
+                <AppLogo appId={a.id} name={a.name} size={18} />
+                {a.name}
+                <button type="button" aria-label={`Remove ${a.name}`} onClick={() => remove(a.id)}>
+                  <X size={13} strokeWidth={2.4} aria-hidden />
+                </button>
+              </motion.span>
+            ))}
+          </AnimatePresence>
+          {chosen.length === 0 && <p className="bxc__none">None added yet</p>}
+        </div>
       </div>
-      <SearchBox block value={q} onChange={setQ} placeholder="Search applications to add…" label="Search applications to add" />
-      <ul className="bxl__list bxc__list" aria-label="Applications to add">
-        {options.length === 0 && (needle ? <NoMatches compact noun="applications" query={q} onClear={() => setQ('')} /> : <li className="bxfer__empty">Nothing left to add.</li>)}
-        {options.map((a) => (
-          <li key={a.id}>
-            <button type="button" className="bxl__row" onClick={() => add(a.id)}>
-              <AppLogo appId={a.id} name={a.name} size={20} />
-              <b>{a.name}</b>
-              <span className="bxc__add">Add</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div className="bxc__part is-list">
+        <p className="bxc__lab" id="bxc-add">
+          Applications to add
+        </p>
+        <ul className="bxl__list bxc__list" aria-labelledby="bxc-add">
+          {options.length === 0 &&
+            (needle ? (
+              <NoMatches compact noun="applications" query={q} onClear={() => setQ('')} />
+            ) : (
+              /* Every application is already a chip above, so the list has nothing to show rather than
+                 nothing to match: its own end state, not a search miss. */
+              <li className="bxc__done">
+                <span className="bxc__donemark">
+                  <Check size={18} strokeWidth={2.4} aria-hidden />
+                </span>
+                <b>Every application is in this policy</b>
+              </li>
+            ))}
+          {options.map((a) => (
+            <li key={a.id}>
+              <button type="button" className="bxl__row" aria-label={`Add ${a.name}`} onClick={() => add(a.id)}>
+                <AppLogo appId={a.id} name={a.name} size={24} />
+                <b>{a.name}</b>
+                <span className="bxc__add">
+                  <Plus size={14} strokeWidth={2.2} aria-hidden />
+                  Add
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

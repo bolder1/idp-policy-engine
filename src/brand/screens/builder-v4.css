@@ -302,12 +302,8 @@
 /* The blank screen of a policy with no rules is the kit EmptyState now, like
    every other empty state; `.bf__blank` and its two rows of links are gone. */
 
-/* The list of what Discard throws away, in its confirmation. */
-.bf__discardlist {
-  margin: var(--space-4) 0 0; padding-left: var(--space-6);
-  font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.5;
-}
-.bf__discardlist li { overflow-wrap: anywhere; }
+/* The list of what Discard throws away moved to the kit's `Confirm` rows on
+   22 Oct 2026 (`shape="rows"`), so `.bf__discardlist` has no markup left. */
 
 /* --- Sections ------------------------------------------------------------------ */
 

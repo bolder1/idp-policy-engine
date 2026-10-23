@@ -9,7 +9,8 @@ import { AddExistingPolicy } from './AddExistingPolicy'
 import { ApplicationPage, NewApplicationPage } from './ApplicationPage'
 import { TestingSessionProvider } from './testing/session'
 import { AppActivity } from './app-activity'
-import { GLANCE_ROWS, cardOutcome } from './app-policy-model'
+import { GLANCE_ROWS } from './app-policy-model'
+import { AppPolicyFocusOverride } from './app-policy-focus'
 import { APP_POLICY_GLANCE, PolicyChain } from './app-policy-view'
 import { appStanding } from './app-standing'
 import activitySrc from './app-activity.tsx?raw'
@@ -24,14 +25,22 @@ import viewSrc from './app-policy-view.tsx?raw'
    app-page-model.test.ts; nothing here presses anything.
    -------------------------------------------------------------------------- */
 
-const render = (node: ReactNode) =>
+/* The tab is drawn at a glance here (the layout of 20 Oct 2026); the policy-alone layout (21 Oct) has its own tests below. */
+const renderIn = (focus: boolean, node: ReactNode) =>
   renderToStaticMarkup(
     <BrandProvider>
-      <TestingSessionProvider>{node}</TestingSessionProvider>
+      <TestingSessionProvider>
+        <AppPolicyFocusOverride.Provider value={focus}>{node}</AppPolicyFocusOverride.Provider>
+      </TestingSessionProvider>
     </BrandProvider>,
   )
+const render = (node: ReactNode) => renderIn(false, node)
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 const count = (html: string, needle: string) => html.split(needle).length - 1
+/* The view's orange CONTROLS, which is what "one orange button per view" counts. A split button (kit `SplitButton`)
+   is one object drawn in two halves — the action, and the chevron holding the rest of what can be done to it — and
+   both halves wear the action's fill, so the chevron is not a second orange button and is not counted as one. */
+const orange = (html: string) => count(html, 'bx-btn--brand') - [...html.matchAll(/class="[^"]*bx-btn--brand[^"]*bx-menu__trigger--icon/g)].length
 const tabsOf = (html: string) => [...html.matchAll(/role="tab"[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
 const selected = (html: string) => text(html.match(/role="tab"[^>]*aria-selected="true"[^>]*>(.*?)<\/button>/)?.[1] ?? '').trim()
 
@@ -71,8 +80,8 @@ describe('an application page', () => {
   })
 
   it('has no second policy to add once it has its one, and no explaining sentence over the list', () => {
-    /* One application has at most one sign-in policy: Edit is the view's one orange button, and nothing adds another. */
-    expect(count(out, 'bx-btn--brand')).toBe(1)
+    /* One application has at most one sign-in policy: Edit policy is the view's one orange control, and nothing adds another. */
+    expect(orange(out)).toBe(1)
     expect(text(out)).not.toContain('Create new policy')
     expect(text(out)).not.toContain('Add existing policy')
     expect(text(out)).not.toContain('Checked top to bottom')
@@ -95,16 +104,24 @@ describe('the Policies tab', () => {
   const acts = (html: string) => html.slice(html.indexOf('apol__acts'), html.indexOf('</div>', html.indexOf('apol__acts')))
   const buttonsIn = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
 
-  it('heads the policy with exactly two buttons, Replace policy then Edit, and Edit the one orange button', () => {
+  it('heads the policy with one split button, Edit policy and its chevron, and nothing else orange in the view', () => {
     expect(box).toMatch(/<h2[^>]*>Box access<\/h2>/)
-    expect(buttonsIn(acts(box))).toEqual(['Replace policy', 'Edit'])
-    expect(count(box, 'bx-btn--brand')).toBe(1)
-    expect(count(acts(box), 'bx-btn--brand')).toBe(1)
+    /* The action, then its chevron, which carries a glyph and no words. Replace policy is inside that chevron's
+       menu, which static markup never opens (owner, 21 Oct 2026: "move the options inside the dropdown button"). */
+    expect(buttonsIn(acts(box))).toEqual(['Edit policy', ''])
+    expect(acts(box)).toContain('bx-split')
+    expect(acts(box)).toContain('aria-label="More for this policy"')
+    expect(orange(box)).toBe(1)
+    expect(orange(acts(box))).toBe(1)
   })
 
-  it('puts the status behind its pill: a labelled menu, and no switch or Remove out in the open', () => {
-    expect(box).toContain('aria-label="Status: Active. Change status"')
-    expect(box).toContain('aria-haspopup="menu"')
+  it('says the status in a plain chip, with every switch in the head\'s one menu', () => {
+    /* The pill was the trigger until 22 Oct 2026, when the owner gave up on making a tinted tag read as pressable
+       ("make it a chip only now, no action, and move the action to the main action button"). So: a chip that is
+       not a button, and the switches it used to hold are items of the head\'s menu, which static markup does not
+       open — hence none of their words appear below. */
+    expect(box).toContain('class="apol__status"')
+    expect(box).not.toContain('aria-label="Status: Active. Change status"')
     const all = buttonsIn(box)
     for (const word of ['Turn off', 'Monitor', 'Turn on', 'Remove', 'Remove from Box', 'Show in builder', 'Delete draft']) expect(all).not.toContain(word)
     expect(t).not.toContain('Show in builder')
@@ -331,11 +348,15 @@ describe.runIf(APP_POLICY_GLANCE)('the Policies tab at a glance', () => {
     const rules = rulesOf(aws)
     const canvas = rules.slice(0, rules.indexOf('apol__rulesfoot'))
     const own = showcaseTenant().policies.find((p) => p.id === 'sc-aws-engineering')!
-    const badged = [...own.rules.map((r) => r.id), 'fallback'].filter((id) => cardOutcome(own, id) !== null)
-    expect(badged.length).toBeGreaterThanOrEqual(2)
-    expect(count(canvas, 'class="bb__said"')).toBe(badged.length)
-    expect(rules).not.toContain('>Complete<')
-    expect(rules).not.toContain('>Always on<')
+    /* NO outcome badge on these cards since 22 Oct 2026 (owner: "the user can open and see the result, so I
+       don't want to showcase that twice"), and no state pill either ("remove this as well"). The head is the
+       number and the name; the decision is read by opening the rule. */
+    expect(own.rules.length).toBeGreaterThanOrEqual(2)
+    expect(count(canvas, 'class="bb__said"')).toBe(0)
+    /* This is the GLANCE layout (FOCUS off), which the owner does not use. With no outcome badge to stand in its
+       place, the builder's own state pill is what its heads carry again. On the layout he does use, the pill is
+       hidden in applications.css; nothing here asserts on that, because hiding is not removing. */
+    expect(rules).toContain('>Complete<')
   })
 
   it('gives each card one keyboard stop, its title, which says what it opens', () => {
@@ -552,5 +573,28 @@ describe('Add existing policy', () => {
     expect(out).toMatch(/<button[^>]*disabled=""[^>]*>Add this policy<\/button>/)
     expect(t).not.toContain('Add a copy')
     expect(out).not.toContain('bapr__stack')
+  })
+})
+
+/* The Policies tab on the policy alone (21 Oct 2026): the rules wide, the facts beside them, Sign-in activity a button
+   that opens it in a panel. */
+describe('the Policies tab on the policy alone', () => {
+  const box = renderIn(true, <ApplicationPage appId="box" />)
+
+  it('heads the policy with Edit policy and one chevron holding the rest, still the view’s one orange control', () => {
+    const acts = box.slice(box.indexOf('apol__acts'), box.indexOf('</div>', box.indexOf('apol__acts')))
+    /* Sign-in activity, Check access and Replace policy are all inside the chevron's menu now; this head draws
+       nothing beside it. */
+    expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', ''])
+    expect(acts).toContain('aria-label="More for this policy"')
+    expect(acts).not.toContain('Replace policy')
+    expect(orange(box)).toBe(1)
+  })
+
+  it('draws the rules wide straight under the policy name and buttons, and the activity table not at all until the button is pressed', () => {
+    expect(box).toContain('class="apol__focus"')
+    expect(box).not.toContain('insp__hero')
+    expect(box).not.toContain('aria-label="Find a person in Box sign')
+    expect(box).not.toContain('apol__pair')
   })
 })

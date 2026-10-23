@@ -47,7 +47,8 @@
    here ellipsizes rather than folding. */
 .bb {
   --bb-insp: 560px;
-  --bb-card: 520px;
+  --bb-card-edit: 520px;
+  --bb-card: var(--bb-card-edit);
   --bb-dot: #d3dae1;
   --bb-stage: #f6f7f9;
   --bb-link: var(--border-default);
@@ -3776,7 +3777,12 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
   display: block;
   border: var(--bw-thin) solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: var(--bb-stage);
+  /* The builder's own dotted ground wherever the chain is drawn (owner, 21 Oct 2026: "use the same canvas background,
+     globally"): not a flat grey. The dots at their true size, no pan or zoom to follow. */
+  background-color: var(--bb-stage);
+  background-image: radial-gradient(circle, var(--bb-dot) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  background-position: 0 0;
 }
 .insp__canvas .bb__stage { width: auto; position: relative; inset: auto; height: auto; overflow: visible; cursor: default; }
 .insp__canvas .bb__world { position: static; transform: none !important; padding: var(--space-6); }
@@ -3817,9 +3823,15 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
    picked — a thin border running blue through the colours down its left side and fading out to the right, with a
    soft glow of the same colours inside — here blue, violet, teal and green, never orange or red (Save policy's and
    Deny's). The edge and the glow are layers that fade in; nothing turns or moves. */
+/* OUT OF THE CHAIN'S WAY (owner, 22 Oct 2026: "move it somewhere else where this distracts the user from seeing
+   the whole thing — maybe move it left, or a toolbox, whatever helps to take minimum space").
+
+   It sat centred above the view dock, which on a long policy put a floating pill straight over the cards and on a
+   short one left two objects stacked in the middle of an empty canvas. Bottom left: the chain is centred, so the
+   left gutter is the one place on this canvas that never holds a card, and the dock keeps the middle. */
 .bb__magicat {
-  grid-column: 2; grid-row: 1; align-self: end; justify-self: center;
-  z-index: 5; margin-bottom: 68px;
+  grid-column: 2; grid-row: 1; align-self: end; justify-self: start;
+  z-index: 5; margin: 0 0 var(--space-6) var(--space-6);
   max-width: calc(100% - var(--space-9));
 }
 .bb__magic {
@@ -3868,19 +3880,27 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__magic:hover::before, .bb__magic:hover::after,
 .bb__magic:focus-visible::before, .bb__magic:focus-visible::after,
 .bb__magic.has-context::before, .bb__magic.has-context::after { opacity: 1; }
-.bb__magic__mark { flex: none; color: var(--text-tertiary); transition: color var(--dur-normal) var(--ease-standard); }
+.bb__magic__mark {
+  flex: none; color: var(--text-tertiary);
+  transition: color var(--dur-normal) var(--ease-standard), transform var(--dur-normal) var(--ease-standard);
+}
 .bb__magic:hover .bb__magic__mark,
 .bb__magic:focus-visible .bb__magic__mark,
 .bb__magic.has-context .bb__magic__mark { color: var(--mg-a); }
-/* The selected card it opens on: a quiet chip after the word. */
-.bb__magic__ctx {
-  display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0;
-  height: 24px; padding: 0 var(--space-3);
-  border-radius: var(--radius-full);
-  background: var(--tint-blue-bg); color: var(--tint-blue-fg);
-  font-size: var(--fs-sm); font-weight: var(--fw-medium);
-}
-.bb__magic__ctxname { min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The mark leans in as the ring lights, and the pill lifts a pixel off the canvas: the whole control answers the
+   pointer rather than just repainting its edge. A plain button, not a motion element, so a transform is safe here
+   (CLAUDE.md's rule is about Motion owning its own). */
+.bb__magic:hover .bb__magic__mark,
+.bb__magic:focus-visible .bb__magic__mark { transform: scale(1.12) rotate(-6deg); }
+.bb__magic { transition: box-shadow var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard), transform var(--dur-normal) var(--ease-standard); }
+.bb__magic:hover, .bb__magic:focus-visible { transform: translateY(-1px); }
+.bb__magic:active { transform: translateY(0); }
+/* The selected-card chip that stood here is gone (owner, 22 Oct 2026); DescribeMagic.tsx says why. */
 @media (prefers-reduced-motion: reduce) {
   .bb__magic, .bb__magic::before, .bb__magic::after, .bb__magic__mark { transition: none; }
+  .bb__magic:hover, .bb__magic:focus-visible, .bb__magic:hover .bb__magic__mark, .bb__magic:focus-visible .bb__magic__mark { transform: none; }
 }
+
+/* The applications picker is a form, not a rule's parts: no guide rule down its left (owner, 21 Oct 2026: "the line is
+   overlapped with the content and not aligned"), so the search, the chips and the list share the heading's own edge. */
+.bb__insp .bb__apps__sec > .bb__sec__body { margin-left: 0; padding-left: 0; border-left: 0; }

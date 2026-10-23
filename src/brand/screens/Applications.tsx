@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AppWindow, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { AppWindow, Pencil, Plus, Trash2 } from 'lucide-react'
 
-import { Button, RowMenu, SearchBox, type MenuItem } from '../kit'
+import { Button, IconButton, SearchBox } from '../kit'
 import { EmptyState, NoMatches } from '../empty'
 import { PageHead } from '../Shell'
 import { AppLogo } from '../logos/AppLogo'
@@ -27,14 +27,22 @@ import { SHOWCASE } from '../showcase'
    Add application opens Choose application, the live catalogue (AppCatalog,
    13 Oct 2026; spec docs/specs/APP-CREATE-AND-ACCESS.md §3).
 
-   The name opens the application's own page, on Policies. The row menu is the
-   live one's, less App Access Configuration: Edit (the page's Basic tab), Users
-   and groups (the live "Show Associated Entities", the page's Users tab), and
-   Delete. Delete is still a toast: deleting an application needs
-   ConfirmDelete's refuse-while-live contract, the saved sign-ins that name it
-   and its retired id, and none of that is built (spec §5). The Protection cell
-   keeps its quick add: the protection panel, where new and existing are both
-   visible before either is chosen.
+   The name opens the application's own page, on Policies. Actions are two
+   icon buttons in the column rather than a kebab (owner, 22 Oct 2026: "we can
+   remove the three dots from here and have icon buttons in the column, and
+   remove Users and groups because the user can go inside to do whatever, so we
+   can have 2 buttons"): Edit, which opens the page's Basic tab, and Delete.
+   Users and groups was the third, and it only went to a tab of the page the
+   name already opens — a menu whose own row made it redundant. Two buttons
+   read at a glance where a kebab costs a press to find out it held three
+   items, one of them a duplicate.
+
+   Delete is still a toast: deleting an application needs ConfirmDelete's
+   refuse-while-live contract, the saved sign-ins that name it and its retired
+   id, and none of that is built (spec §5). It is neutral, not red: a
+   destructive trigger carries no colour and the confirm it opens carries it
+   all. The Protection cell keeps its quick add: the protection panel, where
+   new and existing are both visible before either is chosen.
    -------------------------------------------------------------------------- */
 
 type SortKey = 'name' | 'type' | 'protection' | 'updated'
@@ -47,12 +55,6 @@ const ROW_H = 52
 
 const NOT_BUILT = SHOWCASE ? 'Coming soon.' : 'Not built in this prototype.'
 const APP_VIEWS = LIB_VIEWS.map((v) => (v.id === 'table' ? v : { ...v, disabled: true, note: NOT_BUILT }))
-
-const ROW_ACTIONS: MenuItem[] = [
-  { id: 'edit', label: 'Edit application', icon: Pencil },
-  { id: 'people', label: 'Users and groups', icon: Users },
-  { id: 'delete', label: 'Delete application', icon: Trash2, danger: true, divide: true },
-]
 
 export function Applications() {
   const store = useBrand()
@@ -183,7 +185,7 @@ export function Applications() {
                       {head('type', 'App type')}
                       {head('protection', 'Policy')}
                       {head('updated', 'Last updated')}
-                      <th scope="col" className="btable__actions btable__col-actions">
+                      <th scope="col" className="btable__actions btable__col-actions btable__col-actions--pair">
                         Actions
                       </th>
                     </tr>
@@ -247,15 +249,14 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
       <td className="u-muted" title={app.lastUpdated}>
         {app.lastUpdated.replace(/:\d\d$/, '')}
       </td>
-      <td className="btable__actions">
-        <RowMenu
-          label={`Actions for ${app.name}`}
-          items={ROW_ACTIONS}
-          onSelect={(id) => {
-            if (id === 'edit') store.go({ name: 'application', appId: app.id, tab: 'basic' })
-            else if (id === 'people') store.go({ name: 'application', appId: app.id, tab: 'users' })
-            else store.showToast(SHOWCASE ? 'Deleting applications is coming soon.' : 'Deleting applications is not built in this prototype.')
-          }}
+      <td className="btable__actions btable__actions--pair">
+        <IconButton icon={Pencil} label={`Edit ${app.name}`} onClick={() => store.go({ name: 'application', appId: app.id, tab: 'basic' })} size="sm" tone="ghost" />
+        <IconButton
+          icon={Trash2}
+          label={`Delete ${app.name}`}
+          onClick={() => store.showToast(SHOWCASE ? 'Deleting applications is coming soon.' : 'Deleting applications is not built in this prototype.')}
+          size="sm"
+          tone="ghost"
         />
       </td>
     </tr>

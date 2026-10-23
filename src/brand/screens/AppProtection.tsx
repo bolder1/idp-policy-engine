@@ -3,7 +3,7 @@ import { useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Pencil, ShieldPlus, Unlink } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, Modal, Note, RowMenu, StatusPill, TipDot, type MenuItem } from '../kit'
+import { Badge, Button, Callout, Confirm, Drawer, Note, RowMenu, StatusPill, TipDot, type MenuItem } from '../kit'
 import { EmptyState } from '../empty'
 import { Picker } from '../picker'
 import { AppLogo } from '../logos/AppLogo'
@@ -14,7 +14,7 @@ import { appsOf, blankPolicy, nameTaken, type Policy } from '../data'
 import { DECISION_WORDS } from '../decision-words'
 import { isPostSignIn } from '../post-sign-in'
 import { ApplicationFixed } from './scope-fields'
-import { attachKind, attachTo, attachableTo, detachFrom, rulesLabel } from './app-policies'
+import { REMOVE_RUNS_CHECKS, attachKind, attachTo, attachableTo, detachFrom, rulesLabel } from './app-policies'
 import { appStanding, deciderChanges, keyName, rowTip, visibleMoves, whoLabel, type Key, type StandRow } from './app-standing'
 import { addToApp, attachNote, existingHint, removeCopy, removeFromApp } from './applications-model'
 import { useAppsGuard } from './board/apps-guard'
@@ -188,7 +188,9 @@ export function AppProtection({
     if (!app) return
     const live = store.policyById(policyId)
     if (!live || live.isSystem) return
-    if (!appsGuard.guards(live)) return takeOff(policyId)
+    /* Same gesture as the Policies tab's Remove, so the same answer (app-policies.ts `REMOVE_RUNS_CHECKS`):
+       the confirm has named who moves where, and the press writes. */
+    if (!REMOVE_RUNS_CHECKS || !appsGuard.guards(live)) return takeOff(policyId)
     appsGuard.check(live, detachFrom(live, app.id).appIds, () => takeOff(policyId))
   }
 
@@ -638,21 +640,17 @@ export function RemoveDialog({
   const copy = policy ? removeCopy(policy, app) : null
 
   return (
-    <Modal
+    /* Shell only. The `moves` block below — who moves to which policy — is the
+       obvious next thing to become real `rows`, but that is a redesign rather
+       than a migration, and this dialog sits in the Replace flow another session
+       is currently debugging for a hang. Its insides are left alone on purpose. */
+    <Confirm
       open={!!policy}
       onClose={onCancel}
+      tone="removed"
       title={`Remove ${policy?.name ?? 'this policy'} from ${app.name}?`}
-      width={480}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={onConfirm}>
-            Remove
-          </Button>
-        </>
-      }
+      confirmLabel="Remove"
+      onConfirm={onConfirm}
     >
       {copy && (
         <div className="bapr__confirm">
@@ -678,6 +676,6 @@ export function RemoveDialog({
           )}
         </div>
       )}
-    </Modal>
+    </Confirm>
   )
 }

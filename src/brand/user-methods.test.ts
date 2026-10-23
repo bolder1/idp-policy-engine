@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { SEED_ENROLMENT, activateIn, enrolIssue, isEmail, isPhone, questionPlan, readyFor } from './user-methods'
+import { SEED_ENROLMENT, activateIn, enrolIssue, enrolShapeFor, gridSequence, isEmail, isPhone, questionPlan, readyFor } from './user-methods'
 
 describe('readyFor', () => {
   it('is ready when enrolled, when there is nothing to set up, or when a token is held', () => {
@@ -74,5 +74,21 @@ describe('what a person types', () => {
     expect(enrolIssue('passkey', { device: 'Security key' })).toBeNull()
     /* Registered by scanning, or not configured by the admin: nothing to type. */
     expect(enrolIssue('authenticator', {}, 3, 'scan')).toBeNull()
+  })
+})
+
+/* Grid Pattern is configured by the person (21 Oct 2026): four tiles, then their numbers in the order picked. */
+describe('grid pattern enrolment', () => {
+  it('is a form of its own, so the row offers Configure', () => {
+    expect(enrolShapeFor('grid').kind).toBe('grid')
+  })
+
+  it('waits for four tiles and a sequence, and only accepts the numbers on the tiles in the order picked', () => {
+    expect(enrolIssue('grid', { tiles: '0,1,2' })?.message).toBe('')
+    expect(enrolIssue('grid', { tiles: '0,1,2,3' })?.message).toBe('')
+    /* Tiles 5, 6, 9, 10 hold 4, 5, 6, 0. */
+    expect(gridSequence('5,6,9,10')).toBe('4560')
+    expect(enrolIssue('grid', { tiles: '5,6,9,10', sequence: '0654' })?.message).toMatch(/order/)
+    expect(enrolIssue('grid', { tiles: '5,6,9,10', sequence: '4560' })).toBeNull()
   })
 })

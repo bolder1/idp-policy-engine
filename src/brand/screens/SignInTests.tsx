@@ -48,7 +48,7 @@ import {
 } from './sign-in-tests/sign-in-card'
 import { TryJourney } from './sign-in-tests/TryJourney'
 import { InspectPanel } from './sign-in-tests/InspectPanel'
-import { isPeek, type InspectTarget } from './sign-in-tests/inspect-model'
+import { isPeek, type InspectTarget, type SeeRun } from './sign-in-tests/inspect-model'
 import { openerOf, popupOpen, refocus } from './sign-in-tests/page-keys'
 import { SavedPanel, TryPanel, WhyPanel } from './sign-in-tests/TryPanel'
 import { useSimEnv } from './sim-env'
@@ -61,7 +61,9 @@ import { tokenDomId, tokenOfField, type TokenId } from './testing/sign-in-senten
 /* The builder's sheet: the page wears its bar, region, dock and panel, and
    may be the first of the two opened in a visit. */
 import './board/board.css'
-import { BREAK_IN_ATTEMPTS, CANVAS_OPTIONS, DENIAL_REASONS, INSPECTOR, OPEN_AT_ONCE, SAVED_SIGN_INS } from './sign-in-tests/phase'
+import { BREAK_IN_ATTEMPTS, CANVAS_OPTIONS, DENIAL_REASONS, INSPECTOR, SAVED_SIGN_INS } from './sign-in-tests/phase'
+import { useRunFlags } from './sign-in-tests/check-version'
+import { CheckVersionSwitch } from './sign-in-tests/CheckVersionSwitch'
 import { CanvasSwitch } from './sign-in-tests/CanvasSwitch'
 import { setCheckStage, useCheckStage, useFavourites, useStageFollowsTheme } from './sign-in-tests/canvas-shelf'
 import { JARVIS_END_MS, JARVIS_MID_MS, JarvisButton, JarvisTransition, type JarvisPhase } from './sign-in-tests/jarvis-mode/JarvisMode'
@@ -217,6 +219,10 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   const env = useSimEnv()
   const reduced = useReducedMotion() === true
   const panelId = useId()
+  /* The version's word on it (check-version.ts, 20 Oct 2026): phase.ts says what is available, Classic turns it off.
+     Named as the flag so every line that read the flag reads it unchanged. */
+  const runFlags = useRunFlags()
+  const OPEN_AT_ONCE = runFlags.openAtOnce
 
   const [tab, setTab] = useState<SignInTestsTab>(TABLES ? routeTab : 'try')
   /* The route's tab, as last seen: a new one from outside moves the page. */
@@ -290,7 +296,7 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
     panelWas.current = panel
     if (panel !== 'why' && panel !== 'form') backTo.current = null
     else if (OPEN_AT_ONCE && was === 'blocked') backTo.current = 'blocked'
-  }, [panel])
+  }, [panel, OPEN_AT_ONCE])
   /* The canvas's zoom, from the dock: the run's column scaled, the dots with it. */
   const [zoom, setZoom] = useState(1)
   /* The layout the run is drawn in, while the layouts are compared (phase.ts `CANVAS_OPTIONS`) — Focus, whatever was
@@ -746,14 +752,19 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
   }
   /* The details panel: a name pressed on the run puts that one thing in the right-hand panel, fresh — one page, no way
      back (owner, 6 Oct 2026: "I don't want this multi-page thing"). Edit in builder is the way out. */
-  const [inspect, setInspect] = useState<{ target: InspectTarget; plan: EngineRun } | null>(null)
-  const onInspect = (t: InspectTarget, plan: EngineRun) => {
+  /* `see`: the sign-in the run is of, for What they see — a page of this panel (owner, 20 Oct 2026: "open in the right
+     side panel as a specific view"), from the outcome's Preview or the deciding policy's details. */
+  const [inspect, setInspect] = useState<{ target: InspectTarget; plan: EngineRun; see: SeeRun | null } | null>(null)
+  const onInspect = (t: InspectTarget, plan: EngineRun, _fresh?: boolean, see?: SeeRun | null) => {
     noteOpener()
-    setInspect({ target: t, plan })
+    setInspect({ target: t, plan, see: see ?? null })
     setPanel('inspect')
   }
+  /* A name pressed inside the panel: its page takes the place of the one shown, for the same run — one page, no way back. */
+  const openInPanel = (t: InspectTarget) => setInspect((cur) => (cur ? { ...cur, target: t } : cur))
   const PEEK_SCREEN = { zone: { name: 'zones' }, device: { name: 'fingerprint' }, risk: { name: 'risk-signals' }, hook: { name: 'hooks' }, app: { name: 'applications' } } as const
   const editInBuilder = (t: InspectTarget) => {
+    if (t.kind === 'see') return
     if (isPeek(t)) return t.kind === 'person' ? undefined : go(PEEK_SCREEN[t.kind])
     /* The builder opens on the policy itself, not its Check access (owner, 20 Oct 2026: "when I go inside the builder,
        don't start with Check access mode; start with the policy builder part"). The sign-in still rides along, so the
@@ -841,16 +852,24 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
       <BoardBarPlain
         title={ACCESS_CHECKS}
         actions={
-          CANVAS_OPTIONS && CANVAS_PICKER ? (
-            <>
-              <CanvasSwitch value={layout} onChange={setLayout} favourites={favourites} />
-              {/* Focus has no button of its own (owner, 4 Oct 2026: Focus is the main view — the Canvas dropdown leads
-                  to it, first on both shelves; v1 is archived, so no version switch); Aruna's way in stands on the
-                  canvas, not here. */}
-              {/* Reasoning and Guided tour · Soon are hidden for now (owner, 4 Oct 2026: "you can hide this as of
-                  now … hide this as well, no need") — CanvasReasoning.tsx and GuidedTourSoon.tsx are kept. */}
-            </>
-          ) : undefined
+          <>
+            {CANVAS_OPTIONS && CANVAS_PICKER ? (
+              <>
+                <CanvasSwitch value={layout} onChange={setLayout} favourites={favourites} />
+                {/* Focus has no button of its own (owner, 4 Oct 2026: Focus is the main view — the Canvas dropdown leads
+                    to it, first on both shelves; v1 is archived, so no version switch); Aruna's way in stands on the
+                    canvas, not here. */}
+                {/* Reasoning and Guided tour · Soon are hidden for now (owner, 4 Oct 2026: "you can hide this as of
+                    now … hide this as well, no need") — CanvasReasoning.tsx and GuidedTourSoon.tsx are kept. */}
+              </>
+            ) : null}
+            {/* Shown under SHOWCASE too (owner, 20 Oct 2026: "give me the classic version of Check access, where we used
+                to have the old version, the multiple-policy one, and the current v2 as a modern one based on the current
+                product state"): the versions are his to present and switch between in the browser, so this one compare
+                control is not gated on SHOWCASE, against the rule for A/B controls (phase.ts VERSION_SWITCH). Classic · v3
+                since he withdrew v2 the same day ("Remove v2, no need, it's bad"). */}
+            <CheckVersionSwitch />
+          </>
         }
       />
       {/* The builder's region: the dotted ground under the canvas and the
@@ -869,6 +888,8 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
             zoom={zoom}
             onZoom={setZoom}
             onInspect={INSPECTOR ? onInspect : undefined}
+            inspected={INSPECTOR && panel === 'inspect' && inspect ? inspect.target : null}
+            onCloseInspect={() => closePanel(true)}
             onNode={() => openPanel(() => focusRow('person', true))}
             onAdd={(f) => openPanel(() => focusRow(tokenOfField(f), true))}
             onAskSave={() => openPanel(() => setSaveOpen(true))}
@@ -963,6 +984,8 @@ export function SignInTests({ tab: routeTab = 'try' }: { tab?: SignInTestsTab })
               onToggleWidth={() => setWide((w) => !w)}
               onClose={() => closePanel(true)}
               onEdit={editInBuilder}
+              see={inspect.see}
+              onOpen={openInPanel}
             />
           )}
           {panel === 'saved' && (

@@ -118,6 +118,22 @@ export interface GuardInput {
   changedFrom: Pick<Policy, 'rules' | 'fallback'> | null
   /** The tenant as it stands (the store's policies). */
   policies: readonly Policy[]
+  /* OTHER policies that also change in the same press, applied on top of
+     `after` when the tenant's after-state is built (owner, 22 Oct 2026).
+
+     `after` is one policy, and `withPolicy` puts that one in its slot, so a
+     press that changes two was modelled as a press that changed one. Replace
+     policy is exactly that press: the new policy is attached and the old one
+     detached together, and with only the new one named the checks ran against
+     a tenant where BOTH sat on the application — a state one application, one
+     sign-in policy forbids. If the old policy outranked the new one for
+     somebody, the checks saw their decider unchanged and passed clean on a
+     change that moved them.
+
+     The BEFORE state is deliberately untouched: both policies really are on
+     the application until the write happens, and that is what the checks
+     compare against. */
+  alsoAfter?: readonly Policy[]
   env: SimEnv
   apps: readonly App[]
   savedSignIns: readonly SavedSignIn[]
@@ -303,7 +319,7 @@ function breakInMoves(was: BreakInResult, now: BreakInResult): BreakInMove[] {
 
 export function runGuard(input: GuardInput): GuardResult {
   const { kind, before, after, policies, env, savedSignIns, adminId } = input
-  const policiesAfter = withPolicy(policies, after)
+  const policiesAfter = (input.alsoAfter ?? []).reduce<readonly Policy[]>(withPolicy, withPolicy(policies, after))
   const apps = new Set(appsOfBoth(before, after))
 
   /* Saved sign-ins: every one on this policy's applications, and any other

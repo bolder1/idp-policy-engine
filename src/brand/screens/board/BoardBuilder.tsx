@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, History as PastIcon, Keyboard, ListChecks, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Redo2, ShieldAlert, Trash2, Undo2, Users, Wrench, type LucideIcon } from 'lucide-react'
 
-import { Button, Modal, Tip } from '../../kit'
+import { Confirm, Modal, Tip } from '../../kit'
 import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
 import { dictionaryOf, type AnswerKey, type DescribeTenant, type RuleIds } from '../../create/describe-model'
 import { checksView, withChecks, type CheckContext } from '../../create/describe-checks'
@@ -22,7 +22,7 @@ import { arrivalKey, firstArrival, landFix, type ArriveFix } from './arrive-fix'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { afterPaint, guardOpens, isStale, overridePatch, patchSignIns, tryRunGuard, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from '../guard'
 import { GuardDrawer } from '../guard-page'
-import { offersMonitorAfterSave, portalRoot, statusToast } from '../status-options'
+import { offersMonitorAfterSave, portalRoot, statusToast, monitorOffered } from '../status-options'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, revertTo, undo, type History } from '../history'
 import { useSimEnv } from '../sim-env'
 import { boardPagesAllowed } from '../testing/board-views'
@@ -1377,7 +1377,7 @@ export function BoardBuilder({
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
     ...(canTest ? ([{ id: 'try', label: testOn ? `Close ${ACCESS_CHECK}` : ACCESS_CHECK, kbd: 'T', icon: LogIn }] as Cmd[]) : []),
     ...(testOn ? views.map((v) => ({ id: `view:${v}`, label: DOCK_TAB_LABEL[v], icon: VIEW_ICON[v] }) as Cmd) : []),
-    ...(describeDoorCmd ? ([{ id: 'describe', label: GUIDED_SETUP ? 'Start guided setup' : 'Describe it', icon: GUIDED_SETUP ? ListChecks : PenLine }] as Cmd[]) : []),
+    ...(describeDoorCmd ? ([{ id: 'describe', label: GUIDED_SETUP ? 'Guide me' : 'Describe it', icon: GUIDED_SETUP ? ListChecks : PenLine }] as Cmd[]) : []),
     ...(editing ? draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd) : []),
   ]
 
@@ -2038,7 +2038,7 @@ export function BoardBuilder({
        leaves draft only by being saved, so what is monitored is what was just
        on screen. The first save leaves it off, and the toast offers the one
        step on. */
-    const canMonitor = offersMonitorAfterSave(saved, next, { monitor: store.features.monitorMode })
+    const canMonitor = offersMonitorAfterSave(saved, next, { monitor: monitorOffered(store.features) })
     store.showToast(
       commitToast(saved, next),
       canMonitor
@@ -2495,7 +2495,7 @@ export function BoardBuilder({
       {describeDoor && !DESCRIBE_BAR && (draft.rules.length > 0 || scratch) && (
         <button type="button" className="bdsc-door" onClick={openDescribe}>
           {GUIDED_SETUP ? <ListChecks size={14} strokeWidth={2} aria-hidden /> : <PenLine size={14} strokeWidth={2} aria-hidden />}
-          {GUIDED_SETUP ? 'Start guided setup' : 'Describe it'}
+          {GUIDED_SETUP ? 'Guide me' : 'Describe it'}
         </button>
       )}
 
@@ -2696,7 +2696,7 @@ export function BoardBuilder({
             policyName={saved.name}
             result={guard.result}
             run={guard.run}
-            primaryLabel={guard.kind === 'turn-on' ? 'Turn on' : features.publish ? 'Publish policy' : 'Save policy'}
+            primaryLabel={guard.kind === 'turn-on' ? 'Make active' : features.publish ? 'Publish policy' : 'Save policy'}
             onConfirm={() => {
               setGuardOpen(false)
               publish(guard.intent)
@@ -2722,24 +2722,18 @@ export function BoardBuilder({
         )}
 
       {/* Only when a saved draft would go. Unsaved edits alone revert as an undoable step. */}
-      <Modal
+      <Confirm
         open={confirmDiscard}
         onClose={() => setConfirmDiscard(false)}
+        tone="warning"
+        shape="hero"
         title="Discard draft?"
-        width={440}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirmDiscard(false)}>
-              Keep draft
-            </Button>
-            <Button variant="danger" onClick={revert}>
-              Discard
-            </Button>
-          </>
-        }
+        cancelLabel="Keep draft"
+        confirmLabel="Discard"
+        onConfirm={revert}
       >
-        <p className="bx-leave__body">The policy goes back to its live rules.</p>
-      </Modal>
+        The policy goes back to its live rules.
+      </Confirm>
 
     </div>
     </PostBoardContext.Provider>

@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Check, Copy, Monitor, QrCode, Settings, ShieldCheck, Smartphone, X } from 'lucide-react'
+import { ArrowUpRight, Check, Copy, Monitor, QrCode, Settings, ShieldCheck, Smartphone, X } from 'lucide-react'
 
 import { Button, IconButton, TipDot, Toggle } from '../kit'
 import { Picker } from '../picker'
 import { useBrand } from '../store'
 import type { AuthMethod } from '../methods'
 import {
+  GRID_NUMBERS,
+  GRID_PICKS,
   SECURITY_QUESTIONS,
   enrolIssue,
   PROFILE,
@@ -218,7 +220,7 @@ export function UserMethodCard({
     <div className={`bm8__card bm8__card--method bmu__card ${open ? 'is-open' : ''}`}>
       <div className="bmu__head">
         <span className="bm8__tile bm8__tile--logo" aria-hidden>
-          <MethodIcon name={m.name} size={36} />
+          <MethodIcon name={m.name} size={36} plain />
         </span>
 
         <div className="bm8__info">
@@ -458,6 +460,41 @@ export function EnrolForm({
       )
     }
 
+    case 'grid': {
+      const tiles = (draft.tiles ?? '').split(',').filter(Boolean)
+      const press = (i: number) => {
+        const at = String(i)
+        const next = tiles.includes(at) ? tiles.filter((t) => t !== at) : tiles.length < GRID_PICKS ? [...tiles, at] : tiles
+        onDraft('tiles', next.join(','))
+        /* A new pattern is a new sequence to type. */
+        onDraft('sequence', '')
+      }
+      return (
+        <>
+          <Steps>
+            <Step n={1} title={`Select the ${GRID_PICKS} tiles forming a unique pattern`}>
+              <div className="bmu__grid" role="group" aria-label="Pattern grid">
+                {GRID_NUMBERS.map((num, i) => (
+                  <button key={i} type="button" className={`bmu__tile${tiles.includes(String(i)) ? ' is-on' : ''}`} aria-pressed={tiles.includes(String(i))} aria-label={`Row ${Math.floor(i / 4) + 1}, column ${(i % 4) + 1}, ${num}`} onClick={() => press(i)}>
+                    {num}
+                  </button>
+                ))}
+              </div>
+            </Step>
+            <Step n={2} title="Enter the numbers in selected order sequence">
+              <p className="bmu__hint">Remember the exact sequence of locations you select, as you will need to select the same locations to sign in.</p>
+              <label className="bmu__field">
+                <span className="u-sr-only">Numbers in the sequence</span>
+                <input value={draft.sequence ?? ''} inputMode="numeric" placeholder="Enter numbers in the sequence" onChange={(e) => onDraft('sequence', e.target.value)} />
+              </label>
+              {errorLine(`${uid}-gerr`, issue?.message || null)}
+            </Step>
+          </Steps>
+          {footer('Confirm pattern')}
+        </>
+      )
+    }
+
     case 'push-app':
     case 'authenticator': {
       if (shape.setup === 'unavailable') {
@@ -613,11 +650,18 @@ export function EnrolForm({
    phone number in a non-editable format"). One card for the panel: the fields its methods send to, each with what is
    on file, or "Not added". Changing them is on the profile page, not here. */
 export function ProfileFacts({ methods }: { methods: readonly Pick<AuthMethod, 'id'>[] }) {
+  const { showToast } = useBrand()
   const fields = [...new Set(methods.flatMap((m) => profileFieldsFor(m.id) ?? []))] as ProfileField[]
   if (fields.length === 0) return null
   return (
     <section className="bmu__profile" aria-label="From your profile">
-      <h3 className="bmu__profilehead">From your profile</h3>
+      <div className="bmu__profilebar">
+        <h3 className="bmu__profilehead">From your profile</h3>
+        {/* Opens the profile page in this tab, where the phone and the email are changed (21 Oct 2026). The page is not built yet. */}
+        <Button variant="link" size="sm" iconRight={ArrowUpRight} onClick={() => showToast('Your profile page is not built in this prototype.')}>
+          Update information
+        </Button>
+      </div>
       <dl className="bmu__profilegrid">
         {fields.map((k) => (
           <div key={k}>

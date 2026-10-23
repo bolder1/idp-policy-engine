@@ -138,3 +138,16 @@ export const deleteConfirmed = (typed: string): boolean => typed.trim().toUpperC
     passing. Never while the delete is refused, since there is nothing to arm. */
 export const asksForDeleteWord = (impact: DeleteImpact | undefined, requireTyped = false): boolean =>
   (impact?.stuck.length ?? 0) === 0 && (requireTyped || (impact?.live.length ?? 0) > 0)
+
+/** Whether a delete confirmation asks for a tick instead — the ladder's middle
+    rung (docs/specs/POPUPS.md, edge case 6: "nothing -> checkbox -> typed
+    name", promised there and never built).
+
+    It is the case where nothing breaks today but something is left dangling:
+    only DRAFT or stopped policies name the object, so no sign-in changes when
+    it goes, and yet those rules will need another one before they can ever be
+    published. A plain confirm says nothing about that and the typed word
+    overstates it — the admin is not about to break anything, they are taking on
+    work. Never alongside the word: one rung at a time. */
+export const asksForDeleteTick = (impact: DeleteImpact | undefined, requireTyped = false): boolean =>
+  !asksForDeleteWord(impact, requireTyped) && (impact?.stuck.length ?? 0) === 0 && (impact?.later.length ?? 0) > 0

@@ -22,7 +22,12 @@ import { Focus2Brief } from './focus2-brief'
 import { footerBeside, saidOf } from './focus2-brief-model'
 import { Focus2Full, Focus2Reveal, type Focus2Calls } from './focus2-cards'
 import { CANVASBAR_FNS_LANE, CANVASBAR_H, CANVASBAR_LANE, CANVASBAR_NARROW, Focus2CanvasBar } from './focus2-canvasbar'
-import { DETAILS_IN_BAR, ONE_POLICY_CARD } from '../phase'
+import { DENIAL_REASONS, DETAILS_IN_BAR } from '../phase'
+import { denyReasonOf } from '../deny-reason'
+import { BoardRunChain } from './board-run'
+import { useBoardRunFold } from './board-run-fold'
+import { boardIdOf, groupOf, runFoldOn, runGroups } from './board-run-model'
+import { useRunFlags } from '../check-version'
 import { MORPH_HOLD, MORPH_LEAD, MORPH_STAGGER, ROW_H, STATION_OPENS, lineAt, overviewPlaces, rowLabel, type RouteRow, type StationKind, type StationSize } from './focus2-overview'
 import { readFocusView, writeFocusView, type FocusView } from './focus2-view'
 import { Focus2Route, LINE_S, RowFace, type RouteMood } from './focus2-route'
@@ -38,6 +43,7 @@ import { usePresenter } from './focus2-pace'
 import { playerKeyAction } from './focus2-player-model'
 import { beatOfCard, cardName, cardsOf, pickLabel } from './focus2-story'
 import { DIM_MS, playsLanding } from './focus2-draw-model'
+import { Focus2See } from './focus2-see'
 import { Focus2Bar } from './focus2-trail'
 import { trailOf } from './focus2-trail-model'
 import { useFocusWhy } from './focus2-why'
@@ -245,6 +251,19 @@ import './focus2.css'
    beat; the card's own breath, about 6.5 s to the answer), the brief's policy clause, and an answer's citation — a rule
    or a check lights the Policy card, and its row (`litRow`). The Why stays under that card's head. Off: four keys as
    they were.
+
+   THE RUN'S MOTION (20 Oct 2026; phase.ts RUN_MOTION). Every run tells its story — a Run, a past or blocked sign-in
+   opened at once, an edit, a mount, a Replay: the sentence states itself, the policy works card by card, the deciding
+   rule locks, the outcome lands last and stays open, the brief's room held from the first frame so nothing moves under
+   the answer. Escape lands it at once; reduced motion draws it landed. The flags are read through the viewer's version
+   (check-version.ts): Classic turns them, and ONE_POLICY_CARD, off — the run as it was.
+
+   V3: THE RUN ON THE BUILDER'S OWN CANVAS (20 Oct 2026; phase.ts BUILDER_CANVAS_CHECK; owner: "the v3 is mainly based on
+   how we have it in the builder's edit part … the same policy rule cards in the whole canvas instead of showing
+   everything in one card"). In the chain's place, under the same wrapper and the same brief room, the policy is drawn
+   on the builder's Board — its head, its own RuleCards and Nothing else matched, the outcome at the chain's end —
+   and read one card at a time (board-run.tsx, board-run-model.ts). The one-card v2 is withdrawn ("Remove v2, no need,
+   it's bad").
    -------------------------------------------------------------------------- */
 
 /* THE ROUTE MAP (owner, 5 Oct 2026: "just 4 simple cards will be enough"): Horizontal is the chain laid across the
@@ -322,11 +341,20 @@ const ARRIVE = 0.16
 const LANDING_MS = 1800
 /** The brief's fallback cue: this long after a landing whose cards stay open, it comes anyway. */
 const BRIEF_AFTER_MS = 1600
+/* Under the run's motion (RUN_MOTION, 20 Oct 2026) the policy's section has folded a beat before the answer lands and the
+   outcome stays open, so the brief follows the landing by this, never by the fallback above. */
+const BRIEF_MOTION_MS = 120
+/** The verdict's sound under the run's motion: this long after the outcome step is presented, as its title comes in. */
+const VERDICT_AT_MS = 200
 /* The brief over the cards (Both): its headline is at most this wide, and the cards stand this far under it. Before
    the headline has been measured — a static paint — it is planned at two lines and the finding line. */
 const HEAD_W = 760
 const HEAD_GAP = 12
 const HEAD_SEED = 112
+/* The headline's last measured height (RUN_MOTION, 20 Oct 2026): its room over the chain is held from a run's first frame,
+   at the height it had last time, so nothing moves under the answer as it opens. A module variable so the next view
+   mounted (the builder's, the page's on a revisit) starts from it too. */
+let lastHeadH: number | null = null
 /* A view turned on or off moves the cards even on a run drawn sharp: for this long their spring runs whatever
    `instant` says, so the band glides to its new place rather than jumping there. */
 const VIEW_MOVE_MS = 900
@@ -507,6 +535,10 @@ export default function Focus2Layout(
   },
 ) {
   const { plan, s, animate, reduced, jumped, runKey, form, asGroup, running } = props
+  /* The version's word on it (check-version.ts, 20 Oct 2026): phase.ts says what is available, Classic turns it off.
+     Named as the flag so every line that read the flag reads it unchanged. */
+  const runFlags = useRunFlags()
+  const ONE_POLICY_CARD = runFlags.onePolicy
   const look = useCheckStage()
   const { users, apps, zones } = useBrand()
   const stageRef = useRef<StageView | null>(null)
@@ -561,7 +593,8 @@ export default function Focus2Layout(
      the chain takes it and its nodes glide; `linksOn` draws them again once they have landed. */
   const [shape, setShape] = useState<FocusView>(view)
   const [linksOn, setLinksOn] = useState(true)
-  const across = chained && shape === 'horizontal'
+  /* Check access v3 has no across shape: the builder's canvas is one column (20 Oct 2026). */
+  const across = chained && shape === 'horizontal' && !runFlags.canvas
   /* The path's room. The chain down the canvas is a column that narrows with its lane (classic2.css `.rl-c2__chain`), so
      it is never handed more than the lane holds: the band's 560 floor (`pathWidth`) made its world wider than the lane
      left beside the questions on a canvas the Check access panel had already narrowed, and the chain ran under the
@@ -694,8 +727,9 @@ export default function Focus2Layout(
     setBriefOn(true)
     setBriefPressed(false)
     setCarouselOn(false)
-    /* Told on mount and on Replay; a Run after the first of the session lands straight away. */
-    setQuickKey(!tell.current && storyTold ? runKey : null)
+    /* Told on mount and on Replay; a Run after the first of the session lands straight away. Under the run's motion
+       (RUN_MOTION; owner, 20 Oct 2026: "always animated") every run is told: Run, a past or blocked sign-in, an edit. */
+    setQuickKey(!runFlags.motion && !tell.current && storyTold ? runKey : null)
     tell.current = false
     born.current = new Set<string>()
   }
@@ -710,7 +744,7 @@ export default function Focus2Layout(
   }, [quickKey, runKey])
 
   const held = paused || reading
-  const pace = usePresenter({ plan, s, runKey, reduced, jumped: settled, paused: held, onePolicy: ONE_POLICY_CARD })
+  const pace = usePresenter({ plan, s, runKey, reduced, jumped: settled, paused: held, onePolicy: ONE_POLICY_CARD, motion: runFlags.motion, canvas: runFlags.canvas })
   const { p, beat, reached, beats, clock, presenting, jumpTo, skip: skipPace } = pace
   const landed = pace.landed
   /* Sharp and in place: reduced motion, a run drawn settled, or a Skip. Stepping by hand is NOT in this list — see
@@ -763,17 +797,53 @@ export default function Focus2Layout(
       if (cue) playCue(cue)
     }
   }, [running, whyDone, plan])
+  /* Under the run's motion (RUN_MOTION, 20 Oct 2026) the sound is the verdict's own: as its title comes in, a beat after
+     the outcome is presented — by a timer, so a hidden pane still sounds. A run drawn at once, or skipped, keeps the
+     landing's cue above; either way it plays once a run. */
+  const verdictDue = runFlags.motion && !instant && plan.at.outcome >= 0 && p >= plan.at.outcome
+  useEffect(() => {
+    if (!verdictDue || !cueArmed.current) return
+    const t = window.setTimeout(() => {
+      if (!cueArmed.current) return
+      cueArmed.current = false
+      const cue = cueForDecision(plan.outcome.decision)
+      if (cue) playCue(cue)
+    }, VERDICT_AT_MS)
+    return () => window.clearTimeout(t)
+  }, [verdictDue, plan])
 
   // --- Classic v2's cards: the Vertical view's chain, and the Horizontal view's stations ---
-  const chain = useChainRun(presented, { onePolicy: ONE_POLICY_CARD })
+  const chain = useChainRun(presented, { onePolicy: ONE_POLICY_CARD, motion: runFlags.motion })
   const identityKey = props.identities?.find((i) => i.active)?.key ?? ''
   /* Vertical: open as the story reaches each card, folded once it lands — Classic v2's fold. Horizontal: the heads, so
      the route reads at a glance; a station's fold opens it in place. Each view's presses stand until the next run. */
   /* The chain's own cards: Focus draws no sign-in card, so the fold-all and its words count only the three. */
   /* Card by card (classic2-model.ts `foldOne`): the card the engine is on is open, the ones it has done with fold to their
      heads as the next opens, and all fold once it lands — the chain stays short and nothing is born under the bar. */
-  const vFold = useChainFold(`${runKey}:${identityKey}`, chainCards(chain.shown), chain.landed, { on: onCard(presented.plan, p, ONE_POLICY_CARD) })
+  /* Under the run's motion (RUN_MOTION, 20 Oct 2026) the outcome lands open and stays so. The version is part of the
+     run's key, so a fold pressed in one version is not carried to the other. */
+  const vFold = useChainFold(`${runKey}:${identityKey}:${runFlags.version}`, chainCards(chain.shown), chain.landed, { on: onCard(presented.plan, p, ONE_POLICY_CARD), keepOutcome: runFlags.motion })
   const hFold = useChainFold(`${runKey}:${identityKey}:route`, CARDS, true)
+  /* CHECK ACCESS V3 (runFlags.canvas, 20 Oct 2026): the policy's own cards stay folded while the walk is read on their
+     second lines (20 Oct 2026, evening: no body opens on its own, so the column never jumps); once it lands the outcome
+     stays open when it has a body (a Deny's reason, a Depends' ways). The rules never reached and each stack of walked
+     misses fold too, by their own ids (board-run-model.ts `runGroups`), folded until a press. The same contract as the
+     chain's: a press stands until the next run, the dock's fold-all and the brief's cue read it. */
+  const outcomeBody = plan.outcome.status === 'depends' ? chain.outcome.outcomes.length > 0 : DENIAL_REASONS && !!denyReasonOf(plan)
+  const runIds = useMemo(() => (chain.decider ? [...chain.decider.rules.map((r) => r.id), 'fallback', ...(outcomeBody ? ['outcome'] : [])] : []), [chain.decider, outcomeBody])
+  const runPerson = chain.group === null ? chain.who : null
+  const runGroupsOf = useMemo(() => (runFlags.canvas ? runGroups(plan, chain.decider, { person: runPerson, resolve: chain.resolve }) : []), [runFlags.canvas, plan, chain.decider, runPerson, chain.resolve])
+  const runGroupIds = useMemo(() => runGroupsOf.map((g) => g.id), [runGroupsOf])
+  const rFold = useBoardRunFold(`${runKey}:${identityKey}:${runFlags.version}`, runIds, chain.landed, runFoldOn(plan, p), outcomeBody, runGroupIds)
+  /* The admin moved the camera while the run plays — a wheel or a drag on the stage, its scrollbar, a press that opened a
+     card: every follow and the landed fit stand down for this run (a new run, or a Replay, gives it back). */
+  const cameraHeld = useRef<{ key: number; held: boolean }>({ key: runKey, held: false })
+  if (cameraHeld.current.key !== runKey) cameraHeld.current = { key: runKey, held: false }
+  /* Whether the run is playing now, for the stage's own gestures (read by its listeners, below). */
+  const playingNow = useRef(false)
+  const holdCamera = useCallback(() => {
+    cameraHeld.current.held = true
+  }, [])
   const { 'sign-in': signOpen, policy: policyOpen, rule: ruleOpen, outcome: outOpen } = hFold.open
   const stationOpen = useMemo<Partial<Record<StationKind, boolean>>>(() => ({ sign: signOpen, policies: policyOpen, rule: ruleOpen, outcome: outOpen }), [signOpen, policyOpen, ruleOpen, outOpen])
   const { sizes: stationSizes, measure } = useStationSizes()
@@ -819,7 +889,14 @@ export default function Focus2Layout(
   )
   /* Both: the headline takes the top of the world and the band is what is left under it. The band's box still starts
      at the world's top — only the places move down — so a view change is the cards' own spring and not a jump. */
-  const headSpace = both ? (headH > 0 ? headH : HEAD_SEED) + HEAD_GAP : 0
+  /* Under the run's motion (RUN_MOTION, 20 Oct 2026) the room is held from the run's first frame while the brief is on,
+     at the height it had last, and only its words sweep in once the run lands: the card never moves under the answer. */
+  const roomHeld = runFlags.motion && briefOn && !plan.empty
+  const headSpace = both || roomHeld ? (headH > 0 ? headH : (lastHeadH ?? HEAD_SEED)) + HEAD_GAP : 0
+  const onHead = useCallback((h: number) => {
+    if (h > 0) lastHeadH = h
+    setHeadH(h)
+  }, [])
   const bandH = Math.max(220, room.h - PLAYER_H - headSpace)
   const top = headSpace + Math.round(Math.max(4, (bandH - Math.min(bandH, planned)) / 2))
   /* A headline and the run's tallest card that cannot both stand over the voice strip make the world taller rather than
@@ -889,6 +966,9 @@ export default function Focus2Layout(
   const recentLanding = landed && mark.current.landed > 0 && nowMs - mark.current.landed < LANDING_MS
   /* The card's own work is animated while the story is being told, and through the landing it presents. */
   const playing = !instant && (animate || presenting || recentLanding)
+  playingNow.current = playing
+  /* The sign beat under the run's motion (RUN_MOTION): the sentence on the first node states itself, unit by unit. */
+  const stating = runFlags.motion && playing && p < (plan.at.found >= 0 ? plan.at.found : 1)
   /* A view just turned on or off: the cards spring to their new place even on a run drawn sharp. */
   const gliding = !reduced && nowMs < moveUntil.current
   useEffect(() => {
@@ -996,6 +1076,7 @@ export default function Focus2Layout(
     /* After the card's body has opened, so what is followed is the card as it stands. */
     const t = window.setTimeout(
       () => {
+        if (runFlags.canvas && cameraHeld.current.held) return
         const root = rootRef.current
         const el = root?.querySelector('.rl-f2v [data-follow]') ?? root?.querySelector('.rl-f2v .rl-c2__seg:last-child')
         const sc = el?.closest('.rstage__scroll')
@@ -1012,6 +1093,7 @@ export default function Focus2Layout(
       reduced ? 0 : FOLD_S * 1000 + 40,
     )
     return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the version is read as the step moves
   }, [vFollow, reduced])
   /* Landed, and folded: Classic v2's own fit — the whole chain in view down to FIT_MIN, and when it is taller even then,
      the outcome kept in view at zoom 1. Once a run, and again when the brief moves it down. */
@@ -1025,6 +1107,13 @@ export default function Focus2Layout(
         const body = worldEl?.querySelector<HTMLElement>('.rl-f2v')
         if (!stage || !scroller || !body) return
         const roomH = scroller.clientHeight - TOP_PAD - FOCUS2_FLOOR_PAD
+        /* Check access v3 stays at zoom 1, the builder's own size (no FIT_MIN): it fits, or the answer is framed. */
+        if (runFlags.canvas) {
+          if (cameraHeld.current.held) return
+          if (body.offsetHeight <= roomH) stage.fit({ max: 1, min: 1, jump: instant })
+          else stage.follow(worldEl?.querySelector('.rl-f2v [data-card="outcome"]'), { lazy: true, jump: instant })
+          return
+        }
         if (body.offsetHeight * FIT_MIN <= roomH) stage.fit({ max: 1, min: FIT_MIN, jump: instant })
         else stage.follow(worldEl?.querySelector('.rl-f2v [data-card="outcome"]'), { lazy: true, jump: instant })
       },
@@ -1033,6 +1122,25 @@ export default function Focus2Layout(
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once a landing, and once a move of the brief
   }, [vLanded])
+
+  useEffect(() => {
+    const sc = worldEl?.closest<HTMLElement>('.rstage__scroll')
+    if (!runFlags.canvas || !sc) return
+    const hold = () => {
+      if (playingNow.current) cameraHeld.current.held = true
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'PageUp' || e.key === 'PageDown') hold()
+    }
+    sc.addEventListener('wheel', hold, { passive: true })
+    sc.addEventListener('pointerdown', hold, { passive: true })
+    sc.addEventListener('keydown', onKey)
+    return () => {
+      sc.removeEventListener('wheel', hold)
+      sc.removeEventListener('pointerdown', hold)
+      sc.removeEventListener('keydown', onKey)
+    }
+  }, [runFlags.canvas, worldEl])
 
   /* The zoom the owner had removed is still reachable by a trackpad pinch, because RunStage binds ctrl/⌘ + wheel on
      its own scroller and that file is not ours to edit. Stopped here, on our own world, before the event reaches it. */
@@ -1124,7 +1232,10 @@ export default function Focus2Layout(
   const skip = useCallback(() => {
     setSkipped(true)
     skipPace()
-  }, [skipPace])
+    /* Escape finishes at once under the run's motion (RUN_MOTION, 20 Oct 2026): the engine lands too, so the card is
+       drawn landed now rather than row by row at the engine's own pace, and the answer is said once, as it lands. */
+    if (runFlags.motion) onLand?.()
+  }, [skipPace, runFlags.motion, onLand])
 
   /* The card at the centre's own presses, through a ref so its memo holds: open a rule in the builder, bring the rule
      that came closest. */
@@ -1174,7 +1285,7 @@ export default function Focus2Layout(
       const i = key ? shown.findIndex((m) => m.key === key) : -1
       if (i >= 0) pickCard(i)
     },
-    [shown, plan, pickCard, route, chained],
+    [shown, plan, pickCard, route, chained, ONE_POLICY_CARD],
   )
   /* Left, the canvas falls back to what is pinned, then to what the answer is about — the same ladder `lit` reads,
      or a pinned citation would stay lit while its card slid away under the pointer leaving it. */
@@ -1193,10 +1304,21 @@ export default function Focus2Layout(
       setPin(t)
       /* In the chain, a citation pressed opens its card too, so what it points at is there to read. */
       const k = chained ? chainCardOf(t, ONE_POLICY_CARD) : null
-      if (k && k !== 'sign-in') vFold.set(k, true)
+      /* Check access v3: the cited rule's own card opens (the outcome where it has a body) — inside the group that folds
+         it first (the rules never reached, a stack of misses), and it is brought once both have unfolded. */
+      if (runFlags.canvas) {
+        const row = rowOf(t)
+        const at = row ? plan.rules.findIndex((r) => boardIdOf(r) === row) : -1
+        const g = at >= 0 ? groupOf(runGroupsOf, at) : undefined
+        if (g) rFold.set(g.id, true)
+        if (row) rFold.set(row, true)
+        else if (k === 'outcome' && outcomeBody) rFold.set('outcome', true)
+        window.setTimeout(() => bring(t), reduced ? 0 : (g ? 280 : 0) + FOLD_S * 1000)
+        return
+      } else if (k && k !== 'sign-in') vFold.set(k, true)
       bring(t)
     },
-    [bring, chained, vFold],
+    [bring, chained, vFold, ONE_POLICY_CARD, runFlags.canvas, rFold, outcomeBody, plan, runGroupsOf, reduced],
   )
   /* The brief's phrases (focus2-brief.tsx) go down the same two paths, with two differences. A hover while the story
      is still being told lights its card and does not bring it: the headline sits under the row, the pointer crosses it
@@ -1224,6 +1346,19 @@ export default function Focus2Layout(
   const onAction = useCallback(
     (a: Action): boolean => {
       /* In the chain both open the card itself, where it stands, and bring it into view. */
+      /* Check access v3: the card that decided (or the first that could not be told) opens where it stands, and is brought. */
+      if (chained && runFlags.canvas && (a.kind === 'checks' || a.kind === 'see')) {
+        if (a.kind === 'see') {
+          setPin('screens')
+          if (outcomeBody) rFold.set('outcome', true)
+        }
+        const at = a.kind === 'checks' ? (plan.landing ?? plan.rules.findIndex((r) => r.state === 'unknown')) : -1
+        const id = at !== null && at >= 0 ? plan.rules[at]?.id : undefined
+        if (id) rFold.set(id, true)
+        const el = id ? rootRef.current?.querySelector(`.rl-f2v .bbr [data-rule-row="${id}"]`) : rootRef.current?.querySelector('.rl-f2v [data-card="outcome"]')
+        if (el) window.setTimeout(() => stageRef.current?.follow(el, { lazy: true, jump: reduced }), reduced ? 0 : FOLD_S * 1000 + 40)
+        return true
+      }
       if (chained && (a.kind === 'checks' || a.kind === 'see')) {
         const k: CardKey = a.kind === 'checks' ? (ONE_POLICY_CARD ? 'policy' : 'rule') : 'outcome'
         if (a.kind === 'see') setPin('screens')
@@ -1256,7 +1391,7 @@ export default function Focus2Layout(
       }
       return false
     },
-    [shown, landed, pickCard, toCard, route, plan, focus, chained, vFold, reduced],
+    [shown, landed, pickCard, toCard, route, plan, focus, chained, vFold, reduced, ONE_POLICY_CARD, runFlags.canvas, rFold, outcomeBody],
   )
 
   /* The view's ONE call of the previews: every entry is a real `resolveSignIn` + `engineRun` on a changed sign-in,
@@ -1384,6 +1519,8 @@ export default function Focus2Layout(
       if (t?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="listbox"]')) return
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
       if (e.key === 'Escape') return
+      /* Space on a button is the button's press (RUN_MOTION, 20 Oct 2026): it pressed nothing, pausing the story instead. */
+      if (runFlags.motion && e.key === ' ' && t?.closest('button, a, [role="radio"]')) return
       /* On the map the keys walk the cards, not the beats — a beat that only goes deeper into a card already marked
          would be a press that shows nothing — and Enter opens the marked card in the carousel. A button keeps its own
          Enter. */
@@ -1416,7 +1553,7 @@ export default function Focus2Layout(
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [beatShown, beats.length, reached, landed, held, goTo, skip, route, chained, focus, count, toCard, pickCard])
+  }, [beatShown, beats.length, reached, landed, held, goTo, skip, route, chained, focus, count, toCard, pickCard, runFlags.motion])
 
   /* ESCAPE, ON THE WAY DOWN. One thing let go at a time: Skip while the story is still being told, then the note a
      row opened, then the carousel over the Horizontal view (back to the route, as the bar's Back), then the answers
@@ -1546,6 +1683,8 @@ export default function Focus2Layout(
   const litCard = chainCardOf(lit, ONE_POLICY_CARD)
   /* The merged card's row an answer or the brief points at: a rule, or one of its checks. */
   const litRow = ONE_POLICY_CARD ? rowOf(lit) : null
+  /* The chain's first node, the sign-in: the chain's and v3's alike. */
+  const startNode = <SignInNode run={presented} lit={litCard === 'sign-in'} across={across} stating={stating} />
   const litRule = (ri: number | undefined): boolean => {
     const r = ri === undefined ? undefined : plan.rules[ri]
     return !!r && !!lit && (lit === `rule:${r.id}` || lit.startsWith(`check:${r.id}:`))
@@ -1559,21 +1698,38 @@ export default function Focus2Layout(
      bar"): it folds or opens every card on screen, in either shape — or, on the route (ROUTE_MAP), its stations. With
      no card on screen yet there is nothing for it to do. */
   const folds = chained ? vFold : hFold
-  const foldable = chained ? chainCards(chain.shown).length > 0 : !!ov
+  /* Check access v3 folds the policy's own cards (`rFold`): the dock's fold-all and the brief's cue read them instead. */
+  const foldAny = runFlags.canvas ? rFold.anyOpen : folds.anyOpen
+  const foldAll = runFlags.canvas ? rFold.foldAll : folds.foldAll
+  const foldable = runFlags.canvas ? runIds.length > 0 : chained ? chainCards(chain.shown).length > 0 : !!ov
   /* The brief's cue (see `both`): the first moment of this run with it landed and no card open — or, where someone keeps
      a card open, a beat after the landing anyway. */
-  const anyOpen = folds.anyOpen
+  const anyOpen = foldAny
+  /* Under the run's motion the outcome stays open, so the cue is the policy's section folded (it folds as the outcome is
+     presented, a beat before the landing), never the fallback that waits on every card. */
+  /* Check access v3: the rule cards have folded (the outcome may stay open with its body): a fold's length after landing. */
+  const cueWait = runFlags.canvas
+    ? rFold.anyRuleOpen
+      ? BRIEF_AFTER_MS
+      : FOLD_S * 1000 + 120
+    : runFlags.motion
+      ? folds.open.policy
+        ? BRIEF_AFTER_MS
+        : BRIEF_MOTION_MS
+      : anyOpen
+        ? BRIEF_AFTER_MS
+        : FOLD_S * 1000 + 120
   useEffect(() => {
     if (!landed || briefDue === runKey) return
     /* Read, fold, then the brief: the cards finish folding before the headline opens over them, so the fold and the
        headline's glide never run in the same frames (they crossed, and card heads overlapped). A timer, not an animation's
        end: a hidden pane stops animation frames, and the brief must come all the same. */
-    const t = window.setTimeout(() => setBriefDue(runKey), anyOpen ? BRIEF_AFTER_MS : FOLD_S * 1000 + 120)
+    const t = window.setTimeout(() => setBriefDue(runKey), cueWait)
     return () => window.clearTimeout(t)
-  }, [landed, anyOpen, runKey, briefDue])
+  }, [landed, cueWait, runKey, briefDue])
 
   return (
-    <div ref={setRoot} className={`rl-focus-root rl-f2${instant ? ' is-sharp' : ''}`} data-stage={look}>
+    <div ref={setRoot} className={`rl-focus-root rl-f2${instant ? ' is-sharp' : ''}${runFlags.motion && held ? ' is-held' : ''}`} data-stage={look}>
       <div className="rl-focus__backdrop" aria-hidden />
       {/* `pad.left` takes the panel's room as well as the path's, and `.rstage__world` is `margin: auto`, so the
           auto margin centres the world in what is LEFT and the open card keeps its centre (focus2-geometry.ts puts
@@ -1593,13 +1749,13 @@ export default function Focus2Layout(
             <Focus2CanvasBar
               view={view}
               onView={pickView}
-              pair={HORIZONTAL_VIEW}
+              pair={HORIZONTAL_VIEW && !runFlags.canvas}
               breakIn={landed && props.breakIn && props.onReviewBreakIn ? { holes: props.breakIn.summary.holes > 0, onPress: () => props.onReviewBreakIn?.('outcome') } : null}
               details={DETAILS_IN_BAR && landed && props.onInspect && (plan.decider || form.appId) ? { onPress: () => props.onInspect?.(plan.decider ? { kind: 'policy', policyId: plan.decider.id } : { kind: 'app', id: form.appId! }, true) } : null}
               brief={both}
               onBrief={() => pickBrief(!both)}
               questions={{ open: askOpen, onToggle: () => setAskBy(!askOpen) }}
-              fold={{ any: folds.anyOpen, can: foldable, onPress: folds.foldAll }}
+              fold={{ any: foldAny, can: foldable, onPress: foldAll }}
               onBack={drilled ? backToRoute : null}
               backAfter={MORPH_HOLD}
               voice={FOCUS_VOICE ? { line: voiceLine, muted: narrator.muted, onMuted: narrator.setMuted, onStop: () => narrator.cancel() } : null}
@@ -1673,6 +1829,48 @@ export default function Focus2Layout(
                   {/* Out of the view's presence (see FRESH below): the chain's own arrivals and folds are its to play. */}
                   <PresenceContext.Provider value={null}>
                     <div className="rl-c2 rl-f2v__c2">
+                      {runFlags.canvas ? (
+                        /* CHECK ACCESS V3: the run on the builder's own canvas (board-run.tsx), in the chain's place. */
+                        <BoardRunChain
+                          run={presented}
+                          data={chain}
+                          fold={rFold}
+                          animate={playing}
+                          snap={instant}
+                          motion={runFlags.motion}
+                          start={startNode}
+                          why={focusWhy.link}
+                          lit={litCard}
+                          litRow={litRow}
+                          groups={runGroupsOf}
+                          outcomeBody={outcomeBody}
+                          onHold={holdCamera}
+                          /* What they see, as a Preview button in the outcome's head: the same animated popover the
+                             older outcome card's thumbnail opened (20 Oct 2026), its Escape the view's own. */
+                          see={
+                            props.screens.length > 0 && form.appId ? (
+                              <Focus2See
+                                variant="button"
+                                screens={props.screens}
+                                appId={form.appId}
+                                open={seeOpen}
+                                reduced={reduced}
+                                portal={rootEl}
+                                onOpen={() => setSeeOpen(true)}
+                                onClose={() => setSeeOpen(false)}
+                                panel={
+                                  props.onInspect
+                                    ? {
+                                        pressed: props.inspected?.kind === 'see',
+                                        onPress: () => (props.inspected?.kind === 'see' ? props.onCloseInspect?.() : props.onInspect?.({ kind: 'see' }, true)),
+                                      }
+                                    : undefined
+                                }
+                              />
+                            ) : undefined
+                          }
+                        />
+                      ) : (
                       <Classic2Chain
                         run={presented}
                         data={chain}
@@ -1680,7 +1878,7 @@ export default function Focus2Layout(
                         animate={playing}
                         snap={instant}
                         orientation={across ? 'horizontal' : 'vertical'}
-                        start={<SignInNode run={presented} lit={litCard === 'sign-in'} across={across} />}
+                        start={startNode}
                         signInCard={false}
                         glide={glide}
                         links={linksOn}
@@ -1688,7 +1886,9 @@ export default function Focus2Layout(
                         why={focusWhy.link}
                         onePolicy={ONE_POLICY_CARD}
                         litRow={litRow}
+                        motion={runFlags.motion}
                       />
+                      )}
                     </div>
                   </PresenceContext.Provider>
                 </motion.div>
@@ -1909,7 +2109,8 @@ export default function Focus2Layout(
                   onCite={citeBrief}
                   onPin={pinBrief}
                   onHow={() => {}}
-                  onHead={setHeadH}
+                  onHead={onHead}
+                  cap={runFlags.motion ? 0.4 : undefined}
                 />
               )}
             </AnimatePresence>

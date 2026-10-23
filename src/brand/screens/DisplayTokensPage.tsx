@@ -11,7 +11,7 @@ import {
   UserX,
 } from 'lucide-react'
 
-import { Badge, Button, DeleteButton, Drawer, Modal, RowMenu, SearchBox, type MenuItem } from '../kit'
+import { Badge, Button, Confirm, DeleteButton, Drawer, RowMenu, SearchBox, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { EmptyState, NoMatches } from '../empty'
 import { useLeaveGuard } from '../leave-guard'
@@ -115,7 +115,7 @@ type Slider =
   | { kind: 'upload'; mode: UploadMode }
   | { kind: 'sync'; serial: string }
 
-type Confirm = { kind: 'unassign'; serials: string[] }
+type PendingConfirm = { kind: 'unassign'; serials: string[] }
 
 /** Fixed row height of both lists, matching `.bdt__list`. */
 const ROW_H = 64
@@ -464,7 +464,7 @@ export function DisplayTokensPage({ tab }: { tab: DisplayTokenTab }) {
 
   /* --- Confirmations --------------------------------------------------------------- */
 
-  const [confirm, setConfirm] = useState<Confirm | null>(null)
+  const [confirm, setConfirm] = useState<PendingConfirm | null>(null)
   /* What a delete will remove and what it passes over, taken when the dialog
      opens and kept while it animates out — by then the tokens are gone, and a
      dialog read live would retitle itself "Delete 0 tokens?" on its way off. */
@@ -692,6 +692,7 @@ export function DisplayTokensPage({ tab }: { tab: DisplayTokenTab }) {
         open={delOpen}
         name={del.deleting.length === 1 ? del.deleting[0] : plural(del.deleting.length, 'token')}
         noun="token"
+        tickCount={del.deleting.length}
         detail={deleteDetail(del.deleting.length, del.kept)}
         onCancel={() => setDelOpen(false)}
         onConfirm={() => delOpen && remove(del.deleting)}
@@ -1079,7 +1080,7 @@ function UnassignConfirm({
   onClose,
   onUnassign,
 }: {
-  confirm: Confirm | null
+  confirm: PendingConfirm | null
   tokens: HardwareToken[]
   nameOf: (t: HardwareToken) => string
   methodOn: boolean
@@ -1109,27 +1110,18 @@ function UnassignConfirm({
   const v = view ?? last
 
   return (
-    <Modal
+    <Confirm
       open={!!view}
       onClose={onClose}
+      tone="removed"
       title={v?.title ?? ''}
-      width={480}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="danger" icon={UserX} onClick={() => view && onUnassign(view.serials)}>
-            Unassign
-          </Button>
-        </>
-      }
+      confirmLabel="Unassign"
+      confirmIcon={UserX}
+      onConfirm={() => view && onUnassign(view.serials)}
     >
-      <div className="bx-confirm">
-        {(v?.lines ?? []).map((line) => (
-          <p key={line}>{line}</p>
-        ))}
-      </div>
-    </Modal>
+      {(v?.lines ?? []).map((line) => (
+        <p key={line}>{line}</p>
+      ))}
+    </Confirm>
   )
 }

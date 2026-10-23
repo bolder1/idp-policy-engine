@@ -38,10 +38,18 @@ describe('the locked board canvas', () => {
     expect(lockedView({ x: 0, y: -600, z: 1 }, size, zoom).y).toBe(-600)
   })
 
-  it('keeps a chain shorter than the stage pinned to the top, where a list is read from', () => {
+  /* 20 Oct 2026 (owner): "can we start with the centre instead of the top". A short chain stands in the stage's middle,
+     whatever y it was handed; it was pinned to the top before. */
+  it('stands a chain shorter than the stage in its middle, whatever y it was handed', () => {
     const short = { ...size, worldH: 300 }
-    expect(lockedView({ x: 0, y: -50, z: 1 }, short, zoom).y).toBe(0)
-    expect(lockedView({ x: 0, y: 50, z: 1 }, short, zoom).y).toBe(0)
+    expect(lockedView({ x: 0, y: -50, z: 1 }, short, zoom).y).toBe(250)
+    expect(lockedView({ x: 0, y: 50, z: 1 }, short, zoom).y).toBe(250)
+    // At half zoom the same world is 150px tall: (800 - 150) / 2.
+    expect(lockedView({ x: 0, y: 0, z: 0.5 }, short, zoom).y).toBe(325)
+  })
+
+  it('reads a chain exactly as tall as the stage from the top: the middle and the top meet', () => {
+    expect(lockedView({ x: 0, y: 40, z: 1 }, { ...size, worldH: 800 }, zoom).y).toBe(0)
   })
 
   it('clamps the zoom before centring on it', () => {

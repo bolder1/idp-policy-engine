@@ -1,4 +1,5 @@
 import { FALLBACK_NAME, fallbackRule, type AccessDecision, type Policy, type Rule } from '../../data'
+import type { SignInScreens } from '../testing/screens-of'
 import type { EngineRun, RuleState } from './engine-run'
 
 /* -----------------------------------------------------------------------------
@@ -12,11 +13,30 @@ import type { EngineRun, RuleState } from './engine-run'
 export type PeekKind = 'zone' | 'device' | 'risk' | 'hook' | 'person' | 'app'
 export type PeekTarget = { kind: PeekKind; id: string }
 
-export type InspectTarget = { kind: 'policy'; policyId: string } | { kind: 'rule'; policyId: string; ruleId: string | null } | PeekTarget
+/* What they see (owner, 20 Oct 2026: "open in the right side panel as a specific view, with context and the important
+   information we can show"): the end-user's sign-in page for the run on screen, as a page of its own. It names no
+   object — the run it is of rides beside it (`SeeRun`). */
+export type SeeTarget = { kind: 'see' }
 
-export const isPeek = (t: InspectTarget): t is PeekTarget => t.kind !== 'policy' && t.kind !== 'rule'
+export type InspectTarget = { kind: 'policy'; policyId: string } | { kind: 'rule'; policyId: string; ruleId: string | null } | PeekTarget | SeeTarget
+
+export const isPeek = (t: InspectTarget): t is PeekTarget => t.kind !== 'policy' && t.kind !== 'rule' && t.kind !== 'see'
+
+/** The sign-in a What they see page is of: its pages (screens-of.ts), the application, and who signs in. */
+export interface SeeRun {
+  screens: readonly SignInScreens[]
+  appId: string
+  /** The person's id; null for "Anyone in <group>". */
+  personId: string | null
+  /** The group's name, for "Anyone in <group>"; null for a person. */
+  group: string | null
+}
+
+/** The bar's word for the What they see page. */
+export const SEE_TITLE = 'What they see'
 
 export const sameTarget = (a: InspectTarget, b: InspectTarget): boolean => {
+  if (a.kind === 'see' || b.kind === 'see') return a.kind === b.kind
   if (isPeek(a) || isPeek(b)) return isPeek(a) && isPeek(b) && a.kind === b.kind && a.id === b.id
   return a.kind === b.kind && a.policyId === b.policyId && (a.kind === 'policy' || (b.kind === 'rule' && a.ruleId === b.ruleId))
 }
@@ -91,6 +111,7 @@ export const PEEK_FALLBACK: Record<PeekKind, string> = { zone: 'Zone', device: '
 
 /** The breadcrumb's label for a target: the policy's name, or "Rule 2 · Name" / "Nothing else matched". */
 export function targetLabel(t: InspectTarget, policies: readonly Pick<Policy, 'id' | 'name' | 'rules'>[], names: Partial<Record<PeekKind, (id: string) => string | undefined>> = {}): string {
+  if (t.kind === 'see') return SEE_TITLE
   if (isPeek(t)) return names[t.kind]?.(t.id) ?? PEEK_FALLBACK[t.kind]
   const p = policies.find((x) => x.id === t.policyId)
   if (!p) return 'Policy'

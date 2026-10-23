@@ -241,6 +241,33 @@ export const ONE_PRESENT_MS: Partial<Record<StepKind, number>> = { find: 200, sc
 export const ONE_POLICY_MIN = 700
 export const ONE_POLICY_GD_MIN = 900
 
+/* The run's motion (phase.ts RUN_MOTION, 20 Oct 2026: "always animated", and the card-by-card story he queued on 5 Oct).
+   Every step carries what is drawn on it, so there is no generic read hold — the lock is the deciding row's read, the
+   done beat the card's, compact a miss's. One check reads in 480 ms, an even tick. The answer is readable about 5.4 s
+   after Run for Aisha Khan on Google Workspace (6.4 s before), and the picture is never held waiting on the engine's
+   brisk front (engine-run.ts BRISK_FRONT_MS): presented at or after the engine at every step of the showcase. A walk
+   long enough to pass MOTION_SOFT_MS reads the rules after its first miss quicker (MOTION_QUICK_MS); the first miss,
+   the lock, the done beat and the landing keep their length, since the rhythm is learned on them. */
+export const MOTION_PRESENT_MS: Partial<Record<StepKind, number>> = {
+  find: 360,
+  scan: 160,
+  found: 240,
+  decides: 120,
+  expand: 160,
+  rule: 200,
+  check: 220,
+  checked: 260,
+  'rule-end': 760,
+  compact: 340,
+  deciding: 640,
+  outcome: 700,
+}
+export const MOTION_BEAT_MIN: Record<BeatKind, number> = { sign: 900, policies: 1600, covers: 520, rule: 640, then: 640, outcome: 0 }
+/** The covering beat when the Global Default decides: the line under its head that says why is read too. */
+export const MOTION_COVERS_GD_MIN = 680
+export const MOTION_QUICK_MS = { rule: 120, check: 140, checked: 160, compact: 200 } as const
+export const MOTION_SOFT_MS = 7500
+
 /** A conflict is named on its own step and held, whatever its kind says: the finding has to be read before the answer lands. */
 export const NOTICE_MS = 1400
 /** The last step before a beat boundary is held this much longer: it carries the finding that ended the beat. */
@@ -281,6 +308,8 @@ export interface PresentedTimeline {
   shrunk: boolean
   /** Over the cap even with every read hold and row at its floor, by this much; 0 normally. */
   over: number
+  /** Check access v3 (`canvas`): the rules read on their heads alone, by their place in `plan.rules` (`skimRules`). */
+  skims?: ReadonlySet<number>
 }
 
 export interface PresentOptions {
@@ -288,6 +317,27 @@ export interface PresentOptions {
   pace?: Pace
   /** The merged Policy card's pace (ONE_PRESENT_MS, ONE_POLICY_MIN); hand the beats `storyOf(plan, { onePolicy })` too. */
   onePolicy?: boolean
+  /** The run's motion (RUN_MOTION, with `onePolicy`): MOTION_PRESENT_MS, no read hold, MOTION_BEAT_MIN, the soft compression. */
+  motion?: boolean
+  /** Check access v3 on the builder's canvas (BUILDER_CANVAS_CHECK): who-misses and rules switched off are skims from the first, and the soft compression starts after the first condition miss (`skimRules`). */
+  canvas?: boolean
+}
+
+/* CHECK ACCESS V3: SKIMS (BUILDER_CANVAS_CHECK, 20 Oct 2026). On the builder's canvas every rule is a card of its own,
+   and a long policy is mostly cards the sign-in was never for. A rule that failed on who it is for, and a rule switched
+   off, are read on their heads alone — the reading edge, "Reading", the result — at MOTION_QUICK_MS from the first of
+   them, floored by the rule beat's own minimum (MOTION_BEAT_MIN.rule), and never opened. The soft compression of a long
+   walk (MOTION_SOFT_MS) starts after the first CONDITION miss — a who-miss is already a skim, so it never counts as the
+   first miss — and the condition misses it quickens are skims too, since a body opened and folded in 620 ms flickers.
+   The decider, a rule that could not be told and a possible way always open. One set, the timeline's, so "a card opens"
+   and "its beat is long enough to open" can never disagree (board-run-model.ts reads `PresentedTimeline.skims`). */
+const whoMissed = (plan: EngineRun, rule: number): boolean => {
+  const r = plan.rules[rule]
+  return !!r && r.state === 'no-match' && r.failing !== null && r.checks[r.failing]?.category === 'who'
+}
+/** The rules a run on the builder's canvas reads on their heads alone: what `presentTimeline` with `canvas` decided. */
+export function skimRules(plan: EngineRun, beats: readonly Beat[] = storyOf(plan, { onePolicy: true })): ReadonlySet<number> {
+  return presentTimeline(plan, beats, { onePolicy: true, motion: true, canvas: true }).skims ?? new Set<number>()
 }
 
 /**
@@ -311,33 +361,79 @@ export interface PresentOptions {
 export function presentTimeline(plan: EngineRun, beats: readonly Beat[] = storyOf(plan), opts: PresentOptions = {}): PresentedTimeline {
   const steps = plan.steps
   const one = opts.onePolicy === true
-  const dur = steps.map((st) => (st.notice ? NOTICE_MS : ((one ? ONE_PRESENT_MS[st.kind] : undefined) ?? PRESENT_MS[st.kind] ?? 0)))
+  const motion = opts.motion === true
+  const canvas = opts.canvas === true
+  const dur = steps.map((st) => (st.notice ? NOTICE_MS : ((motion ? MOTION_PRESENT_MS[st.kind] : undefined) ?? (one ? ONE_PRESENT_MS[st.kind] : undefined) ?? PRESENT_MS[st.kind] ?? 0)))
 
   /* The read hold, on the last step of every beat but the last: that step is
      where the beat's finding lands, and in the engine's own pace it is gone
      in 260 ms. The last beat needs none — the outcome's build is its hold,
      and the answer then stays on screen. */
   const holds: number[] = []
-  for (let i = 0; i < beats.length - 1; i++) {
+  /* None under the run's motion: each step already holds what is drawn on it (MOTION_PRESENT_MS). */
+  for (let i = 0; i < (motion ? 0 : beats.length - 1); i++) {
     const at = beats[i].to
     if (at < 0 || at >= dur.length) continue
     dur[at] += READ_HOLD
     holds.push(at)
   }
 
+  /* Check access v3 (`canvas`): who-misses and rules switched off are skims from the first (`skimRules`). */
+  const skims = new Set<number>()
+  const quicken = (b: Beat): boolean => {
+    let took = false
+    for (let i = Math.max(0, b.from); i <= Math.min(b.to, dur.length - 1); i++) {
+      const st = steps[i]
+      if (st.notice) continue
+      const quick = (MOTION_QUICK_MS as Partial<Record<StepKind, number>>)[st.kind]
+      if (quick !== undefined && quick < dur[i]) {
+        dur[i] = quick
+        took = true
+      }
+    }
+    return took
+  }
+  if (canvas) {
+    for (const b of beats) {
+      if (b.kind !== 'rule' || b.rule === undefined || b.rule === plan.landing) continue
+      if (!whoMissed(plan, b.rule) && plan.rules[b.rule]?.state !== 'off') continue
+      skims.add(b.rule)
+      if (motion) quicken(b)
+    }
+  }
+
   /* A beat the engine raced through is held long enough to read. The deficit
      goes on the beat's LAST step, where its result is already on screen, so
      the extra time is spent reading the finding rather than waiting for it. */
   for (const b of beats) {
-    const least = minOf(b, plan, one)
+    const least = minOf(b, plan, one, motion)
     const held = spanMs(dur, b)
     if (held < least && b.to >= 0 && b.to < dur.length) dur[b.to] += least - held
   }
 
   let shrunk = false
+  /* The run's motion, a long walk: past MOTION_SOFT_MS, the rules after the first that missed read quicker. Never a
+     notice step, and never the rule that decides. */
+  if (motion && sum(dur) > MOTION_SOFT_MS) {
+    /* On the canvas, the first CONDITION miss: a who-miss is already a skim. */
+    const firstMiss = beats.findIndex((b) => b.kind === 'rule' && b.rule !== undefined && b.rule !== plan.landing && plan.rules[b.rule]?.state === 'no-match' && !(canvas && skims.has(b.rule)))
+    if (firstMiss >= 0) {
+      for (const b of beats.slice(firstMiss + 1)) {
+        if (b.kind !== 'rule' || b.rule === plan.landing) continue
+        if (quicken(b)) shrunk = true
+        if (canvas && b.rule !== undefined && plan.rules[b.rule]?.state === 'no-match') skims.add(b.rule)
+        /* On the canvas a quickened beat keeps the rule beat's floor, so a card is never on screen for less. */
+        if (canvas && b.to >= 0 && b.to < dur.length) {
+          const least = minOf(b, plan, one, motion)
+          const held = spanMs(dur, b)
+          if (held < least) dur[b.to] += least - held
+        }
+      }
+    }
+  }
   if (sum(dur) > PRESENT_CAP_MS) {
     /* The read holds first. */
-    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, holds.map((at) => ({ at, room: READ_HOLD - READ_HOLD_MIN })), one)
+    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, holds.map((at) => ({ at, room: READ_HOLD - READ_HOLD_MIN })), one, motion) || shrunk
   }
   if (sum(dur) > PRESENT_CAP_MS) {
     /* Then the rows, the other thing there can be a great many of. A notice
@@ -346,10 +442,11 @@ export function presentTimeline(plan: EngineRun, beats: readonly Beat[] = storyO
     const rows: Room[] = []
     steps.forEach((st, i) => {
       if (st.notice) return
-      if (st.kind === 'check') rows.push({ at: i, room: PRESENT_MS.check - CHECK_MIN })
-      else if (st.kind === 'checked') rows.push({ at: i, room: PRESENT_MS.checked - CHECKED_MIN })
+      /* Under the run's motion a row may already be under the full table's: it gives what it has over its floor. */
+      if (st.kind === 'check') rows.push({ at: i, room: motion ? Math.max(0, dur[i] - CHECK_MIN) : PRESENT_MS.check - CHECK_MIN })
+      else if (st.kind === 'checked') rows.push({ at: i, room: motion ? Math.max(0, dur[i] - CHECKED_MIN) : PRESENT_MS.checked - CHECKED_MIN })
     })
-    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, rows, one) || shrunk
+    shrunk = shrink(dur, plan, beats, sum(dur) - PRESENT_CAP_MS, rows, one, motion) || shrunk
   }
 
   /* An edit re-run, whole, at 0.7 ×. Read off the engine's own pace rather
@@ -371,6 +468,7 @@ export function presentTimeline(plan: EngineRun, beats: readonly Beat[] = storyO
     beats: beats.map((beat) => ({ beat, at: at[Math.min(beat.from, at.length - 1)] ?? 0, dur: spanMs(dur, beat) })),
     shrunk,
     over: Math.max(0, t - PRESENT_CAP_MS),
+    ...(canvas ? { skims } : null),
   }
 }
 
@@ -385,11 +483,11 @@ interface Room {
    than everything at the front; the second hands out what the flooring left,
    a ms at a time, so the cut is exactly what was asked for and comes out the
    same on every machine. Says whether it took anything. */
-function shrink(dur: number[], plan: EngineRun, beats: readonly Beat[], need: number, rooms: readonly Room[], one = false): boolean {
+function shrink(dur: number[], plan: EngineRun, beats: readonly Beat[], need: number, rooms: readonly Room[], one = false, motion = false): boolean {
   if (need <= 0) return false
   /* What each beat can give at all, shared out among its own steps. */
   const slack = new Map<number, number>()
-  beats.forEach((b, i) => slack.set(i, Math.max(0, spanMs(dur, b) - minOf(b, plan, one))))
+  beats.forEach((b, i) => slack.set(i, Math.max(0, spanMs(dur, b) - minOf(b, plan, one, motion))))
   const room = rooms.map((r) => {
     const i = beatOfStep(beats, r.at)
     const left = slack.get(i) ?? 0
@@ -418,7 +516,14 @@ function shrink(dur: number[], plan: EngineRun, beats: readonly Beat[], need: nu
   return take.some((k) => k > 0)
 }
 
-function minOf(b: Beat, plan: EngineRun, one = false): number {
+function minOf(b: Beat, plan: EngineRun, one = false, motion = false): number {
+  /* The run's motion: its own floors (MOTION_BEAT_MIN), the covering beat longer where the Global Default decides. */
+  if (motion) {
+    if (b.kind === 'covers') return plan.decider?.isGlobalDefault ? MOTION_COVERS_GD_MIN : MOTION_BEAT_MIN.covers
+    if (b.kind !== 'rule') return MOTION_BEAT_MIN[b.kind]
+    const r = b.rule === undefined ? undefined : plan.rules[b.rule]
+    return r?.state === 'off' ? OFF_RULE_MIN : MOTION_BEAT_MIN.rule
+  }
   if (one && b.kind === 'covers') return plan.decider?.isGlobalDefault ? ONE_POLICY_GD_MIN : ONE_POLICY_MIN
   if (b.kind !== 'rule') return BEAT_MIN[b.kind]
   const r = b.rule === undefined ? undefined : plan.rules[b.rule]
@@ -551,6 +656,10 @@ export interface PresenterInput {
   pace?: Pace
   /** The merged Policy card's story and pace (ONE_POLICY_CARD). */
   onePolicy?: boolean
+  /** The run's motion (RUN_MOTION): its pace, `presentTimeline`'s `motion`. */
+  motion?: boolean
+  /** Check access v3 on the builder's canvas: `presentTimeline`'s `canvas` (skims). */
+  canvas?: boolean
 }
 
 /** What the rail's segment animates over. It changes only as the beat does, so the fill is not a re-render a frame. */
@@ -596,9 +705,9 @@ export interface Presenter {
    the beat, whether it is waiting. The rail animates its own fill from
    `clock`, which changes once a beat. */
 export function usePresenter(input: PresenterInput): Presenter {
-  const { plan, s, runKey, reduced, jumped: landedAlready, paused, pace, onePolicy = false } = input
+  const { plan, s, runKey, reduced, jumped: landedAlready, paused, pace, onePolicy = false, motion = false, canvas = false } = input
   const beats = useMemo(() => storyOf(plan, { onePolicy }), [plan, onePolicy])
-  const tl = useMemo(() => presentTimeline(plan, beats, { pace, onePolicy }), [plan, beats, pace, onePolicy])
+  const tl = useMemo(() => presentTimeline(plan, beats, { pace, onePolicy, motion, canvas }), [plan, beats, pace, onePolicy, motion, canvas])
 
   /* Nothing to present: the host settles at once under reduced motion, and a
      revisit or a Skip is already landed. Derived, not stored, so turning

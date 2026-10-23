@@ -441,16 +441,21 @@ describe('where it stands', () => {
 })
 
 describe('the door', () => {
-  it('says Start guided setup, and names the card it opens on', () => {
-    expect(text(html(<DescribeDoor onOpen={noop} />))).toBe('Start guided setup')
+  it('says Guide me, names the card it opens on, and draws no chip for it', () => {
+    /* "Guide me", not "Start guided setup" (owner, 22 Oct 2026), and the selected-card chip inside the button is
+       gone with it ("remove that completely from the product") — the context still reaches the panel and still
+       names the card for assistive tech, which is what the aria-label below is. */
+    expect(text(html(<DescribeDoor onOpen={noop} />))).toBe('Guide me')
     const out = html(<DescribeDoor onOpen={noop} context={{ label: 'Rule 2 · Contractors' }} />)
-    expect(out).toContain('aria-label="Start guided setup for Rule 2 · Contractors"')
-    expect(magicSrc).toContain("const word = GUIDED_SETUP ? 'Start guided setup' : 'Describe it'")
+    expect(out).toContain('aria-label="Guide me through Rule 2 · Contractors"')
+    expect(out).not.toContain('bb__magic__ctx')
+    expect(text(html(<DescribeDoor onOpen={noop} context={{ label: 'Rule 2 · Contractors' }} />))).toBe('Guide me')
+    expect(magicSrc).toContain("const word = GUIDED_SETUP ? 'Guide me' : 'Describe it'")
   })
 
   it('keeps Describe it whole behind the flag', () => {
     expect(builderSrc).toContain('{describeOpen && !GUIDED_SETUP && (')
-    expect(builderSrc).toContain("label: GUIDED_SETUP ? 'Start guided setup' : 'Describe it'")
+    expect(builderSrc).toContain("label: GUIDED_SETUP ? 'Guide me' : 'Describe it'")
   })
 })
 

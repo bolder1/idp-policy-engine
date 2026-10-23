@@ -94,6 +94,7 @@ const BY_PROMPT: Record<EnrolKind, Play> = {
   token: 'hardware-token',
   assigned: 'hardware-token',
   passkey: 'passkey',
+  grid: 'generic',
   none: 'generic',
 }
 

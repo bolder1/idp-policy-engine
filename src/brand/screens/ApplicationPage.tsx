@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Activity,
@@ -51,7 +51,7 @@ import {
   type NewDraft,
 } from './app-page-model'
 import { AppGroupsTab, AppUsersTab } from './app-people-tabs'
-import { attachTo, attachableTo, deleteDetail, detachFrom } from './app-policies'
+import { REMOVE_RUNS_CHECKS, REPLACE_MAKES_DRAFT, attachTo, attachableTo, deleteDetail, detachFrom } from './app-policies'
 import { SetupTabBody, type SetupPatch } from './app-setup-forms'
 import { appStanding, type StandRow } from './app-standing'
 import { addToApp, removeFromApp, replaceOnApp } from './applications-model'
@@ -472,6 +472,32 @@ function AppPage({
 
 /* --- Policies ------------------------------------------------------------------- */
 
+/* The tab in the setup tabs' own column, with the right half left empty (owner, 22 Oct 2026, holding it against
+   the Attributes tab: "I think we can use the same width as we have in other tab like advance or attributes for this,
+   no need use the full page, make the right side empty as of now, it's okay like other page").
+
+   This REVERSES "app page full width" of 19 Oct (docs/memory/app-policy-tab-canvas-19-oct.md) — do not put it back
+   from that note. One child inside `bz7__cols` is exactly what SetupTabBody draws for Advanced and Attributes
+   (app-setup-forms.tsx), so the tabs line up down the page; the empty half is the point, and nothing goes in it.
+
+   ONLY the canvas gets the column, and applications.css decides that from what is actually drawn rather than this
+   file guessing at it: a layout of two panels side by side — the application with no policy of its own, or the tab
+   with FOCUS off — is a quarter of the page in each panel at this width, so the table loses its columns and the rule
+   cards come out 100px wide. Those keep the page until they are redrawn for a column, which is their own piece of
+   work. The wrapper is always here; the sheet widens it back where the canvas is absent.
+
+   `bapp__polcols` is what the sheet aims at, and it has to be here: the setup tabs build their own `bz7__cols` straight
+   inside #bapp-panel (app-setup-forms.tsx), so a rule written at that level reaches THEM too. One was, for an hour on
+   22 Oct, and it put Basic, Advanced and Attributes back to the full page the moment Policies took a column — the
+   exact opposite of what was asked. Scope anything about this column to the class, never to the position. */
+function WorkColumn({ children }: { children: ReactNode }) {
+  return (
+    <div className="bz7__cols bapp__polcols">
+      <div className="bz7__work">{children}</div>
+    </div>
+  )
+}
+
 function PoliciesTab({
   app,
   flash,
@@ -500,7 +526,11 @@ function PoliciesTab({
   /* One application, one policy (14 Oct 2026): the one that decides here, else
      the first on it. Any other is data the ruling bars, said on the view's
      state line with the way to clean it up. */
-  const shown = rows.find((r) => r.state === 'decides') ?? rows[0]
+  /* A draft never leads. `duplicatePolicy` prepends its copy to the tenant's list (store.tsx), so once a
+     replace parks a draft here, `rows[0]` is that draft whenever nothing decides — an inactive or monitoring
+     policy would drop into `others` and be read as the stray. The decider leads; failing that, the policy
+     that could be one. */
+  const shown = rows.find((r) => r.state === 'decides') ?? rows.find((r) => r.policy.status !== 'draft') ?? rows[0]
   const others = rows.filter((r) => r !== shown)
   /* App access only: the drawer shows the rest, greyed with the reason, but a
      button that opens on nothing to pick is a dead end. */
@@ -576,31 +606,90 @@ function PoliciesTab({
     focusRow(policyId)
     return true
   }
+  /* Replace policy, the draft-copy way (app-policies.ts `REPLACE_MAKES_DRAFT`): the pick is copied onto this
+     application alone, as a draft. The application keeps the policy it has and keeps being decided by it, so
+     not one sign-in moves — the copy is the admin's to read, change and turn on when they are ready.
+
+     The copy is independent of what it was copied from: `duplicatePolicy` gives it its own id, its own rule
+     ids and its own name, so editing it never reaches the applications the original is on. That is the whole
+     point of copying rather than attaching the shared policy, and it is why this press needs no checks.
+
+     Undo deletes the copy, and only while it is untouched — the same refusal `undoTo` makes
+     (applications-model.ts): an Undo pressed after the admin has opened and edited the draft would throw their
+     work away. */
+  const draftCopy = (policyId: string): boolean => {
+    const from = store.policyById(policyId)
+    if (!from || from.isSystem) return false
+    const id = store.duplicatePolicy(policyId, { appIds: [app.id] })
+    if (!id) return false
+    const made = store.policyById(id)
+    playCue('attach')
+    store.showToast(`${made?.name ?? 'Copy'} added to ${app.name} as a draft. Nothing changes until you turn it on.`, {
+      label: 'Undo',
+      run: () => {
+        if (!made || store.policyById(id) !== made) {
+          store.showToast(`Can't undo. ${made?.name ?? 'The draft'} has changed since.`)
+          return
+        }
+        store.deletePolicy(id)
+      },
+    })
+    return true
+  }
+
   /* False when the policy no longer exists; 'checking' while the checks run.
      The add drawer waits for them, under the page when one opens — so Keep
      editing goes back to the pick — and is closed from here once the add is made. */
+  /* Replace policy: the old one comes off in the same press, so the checks
+     read the tenant as it will actually be, with both changes at once
+     (guard.ts `alsoAfter`). Without it a replace is checked as a plain add —
+     both policies on the application at once, which is the very state one
+     application, one policy (14 Oct 2026) exists to prevent, and the reading
+     that makes the policy going on look shadowed when it is about to decide
+     alone. Re-read by id: the copy held in `replacing` is a render old. */
+  const alsoOff = (): readonly Policy[] | undefined => {
+    if (!replacing) return undefined
+    const live = store.policyById(replacing.id)
+    return live && !live.isSystem ? [detachFrom(live, app.id)] : undefined
+  }
   const attach = (policyId: string): boolean | 'checking' => {
     const live = store.policyById(policyId)
     if (!live || live.isSystem) return false
+    /* A replace makes a draft copy and writes nothing live, so there is nothing to check first. The guard below
+       still runs for a plain add, which does put a live policy on this application. */
+    if (replacing && REPLACE_MAKES_DRAFT) return draftCopy(policyId)
     if (!appsGuard.guards(live)) return putOn(policyId)
-    appsGuard.check(live, attachTo(live, app.id, store.apps).appIds, () => {
-      if (putOn(policyId)) setAdding(false)
-    })
+    appsGuard.check(
+      live,
+      attachTo(live, app.id, store.apps).appIds,
+      () => {
+        if (putOn(policyId)) setAdding(false)
+      },
+      undefined,
+      alsoOff(),
+    )
     return 'checking'
   }
   const takeOff = (policyId: string) => {
     if (removeFromApp(store, policyId, app)) focusHead()
   }
+  /* The confirm is the whole of it now (app-policies.ts `REMOVE_RUNS_CHECKS`): it has already named what
+     becomes of the policy and who moves to which policy, so the press writes. */
   const detach = (policyId: string) => {
     const live = store.policyById(policyId)
     if (!live || live.isSystem) return
-    if (!appsGuard.guards(live)) return takeOff(policyId)
+    if (!REMOVE_RUNS_CHECKS || !appsGuard.guards(live)) return takeOff(policyId)
     appsGuard.check(live, detachFrom(live, app.id).appIds, () => takeOff(policyId))
   }
   /* The page names its write by the applications it read: with this one, the
-     add; without it, the removal. */
+     add — or the replace, when one is going off in the same press; without
+     it, the removal. */
   const guardPage = appsGuard.page({
-    primaryLabel: appsGuard.held?.appIds.includes(app.id) ? `Add to ${app.name}` : `Remove from ${app.name}`,
+    primaryLabel: !appsGuard.held?.appIds.includes(app.id)
+      ? `Remove from ${app.name}`
+      : replacing
+        ? `Replace on ${app.name}`
+        : `Add to ${app.name}`,
     onConfirm: (ids, p) => {
       if (!ids.includes(app.id)) return takeOff(p.id)
       if (putOn(p.id)) setAdding(false)
@@ -646,39 +735,50 @@ function PoliciesTab({
 
   return (
     <>
-      <div ref={view} className="apol__wrap">
-        {shown ? (
-          /* One application, one policy (owner, 14 Oct 2026): the tab IS the policy, read in the page. Who it
-             covers is changed in the policy; two buttons here, the rest on the status pill. */
-          <AppPolicyView
-            app={app}
-            row={shown}
-            others={others}
-            globalDefault={fallback}
-            everyoneElse={everyoneElse}
-            saving={saving}
-            flash={flash}
-            deletable={deletable(shown.policy)}
-            onReplace={() => {
-              setReplacing(shown.policy)
-              setAdding(true)
-            }}
-            onMenu={onMenu(shown)}
-            onRemoveOther={remove}
-            onTab={onTab}
-          />
-        ) : (
-          /* Nothing of its own: the Global Default's rules are what it gets, and the two ways to give it a policy. */
-          <AppNoPolicyView
-            app={app}
-            globalDefault={fallback}
-            saving={saving}
-            onNew={newPolicy}
-            onAdd={attachable.length > 0 ? () => setAdding(true) : undefined}
-            onTab={onTab}
-          />
-        )}
-      </div>
+      {/* The setup tabs' own column, not the page's full width (owner, 22 Oct 2026, with the Attributes tab beside
+          it: "I think we can use the same width as we have in other tab like advance or attributes for this, no need
+          use the full page, make the right side empty as of now, it's okay like other page").
+
+          This REVERSES "app page full width" of 19 Oct (docs/memory/app-policy-tab-canvas-19-oct.md) — do not put it
+          back from that note. One child inside `bz7__cols` is exactly what SetupTabBody draws for Advanced and
+          Attributes (app-setup-forms.tsx), so the tabs line up down the page; the right half stays empty on purpose,
+          and nothing is to be moved into it. */}
+      <WorkColumn>
+        <div ref={view} className="apol__wrap">
+          {shown ? (
+            /* One application, one policy (owner, 14 Oct 2026): the tab IS the policy, read in the page. Who it
+               covers is changed in the policy; two buttons here, the rest on the status pill. */
+            <AppPolicyView
+              app={app}
+              row={shown}
+              others={others}
+              globalDefault={fallback}
+              everyoneElse={everyoneElse}
+              saving={saving}
+              flash={flash}
+              deletable={deletable(shown.policy)}
+              onReplace={() => {
+                setReplacing(shown.policy)
+                setAdding(true)
+              }}
+              onDuplicate={() => addCopy(shown.policy.id)}
+              onMenu={onMenu(shown)}
+              onRemoveOther={remove}
+              onTab={onTab}
+            />
+          ) : (
+            /* Nothing of its own: the Global Default's rules are what it gets, and the two ways to give it a policy. */
+            <AppNoPolicyView
+              app={app}
+              globalDefault={fallback}
+              saving={saving}
+              onNew={newPolicy}
+              onAdd={attachable.length > 0 ? () => setAdding(true) : undefined}
+              onTab={onTab}
+            />
+          )}
+        </div>
+      </WorkColumn>
 
       <AddExistingPolicy
         open={adding}
@@ -706,6 +806,7 @@ function PoliciesTab({
           open={deleting.open}
           name={deleting.policy.name}
           noun="policy"
+          requireTyped
           detail={deleteDetail(deleting.policy, store.policies, store.apps, store.users, store.groups) ?? undefined}
           onCancel={() => setDeleting({ ...deleting, open: false })}
           onConfirm={() => {

@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Asterisk, Check, Gauge, Layers, MonitorSmartphone, Network, Webhook, type LucideIcon } from 'lucide-react'
+import { Asterisk, Check, Gauge, Layers, MonitorPlay, MonitorSmartphone, Network, Webhook, type LucideIcon } from 'lucide-react'
 
 import { Face } from '../../faces'
 import { StatusPill, Tip } from '../../kit'
@@ -56,6 +56,8 @@ export function KindMark({ target, small = false }: { target: InspectTarget; sma
     inner = target.ruleId === null || i < 0 ? <Asterisk size={size} strokeWidth={2.2} /> : <b>{i + 1}</b>
   } else if (target.kind === 'policy') {
     inner = <Layers size={size} strokeWidth={2} />
+  } else if (target.kind === 'see') {
+    inner = <MonitorPlay size={size} strokeWidth={2} />
   } else {
     const Icon = PEEK_ICON[target.kind]
     inner = <Icon size={size} strokeWidth={2} />
@@ -110,14 +112,16 @@ export interface HeroFact {
 }
 
 /** The overview card at the top of every page: the mark, the name and its standing, the facts, and a strip at its foot. */
-export function Hero({ target, kicker, name, badge, facts, strip }: { target: InspectTarget; kicker: string; name: string; badge?: ReactNode; facts: HeroFact[]; strip?: ReactNode }) {
+export function Hero({ target, kicker, name, badge, facts, strip, nameAttrs }: { target: InspectTarget; kicker: string; name: string; badge?: ReactNode; facts: HeroFact[]; strip?: ReactNode; nameAttrs?: Record<string, string | number | boolean> }) {
   return (
     <section className="insp__hero" aria-label={`${kicker}: ${name}`}>
       <div className="insp__herohead">
         <KindMark target={target} />
         <div className="insp__heroname">
           <span className="insp__kicker">{kicker}</span>
-          <b title={name}>{name}</b>
+          <b title={name} {...nameAttrs}>
+            {name}
+          </b>
         </div>
         {badge}
       </div>

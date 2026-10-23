@@ -2,17 +2,14 @@ import { AnimatePresence, motion, animate, useReducedMotion } from 'motion/react
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import {
   Activity,
-  AlertTriangle,
   AppWindow,
   ArrowLeft,
   BookOpen,
-  CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   CreditCard,
   FileText,
   IdCard,
-  Info,
   KeyRound,
   LayoutGrid,
   type LucideIcon,
@@ -23,13 +20,11 @@ import {
   Settings,
   ShieldCheck,
   Sun,
-  Trash2,
   UserRound,
   Users,
   Volume2,
   VolumeX,
   X,
-  XCircle,
   Zap,
 } from 'lucide-react'
 
@@ -40,9 +35,9 @@ import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
 import { Tip } from './kit'
+import { TONE_ICON } from './toast-tone'
 import { screenOffered } from './edition-screens'
 import { useBrand, useToast, type BrandScreen } from './store'
-import type { ToastTone } from './toast-tone'
 import { pressToastAction } from './toast-action'
 import { useTheme } from './theme-mode'
 import { playCue, playToastCue, useSoundSetting } from './sound'
@@ -642,14 +637,10 @@ export function Shell({ children }: { children: ReactNode }) {
   )
 }
 
-/* The mark for each kind of news (22 Sep 2026). */
-const TOAST_ICON: Record<ToastTone, LucideIcon> = {
-  success: CheckCircle2,
-  removed: Trash2,
-  warning: AlertTriangle,
-  error: XCircle,
-  info: Info,
-}
+/* The mark for each kind of news (22 Sep 2026) now lives in toast-tone.ts as
+   `TONE_ICON`: the confirm dialogs read the same map (kit.tsx `Confirm`,
+   22 Oct 2026), and two copies would drift the moment a tone was added. */
+const TOAST_ICON = TONE_ICON
 
 /* Its own component, so subscribing to the toast re-renders this node rather
    than the whole shell around it.

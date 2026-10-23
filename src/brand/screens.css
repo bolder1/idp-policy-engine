@@ -181,6 +181,10 @@
 /* Fixed-content columns, sized to their content rather than to their share. */
 .btable__col-status { width: 128px; }
 .btable__col-actions { width: 56px; }
+/* Two icon buttons in the column instead of a kebab (Applications.tsx): the column holds a pair, so it is wider,
+   and the pair sits at the same right edge the single kebab did — row ends line up either way. */
+.btable__col-actions--pair { width: 88px; }
+.btable td.btable__actions--pair { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); height: var(--row-h, 52px); }
 /* The row menu stays reachable when the table does scroll. It is the only
    column whose position matters more than its context. */
 .btable thead th.btable__col-actions,

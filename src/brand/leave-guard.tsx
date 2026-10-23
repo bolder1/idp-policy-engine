@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 
-import { Badge, Button, Modal } from './kit'
+import { Badge, Confirm } from './kit'
 import { useBrand, type LeaveGuard } from './store'
 
 /* --- Leaving a screen with unsaved work ---------------------------------------
@@ -84,31 +84,38 @@ export function LeaveDialog() {
   const reason = p?.canSave ? (p.blocked ?? null) : null
 
   return (
-    <Modal
+    /* The hero shape (owner, 22 Oct 2026: "hero shape for delete and discard").
+       One sentence and no list, which is what the hero is for — and leaving
+       unsaved work behind is the most interrupting thing this console does, so
+       it is the one that earns the moment.
+
+       `warning`, not `removed`: nothing is deleted from the tenant, the edits in
+       front of you are. The three-way decision — stay, lose it, keep it — is the
+       product's only genuine one, which is why `alt` exists at all. */
+    <Confirm
       open={!!pendingLeave}
       onClose={leaveStay}
+      tone="warning"
+      shape="hero"
       title="Unsaved changes"
-      width={440}
-      footer={
-        <>
-          <Button variant="ghost" onClick={leaveStay}>
-            Keep editing
-          </Button>
-          <Button variant="danger" onClick={leaveDiscard}>
-            Discard
-          </Button>
-          {p?.canSave && (
-            <Button variant="brand" disabled={!!reason} title={reason ?? undefined} onClick={leaveSave}>
-              {p.saveLabel}
-            </Button>
-          )}
-        </>
-      }
+      cancelLabel="Keep editing"
+      confirmLabel="Discard"
+      onConfirm={leaveDiscard}
+      /* No dimmed Save. It used to render disabled with the reason in a
+         `title`, so the footer offered a red Discard beside a 45%-opacity
+         orange button that was both the recommended action and unpressable —
+         and the reason why sat in a tooltip no keyboard or touch user could
+         reach. When saving is not on offer, the dialog says so in the body and
+         the button is simply not there. */
+      alt={p?.canSave && !reason ? { label: p.saveLabel, onClick: leaveSave } : undefined}
     >
-      <p className="bx-leave__body">
-        {reason ?? (p?.canSave ? 'Save your changes or discard them before you leave.' : 'Leaving discards your changes.')}
-      </p>
-    </Modal>
+      {/* With Save on offer the three buttons ARE the content: "save your
+          changes or discard them before you leave" is those buttons written out
+          as a sentence. A body earns its place here only when it says something
+          they cannot — why saving is blocked, or that there is no way to keep
+          this work. */}
+      {reason ? `This can't be saved yet. ${reason}` : p?.canSave ? undefined : 'Leaving discards your changes.'}
+    </Confirm>
   )
 }
 

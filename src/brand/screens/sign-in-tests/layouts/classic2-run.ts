@@ -78,9 +78,10 @@ export interface ChainRun {
 }
 
 /** The chain's words for a run at its own step (`run.s`); `onePolicy`, the merged Policy card's (ONE_POLICY_CARD). */
-export function useChainRun(run: RunLayoutProps, opts: { onePolicy?: boolean } = {}): ChainRun {
+export function useChainRun(run: RunLayoutProps, opts: { onePolicy?: boolean; motion?: boolean } = {}): ChainRun {
   const { plan, s, running, form, asGroup, screens } = run
   const onePolicy = opts.onePolicy === true
+  const motion = opts.motion === true
   const brand = useBrand()
   const resolve = useNameLookup()
   const env = useSimEnv()
@@ -110,8 +111,8 @@ export function useChainRun(run: RunLayoutProps, opts: { onePolicy?: boolean } =
   const one = useMemo<OneCard | null>(() => {
     if (!onePolicy) return null
     const why = oneWhy(plan, inPolicy)
-    return { why, head: oneHead(plan, s), also: oneAlso(plan, why), gd: oneGdFoot(plan, gd, why), outcomeMeta: outcomeMetaOne(outcome), inPolicy, walked: s >= walkEnd(plan) }
-  }, [onePolicy, plan, s, gd, inPolicy, outcome])
+    return { why, head: oneHead(plan, s, motion ? { resolveAt: 'lock' } : {}), also: oneAlso(plan, why), gd: oneGdFoot(plan, gd, why), outcomeMeta: outcomeMetaOne(outcome), inPolicy, walked: s >= walkEnd(plan) }
+  }, [onePolicy, motion, plan, s, gd, inPolicy, outcome])
 
   return {
     shown,
@@ -150,11 +151,11 @@ export interface ChainFold {
 
 /* The fold: open as reached while it plays, folded once it lands; what the admin pressed stands until the next run (or
    another identity of it) — `key` is what says which run that is. */
-export function useChainFold(key: string, shown: readonly CardKey[], landed: boolean, one?: { on: CardKey | null }): ChainFold {
+export function useChainFold(key: string, shown: readonly CardKey[], landed: boolean, one?: { on: CardKey | null; keepOutcome?: boolean }): ChainFold {
   const [hand, setHand] = useState<{ key: string; open: Partial<Record<CardKey, boolean>> }>({ key, open: {} })
   const pressed = hand.key === key ? hand.open : {}
   /* `one`: Focus's card-by-card fold (classic2-model.ts `foldOne`); absent, Classic v2's every-card-open-while-it-plays. */
-  const open = one ? foldOne(shown, one.on, landed, pressed) : foldOpen(shown, landed, pressed)
+  const open = one ? foldOne(shown, one.on, landed, pressed, { keepOutcome: one.keepOutcome }) : foldOpen(shown, landed, pressed)
   const anyOpen = shown.some((k) => open[k])
   return {
     open,

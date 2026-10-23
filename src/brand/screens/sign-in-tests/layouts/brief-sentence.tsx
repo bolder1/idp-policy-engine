@@ -42,6 +42,8 @@ export interface SentenceProps {
   className?: string
   /** Everything written at once (a what-if briefed): one sweep through the sentence, word after word. */
   sweep?: boolean
+  /** The latest a word of the sweep may start, in seconds (Focus's run motion, 20 Oct 2026); absent, none. */
+  sweepCap?: number
   /** Draw each cited phrase's number (default). Off: the phrase alone, lit and pinned as before. */
   numbers?: boolean
 }
@@ -122,7 +124,7 @@ function Stream({ part, animate, dur, base = 0, small }: { part: Part; animate: 
   )
 }
 
-export function Sentence({ parts, num, s, landed, animate, working, lit, pinned, tone, durOf, onHot, onPin, className = '', sweep = false, numbers = true }: SentenceProps) {
+export function Sentence({ parts, num, s, landed, animate, working, lit, pinned, tone, durOf, onHot, onPin, className = '', sweep = false, numbers = true, sweepCap }: SentenceProps) {
   let words = 0
   const small = className.includes('is-after')
   /* The first blank of the cite the engine is on: the one blue blank. */
@@ -139,7 +141,7 @@ export function Sentence({ parts, num, s, landed, animate, working, lit, pinned,
             </span>
           )
         }
-        const base = sweep ? words * 0.035 : 0
+        const base = sweep ? (sweepCap === undefined ? words * 0.035 : Math.min(sweepCap, words * 0.035)) : 0
         words += p.text.split(/\s+/).filter(Boolean).length
         const body = <Stream key={`${p.key}:on`} part={p} animate={animate} dur={sweep ? 300 : durOf(p.at)} base={base} small={small} />
         if (!p.cite || num[p.cite] === undefined) {

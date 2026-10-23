@@ -260,7 +260,7 @@ describe('(d) a panel shut gives the focus back to what opened it — then the d
 
   it('the page notes the opener as each panel opens — a name, the attempts, the why, the form, the saved, the blocked', () => {
     expect(pageSrc).toContain('opener.current = openerOf(a instanceof HTMLElement ? a : null, panel !== null ? opener.current : null, document.body)')
-    expect(pageSrc).toMatch(/const onInspect = \(t: InspectTarget, plan: EngineRun\) => \{\s+noteOpener\(\)/)
+    expect(pageSrc).toMatch(/const onInspect = \(t: InspectTarget, plan: EngineRun, _fresh\?: boolean, see\?: SeeRun | null\) => \{\s+noteOpener\(\)/)
     expect(pageSrc).toMatch(/if \(from === 'outcome' && panel === 'break-in'\) \{\s+closePanel\(\)\s+return\s+\}\s+if \(leaving\.current\) leaving\.current\.keepFocus = true\s+noteOpener\(\)/)
     expect(pageSrc).toMatch(/onOpen: \(o: boolean\) => \{\s+if \(o\) \{\s+noteOpener\(\)/)
     expect(pageSrc).toMatch(/const openPanel = \(then\?: \(\) => void\) => \{[\s\S]*?noteOpener\(\)\s+setPanel\('form'\)/)

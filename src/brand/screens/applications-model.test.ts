@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { App, Policy, PolicyStatus, PolicyType, Rule } from '../data'
 import { showcaseTenant } from '../fixtures'
-import { attachNote, compareUpdated, existingHint, removeCopy, removeToast, replaceOnApp, replaceToast, type PolicyWriter } from './applications-model'
+import { attachNote, compareUpdated, existingHint, removeCopy, removeToast, replaceCopy, replaceOnApp, replaceToast, type PolicyWriter } from './applications-model'
 
 let n = 0
 const rule = (enabled = true): Rule =>
@@ -168,5 +168,42 @@ describe('existingHint', () => {
     expect(existingHint(2, 5)).toBe('Adds this application. The policy keeps its others.')
     expect(existingHint(0, 0)).toBe('No other policies yet.')
     expect(existingHint(0, 3)).toBe('Every policy is already on this application.')
+  })
+})
+
+describe('replaceCopy', () => {
+  /* Replace writes a removal and an add in one press. The add always had a
+     sentence (`attachNote`); the removal had none until the toast, by which
+     time both writes had already happened. These pin the two things that were
+     lost silently: the old policy's published rules, and the application's
+     protection. */
+
+  it("says what becomes of the policy coming off, in the remove dialog's words", () => {
+    /* Reused, not restated: a second copy of this sentence would drift from
+       the one the remove dialog shows for the same write. */
+    const off = policy('Box access', { appIds: ['gh', 'aws'] })
+    expect(replaceCopy(off, policy('Box contractors'), gh).policy).toBe(removeCopy(off, gh).policy)
+  })
+
+  it('warns that a saved draft replaces the published rules when this was the last application', () => {
+    const off = policy('Solo', { appIds: ['gh'], pendingDraft: { rules: [rule()], savedAt: 'now', savedBy: 'You' } })
+    expect(replaceCopy(off, policy('New'), gh).policy).toBe('Solo becomes a draft. Its saved draft replaces the published rules.')
+  })
+
+  it('says the application falls back when the replacement does not decide and the one coming off did', () => {
+    const off = policy('AWS access')
+    const on = policy('Code review', { status: 'draft' })
+    expect(replaceCopy(off, on, gh, 'Global Default Policy').protection).toBe(
+      'AWS access decides sign-ins to GitHub today. Code review does not, so GitHub falls back to Global Default Policy.',
+    )
+  })
+
+  it('says nothing about protection when the replacement decides too', () => {
+    expect(replaceCopy(policy('AWS access'), policy('AWS contractors'), gh).protection).toBeNull()
+  })
+
+  it('says nothing about protection when the one coming off was not deciding either', () => {
+    /* Nothing was protecting the application, so nothing is being lost. */
+    expect(replaceCopy(policy('Old', { status: 'inactive' }), policy('New', { status: 'draft' }), gh).protection).toBeNull()
   })
 })

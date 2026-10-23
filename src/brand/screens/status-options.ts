@@ -8,6 +8,19 @@ import { ACCESS_CHECK } from './sign-in-tests/names'
 
 export type StatusTarget = 'active' | 'inactive' | 'monitor'
 
+/* MONITORING IS NOT BUILT FOR THIS PHASE (owner, 22 Oct 2026: "Monitor should go to coming soon ... just add
+   coming soon and hide the function"). Off, no screen offers the switch or View monitoring, and the app policy
+   head lists Monitoring as Coming soon so the state is announced rather than quietly absent.
+
+   A FLAG, not an edition difference: `features.monitorMode` says whether a CUSTOMER'S tier includes monitoring,
+   and both tiers do — turning that off made the full edition stop granting everything, which is a contract its
+   own tests hold it to. "Not built yet" is a phase. Everything behind this is kept; flip it and monitoring is a
+   live state again. */
+export const MONITOR_MODE: boolean = false
+
+/** What a screen passes as `monitor`: the tier's answer and the phase's, so no caller has to remember both. */
+export const monitorOffered = (features: { monitorMode: boolean }): boolean => MONITOR_MODE && features.monitorMode
+
 /* Portals go to the app root, not <body>: the button, heading and focus resets
    are scoped to `.brand-root`, and outside it the menu items and the dialog's
    buttons render as grey UA buttons in the system font. */
@@ -18,9 +31,19 @@ export interface StatusOption {
   label: string
 }
 
-const TURN_ON: StatusOption = { target: 'active', label: 'Turn on' }
-const TURN_OFF: StatusOption = { target: 'inactive', label: 'Turn off' }
-const MONITOR: StatusOption = { target: 'monitor', label: 'Monitor' }
+/* THE SWITCHES ARE NAMED FOR THE STATE THEY PRODUCE (owner, 22 Oct 2026: "call it Active in action, whatever —
+   not Turn on, Turn off — and change it globally; I mean the policy engine and in apps, everywhere").
+
+   The pill says Active, Inactive, Draft, Monitoring. The switch beside it said Turn on and Turn off, so the thing
+   you pick and the thing you read were two vocabularies for one idea, and an admin had to translate between them
+   every time. Now the menu is the list of states and the current one is simply absent from it, which is how a
+   state is chosen everywhere else in this console.
+
+   It reads as a noun where the house asks for verbs on buttons, and that is the point: these are not actions on
+   the policy, they are what the policy IS. Everything that routes off `target` is untouched. */
+const TURN_ON: StatusOption = { target: 'active', label: 'Active' }
+const TURN_OFF: StatusOption = { target: 'inactive', label: 'Inactive' }
+const MONITOR: StatusOption = { target: 'monitor', label: 'Monitoring' }
 
 /* The switches a policy offers, by how much each enforces, with the current
    status left out: Turn on, then Monitor, then Turn off. Empty for drafts,

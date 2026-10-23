@@ -16,7 +16,9 @@ import layoutRaw from './Focus2Layout.tsx?raw'
 import chainRaw from './classic2-chain.tsx?raw'
 import glideRaw from './classic2-glide.ts?raw'
 import { conditionsWord, factRows } from './classic2-model'
-import { ONE_POLICY_CARD } from '../phase'
+import { DENIAL_REASONS, ONE_POLICY_CARD } from '../phase'
+import { CheckVersionOverride, type CheckVersion } from '../check-version'
+import { denyReasonOf } from '../deny-reason'
 import { rowFacts } from './shared/sign-in-row'
 import { citeOfLit, citeTargets, footerBeside, readViews, saidOf, viewsOf } from './focus2-brief-model'
 import { FIRST_FOCUS_VIEW, FOCUS_VIEW_KEY, readFocusView, type FocusView } from './focus2-view'
@@ -100,15 +102,24 @@ interface Paint {
   view?: FocusView
   brief?: boolean
   carousel?: boolean
+  /** The version of Check access (check-version.ts); absent, the one a viewer who never chose sees (v3). */
+  version?: CheckVersion
 }
 const wrap = (p: RunLayoutProps, paint: Paint = {}) =>
   renderToStaticMarkup(
-    <BrandProvider>
-      <TestingSessionProvider>
-        <Focus2Layout {...p} initialView={paint.view} initialBrief={paint.brief} initialCarousel={paint.carousel} />
-      </TestingSessionProvider>
-    </BrandProvider>,
+    <CheckVersionOverride.Provider value={paint.version ?? null}>
+      <BrandProvider>
+        <TestingSessionProvider>
+          <Focus2Layout {...p} initialView={paint.view} initialBrief={paint.brief} initialCarousel={paint.carousel} />
+        </TestingSessionProvider>
+      </BrandProvider>
+    </CheckVersionOverride.Provider>,
   )
+/* THE CHAIN IS CLASSIC'S (20 Oct 2026). v3, the default, draws the run on the builder's own canvas in the chain's place
+   (board-run.tsx; board-run-ui.test.tsx pins it), so the chain's own tests below — its cards, its connectors, its two
+   shapes — are pinned to Classic, the run as it was before 20 Oct: the policy's card, its rule card, the outcome. */
+const CLASSIC: Paint = { version: 'classic' }
+const CLASSIC_CARDS: readonly string[] = ['policy', 'rule', 'outcome']
 /** The cards one at a time over the Horizontal view: the route's (ROUTE_MAP), so asked for with the route off it is
     simply Horizontal. */
 const CAROUSEL: Paint = { view: 'horizontal', carousel: true }
@@ -295,8 +306,11 @@ describe('the first paint', () => {
         expect([...order].sort((a, z) => a - z), `${name} ${at}`).toEqual(order)
         expect(bar, name).toContain('>Brief</button>')
         expect(bar, name).toContain('>Questions</button>')
-        /* A settled run lands folded: the button opens every card; with nothing chosen there is no card for it. */
-        expect(bar, name).toMatch(/data-fn="fold"[\s\S]*<span>Expand all<\/span>/)
+        /* A settled run lands folded: the button opens every card; with nothing chosen there is no card for it. Under the
+           run's motion (RUN_MOTION, 20 Oct 2026) an outcome with something to read — a Deny's reason, a Depends' ways —
+           lands open and stays so, and the button folds it. */
+        const kept = props !== EMPTY && (props.plan.outcome.status === 'depends' || (DENIAL_REASONS && denyReasonOf(props.plan) !== null))
+        expect(bar, name).toContain(kept ? '<span>Collapse all</span>' : '<span>Expand all</span>')
         expect(/data-fn="fold"[^>]*aria-disabled="true"/.test(bar), `${name} ${at}`).toBe(props === EMPTY)
         /* Three buttons, and never a Back while the route is off. */
         expect(count(bar, '<button'), `${name} ${at}`).toBe(3)
@@ -351,7 +365,7 @@ describe('the first paint', () => {
       ['Depends', DEPENDS, 'is-depends'],
     ] as const) {
       for (const view of ['vertical', 'horizontal'] as const) {
-        const out = wrap(props, { view })
+        const out = wrap(props, { ...CLASSIC, view })
         expect(out, `${name} ${view}`).toMatch(new RegExp(`class="bb__card rl-c2__card is-terminal rl-c2__out ${tone}"`))
         expect(out, `${name} ${view}`).not.toContain('rl-f2__qs')
       }
@@ -359,10 +373,16 @@ describe('the first paint', () => {
     /* The matched rule's deny edge: the rule card's with the merged card off. With it on (20 Oct 2026) there is no rule
        card: the deciding row inside the Policy card takes the edge (classic2-one-ui.test.tsx draws it open), and the
        folded card says which row decided on its head. */
-    if (ONE_POLICY_CARD) {
-      const policy = (html: string) => html.slice(html.lastIndexOf('<', html.indexOf('data-card="policy"')), html.lastIndexOf('<', html.indexOf('data-card="outcome"')))
-      for (const view of ['vertical', 'horizontal'] as const) expect(text(policy(wrap(DENY, { view }))), view).toMatch(/^Policy .+ (Rule \d+ · .+|No rule matched)/)
-    } else expect(wrap(DENY, { view: 'horizontal' })).toMatch(/class="bb__card rl-c2__card is-deny[^"]* is-matched"/)
+    /* Classic keeps the rule card, ringed (20 Oct 2026: the chain is Classic's; the merged card has no version of its own). */
+    expect(wrap(DENY, { ...CLASSIC, view: 'horizontal' })).toMatch(/class="bb__card rl-c2__card is-deny[^"]* is-matched"/)
+    /* v3 carries the verdict on the same outcome card, at the end of the builder's canvas. */
+    expect(ONE_POLICY_CARD).toBe(true)
+    for (const [name, props, tone] of [
+      ['Deny', DENY, 'is-deny'],
+      ['Allow', ALLOW, 'is-allow'],
+      ['Depends', DEPENDS, 'is-depends'],
+    ] as const)
+      expect(wrap(props), `${name} v3`).toMatch(new RegExp(`class="bb__card rl-c2__card( is-open)? is-terminal rl-c2__out ${tone}[ "]`))
   })
 
   it('draws a run with nothing chosen without throwing, and says so', () => {
@@ -407,7 +427,7 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
     expect(readFocusView()).toBe('vertical')
     expect(readViews()).toBe('cards')
     for (const { name, props } of [...RUNS, { name: 'nothing chosen', props: EMPTY }]) {
-      const out = wrap(props)
+      const out = wrap(props, CLASSIC)
       expect(side(out, 'vertical'), name).toBeNull()
       expect(side(out, 'horizontal'), name).toBeNull()
       const ran = props !== EMPTY
@@ -421,13 +441,14 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
       expect(out, name).toMatch(/class="rl-c2__chain"/)
       expect(out, name).not.toContain('is-across')
       if (props !== EMPTY) {
-        expect(cardsIn(out), name).toEqual(CHAIN_CARDS)
+        expect(cardsIn(out), name).toEqual(CLASSIC_CARDS)
         /* A connector a card and no other, each at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
-        expect(count(out, 'class="bb__link'), name).toBe(CHAIN_CARDS.length)
-        expect(count(out, settledLink(props)), name).toBe(CHAIN_CARDS.length)
+        expect(count(out, 'class="bb__link'), name).toBe(CLASSIC_CARDS.length)
+        expect(count(out, settledLink(props)), name).toBe(CLASSIC_CARDS.length)
       }
-      /* The same as asking for Vertical. */
-      expect(out, name).toBe(wrap(props, { view: 'vertical' }))
+      /* The same as asking for Vertical, in either version. */
+      expect(out, name).toBe(wrap(props, { ...CLASSIC, view: 'vertical' }))
+      expect(wrap(props), name).toBe(wrap(props, { view: 'vertical' }))
     }
   })
 
@@ -437,7 +458,8 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
      visit changes nothing. */
   it('keeps HORIZONTAL_VIEW off: no pair in the bar, Vertical drawn, and a stored horizontal ignored', () => {
     expect(layoutSrc).toMatch(/const HORIZONTAL_VIEW = false\n/)
-    expect(layoutSrc).toContain('pair={HORIZONTAL_VIEW}')
+    /* v3 has no across shape at all (20 Oct 2026): the builder's canvas is one column. */
+    expect(layoutSrc).toContain('pair={HORIZONTAL_VIEW && !runFlags.canvas}')
     expect(layoutSrc).toContain("HORIZONTAL_VIEW ? readFocusView() : 'vertical'")
     const stored = { getItem: (k: string) => (k === FOCUS_VIEW_KEY ? 'horizontal' : null), setItem: () => {}, removeItem: () => {} }
     vi.stubGlobal('window', { localStorage: stored, addEventListener: () => {}, removeEventListener: () => {} })
@@ -445,10 +467,11 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
       /* The store does hold Horizontal: only the flag keeps the view from reading it. */
       expect(readFocusView()).toBe('horizontal')
       for (const { name, props } of [...RUNS, { name: 'nothing chosen', props: EMPTY }]) {
-        const out = wrap(props)
-        expect(out, name).toBe(wrap(props, { view: 'vertical' }))
+        const out = wrap(props, CLASSIC)
+        expect(out, name).toBe(wrap(props, { ...CLASSIC, view: 'vertical' }))
         expect(out, name).not.toContain('is-across')
         expect(out, name).toMatch(/class="rl-c2__chain"/)
+        expect(wrap(props), name).not.toContain('is-across')
         expect(barOf(out), name).not.toContain('f2cb__pair')
         expect(barOf(out), name).not.toContain('data-view=')
       }
@@ -463,15 +486,15 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
      and nothing else on the canvas. */
   it('lays the same chain across on Horizontal: the node and exactly three cards, a connector before each, nothing else', () => {
     for (const { name, props } of RUNS) {
-      const out = wrap(props, { view: 'horizontal' })
+      const out = wrap(props, { ...CLASSIC, view: 'horizontal' })
       expect(out, name).toMatch(/class="rl-c2__chain is-across"/)
-      /* A track a card: two since the merged Policy card (20 Oct 2026), three with it off. */
-      expect(out, name).toMatch(new RegExp(`--rl-c2-tracks:${CHAIN_CARDS.length}`))
+      /* A track a card: Classic's three (the policy, its rule, the outcome). */
+      expect(out, name).toMatch(new RegExp(`--rl-c2-tracks:${CLASSIC_CARDS.length}`))
       expect(nodeOf(out), name).toContain(props.plan.appName)
-      expect(cardsIn(out), name).toEqual(CHAIN_CARDS)
+      expect(cardsIn(out), name).toEqual(CLASSIC_CARDS)
       /* The same connectors as down the canvas, at rest in the outcome's tone (6 Oct 2026: the ink and tone classes). */
-      expect(count(out, 'class="bb__link'), name).toBe(CHAIN_CARDS.length)
-      expect(count(out, settledLink(props)), name).toBe(CHAIN_CARDS.length)
+      expect(count(out, 'class="bb__link'), name).toBe(CLASSIC_CARDS.length)
+      expect(count(out, settledLink(props)), name).toBe(CLASSIC_CARDS.length)
       for (const gone of ['f2o__', 'rl-focus__slot', 'rl-focus__edge', 'rl-f2__band']) expect(out, `${name} ${gone}`).not.toContain(gone)
       /* The row is drawn by `initialView` alone: the bar still has no pair to press. */
       expect(side(out, 'horizontal'), name).toBeNull()
@@ -479,10 +502,10 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
       expect(back(out), name).toBeNull()
       /* The same heads as down the canvas: the same step, what was selected and meta line on each card. */
       const heads = (html: string) => [...html.matchAll(/class="rl-c2__kicker">([^<]*)</g)].map((m) => m[1])
-      expect(heads(out), name).toEqual(heads(wrap(props, { view: 'vertical' })))
+      expect(heads(out), name).toEqual(heads(wrap(props, { ...CLASSIC, view: 'vertical' })))
     }
     /* An empty plan keeps no place for a card. */
-    expect(wrap(EMPTY, { view: 'horizontal' })).toMatch(/--rl-c2-tracks:0/)
+    expect(wrap(EMPTY, { ...CLASSIC, view: 'horizontal' })).toMatch(/--rl-c2-tracks:0/)
   })
 
   it('can only glide between the two: the same chain element, the same cards under the same ids, in either shape', () => {
@@ -506,7 +529,8 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
       for (const paint of [{ view: 'vertical' }, { view: 'horizontal' }, CAROUSEL] as Paint[]) {
         const out = wrap(props, { ...paint, brief: true })
         expect(out, name).toContain('rl-brief rl-f2b is-head')
-        expect(out, name).toContain('rl-c2__chain')
+        /* Over the chain (Classic) or the builder's canvas (v3, 20 Oct 2026). */
+        expect(out, name).toMatch(/class="(rl-c2__chain|bbr)[ "]/)
         expect(out, name).not.toContain('is-alone')
         expect(out, name).not.toContain('How it was decided')
         expect(out, name).not.toContain('rl-brief__how')
@@ -527,7 +551,8 @@ describe('one view and two functions: vertical, brief, questions (the horizontal
     }
     /* The headline stands at the world's top. */
     expect(wrap(ALLOW, { brief: true })).toMatch(/class="rl-brief rl-f2b is-head"[^>]*top:0%/)
-  })
+    /* Its own cap, as the other paint-heavy tests here have: v3 (20 Oct 2026) draws the policy's whole canvas in each paint. */
+  }, 60_000)
 
   it('never presses an orange button, selects in greyscale or blue, and says the presses in plain words', () => {
     const bar = barOf(wrap(ALLOW, { brief: false }))

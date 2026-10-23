@@ -112,24 +112,35 @@ export interface OneHead extends CardHead {
 }
 
 /* The head at step `s`: the deciding row, said once — the rows carry the numbers, so neither "Rule 1 of 3" nor
-   "Policy 1 of 2 applies" is drawn. */
-export function oneHead(plan: Pick<EngineRun, 'decider' | 'rules' | 'landing' | 'outcome' | 'at' | 'steps'>, s: number): OneHead {
+   "Policy 1 of 2 applies" is drawn. `resolveAt: 'lock'` (the run's motion, phase.ts RUN_MOTION, 20 Oct 2026): it says
+   the row that decided as that row locks (its rule's end), not at the walk's end, where it spun "Reading rules" for a
+   beat under a row that already said Matches. Without a row that decides, the walk's end as before. */
+export function oneHead(plan: Pick<EngineRun, 'decider' | 'rules' | 'landing' | 'outcome' | 'at' | 'steps'>, s: number, opts: { resolveAt?: 'lock' } = {}): OneHead {
   const title = plan.decider?.name ?? ONE_NO_POLICY
   if (!plan.decider) return { kicker: ONE_KICKER, title, meta: null, reading: false }
-  if (s < walkEnd(plan)) return { kicker: ONE_KICKER, title, meta: { tone: 'work', mark: 'spin', text: ONE_READING }, reading: true }
+  const land = opts.resolveAt === 'lock' && plan.landing !== null ? plan.rules[plan.landing] : undefined
+  const end = land && land.endAt >= 0 ? Math.min(land.endAt, walkEnd(plan)) : walkEnd(plan)
+  if (s < end) return { kicker: ONE_KICKER, title, meta: { tone: 'work', mark: 'spin', text: ONE_READING }, reading: true }
   return { kicker: ONE_KICKER, title, meta: oneMeta(plan), reading: false }
 }
+
+/** A rule that cannot be told, said by the check the sign-in leaves unstated: "Can’t tell · Device not stated". The one
+    composer of these words — the merged card's head and Check access v3's card (board-run-model.ts) both say it so. */
+export const cantTell = (word: string): string => (word ? `Can’t tell · ${word} not stated` : 'Can’t tell')
 
 function oneMeta(plan: Pick<EngineRun, 'rules' | 'landing' | 'outcome'>): HeadMeta {
   if (plan.outcome.status === 'depends') {
     /* The rule card's own words for a row that can't be told (classic2-model.ts `ruleMeta`), on its first one. */
     const r = plan.rules.find((x) => x.index !== null && x.state === 'unknown')
     const word = r?.checks.find((c) => c.status === 'unknown')?.word ?? ''
-    return { tone: 'warn', mark: 'help', text: word ? `Can’t tell · ${word} not stated` : 'Can’t tell' }
+    return { tone: 'warn', mark: 'help', text: cantTell(word) }
   }
   const land = plan.landing !== null ? plan.rules[plan.landing] : undefined
   if (!land || land.index === null) return { tone: 'plain', mark: 'dash', text: ONE_NO_RULE }
-  return { tone: 'ok', mark: 'check', text: `Rule ${land.index + 1} · ${land.name.trim() || 'Untitled rule'}` }
+  /* `name` is the admin's own words at its end (20 Oct 2026): the run's motion resolves the machine words before it and
+     sharpens the name in, never scrambling it (classic2-chain.tsx `Meta`). */
+  const name = land.name.trim() || 'Untitled rule'
+  return { tone: 'ok', mark: 'check', text: `Rule ${land.index + 1} · ${name}`, name }
 }
 
 /** A quiet line at the card's foot: a policy named, what is news about it, and whether it would answer otherwise. */
@@ -186,12 +197,13 @@ export function oneRowBadge(
 
 /* A row's state word where the merged card says more than the rule card did: "Matches · via Sales" on the row that
    decided (none for a group's own run, which already says the group), and "Also matches · not used" on a later rule
-   that also applies. Null: the row's own word (classic2-model.ts `ruleRowState`), as on the rule card. */
-export function oneRowWord(r: Pick<EngineRule, 'via' | 'alsoChecks'>, row: Pick<RuleRowState, 'tone' | 'word'>, walked: boolean, asGroup: boolean): { word: string; also: boolean } | null {
-  if (walked && r.alsoChecks && row.tone === 'not-reached') return { word: ONE_ALSO_RULE, also: true }
+   that also applies. Null: the row's own word (classic2-model.ts `ruleRowState`), as on the rule card. `lead` is the
+   machine's part of it, "Matches" (20 Oct 2026): the run's motion resolves it, and sharpens the group's name in after. */
+export function oneRowWord(r: Pick<EngineRule, 'via' | 'alsoChecks'>, row: Pick<RuleRowState, 'tone' | 'word'>, walked: boolean, asGroup: boolean): { word: string; also: boolean; lead: string } | null {
+  if (walked && r.alsoChecks && row.tone === 'not-reached') return { word: ONE_ALSO_RULE, also: true, lead: ONE_ALSO_RULE }
   if (row.tone !== 'match') return null
   const by = asGroup ? '' : viaWords(r.via ?? null)
-  return { word: by ? `${row.word} · ${by}` : row.word, also: false }
+  return { word: by ? `${row.word} · ${by}` : row.word, also: false, lead: row.word }
 }
 
 /* The Outcome head's third line under the merged card: what the person goes through, since the Policy card's meta

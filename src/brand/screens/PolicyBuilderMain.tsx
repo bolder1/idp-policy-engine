@@ -7,6 +7,7 @@ import {
   Asterisk,
   Copy,
   CopyPlus,
+  EllipsisVertical,
   FileText,
   FileX,
   Filter,
@@ -14,7 +15,6 @@ import {
   Info,
   LayoutTemplate,
   ListX,
-  MoreHorizontal,
   PanelLeftOpen,
   Plus,
   ScrollText,
@@ -22,7 +22,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { Badge, Button, DecisionChip, IconButton, MenuButton, Modal, Tabs, Tip, TipDot, Toggle, type MenuItem } from '../kit'
+import { Badge, Button, Confirm, DecisionChip, IconButton, MenuButton, Tabs, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { blankRule, fallbackRule, reidRule, uniqueName, type Audience, type Policy, type Rule } from '../data'
 import { hasOpenDialog } from '../dialog-chrome'
 import { EmptyState } from '../empty'
@@ -838,42 +838,28 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
       />
 
       {/* Names what goes, the way the save bar's Review changes does. */}
-      <Modal
+      {/* `rows`, not `hero`: this one NAMES what goes, and that is the whole
+          test for which shape a confirm takes (docs/specs/POPUPS.md). The other
+          four discards say one sentence and take the hero. */}
+      <Confirm
         open={confirmDiscard}
         onClose={() => setConfirmDiscard(false)}
+        tone="warning"
+        shape="rows"
         title="Discard changes?"
-        width={440}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirmDiscard(false)}>
-              Keep editing
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                setConfirmDiscard(false)
-                if (hasDraft) store.discardDraft(saved.id)
-                revert()
-                store.showToast('Changes discarded. Press Ctrl+Z to undo.')
-                focusSoon(inPage('.bf__ruleName'), barPrimary, inPage('.bempty__action button'))
-              }}
-            >
-              Discard
-            </Button>
-          </>
-        }
+        cancelLabel="Keep editing"
+        confirmLabel="Discard"
+        rows={changes.map((c, i) => ({ id: `${i}-${c}`, name: c }))}
+        onConfirm={() => {
+          setConfirmDiscard(false)
+          if (hasDraft) store.discardDraft(saved.id)
+          revert()
+          store.showToast('Changes discarded. Press Ctrl+Z to undo.')
+          focusSoon(inPage('.bf__ruleName'), barPrimary, inPage('.bempty__action button'))
+        }}
       >
-        <p className="bx-leave__body">
-          {saved.status === 'draft' ? 'The policy goes back to its last save.' : 'The policy goes back to its live rules.'}
-        </p>
-        {changes.length > 0 && (
-          <ul className="bf__discardlist">
-            {changes.map((c, i) => (
-              <li key={`${i}-${c}`}>{c}</li>
-            ))}
-          </ul>
-        )}
-      </Modal>
+        {saved.status === 'draft' ? 'The policy goes back to its last save.' : 'The policy goes back to its live rules.'}
+      </Confirm>
 
       <ReportUnsaved policyId={saved.id} edits={edits} />
 
@@ -1088,7 +1074,7 @@ function RuleCard({
         <MenuButton
           label={`${label} actions`}
           iconOnly
-          icon={MoreHorizontal}
+          icon={EllipsisVertical}
           size="sm"
           align="end"
           items={ruleItems}

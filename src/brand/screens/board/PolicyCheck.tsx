@@ -50,7 +50,8 @@ import { DOCK_TAB_LABEL, policyApps } from '../testing/test-dock'
 import { PEOPLE_AND_BREAK_IN, firstCheckApp, onPolicyApps, type CheckView } from './test-mode'
 import { boardVersion, columnsFor, runColumns } from './try-sign-in'
 import './check-access.css'
-import { OPEN_AT_ONCE, SAVED_SIGN_INS } from '../sign-in-tests/phase'
+import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
+import { useRunFlags } from '../sign-in-tests/check-version'
 
 /* -----------------------------------------------------------------------------
    Check access inside a policy: the builder's test mode, as the Sign-in tests
@@ -179,6 +180,10 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
   const env = useSimEnv()
   const reduced = useReducedMotion() === true
   const stage = useRef<HTMLDivElement | null>(null)
+  /* The version's word on it (check-version.ts, 20 Oct 2026): phase.ts says what is available, Classic turns it off.
+     Named as the flag so every line that read the flag reads it unchanged; `runFlags`, since `version` is the policy's. */
+  const runFlags = useRunFlags()
+  const OPEN_AT_ONCE = runFlags.openAtOnce
 
   /* Nobody yet, on the policy's first application, its facts at their defaults: where a visit with no sign-in
      starts, and where Reset puts the panel back. */
@@ -220,7 +225,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
     panelWas.current = panel
     if (panel !== 'why' && panel !== 'form') backTo.current = null
     else if (OPEN_AT_ONCE && was === 'past') backTo.current = 'past'
-  }, [panel])
+  }, [panel, OPEN_AT_ONCE])
   useEffect(() => {
     kept.current = { page, runId, loaded, zoom }
   })
@@ -531,7 +536,7 @@ export function PolicyCheck({ saved, draft, panel, onPanel, wide, onToggleWidth,
         onPanel(back)
       },
     }),
-    [panel, whySlot, onPanel],
+    [panel, whySlot, onPanel, OPEN_AT_ONCE],
   )
   /* The Why's Fix on this policy is made here, in this draft (conflict-fix.ts `FixHere`); on another, it opens that one. */
   const fixHere = useMemo(() => ({ policyId: saved.id, onFixes, form: ran }), [saved.id, onFixes, ran])

@@ -334,9 +334,9 @@ describe('turning one on and off', () => {
   })
 
   it('offers Turn on on a draft, and never Monitor', () => {
-    expect(statusOptions(collab, { monitor: true }).map((o) => o.label)).toEqual(['Turn on'])
-    expect(statusOptions(dataExport, { monitor: true }).map((o) => o.label)).toEqual(['Turn off'])
-    expect(statusOptions({ ...dataExport, status: 'inactive' }, { monitor: true }).map((o) => o.label)).toEqual(['Turn on'])
+    expect(statusOptions(collab, { monitor: true }).map((o) => o.label)).toEqual(['Active'])
+    expect(statusOptions(dataExport, { monitor: true }).map((o) => o.label)).toEqual(['Inactive'])
+    expect(statusOptions({ ...dataExport, status: 'inactive' }, { monitor: true }).map((o) => o.label)).toEqual(['Active'])
     for (const p of post) for (const status of ['draft', 'active', 'inactive'] as const) expect(statusOptions({ ...p, status }, { monitor: true }).map((o) => o.target)).not.toContain('monitor')
     /* A sign-in draft still offers nothing: it leaves draft through Review and save. */
     expect(statusOptions({ ...byId('sc-dev-tools'), status: 'draft' }, { monitor: true })).toEqual([])

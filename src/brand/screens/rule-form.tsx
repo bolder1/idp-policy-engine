@@ -4,6 +4,7 @@ import {
   Check,
   Clock,
   Copy,
+  EllipsisVertical,
   Gauge,
   Globe,
   Info,
@@ -11,7 +12,6 @@ import {
   type LucideIcon,
   MapPin,
   MonitorSmartphone,
-  MoreHorizontal,
   Plus,
   ShieldAlert,
   UserCheck,
@@ -567,7 +567,7 @@ function CardBlock({
         <MenuButton
           label={`Branch ${cardLetter(index)} actions`}
           iconOnly
-          icon={MoreHorizontal}
+          icon={EllipsisVertical}
           size="sm"
           items={menu}
           onSelect={(id) => {
@@ -774,7 +774,7 @@ function ConditionRow({
       <MenuButton
         label={`${t.label} actions`}
         iconOnly
-        icon={MoreHorizontal}
+        icon={EllipsisVertical}
         size="sm"
         items={menu}
         onSelect={(id) => {

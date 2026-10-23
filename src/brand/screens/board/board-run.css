@@ -1,0 +1,429 @@
+/* -----------------------------------------------------------------------------
+   CHECK ACCESS V3: THE RUN ON THE BUILDER'S OWN CANVAS (sign-in-tests/layouts/
+   board-run.tsx; phase.ts BUILDER_CANVAS_CHECK; owner, 20 Oct 2026: "the same
+   policy rule cards in the whole canvas instead of showing everything in one
+   card … reuse the same cards and the same canvas").
+
+   Board draws the policy's own cards (Board `run`); this sheet reads them as a
+   run and nothing more. Everything here is under `.bbr`, the run's own region —
+   never a second `.bb`: it sits inside the page's `.bb` (or the builder's
+   `.bb.is-checking`) and inside `.rl-c2`, so classic2.css's connector ink and
+   the rows' band, sweep and marks reach it as they reach the chain's cards.
+
+     the column     the builder's card width, with room on its right for the lane
+     the canvas     Board's stage and world put back in the flow: no pan, no
+                    transform (Board writes none under a run), no ground
+     connectors     24 px and bare; taken at rest in the strong line, not taken
+                    dashed, a possible way dashed in the notice
+     a card         its standing (`is-r-*`): the reading edge, quiet words for a
+                    miss, the decision's colour only on the card that decided
+     the line       what the sign-in made of a card, on its own line under the
+                    name: a mark, the machine's words, the engine's finding
+     the groups     the rules never reached, folded onto the connector under the
+                    card that decided as one label; walked misses that say the
+                    same, stacked into one card (board-run-model.ts `runGroups`)
+     the lock       once, on the card that decided: its edge and head take the
+                    decision's tone, four corner brackets close onto it from
+                    outside and let go; only the edge stays — never a ring
+     the lane       the route the sign-in took past the cards it never reached,
+                    drawn by each slot's own pseudo-element (no measuring) — only
+                    in a Depends, or once the rules never reached are opened
+
+   Light console only, tokens only: no hex or rgba, no transform, no transition,
+   no px but the column's 520px, never the brand's orange (board-run-ui.test.tsx
+   pins it). Motion animates nothing here; every keyframe is on a plain element
+   or a pseudo-element, and the new ones play only under `.is-play` — a run
+   told, or a group folded by hand — so a run drawn settled draws its last frame.
+   -------------------------------------------------------------------------- */
+
+.bbr {
+  /* A connector, the lane's room beside the column, and where the lane meets a card's head and the outcome's verdict
+     (measured: a card's first line is centred 23 under its top; the verdict's line sits 39 under the outcome's top). */
+  --bbr-link: var(--space-8);
+  --bbr-lane: var(--space-8);
+  --bbr-head-mid: calc(var(--space-8) - var(--bw-thin));
+  --bbr-out-mid: calc(var(--space-10) - var(--space-1));
+  --bbr-lane-tone: var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: min(520px, 100% - 2 * (var(--space-6) + var(--bbr-lane)));
+  margin: 0 auto;
+  padding: var(--space-12) 0 var(--space-16);
+}
+/* The sign-in on the axis, sized to its sentence as the builder's start pill is. */
+.bbr .bbr__pill { display: flex; justify-content: center; min-width: 0; }
+.bbr .bbr__pill > .rl-c2__node { flex: none; }
+.bbr .bbr__policy,
+.bbr .bbr__out { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+
+/* --- Board's canvas, in the flow ---------------------------------------------------------------------------------- */
+
+.bbr .bb__stage {
+  position: relative;
+  height: auto;
+  overflow: visible;
+  background: none;
+  cursor: default;
+  user-select: auto;
+  touch-action: auto;
+}
+.bbr .bb__world { position: static; padding: 0; will-change: auto; cursor: default; }
+.bbr .bb__chain { width: 100%; }
+.bbr .bb__runslot { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+
+/* --- The connectors ----------------------------------------------------------------------------------------------- */
+
+.bbr .bb__link { height: var(--bbr-link); margin-left: 0; }
+/* The connector the folded tail stands in for (the outcome's own): no height. */
+.bbr .bb__link.is-hidden { height: 0; }
+.bbr .bb__link.is-taken::before { background: var(--border-strong); }
+.bbr .bb__link.is-skip::before {
+  background: repeating-linear-gradient(to bottom, var(--border-default) 0 var(--space-2), transparent var(--space-2) var(--space-4));
+}
+.bbr .bb__link.is-possible::before {
+  background: repeating-linear-gradient(to bottom, var(--fb-notice-dot) 0 var(--space-2), transparent var(--space-2) var(--space-4));
+}
+
+/* --- A card ------------------------------------------------------------------------------------------------------- */
+
+/* Each card's tone, for its decision: the lock, its edge at rest, its line and its rows' ticks. */
+.bbr .bb__card.is-allow { --bbr-hit: var(--fb-positive-dot); --bbr-edge: var(--fb-positive-border); --bbr-ground: var(--fb-positive-bg); --bbr-fg: var(--fb-positive-fg); }
+.bbr .bb__card.is-mfa { --bbr-hit: var(--fb-positive-strong-dot); --bbr-edge: var(--fb-positive-strong-border); --bbr-ground: var(--fb-positive-strong-bg); --bbr-fg: var(--fb-positive-strong-fg); }
+.bbr .bb__card.is-deny { --bbr-hit: var(--fb-negative-dot); --bbr-edge: var(--fb-negative-border); --bbr-ground: var(--fb-negative-bg); --bbr-fg: var(--fb-negative-fg); }
+.bbr .bb__card { width: 100%; cursor: pointer; }
+/* Two lines: the name on the first, centred on the number; what the sign-in made of it under it (20 Oct 2026, evening). */
+.bbr .bb__card > .bb__cardhead { align-items: start; border-radius: calc(var(--radius-xl) - var(--bw-thin)); }
+.bbr .bb__card .bb__titlerow { min-height: calc(var(--space-9) - var(--space-1)); }
+/* One line folded, the whole name once opened (the app tab's own rule). */
+.bbr .bb__titlebtn strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bbr .bb__card.is-open .bb__titlebtn strong { white-space: normal; overflow-wrap: anywhere; }
+.bbr .bb__idx.is-still { cursor: inherit; touch-action: auto; }
+.bbr .bb__idx.is-still:hover { background: var(--tone-bg); }
+/* Nothing else matched: its name in the card's own colour, never the deny red at rest. */
+.bbr .bb__card.is-terminal .bb__titlebtn strong { color: var(--text-primary); }
+/* Waiting, and walked past: the policy's shape, quiet — the decision's card is the one in ink. Never reached, switched
+   off, or a rule that also applies (seen once the tail is opened): by colour, never by opacity. */
+.bbr .bb__card:is(.is-r-wait, .is-r-miss, .is-r-stack) .bb__titlebtn strong { color: var(--text-secondary); font-weight: var(--fw-medium); }
+.bbr .bb__card:is(.is-r-not-reached, .is-r-off, .is-r-also) .bb__titlebtn strong { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+.bbr .bb__card:is(.is-r-not-reached, .is-r-off, .is-r-also) .bb__idx { color: var(--text-tertiary); }
+/* The engine on it: the reading edge, a lift, the number in the accent's soft tile. */
+.bbr .bb__card.is-r-reading { border-color: var(--accent-soft-border); box-shadow: var(--el-mid); }
+.bbr .bb__card.is-r-reading .bb__idx { background: var(--accent-soft); color: var(--accent-strong); }
+/* It decided: the decision's edge and its number's tile, and nothing louder (no ring, no shadow, no badge). */
+.bbr .bb__card.is-r-decided { border-color: var(--bbr-edge); }
+.bbr .bb__card.is-r-decided .bb__idx,
+.bbr .bb__card.is-r-decided .bb__idx:hover { background: var(--bbr-ground); color: var(--bbr-fg); }
+.bbr .bb__card.is-terminal.is-r-decided .bb__titlebtn strong { color: var(--bbr-fg); }
+/* A card an answer or the brief points at, while it is pinned: the app tab's traced ring (slate or blue). */
+.bbr .bb__card.is-traced { border-color: var(--accent); box-shadow: 0 0 0 var(--bw-thin) var(--accent); }
+
+/* The fold mark keeps its slot at rest. Board's Centred skin gives the trail its track only under the pointer
+   (board.css), which re-cut a long name each time the pointer crossed a card; under a run the track is held, and the
+   fold mark alone waits for the pointer (`.bb__acts`' own opacity). Same weight as board.css's rule, one class more. */
+.bbr .bb__stage.is-centre .bb__card:not(:hover):not(.is-selected):not(:focus-within):not(.is-menu) .bb__cardhead { grid-template-columns: auto minmax(0, 1fr) auto; }
+.bbr .bb__stage.is-centre .bb__card:not(:hover):not(.is-selected):not(:focus-within):not(.is-menu) .bb__cardhead > .bb__cardmeta { display: flex; }
+
+/* The body: the builder's own reading, its decision chip grey but on the card that decided ("one colour on the way the
+   sign-in took"); each row's mark at its right end. */
+.bbr .bb__card:not(.is-r-decided) .bb__ifaction > .bb__ifchip:is(.is-tone-allow, .is-tone-mfa, .is-tone-deny) {
+  background: var(--surface-sunken);
+  border-color: var(--border-subtle);
+  color: var(--text-tertiary);
+}
+.bbr .bb__ifrow > .bb__tmark,
+.bbr .bb__ifrow > .bbr__notchecked { margin-left: auto; }
+.bbr .bbr__notchecked { flex: none; font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap; }
+.bbr .bb__ifwho > .bbr__notchecked { margin-left: auto; }
+/* Opened by hand, the row that did not hold keeps the negative tint (classic2.css's twin, for the builder's card). */
+.bbr .bb__card.is-open .bb__ifrow.is-cond:has(> .bb__tmark.is-fail),
+.bbr .bb__card.is-open .bb__ifwho:has(> .bb__tmark.is-fail) { background: var(--fb-negative-bg); }
+/* The rows that held, on the card that decided, in its decision's colour; on an also card, the notice — never green. */
+.bbr .bb__card.is-r-decided .bb__tmark.is-pass { background: var(--bbr-ground); color: var(--bbr-fg); }
+.bbr .bb__card.is-r-also .bb__tmark.is-pass { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+
+/* --- The line: what the sign-in made of a card, under its name ---------------------------------------------------- */
+
+/* It opens under the name as the walk reaches the card (`bbr-line-in`), and wraps to two lines at most. */
+.bbr .bbr__statewrap { display: grid; grid-template-rows: 1fr; min-width: 0; }
+.bbr .bbr__statein { min-width: 0; min-height: 0; }
+.bbr .bbr__statewrap.is-play > .bbr__statein { overflow: clip; }
+.bbr .bbr__state {
+  display: flex;
+  align-items: flex-start;
+  column-gap: var(--space-3);
+  min-width: 0;
+  margin-top: var(--space-1);
+  font-size: var(--fs-xs);
+  line-height: var(--space-6);
+  color: var(--text-secondary);
+}
+.bbr .bbr__mk { flex: none; display: inline-grid; place-items: center; width: var(--space-6); height: var(--space-6); }
+.bbr .bbr__mk > .bb__tmark,
+.bbr .bbr__tok > .bb__tmark { width: var(--space-6); height: var(--space-6); }
+.bbr .bbr__txt {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.bbr .bbr__lead { font-weight: var(--fw-medium); }
+/* The finding is the news: in the primary ink, regular. */
+.bbr .bbr__why { color: var(--text-primary); font-weight: var(--fw-regular); }
+.bbr .bbr__state .bx-tip { display: inline; }
+/* A miss: its ✕ neutral on the line, never red at rest — red is only the token's, for its beat, and an opened row's. */
+.bbr .bbr__mk > .bb__tmark.is-fail { background: var(--fb-neutral-bg); color: var(--text-secondary); }
+/* It decided: the decision's colour, on this card only (2FA the second green). */
+.bbr .bbr__state.is-match,
+.bbr .bbr__state.is-match .bbr__why { color: var(--bbr-fg); }
+.bbr .bbr__state.is-match .bbr__mk > .bb__tmark { background: var(--bbr-ground); color: var(--bbr-fg); }
+/* Can't tell, and a rule that also applies: the notice. */
+.bbr .bbr__state.is-notice,
+.bbr .bbr__state.is-notice .bbr__why { color: var(--fb-notice-fg); }
+.bbr .bbr__state.is-notice .bbr__mk > .bb__tmark { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+/* If not: a possible way, an empty dashed ring. Switched off: a dash. */
+.bbr .bbr__mk > .bb__tmark.is-possible { box-sizing: border-box; background: none; border: var(--bw-thin) dashed var(--fb-notice-dot); }
+.bbr .bbr__mk > .bb__tmark.is-off { background: var(--fb-neutral-bg); color: var(--text-tertiary); }
+.bbr .bbr__state:is(.is-faint, .is-work) .bbr__lead { font-weight: var(--fw-regular); }
+
+/* While the walk is on it: "Reading", then one token per check, its mark turning, then landing. The check that failed
+   lights for its beat: its word stands up, its ✕ red, its ground flashes once. */
+.bbr .bbr__strip { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-4); min-width: 0; }
+.bbr .bbr__tok {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.bbr .bbr__tok.is-hit { color: var(--text-primary); font-weight: var(--fw-medium); }
+
+/* The conflict, under the deciding card's line: one quiet note in the notice, indented to the words. */
+.bbr .bbr__also {
+  display: block;
+  padding-left: calc(var(--space-6) + var(--space-3));
+  font-size: var(--fs-xs);
+  line-height: var(--space-6);
+  color: var(--fb-notice-fg);
+  overflow-wrap: anywhere;
+}
+
+.bbr .bbr__statewrap.is-play { animation: bbr-line-in 160ms var(--ease-standard) both; }
+.bbr .bbr__statewrap.is-play .bbr__tok { animation: bbr-tok-in 120ms var(--ease-standard) both; }
+.bbr .bbr__statewrap.is-play .bbr__tok.is-hit { animation: bbr-tok-in 120ms var(--ease-standard) both, bbr-tok-hit 600ms linear both; }
+/* The engine's sentence sharpens in after the words resolve (classic2-motion.css's blur, by name); the note a beat later. */
+.bbr .bbr__statewrap.is-play .bbr__why { animation: rl-mo-blur-in 200ms var(--ease-standard) 80ms both; }
+.bbr .bbr__statewrap.is-play .bbr__also { animation: rl-mo-blur-in 220ms var(--ease-standard) 200ms both; }
+@keyframes bbr-line-in { from { grid-template-rows: 0fr; } to { grid-template-rows: 1fr; } }
+@keyframes bbr-tok-in { from { opacity: 0; } }
+@keyframes bbr-tok-hit {
+  0% { background-color: transparent; }
+  20%, 70% { background-color: var(--fb-negative-bg); }
+  100% { background-color: transparent; }
+}
+
+/* --- The groups: the rules never reached, and walked misses that say the same ------------------------------------- */
+
+/* A group is its head (the label on the connector, or the stack's card) over a body that folds as one piece. Before the
+   walk is over (`is-idle`) the body is open and the head has no height: the column is exactly as it would be without it. */
+.bbr .bbr__group { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+.bbr .bbr__groupbody { display: grid; grid-template-rows: 0fr; min-width: 0; }
+.bbr .bbr__group:is(.is-idle, .is-open) > .bbr__groupbody { grid-template-rows: 1fr; }
+/* Clipped for the fold, but wider than the column so a card's lift and a traced ring are never cut at its sides. */
+.bbr .bbr__groupinner,
+.bbr .bbr__stackin {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+  margin-inline: calc(var(--space-6) * -1);
+  padding-inline: var(--space-6);
+}
+.bbr .bbr__group.is-idle > .bbr__groupbody > .bbr__groupinner { overflow: visible; }
+/* Formed, the head's connector is the first card's: the first card's own stands down. */
+.bbr .bbr__group:not(.is-idle) > .bbr__groupbody > .bbr__groupinner > .bb__runslot:first-child > .bb__link { height: 0; }
+/* The way a group folds, one piece, no stagger: shut as it forms, and each way once on a press (a change of the
+   animation's name restarts it). At rest the static rows hold. */
+.bbr .bbr__group.is-play:not(.is-idle) > .bbr__groupbody { animation: bbr-fold-shut 280ms var(--ease-standard) both; }
+.bbr .bbr__group.is-play.is-open > .bbr__groupbody { animation-name: bbr-fold-open; }
+@keyframes bbr-fold-shut { from { grid-template-rows: 1fr; } to { grid-template-rows: 0fr; } }
+@keyframes bbr-fold-open { from { grid-template-rows: 0fr; } to { grid-template-rows: 1fr; } }
+
+/* The connector a label rides on: the line and the label stacked in one cell, the label masking the line under it. The
+   label is the line's sibling, never inside it: a hovered `.bb__link` takes the brand in board.css. */
+.bbr .bbr__edge { display: grid; min-width: 0; }
+.bbr .bbr__edge > * { grid-area: 1 / 1; }
+.bbr .bbr__edge.is-label > .bb__link { height: var(--space-10); }
+.bbr .bbr__group.is-idle > .bbr__edge > .bb__link { height: 0; }
+.bbr .bbr__group.is-play.is-tail:not(.is-idle) > .bbr__edge > .bb__link { animation: bbr-edge-grow 280ms var(--ease-standard) both; }
+@keyframes bbr-edge-grow { from { height: var(--bbr-link); } to { height: var(--space-10); } }
+.bbr .bbr__groupbtn {
+  place-self: center;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: calc(100% - var(--space-8));
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--bb-stage);
+  font: inherit;
+  font-size: var(--fs-xs);
+  line-height: var(--space-6);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bbr .bbr__groupbtn > svg { flex: none; }
+.bbr .bbr__groupword { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bbr .bbr__groupbtn:hover { color: var(--text-primary); background: var(--surface-sunken); }
+.bbr .bbr__groupbtn:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 0; }
+.bbr .bbr__group.is-play:not(.is-idle) .bbr__groupbtn { animation: rl-mo-fade-in 160ms var(--ease-standard) 120ms both; }
+
+/* The stack's head: no height before the walk is over, then the stack card as the misses fold under it. */
+.bbr .bbr__stackhead { display: grid; grid-template-rows: 1fr; min-width: 0; }
+.bbr .bbr__group.is-idle > .bbr__stackhead { grid-template-rows: 0fr; }
+.bbr .bbr__group.is-play.is-stack:not(.is-idle) > .bbr__stackhead { animation: bbr-fold-open 280ms var(--ease-standard) both; }
+/* The stack card: the builder's card with two folded card edges under it (its shadow: a layer of offset o and spread s
+   ends o + s below the card, -s in from each side). */
+.bbr .bb__card.bbr__stackcard,
+.bbr .bb__card.bbr__stackcard:hover {
+  box-shadow:
+    0 calc(var(--space-4) + var(--space-1)) 0 calc(var(--space-3) * -1) var(--surface-raised),
+    0 calc(var(--space-4) + var(--space-1)) 0 calc(var(--space-3) * -1 + var(--bw-thin)) var(--border-default),
+    0 var(--space-7) 0 calc(var(--space-5) * -1) var(--surface-raised),
+    0 var(--space-7) 0 calc(var(--space-5) * -1 + var(--bw-thin)) var(--border-default);
+}
+.bbr .bb__card.bbr__stackcard { margin-bottom: var(--space-5); }
+.bbr .bbr__stackcard .bb__idx.is-range { width: auto; min-width: calc(var(--space-9) - var(--space-1)); padding-inline: var(--space-2); font-size: var(--fs-xs); }
+.bbr .bbr__group.is-play:not(.is-idle) .bbr__stackcard { animation: rl-mo-fade-in 160ms var(--ease-standard) 120ms both; }
+
+/* --- The lock: once, on the card that decided ---------------------------------------------------------------------- */
+
+.bbr .bb__card.is-r-lock { animation: bbr-lock-edge 0.88s var(--ease-standard) both; }
+.bbr .bb__card.is-r-lock > .bb__cardhead { animation: bbr-lock-ground 0.88s var(--ease-standard) both; }
+.bbr .bb__card.is-r-lock::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--bw-thin) * -1);
+  pointer-events: none;
+  border-radius: var(--radius-xl);
+  --c: var(--bbr-hit);
+  --l: var(--space-5);
+  --w: var(--bw-thick);
+  background:
+    linear-gradient(var(--c), var(--c)) left top / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) left top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--w) var(--l) no-repeat;
+  /* classic2-motion.css's lock, by name, on Aruna's lock-on curve. */
+  animation: rl-mo-lock 0.88s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+@keyframes bbr-lock-edge {
+  0% { border-color: var(--accent-soft-border); }
+  14%, 68% { border-color: var(--bbr-hit); }
+  100% { border-color: var(--bbr-edge); }
+}
+@keyframes bbr-lock-ground {
+  0% { background-color: transparent; }
+  14%, 68% { background-color: var(--bbr-ground); }
+  100% { background-color: transparent; }
+}
+
+/* --- The lane ----------------------------------------------------------------------------------------------------- */
+
+.bbr.is-out-allow { --bbr-lane-tone: var(--fb-positive-dot); }
+.bbr.is-out-mfa { --bbr-lane-tone: var(--fb-positive-strong-dot); }
+.bbr.is-out-deny { --bbr-lane-tone: var(--fb-negative-dot); }
+.bbr :is(.bb__runslot, .bbr__group).is-lane-taken { --bbr-lane-ink: var(--bbr-lane-tone); --bbr-lane-style: solid; }
+.bbr :is(.bb__runslot, .bbr__group).is-lane-possible { --bbr-lane-ink: var(--fb-notice-dot); --bbr-lane-style: dashed; }
+.bbr .bb__runslot:is(.is-lane-from, .is-lane-through, .is-lane-to)::before,
+.bbr .bbr__group.is-lane-through::before,
+.bbr .bb__runslot.is-lane-tick::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  width: var(--bbr-lane);
+  pointer-events: none;
+  border: 0 var(--bbr-lane-style) var(--border-strong);
+  animation:
+    bbr-lane-draw 120ms var(--ease-standard) calc(var(--bbr-lane-i, 0) * var(--bbr-lane-step, 80ms)) both,
+    bbr-lane-ink 2.8s var(--ease-standard) calc(var(--bbr-lane-i, 0) * var(--bbr-lane-step, 80ms)) both;
+}
+.bbr .bb__runslot.is-lane-from::before {
+  top: calc(var(--bbr-link) + var(--bbr-head-mid));
+  bottom: 0;
+  border-top-width: var(--bw-thick);
+  border-right-width: var(--bw-thick);
+  border-top-right-radius: var(--radius-md);
+}
+/* The opened tail passes as one piece: its group carries it (a card inside the folding body would be clipped). */
+.bbr .bb__runslot.is-lane-through::before,
+.bbr .bbr__group.is-lane-through::before { top: 0; bottom: 0; border-right-width: var(--bw-thick); }
+.bbr .bb__runslot.is-lane-to::before {
+  top: 0;
+  height: calc(var(--bbr-link) + var(--bbr-out-mid));
+  border-bottom-width: var(--bw-thick);
+  border-right-width: var(--bw-thick);
+  border-bottom-right-radius: var(--radius-md);
+}
+.bbr .bb__runslot.is-lane-tick::after { top: calc(var(--bbr-link) + var(--bbr-head-mid)); height: 0; border-top-width: var(--bw-thick); }
+/* At rest (a run drawn settled, the run's motion off, or a decided run's tail opened by hand): drawn, in the strong line. */
+.bbr :is(.bb__runslot, .bbr__group).is-lane-rest::before,
+.bbr :is(.bb__runslot, .bbr__group).is-lane-rest::after { animation: none; }
+@keyframes bbr-lane-draw { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+@keyframes bbr-lane-ink {
+  0%, 68% { border-color: var(--bbr-lane-ink); }
+  100% { border-color: var(--border-strong); }
+}
+
+/* Space holds the story (Focus2Layout.tsx `is-held`): what CSS plays here holds with it. */
+.rl-f2.is-held .bbr *,
+.rl-f2.is-held .bbr *::before,
+.rl-f2.is-held .bbr *::after { animation-play-state: paused; }
+
+/* Reduced motion draws the landed picture at once: no line opening, token, hit, blur, fold, edge, lock or ink (each
+   selector as specific as the one that plays it). Presses open and fold at once. */
+@media (prefers-reduced-motion: reduce) {
+  .bbr .bb__card.is-r-lock,
+  .bbr .bb__card.is-r-lock > .bb__cardhead,
+  .bbr .bb__runslot::before,
+  .bbr .bb__runslot::after,
+  .bbr .bbr__group::before,
+  .bbr .bbr__statewrap.is-play,
+  .bbr .bbr__statewrap.is-play .bbr__tok,
+  .bbr .bbr__statewrap.is-play .bbr__tok.is-hit,
+  .bbr .bbr__statewrap.is-play .bbr__why,
+  .bbr .bbr__statewrap.is-play .bbr__also,
+  .bbr .bbr__group.is-play:not(.is-idle) > .bbr__groupbody,
+  .bbr .bbr__group.is-play.is-open > .bbr__groupbody,
+  .bbr .bbr__group.is-play.is-stack:not(.is-idle) > .bbr__stackhead,
+  .bbr .bbr__group.is-play.is-tail:not(.is-idle) > .bbr__edge > .bb__link,
+  .bbr .bbr__group.is-play:not(.is-idle) .bbr__groupbtn,
+  .bbr .bbr__group.is-play:not(.is-idle) .bbr__stackcard { animation: none; }
+  .bbr .bb__card.is-r-lock::after { display: none; }
+}
+@media (forced-colors: active) {
+  .bbr .bb__card.is-r-lock::after { display: none; }
+  .bbr .bb__runslot::before,
+  .bbr .bb__runslot::after,
+  .bbr .bbr__group::before { border-color: CanvasText; }
+  .bbr .bb__link.is-skip::before,
+  .bbr .bb__link.is-possible::before { background: GrayText; }
+  .bbr .bbr__mk > .bb__tmark,
+  .bbr .bbr__tok > .bb__tmark { border: var(--bw-thin) solid CanvasText; }
+  .bbr .bbr__groupbtn { border: var(--bw-thin) solid ButtonText; }
+  .bbr .bbr__groupbtn:focus-visible { outline: var(--bw-thick) solid Highlight; }
+}

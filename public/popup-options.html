@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Popup cards — the A family and C</title>
+<style>
+  :root{
+    --surface-raised:#fff; --surface-sunken:#f5f7f9; --surface-inset:#eef2f5;
+    --border-subtle:#e2e8ed; --text-primary:#12171e; --text-body:#1a222b;
+    --text-secondary:#4a5a6a; --text-tertiary:#5A6775;
+    --brand:#eb5424; --danger:#c00f3a; --notice-bg:#fdf6e0; --notice-border:#f0dfa4; --notice-fg:#7d5800;
+    --radius-sm:4px; --radius-md:6px; --radius-lg:8px; --soft:14px;
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-sunken);color:var(--text-body);font-size:14px;line-height:1.5}
+  .wrap{max-width:1240px;margin:0 auto;padding:40px 24px 90px}
+  h1{font-size:26px;margin:0 0 8px;color:var(--text-primary);letter-spacing:-.01em}
+  .lede{margin:0 0 26px;color:var(--text-secondary);max-width:74ch}
+  h2{font-size:18px;margin:0 0 4px;color:var(--text-primary)}
+  h3{font-size:15px;margin:0 0 3px;color:var(--text-primary)}
+  .why{margin:0 0 2px;color:var(--text-secondary)}
+  .cost{margin:0 0 16px;color:var(--text-tertiary);font-size:13px}
+  .cost b{color:var(--text-secondary);font-weight:600}
+  section{margin:0 0 50px}
+  .tag{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);
+       border:1px solid var(--border-subtle);background:var(--surface-raised);border-radius:999px;padding:3px 9px;margin-bottom:10px}
+  .tag.pick{color:#fff;background:var(--text-primary);border-color:var(--text-primary)}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px}
+  .scrim{border-radius:var(--soft);padding:30px 18px;display:grid;place-items:center;min-height:296px;
+         background-image:linear-gradient(rgba(18,23,30,.40),rgba(18,23,30,.40)),repeating-linear-gradient(0deg,#dfe5ea 0 1px,transparent 1px 22px)}
+  .cap{margin:8px 2px 0;font-size:12.5px;color:var(--text-tertiary)}
+
+  .dlg{background:var(--surface-raised);width:100%;max-width:372px;position:relative;overflow:hidden;
+       box-shadow:0 18px 44px rgba(18,23,30,.22),0 2px 6px rgba(18,23,30,.08)}
+  .dlg.r-sys{border-radius:var(--radius-lg)} .dlg.r-soft{border-radius:var(--soft)}
+  .x{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:999px;border:0;cursor:pointer;z-index:2;
+     display:grid;place-items:center;background:var(--surface-inset);color:var(--text-secondary);font-size:15px;line-height:1}
+  .x.dark{background:#2b3440;color:#fff}
+  .ttl{font-size:17px;font-weight:650;color:var(--text-primary);margin:0 0 6px;letter-spacing:-.005em}
+  .body{margin:0;color:var(--text-secondary)}
+  .body b{color:var(--text-primary)}
+  .acts{display:flex;gap:10px;padding:18px 20px 20px}
+  .acts.end{justify-content:flex-end} .acts.fill>.btn{flex:1}
+  .btn{font:inherit;font-weight:560;border-radius:var(--radius-md);padding:9px 16px;cursor:pointer;border:1px solid transparent}
+  .btn.ghost{background:var(--surface-raised);border-color:var(--border-subtle);color:var(--text-body)}
+  .btn.quiet{background:none;color:var(--text-secondary)}
+  .btn.red{background:var(--danger);color:#fff}
+  .centred{padding:18px 26px 0;text-align:center}
+  .centred .body{max-width:30ch;margin-inline:auto}
+  .badge{position:relative;width:64px;height:64px;border-radius:999px;background:#fff;display:grid;place-items:center;
+         box-shadow:0 4px 14px rgba(18,23,30,.10)}
+
+  /* A1 hero band + rings */
+  .heroband{position:relative;height:138px;display:grid;place-items:center;background:radial-gradient(120% 120% at 50% 42%,#fde8ec,#fdf3f5 48%,#fff)}
+  .rings i{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:999px;border:1px solid rgba(192,15,58,.10)}
+  .rings i:nth-child(1){width:92px;height:92px}.rings i:nth-child(2){width:144px;height:144px}
+  .rings i:nth-child(3){width:198px;height:198px}.rings i:nth-child(4){width:254px;height:254px}
+
+  /* A2 spotlight — no band edge */
+  .spot{position:relative;padding:30px 0 4px;display:grid;place-items:center}
+  .spot::before{content:"";position:absolute;inset:-40px -20px 0;pointer-events:none;
+    background:radial-gradient(60% 72% at 50% 34%, rgba(192,15,58,.13), rgba(192,15,58,.045) 46%, rgba(255,255,255,0) 72%)}
+  .spot.amber::before{background:radial-gradient(60% 72% at 50% 34%, rgba(125,88,0,.15), rgba(125,88,0,.05) 46%, rgba(255,255,255,0) 72%)}
+  .spot .badge{box-shadow:0 0 0 7px rgba(255,255,255,.72),0 6px 18px rgba(18,23,30,.12)}
+
+  /* A3 plinth — badge straddles the edge */
+  .plinth{height:88px;background:linear-gradient(#fdeaee,#fdf5f7)}
+  .straddle{margin-top:-34px;display:grid;place-items:center}
+  .straddle .badge{box-shadow:0 0 0 5px #fff,0 6px 16px rgba(18,23,30,.12)}
+
+  /* A4 tone bar — title inside the band */
+  .tonebar{display:flex;gap:12px;align-items:center;padding:16px 20px;background:#fdeaee;border-bottom:1px solid #f7d4dc}
+  .tonebar.amber{background:var(--notice-bg);border-bottom-color:var(--notice-border)}
+  .tonebar .glyph{flex:none;width:34px;height:34px;border-radius:var(--radius-md);display:grid;place-items:center;background:#fff;color:var(--danger)}
+  .tonebar.amber .glyph{color:var(--notice-fg)}
+  .tonebar .ttl{margin:0}
+  .pad{padding:16px 20px 0}
+
+  /* C rows */
+  .band{display:flex;gap:12px;align-items:flex-start;padding:18px 20px 0}
+  .chip{flex:none;width:34px;height:34px;border-radius:999px;display:grid;place-items:center}
+  .chip.red{background:#fdeaee;color:var(--danger)} .chip.amber{background:var(--notice-bg);color:var(--notice-fg)}
+  .rows{margin:12px 0 0;border:1px solid var(--border-subtle);border-radius:var(--radius-md);overflow:hidden}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;font-size:13px}
+  .row+.row{border-top:1px solid var(--border-subtle)}
+  .pill{flex:none;font-size:11px;font-weight:600;border-radius:999px;padding:2px 8px}
+  .pill.gone{background:#fdeaee;color:var(--danger)} .pill.moves{background:var(--notice-bg);color:var(--notice-fg)}
+  .more{padding:8px 12px;font-size:12px;color:var(--text-tertiary);background:var(--surface-sunken)}
+
+  .note{background:var(--surface-raised);border:1px solid var(--border-subtle);border-left:3px solid var(--brand);
+        border-radius:var(--radius-md);padding:14px 16px;margin:0 0 24px}
+  .note h3{margin:0 0 6px} .note p{margin:0 0 6px} .note p:last-child{margin:0}
+  table{border-collapse:collapse;width:100%;background:var(--surface-raised);border:1px solid var(--border-subtle);
+        border-radius:var(--radius-md);overflow:hidden;font-size:13px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border-subtle);vertical-align:top}
+  th{background:var(--surface-sunken);font-weight:600;color:var(--text-primary)}
+  tr:last-child td{border-bottom:0}
+  .toggle{display:inline-flex;gap:8px;align-items:center;margin:0 18px 22px 0;font-size:13px;color:var(--text-secondary)}
+  .no-rings .rings{display:none}
+  footer{color:var(--text-tertiary);font-size:13px;border-top:1px solid var(--border-subtle);padding-top:18px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <h1>Popup cards — the A family, and C</h1>
+  <p class="lede">You want to keep both. So: four refined takes on the <b>hero</b> idea for short, high-stakes confirms, and
+  <b>C</b> for anything that has to list what changes. Same content throughout, our real tokens throughout.</p>
+
+  <div class="note">
+    <h3>Your reference is a glow, not a band</h3>
+    <p>Looking again at the screenshot, the pink fades into white with <b>no hard edge</b> — it is a radial glow behind the badge,
+    not a tinted header strip. My first option A drew a band with a seam, which is why it felt heavier than the thing you liked.
+    <b>A2 is the faithful one.</b></p>
+  </div>
+
+  <label class="toggle"><input type="checkbox" id="soft"> Draw at 14px corners instead of our 8px</label>
+  <label class="toggle"><input type="checkbox" id="rings"> Hide the decorative rings</label>
+
+  <section>
+    <span class="tag">The A family — for short confirms with no list</span>
+    <h2>Four takes on the hero</h2>
+    <div class="grid2">
+      <div>
+        <div class="scrim"><div class="dlg r-sys">
+          <div class="heroband"><span class="rings"><i></i><i></i><i></i><i></i></span>
+            <span class="badge"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#c00f3a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></span></div>
+          <button class="x dark">&times;</button>
+          <div class="centred"><p class="ttl">Delete AWS access?</p><p class="body">It decides sign-ins for 2 applications. This cannot be undone.</p></div>
+          <div class="acts fill"><button class="btn ghost">Cancel</button><button class="btn red">Delete policy</button></div>
+        </div></div>
+        <p class="cap"><b>A1 Hero band.</b> The original. A visible seam where the tint stops, and 138px before a word.</p>
+      </div>
+      <div>
+        <div class="scrim"><div class="dlg r-sys">
+          <div class="spot"><span class="rings"><i></i><i></i><i></i><i></i></span>
+            <span class="badge"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#c00f3a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></span></div>
+          <button class="x">&times;</button>
+          <div class="centred"><p class="ttl">Delete AWS access?</p><p class="body">It decides sign-ins for 2 applications. This cannot be undone.</p></div>
+          <div class="acts fill"><button class="btn ghost">Cancel</button><button class="btn red">Delete policy</button></div>
+        </div></div>
+        <p class="cap"><b>A2 Spotlight. Faithful to your reference.</b> No seam — the tone glows out from behind the badge and dies
+        into the card. Costs ~90px, not 138.</p>
+      </div>
+      <div>
+        <div class="scrim"><div class="dlg r-sys">
+          <div class="plinth"></div>
+          <div class="straddle"><span class="badge"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#c00f3a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></span></div>
+          <button class="x dark">&times;</button>
+          <div class="centred" style="padding-top:12px"><p class="ttl">Delete AWS access?</p><p class="body">It decides sign-ins for 2 applications. This cannot be undone.</p></div>
+          <div class="acts fill"><button class="btn ghost">Cancel</button><button class="btn red">Delete policy</button></div>
+        </div></div>
+        <p class="cap"><b>A3 Plinth.</b> The badge straddles the tint's edge, so the seam becomes deliberate instead of accidental.
+        Crisper than A1, more structured than A2.</p>
+      </div>
+      <div>
+        <div class="scrim"><div class="dlg r-sys">
+          <div class="tonebar"><span class="glyph"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span>
+            <p class="ttl">Delete AWS access?</p></div>
+          <button class="x">&times;</button>
+          <div class="pad"><p class="body">It decides sign-ins for 2 applications. This cannot be undone.</p></div>
+          <div class="acts end"><button class="btn quiet">Cancel</button><button class="btn red">Delete policy</button></div>
+        </div></div>
+        <p class="cap"><b>A4 Tone bar.</b> Title lives inside the coloured band. Most compact of the four, left-aligned, and the only
+        one that could also carry a list underneath.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="tag pick">C — for confirms that must list what changes</span>
+    <h2>Consequence rows</h2>
+    <p class="why">Named things with a mark each. The tone mark and colour are the toast's, inherited exactly.</p>
+    <div class="grid2">
+      <div class="scrim"><div class="dlg r-sys">
+        <div class="band"><span class="chip red"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span>
+          <div><p class="ttl">Replace AWS access?</p><p class="body">These people change who decides their sign-in.</p>
+            <div class="rows">
+              <div class="row"><span>Engineering</span><span class="pill moves">Moves to AWS contractors</span></div>
+              <div class="row"><span>Kavya Menon</span><span class="pill gone">Loses access</span></div>
+              <div class="row"><span>Everyone else</span><span class="pill moves">Global Default</span></div>
+              <div class="more">AWS access becomes a draft. Its saved draft replaces the published rules.</div>
+            </div></div></div>
+        <button class="x">&times;</button>
+        <div class="acts end"><button class="btn quiet">Cancel</button><button class="btn red">Replace policy</button></div>
+      </div></div>
+      <div class="scrim"><div class="dlg r-sys">
+        <div class="band"><span class="chip amber"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3"/><path d="M12 9v4M12 17h.01"/></svg></span>
+          <div><p class="ttl">Switch to agentless?</p><p class="body">Agentless cannot read these signals.</p>
+            <div class="rows">
+              <div class="row"><span>Manufacturer and model</span><span class="pill gone">Removed</span></div>
+              <div class="row"><span>MAC address</span><span class="pill gone">Removed</span></div>
+              <div class="row"><span>TPM ID</span><span class="pill gone">Removed</span></div>
+              <div class="more">and 3 more · 5 policies check fewer signals from the next sign-in</div>
+            </div></div></div>
+        <button class="x">&times;</button>
+        <div class="acts end"><button class="btn quiet">Keep agent-based</button><button class="btn red">Switch and remove 6</button></div>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="tag">Keeping both</span>
+    <h2>Which dialog gets which</h2>
+    <p class="why">The split is not taste — it is whether the dialog has a list to show. 34 modals, and this is where they land.</p>
+    <table>
+      <tr><th>Job</th><th>Count</th><th>Gets</th><th>Why</th></tr>
+      <tr><td>Delete, discard, leave, turn off</td><td>11</td><td><b>A</b></td><td>One sentence, no list. The moment is the point.</td></tr>
+      <tr><td>Replace policy, switch reach, bulk remove</td><td>5</td><td><b>C</b></td><td>Names are the reason to confirm; centred hero copy cannot hold them.</td></tr>
+      <tr><td>Short forms, pickers, reports</td><td>16</td><td>Plain shell</td><td>A form has no severity. It gets the consistency pass, not a tone.</td></tr>
+      <tr><td>Review changes</td><td>2</td><td>Unchanged</td><td>Already owns the only head slot in the shell.</td></tr>
+    </table>
+  </section>
+
+  <footer>Tell me which of A1–A4, and whether the rings and the 14px corners stay. Then both go in the kit as one component with a
+  <code>shape</code> of hero or rows, so a dialog cannot invent a third look.</footer>
+</div>
+<script>
+  const wrap = document.getElementById('wrap')
+  document.getElementById('soft').addEventListener('change', (e) => {
+    document.querySelectorAll('.dlg').forEach((d) => { d.classList.toggle('r-sys', !e.target.checked); d.classList.toggle('r-soft', e.target.checked) })
+  })
+  document.getElementById('rings').addEventListener('change', (e) => wrap.classList.toggle('no-rings', e.target.checked))
+</script>
+</body>
+</html>

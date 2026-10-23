@@ -524,3 +524,8 @@ export function methodBlocker(m: AuthMethod): string | null {
   if (!m.allowed) return 'Not offered to end users'
   return null
 }
+
+/* Every method switched on in the running prototype, for testing (owner, 21 Oct 2026: "make all the toggles on, so I do not
+   have to do it again and again"). The test suites keep the seed as it was. Set to false to start from the seed. */
+export const ALL_METHODS_ON = true
+export const allOn = (list: AuthMethod[]): AuthMethod[] => (ALL_METHODS_ON && import.meta.env.MODE !== 'test' ? list.map((m) => ({ ...m, active: true, allowed: true })) : list)

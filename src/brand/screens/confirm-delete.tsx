@@ -1,10 +1,10 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { type ReactNode } from 'react'
+import { Trash2 } from 'lucide-react'
 
-import { Button, Callout, DeleteButton, Modal } from '../kit'
+import { Confirm, type ConfirmRow } from '../kit'
 import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
-import { DELETE_WORD, asksForDeleteWord, deleteConfirmed, type DeleteImpact, type PolicyUse } from './usage'
+import { DELETE_WORD, asksForDeleteTick, asksForDeleteWord, type DeleteImpact, type PolicyUse } from './usage'
 
 /* One delete confirmation for everything the Policies area can delete: a policy,
    a zone, a device profile, a risk profile, a hook, a display token.
@@ -37,6 +37,7 @@ export function ConfirmDelete({
   impact,
   detail,
   requireTyped,
+  tickCount,
   onCancel,
   onConfirm,
 }: {
@@ -45,12 +46,24 @@ export function ConfirmDelete({
   name: string
   /** Lower case: 'zone', 'device profile', 'policy'. */
   noun: string
-  /** Omit for objects no rule can reference, such as a policy. */
+  /* Omit for objects no rule can reference, such as a policy — nothing points
+     AT a policy, so there is no usage list to draw. It still asks for the typed
+     word: deleting a live policy hands its applications to the Global Default,
+     which changes who can sign in, and that is the test this dialog applies
+     (owner, 22 Oct 2026: "make this as well a hard-delete version, like we have
+     in zones and device profiles"). The three policy call sites pass
+     `requireTyped` for exactly that reason. */
   impact?: DeleteImpact
   /** One extra fact about the object itself, such as the apps a policy protects. */
   detail?: ReactNode
   /** Ask for the typed word even though no live sign-in changes. */
   requireTyped?: boolean
+  /* Ask for a tick instead, where nothing points at the object but the delete
+     is still worth stopping at — several things going at once. A count is its
+     own kind of stake: taking three tokens out of the inventory in one press is
+     not the same decision as taking one, and the ladder's middle rung is where
+     that belongs. Ignored when the word is already being asked for. */
+  tickCount?: number
   onCancel: () => void
   onConfirm: () => void
 }) {
@@ -60,31 +73,19 @@ export function ConfirmDelete({
   const stuck = impact?.stuck ?? []
   const refused = stuck.length > 0
   const typeToConfirm = asksForDeleteWord(impact, requireTyped)
+  const tickToConfirm = asksForDeleteTick(impact, requireTyped) || (!typeToConfirm && !refused && (tickCount ?? 0) > 1)
 
-  const [typed, setTyped] = useState('')
-  const fieldId = useId()
-  const box = useRef<HTMLInputElement | null>(null)
+  /* The typed word, its field, the reset between subjects and the focus now
+     belong to the kit's `Confirm` (22 Oct 2026). They were duplicated here and
+     nowhere else, which is exactly how sixteen confirms ended up each owning a
+     slightly different version of the same decision. `deleteConfirmed` and this
+     component's own arming test were character-for-character the same, so the
+     move changed no behaviour.
 
-  /* A fresh field for every delete. Without this, cancelling "Corporate
-     managed" and opening "BYOD phones" would open with the old name typed and
-     the button already armed for a different object. */
-  useEffect(() => {
-    setTyped('')
-  }, [open, name])
-
-  /* Straight into the field: an admin who has decided wants to type, not to
-     find the box first. The dialog chrome only moves focus to the panel when
-     it is not already inside it, so this is not undone. */
-  useEffect(() => {
-    if (!open || !typeToConfirm) return
-    const t = window.setTimeout(() => box.current?.focus(), 0)
-    return () => window.clearTimeout(t)
-  }, [open, typeToConfirm])
-
-  const armed = !typeToConfirm || deleteConfirmed(typed)
-
+     `confirm` keeps only the refusal guard: `Confirm` disables its own button
+     and gates Enter until the word matches, so it cannot be reached unarmed. */
   const confirm = () => {
-    if (refused || !armed) return
+    if (refused) return
     /* Demoted BEFORE the object goes, so no render ever shows a live policy
        naming something that has gone. `setPolicyStatus` stamps each one as
        changed by the admin, which it was. */
@@ -98,136 +99,121 @@ export function ConfirmDelete({
     }
   }
 
+  /* The policies a delete touches, each row a way out of the decision: opening
+     one closes this dialog and goes to its rules, where the admin can point them
+     at something else instead of deleting at all. */
+  const asRows = (uses: PolicyUse[]): ConfirmRow[] =>
+    uses.map((u) => ({
+      id: u.policy.id,
+      name: u.policy.name,
+      tag: u.draft ? <ChangeState unsaved={false} draft /> : undefined,
+      /* Named as rules: under a policy name a bare "Japan trip window" read as a
+         description of the policy, not as the rule that changes. */
+      detail: `${u.rules.length === 1 ? 'Rule' : 'Rules'}: ${u.rules.map((r) => r.name).join(', ')}`,
+      onOpen: () => {
+        onCancel()
+        store.go({ name: 'board', policyId: u.policy.id })
+      },
+    }))
+
+  /* Refused, not offered-then-rejected: a system policy cannot move to draft, so
+     there is nothing to confirm and the dialog says so with one Close.
+     `tone="error"` because that is what this is — and it is the toast's own
+     reading of the words: `toastTone` classes "Can't …" as an error. */
   if (refused) {
     return (
-      <Modal
+      <Confirm
         open={open}
         onClose={onCancel}
+        tone="error"
+        blocked
         title={`Can't delete ${name}`}
-        width={480}
-        footer={
-          <Button variant="secondary" onClick={onCancel}>
-            Close
-          </Button>
-        }
+        sections={[{ id: 'stuck', rows: asRows(stuck) }]}
       >
-        <div className="bx-confirm">
-          <p>
-            System policies can't move to draft, and {stuck.length === 1 ? 'this one uses' : 'these use'} this {noun}. Change{' '}
-            {stuck.length === 1 ? 'its rule' : 'their rules'} first.
-          </p>
-          <UseList uses={stuck} onOpen={onCancel} />
-        </div>
-      </Modal>
+        System policies can't move to draft, and {stuck.length === 1 ? 'this one uses' : 'these use'} this {noun}. Change{' '}
+        {stuck.length === 1 ? 'its rule' : 'their rules'} first.
+      </Confirm>
     )
   }
 
+  /* `tone="removed"` carries the Trash2 mark and the negative colour — the same
+     pair the toast uses for a removal, which is the whole point of inheriting
+     its language rather than inventing a dialog palette. */
+  /* HERO WHEN THERE IS NOTHING TO LIST (owner, 22 Oct 2026: "a good delete with
+     animated svg and good background and a good card"). The two shapes split on
+     content, which is what POPUPS.md says they are for: a dialog whose whole
+     body is one sentence takes the spotlight, and a dialog with names to show
+     keeps them — the hero has nowhere to put a list and drops one silently.
+     So a zone nobody uses gets the card, and a zone four live policies depend
+     on gets the four names. */
+  const bare = live.length === 0 && later.length === 0 && stuck.length === 0
+
   return (
-    <Modal
+    <Confirm
       open={open}
       onClose={onCancel}
+      tone="removed"
+      shape={bare ? 'hero' : 'rows'}
       title={`Delete ${name}?`}
-      width={typeToConfirm ? 560 : 480}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <DeleteButton size="md" disabled={!armed} title={armed ? undefined : `Type ${DELETE_WORD} to confirm`} onClick={confirm} />
-        </>
+      /* NO STANDING CALLOUT (owner, 22 Oct 2026, choosing C2). It restated the
+         title — "Delete X?" then "This permanently deletes the X" — and its
+         second clause is true of every delete in this console, so it was a
+         constant rather than news, in red, above the one line that actually
+         said what changes. The permanence moved to the field label, which is
+         read at the moment of arming; where there is no field, `detail` and the
+         section headings carry it. */
+      typeWord={typeToConfirm ? DELETE_WORD : undefined}
+      typeLabel={
+        typeToConfirm ? (
+          <>
+            Type <strong>{DELETE_WORD}</strong> to delete this {noun} for good
+          </>
+        ) : undefined
       }
+      /* What there is to agree to, and it has to be something that is only true
+         if the admin goes through with it. "This can't be undone" is true
+         whether they press Delete or Cancel, so it would be the body again with
+         a box beside it; work they are taking on is not. */
+      ack={
+        !tickToConfirm
+          ? undefined
+          : later.length > 0
+            ? `I know ${count(later.length, 'policy needs', 'policies need')} another ${noun}, and nothing points ${later.length === 1 ? 'it' : 'them'} at one.`
+            : `I know all ${count(tickCount ?? 0, noun, `${noun}s`)} leave for good.`
+      }
+      confirmLabel="Delete"
+      confirmIcon={Trash2}
+      onConfirm={confirm}
+      sections={[
+        ...(live.length > 0
+          ? [
+              {
+                id: 'live',
+                title: `${count(live.length, 'live policy', 'live policies')} ${live.length === 1 ? 'moves' : 'move'} to draft`,
+                caption: `${live.length === 1 ? 'It stops' : 'They stop'} deciding sign-ins until ${live.length === 1 ? 'its rules use' : 'their rules use'} another ${noun}.`,
+                rows: asRows(live),
+              },
+            ]
+          : []),
+        ...(later.length > 0
+          ? [
+              {
+                id: 'later',
+                title: `${count(later.length, live.length > 0 ? 'other policy' : 'policy', live.length > 0 ? 'other policies' : 'policies')} ${
+                  later.length === 1 ? 'needs' : 'need'
+                } another ${noun}`,
+                rows: asRows(later),
+              },
+            ]
+          : []),
+      ]}
+      more={impact && live.length === 0 && later.length === 0 ? `No policy uses this ${noun}.` : undefined}
     >
-      <div className="bx-confirm">
-        <Callout tone="negative">
-          This permanently deletes the {noun}. You can't undo it.
-        </Callout>
-
-        {detail && <p>{detail}</p>}
-
-        {live.length > 0 && (
-          <section className="bx-confirm__sec" aria-labelledby={`${fieldId}-live`}>
-            <h3 id={`${fieldId}-live`}>
-              {count(live.length, 'live policy', 'live policies')} {live.length === 1 ? 'moves' : 'move'} to draft
-            </h3>
-            <p>
-              {live.length === 1 ? 'It stops' : 'They stop'} deciding sign-ins until {live.length === 1 ? 'its rules use' : 'their rules use'} another {noun}.
-            </p>
-            <UseList uses={live} onOpen={onCancel} />
-          </section>
-        )}
-
-        {later.length > 0 && (
-          <section className="bx-confirm__sec" aria-labelledby={`${fieldId}-later`}>
-            <h3 id={`${fieldId}-later`}>
-              {count(later.length, live.length > 0 ? 'other policy' : 'policy', live.length > 0 ? 'other policies' : 'policies')}{' '}
-              {later.length === 1 ? 'needs' : 'need'} another {noun}
-            </h3>
-            <UseList uses={later} onOpen={onCancel} />
-          </section>
-        )}
-
-        {impact && live.length === 0 && later.length === 0 && <p>No policy uses this {noun}.</p>}
-
-        {typeToConfirm && (
-          <div className="bx-confirm__type">
-            <label htmlFor={fieldId}>
-              Type <strong>{DELETE_WORD}</strong> to confirm
-            </label>
-            <input
-              ref={box}
-              id={fieldId}
-              type="text"
-              value={typed}
-              autoComplete="off"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              onChange={(e) => setTyped(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  confirm()
-                }
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </Modal>
+      {detail}
+    </Confirm>
   )
 }
 
-/* The policies a delete touches, each one a way out of the decision: opening a
-   policy closes this dialog and goes to its rules, where the admin can point
-   them at something else instead of deleting at all. */
-/** The policies using something, each row opening that policy. */
-function UseList({ uses, onOpen }: { uses: PolicyUse[]; onOpen: () => void }) {
-  const store = useBrand()
-  return (
-    <ul className="bx-confirm__uses">
-      {uses.map((u) => (
-        <li key={u.policy.id} className="bx-confirm__use">
-          <button
-            type="button"
-            className="bx-confirm__policy"
-            onClick={() => {
-              onOpen()
-              store.go({ name: 'board', policyId: u.policy.id })
-            }}
-          >
-            <span className="bx-confirm__name">{u.policy.name}</span>
-            {u.draft && <ChangeState unsaved={false} draft />}
-            <ChevronRight className="bx-confirm__go" size={15} strokeWidth={2} aria-hidden />
-          </button>
-          {/* Named as rules: under a policy name a bare "Japan trip window" read
-              as a description of the policy, not as the rule that changes. */}
-          <span className="bx-confirm__rules">
-            {u.rules.length === 1 ? 'Rule' : 'Rules'}: {u.rules.map((r) => r.name).join(', ')}
-          </span>
-        </li>
-      ))}
-    </ul>
-  )
-}
+
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`

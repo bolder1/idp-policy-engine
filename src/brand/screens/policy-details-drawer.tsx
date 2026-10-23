@@ -56,6 +56,7 @@ export function PolicyDetailsDrawer({
   const from = boardFrom ? { from: boardFrom } : null
   const [showPast, setShowPast] = useState(false)
   const go = (t: InspectTarget) => {
+    if (t.kind === 'see') return
     if (isPeek(t)) {
       if (t.kind !== 'person') store.go(LIBRARY_SCREEN[t.kind])
       return

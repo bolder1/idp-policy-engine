@@ -25,7 +25,9 @@ import { FilterTabs } from './page-bar'
    Android, macOS"). PREVIEW: the switch shows in the showcase build too, as a
    pending decision; set AGENT_COMPARE to false once one is picked. */
 
-const AGENT_COMPARE = true
+/* Off (owner, 21 Oct 2026: "they want the note one only"): the Note is the one drawn, the switch is hidden, and the other
+   five stay in the code. */
+const AGENT_COMPARE = false
 
 type AgentStyle = 'note' | 'checklist' | 'stripe' | 'strip' | 'steps' | 'split'
 
@@ -133,6 +135,7 @@ export function AgentPrerequisites() {
 function AsNote() {
   return (
     <Note
+      className="bagent__note"
       title={TITLE}
       more={
         <ul>

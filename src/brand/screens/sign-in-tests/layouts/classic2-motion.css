@@ -1,0 +1,228 @@
+/* -----------------------------------------------------------------------------
+   THE RUN'S MOTION (phase.ts RUN_MOTION; owner, 20 Oct 2026: "always animated",
+   and the ask he queued on 5 Oct: "the semi-glitchy type effect … the blur effect
+   we have in the Brief … card by card … check and polish the final outcome").
+   What CSS plays of it, on elements Motion does not move and on pseudo-elements;
+   Motion's props play the rest (classic2-chain.tsx). Every rule here keys on a
+   class the chain puts on only while the story plays, so a run drawn settled,
+   skipped or under reduced motion has none of it.
+
+     words being read   sharpen in: Brief's blur, opacity and a blur to none
+                        (the sentence's units, the
+                        policy's name, a row's name as it is reached, a group's
+                        name after "Matches", the rule's name in the head)
+     machine words      resolve: shared/run-text.tsx `Resolve`, its structure here
+     a miss             one dropout of its words — never a sideways shake, the
+                        wrong-password gesture in a sign-in product
+     the lock           the deciding row: its ground and edge take its decision's
+                        tone, four corner brackets close onto it from outside
+                        and let go, and only its edge stays (never a ring)
+     the scan           one pass under the policy's head as it is found
+     the landing        a light in the outcome's tone passes under its head once,
+                        the verdict comes in by its opacity alone, then its lines
+
+   Light console only, tokens only: no transform, no transition, no hex, no px
+   (classic2-layout.test.tsx pins it, as it pins classic2.css).
+   -------------------------------------------------------------------------- */
+
+@keyframes rl-mo-blur-in {
+  from { opacity: 0; filter: blur(var(--rl-mo-blur, var(--space-1))); }
+  to { opacity: 1; filter: none; }
+}
+@keyframes rl-mo-fade-in { from { opacity: 0; } }
+@keyframes rl-mo-flicker {
+  0% { opacity: 1; }
+  20% { opacity: 0.45; }
+  45% { opacity: 1; }
+  70% { opacity: 0.75; }
+  100% { opacity: 1; }
+}
+
+/* A word sharpening in on its own, its delay its own (`--rl-mo-delay`). */
+.rl-mo-blur { display: inline-block; animation: rl-mo-blur-in 220ms var(--ease-standard) var(--rl-mo-delay, 0ms) both; }
+
+/* --- The machine's words, resolving (shared/run-text.tsx) -------------------- */
+.rl-dec { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.rl-dec__ghost { visibility: hidden; }
+.rl-dec__live { position: absolute; inset: 0; overflow: hidden; white-space: nowrap; }
+
+/* --- The sign-in states itself ------------------------------------------------ */
+
+/* Its four units — who, "signs in to", the application, the count — a beat apart; a name is never split. */
+.rl-c2__node.is-stating :is(.rl-c2__nface, .rl-c2__nname, .rl-c2__nverb, .rl-c2__napp, .rl-c2__ncount) {
+  --rl-mo-blur: var(--space-2);
+  animation: rl-mo-blur-in 240ms var(--ease-standard) calc(var(--i, 0) * 60ms + 60ms) both;
+}
+.rl-c2__node.is-stating .rl-c2__nacts { animation: rl-mo-fade-in 160ms var(--ease-standard) 480ms both; }
+
+/* --- The policy works ------------------------------------------------------- */
+
+.rl-c2__pop { display: inline-grid; place-items: center; }
+/* Its name, and the line under its head that says why the Global Default decides. */
+.rl-c2__card.is-telling > .bb__cardhead .rl-c2__name { animation: rl-mo-blur-in 240ms var(--ease-standard) 100ms both; }
+.rl-c2__card.is-telling .rl-c2__onereason .rl-c2__onetext { animation: rl-mo-blur-in 220ms var(--ease-standard) 200ms both; }
+/* One scan under its head as the policy is found: a line of the accent, travelling once. */
+.rl-c2__card.is-scan > .bb__cardhead { position: relative; }
+.rl-c2__card.is-scan > .bb__cardhead::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--bw-thick);
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent) no-repeat;
+  background-size: 38% 100%;
+  background-position: -40% 0;
+  animation: rl-mo-scan 600ms var(--ease-standard) 120ms 1 both;
+}
+@keyframes rl-mo-scan {
+  from { background-position: -40% 0; opacity: 1; }
+  80% { opacity: 1; }
+  to { background-position: 140% 0; opacity: 0; }
+}
+
+/* The rows: room over the first for the lock's brackets (the body clips what passes its edge), the row being read
+   sharpening its name in, one check read over 480 ms (`--rl-c2-step`, set on the list while the story plays). */
+.rl-c2__rules.is-one.is-motion { padding-top: var(--space-3); }
+.rl-c2__rulename.is-told { animation: rl-mo-blur-in 200ms var(--ease-standard) 60ms both; }
+/* A miss: its words drop out once as they are read. */
+.rl-c2__rule.is-miss :is(.rl-c2__rulename, .rl-c2__rulestate) { animation: rl-mo-flicker 140ms linear both; }
+
+/* --- The lock on the deciding row (no lasting ring) ------------------------ */
+
+.rl-c2__rules.is-one > .rl-c2__rule { position: relative; }
+.rl-c2__rule.is-match.is-d-allow { --rl-c2-hit-bg: var(--fb-positive-bg); }
+.rl-c2__rule.is-match.is-d-mfa { --rl-c2-hit-bg: var(--fb-positive-strong-bg); }
+.rl-c2__rule.is-match.is-d-deny { --rl-c2-hit-bg: var(--fb-negative-bg); }
+.rl-c2__rule.is-match.is-lock { animation: rl-mo-lock-row 0.88s var(--ease-standard) both; }
+.rl-c2__rule.is-match.is-lock::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--bw-thin) * -1);
+  pointer-events: none;
+  border-radius: var(--radius-md);
+  --c: var(--rl-c2-hit);
+  --l: var(--space-5);
+  --w: var(--bw-thick);
+  background:
+    linear-gradient(var(--c), var(--c)) left top / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) left top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--w) var(--l) no-repeat;
+  /* Aruna's lock-on curve. */
+  animation: rl-mo-lock 0.88s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+/* The brackets close from just outside the row (inside the body's padding, never clipped) onto its edge, hold, and go. */
+@keyframes rl-mo-lock {
+  0% { inset: calc(var(--space-3) * -1); opacity: 0; }
+  14% { inset: calc(var(--space-3) * -1); opacity: 0; }
+  50% { inset: calc(var(--bw-thin) * -1); opacity: 1; }
+  68% { inset: calc(var(--bw-thin) * -1); opacity: 1; }
+  100% { inset: calc(var(--bw-thin) * -1); opacity: 0; }
+}
+/* Its ground and edge take its decision's tone, and let go to the open row's ground and the decision's soft edge. */
+@keyframes rl-mo-lock-row {
+  0% { border-color: var(--border-subtle); background-color: var(--accent-soft); }
+  14%, 68% { border-color: var(--rl-c2-hit); background-color: var(--rl-c2-hit-bg); }
+  100% { border-color: var(--rl-c2-hit-edge); background-color: var(--surface-sunken); }
+}
+.rl-c2__rules.is-one > .rl-c2__rule.is-match.is-lock .rl-c2__rulehead > .bx-decision-badge { animation: rl-c2-badge-in var(--dur-normal) var(--ease-standard) 0.12s both; }
+
+/* --- A folded row's checks, under a resting pointer (classic2-chain.tsx `CheckPeek`) --- */
+.rl-c2__rulestate { position: relative; }
+.rl-c2__rulepeek {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: calc(var(--space-5) * -1);
+  height: calc(var(--space-5) * 2);
+  padding-left: var(--space-3);
+  background: var(--surface-raised);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rl-c2__rulehead:hover .rl-c2__rulepeek { background: var(--surface-sunken); }
+.rl-c2__peekit { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); }
+.rl-c2__peekit.is-plain { color: var(--text-tertiary); }
+.rl-c2__peekit.is-pass > svg + svg { color: var(--fb-positive-fg); }
+.rl-c2__peekit.is-fail > svg + svg { color: var(--fb-negative-fg); }
+.rl-c2__peekit.is-unknown > svg + svg { color: var(--fb-notice-fg); }
+
+/* --- The foot drawn in (classic2-one.tsx `OneFoot`) --------------------------- */
+.rl-c2__onefoot.is-drawing { position: relative; border-top-color: transparent; }
+.rl-c2__onerule {
+  position: absolute;
+  top: calc(var(--bw-thin) * -1);
+  left: 0;
+  right: 0;
+  border-top: var(--bw-thin) dashed var(--border-subtle);
+}
+
+/* --- The outcome lands ------------------------------------------------------ */
+
+.rl-c2__out.is-allow { --rl-mo-wash: var(--fb-positive-bg); }
+.rl-c2__out.is-mfa { --rl-mo-wash: var(--fb-positive-strong-bg); }
+.rl-c2__out.is-deny { --rl-mo-wash: var(--fb-negative-bg); }
+.rl-c2__out.is-depends { --rl-mo-wash: var(--fb-notice-bg); }
+.rl-c2__out.is-landing > .bb__cardhead { position: relative; }
+.rl-c2__out.is-landing > .bb__cardhead > * { position: relative; z-index: 1; }
+/* A light in its tone passes under the head once, and is gone: a landing, never a band left lying there. */
+.rl-c2__out.is-landing > .bb__cardhead::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: var(--radius-md);
+  background: var(--rl-mo-wash, var(--fb-neutral-bg));
+  animation: rl-mo-wash 1s var(--ease-standard) 200ms both;
+}
+@keyframes rl-mo-wash {
+  0% { clip-path: inset(0 100% 0 0); opacity: 1; }
+  42% { clip-path: inset(0 0 0 0); opacity: 1; }
+  76% { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 0); opacity: 0; }
+}
+/* The verdict by its opacity alone — readable at once — then what they go through, then its lines. */
+.rl-c2__out.is-landing > .bb__cardhead .rl-c2__name { animation: rl-mo-fade-in 140ms var(--ease-standard) 200ms both; }
+.rl-c2__out.is-landing > .bb__cardhead .rl-c2__meta { animation: rl-mo-fade-in 160ms var(--ease-standard) 280ms both; }
+.rl-c2__out.is-landing .bb__if > * { animation: rl-mo-fade-in 160ms var(--ease-standard) 320ms both; }
+.rl-c2__out.is-landing .bb__if > :nth-child(2) { animation-delay: 360ms; }
+.rl-c2__out.is-landing .bb__if > :nth-child(3) { animation-delay: 400ms; }
+.rl-c2__out.is-landing .bb__if > :nth-child(4) { animation-delay: 440ms; }
+.rl-c2__out.is-landing .bb__if > :nth-child(5) { animation-delay: 480ms; }
+.rl-c2__out.is-landing .bb__if > :nth-child(n + 6) { animation-delay: 520ms; }
+
+/* Space holds the story (Focus2Layout.tsx `is-held`): what CSS plays holds with it. */
+.rl-f2.is-held .rl-c2__chain *,
+.rl-f2.is-held .rl-c2__chain *::before,
+.rl-f2.is-held .rl-c2__chain *::after { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-mo-blur,
+  .rl-c2__node.is-stating :is(.rl-c2__nface, .rl-c2__nname, .rl-c2__nverb, .rl-c2__napp, .rl-c2__ncount, .rl-c2__nacts),
+  .rl-c2__card.is-telling > .bb__cardhead .rl-c2__name,
+  .rl-c2__card.is-telling .rl-c2__onereason .rl-c2__onetext,
+  .rl-c2__rulename.is-told,
+  .rl-c2__rule.is-miss :is(.rl-c2__rulename, .rl-c2__rulestate),
+  .rl-c2__rule.is-match.is-lock,
+  .rl-c2__rule.is-match.is-lock .bx-decision-badge,
+  .rl-c2__out.is-landing > .bb__cardhead :is(.rl-c2__name, .rl-c2__meta),
+  .rl-c2__out.is-landing .bb__if > * { animation: none; }
+  .rl-c2__rule.is-match.is-lock::after,
+  .rl-c2__card.is-scan > .bb__cardhead::after,
+  .rl-c2__out.is-landing > .bb__cardhead::before { display: none; }
+}
+@media (forced-colors: active) {
+  .rl-c2__rule.is-match.is-lock::after,
+  .rl-c2__card.is-scan > .bb__cardhead::after,
+  .rl-c2__out.is-landing > .bb__cardhead::before { display: none; }
+}

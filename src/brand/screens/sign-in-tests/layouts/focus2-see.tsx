@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { MonitorPlay, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -46,10 +46,15 @@ export interface Focus2SeeProps {
   onClose: () => void
   /** The card is receded and its buttons are out of the tab order. */
   inert?: boolean
+  /** 'button': a Preview button in a card's head instead of the thumbnail (Check access v3's outcome; owner, 20 Oct
+      2026: "add a button to show the preview, the animated preview of the outcome we used to have"). Same popover. */
+  variant?: 'thumb' | 'button'
+  /** The button opens a page of the right-hand panel instead of the popover (20 Oct 2026: "open in the right side panel"). */
+  panel?: { pressed: boolean; onPress: () => void }
 }
 
-export function Focus2See({ screens, appId, open, reduced, portal, onOpen, onClose, inert = false }: Focus2SeeProps) {
-  const thumb = useRef<HTMLDivElement | null>(null)
+export function Focus2See({ screens, appId, open, reduced, portal, onOpen, onClose, inert = false, variant = 'thumb', panel }: Focus2SeeProps) {
+  const thumb = useRef<HTMLElement | null>(null)
   const [spot, setSpot] = useState<Spot | null>(null)
   useLayoutEffect(() => {
     if (!open) {
@@ -95,10 +100,41 @@ export function Focus2See({ screens, appId, open, reduced, portal, onOpen, onClo
       )}
     </AnimatePresence>
   )
+  if (variant === 'button')
+    return (
+      <>
+        <button
+          ref={(el) => {
+            thumb.current = el
+          }}
+          type="button"
+          className={`bx-btn bx-btn--ghost bx-btn--sm rl-f2see__btn${open || panel?.pressed ? ' is-open' : ''}`}
+          tabIndex={inert ? -1 : undefined}
+          {...(panel ? { 'aria-pressed': panel.pressed } : { 'aria-haspopup': 'dialog' as const, 'aria-expanded': open })}
+          aria-label="Preview what they see"
+          title="What they see"
+          onClick={(e) => {
+            /* Inside a card whose own press folds it: the preview opens, and the card stays as it is. */
+            e.stopPropagation()
+            if (panel) panel.onPress()
+            else onOpen()
+          }}
+        >
+          <MonitorPlay size={14} strokeWidth={2} aria-hidden />
+          Preview
+        </button>
+        {portal && createPortal(pop, portal)}
+      </>
+    )
   return (
     <div className="rl-f2see">
       {/* The scaled page holds buttons of its own, so the press is a button laid over it, not the thumbnail itself. */}
-      <div ref={thumb} className={`rl-f2see__thumb${open ? ' is-open' : ''}`}>
+      <div
+        ref={(el) => {
+          thumb.current = el
+        }}
+        className={`rl-f2see__thumb${open ? ' is-open' : ''}`}
+      >
         <span className="rl-f2see__frame">
           {/* Real content, scaled down: not a picture of it. Inert and hidden from the tree. */}
           <span className="rl-f2see__scale" aria-hidden inert>

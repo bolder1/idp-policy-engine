@@ -89,3 +89,26 @@ export const ONE_POLICY_CARD: boolean = true
    a run (Sign-in activity's or the app tab's Open in Check access) gives the canvas the focus and says the answer once.
    Off: a past or blocked sign-in fills the form and waits for Run, as it did. */
 export const OPEN_AT_ONCE: boolean = true
+
+/* The run's motion (owner, 20 Oct 2026: "always animated"; and the ask he queued on 5 Oct: "the loading and the overall
+   thing … the semi-glitchy type effect … the blur effect we have in the Brief … card by card: one card done →
+   collapsed, the next card done → collapsed, and then the final card … check and polish the final outcome"). Every
+   run tells its story; the deciding rule is found with a short lock and keeps only its decision's edge, never a
+   lasting ring; the outcome lands last and stays open; Escape lands it at once; reduced motion lands at once.
+   Off: the story told once a session, as it was. */
+export const RUN_MOTION: boolean = true
+
+/* Classic or v3, the owner's to compare (20 Oct 2026: "give me the classic version of Check access … the multiple
+   policy one, and the current v2 as a modern one based on the current product state"; then "so Classic the old
+   version, v2 the one-card edition, v3 the same as the edit builder"; then, of v2 half built, "Remove v2, no need,
+   it's bad"). Drawn even under SHOWCASE: he asked for the versions to be visible and switchable, against the rule
+   that gates A/B controls on it (check-version.ts). Off: no switch, and the run is v3 whatever was stored. */
+export const VERSION_SWITCH: boolean = true
+
+/* Check access on the builder's own canvas (owner, 20 Oct 2026: "I want to rethink the whole experience in a v3 … the
+   same policy rule cards in the whole canvas instead of showing everything in one card … reuse the same cards and the
+   same canvas"; then "Classic = the old version, v2 = the one-card edition, v3 = the same as the edit builder"). The
+   run is drawn on the edit canvas's own cards: the sign-in where the start pill stands, the policy's head, its rule
+   cards read one by one, Nothing else matched last, and the outcome at the chain's end. Needs ONE_POLICY_CARD. Off:
+   v3 is the one-policy card with the run's motion, and the builder's canvas is not drawn by a run. */
+export const BUILDER_CANVAS_CHECK: boolean = true

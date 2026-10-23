@@ -182,10 +182,23 @@ export function onCard(plan: Pick<EngineRun, 'empty' | 'decider' | 'at'>, s: num
 /* Focus's fold: one card open at a time. The card the engine is on is open; a card it has done with folds to its head as
    the next one opens, so the chain stays short and reads as a trail of answers; once the run lands, every card folds.
    What the admin opened or folded by hand stands, as in `foldOpen`. */
-export function foldOne(cards: readonly CardKey[], on: CardKey | null, landed: boolean, hand: Partial<Record<CardKey, boolean>> = {}): Record<CardKey, boolean> {
+export function foldOne(cards: readonly CardKey[], on: CardKey | null, landed: boolean, hand: Partial<Record<CardKey, boolean>> = {}, opts: { keepOutcome?: boolean } = {}): Record<CardKey, boolean> {
   const open: Record<CardKey, boolean> = { 'sign-in': false, policy: false, rule: false, outcome: false }
   for (const k of cards) open[k] = hand[k] ?? (!landed && k === on)
+  /* The outcome lands last and stays open (phase.ts RUN_MOTION, 20 Oct 2026: "and then the final card"): every card
+     before it folds as it lands, as above, but the answer is the one left to read. A press still stands. */
+  if (opts.keepOutcome && cards.includes('outcome')) open.outcome = hand.outcome ?? (landed ? true : on === 'outcome')
   return open
+}
+
+/* The deciding row's LOCK (RUN_MOTION, 20 Oct 2026): the steps it is drawn over — the rule's end, where its row says
+   Matches, through the deciding step, where the card's own answer is read. The row carries the lock's class only while
+   the presented step is inside it, so the brackets close once as the run reaches it, and an Expand all, a row opened by
+   hand or a fold later never plays it again. Null where no rule decides (Can't tell, or none matched). */
+export function lockWindow(plan: Pick<EngineRun, 'rules' | 'landing' | 'at' | 'steps'>): readonly [number, number] | null {
+  const land = plan.landing !== null ? plan.rules[plan.landing] : undefined
+  if (!land || land.endAt < 0) return null
+  return [land.endAt, Math.max(land.endAt, walkEnd(plan))]
 }
 
 /** The dock's one button, the builder's: it says what it will do — "Collapse all" while any card is open, "Expand all" once all are folded. */
@@ -472,6 +485,8 @@ export interface HeadMeta {
   then?: AccessDecision
   /** The words' tooltip, where the line may be cut short (the merged card's Outcome: a Deny's whole message). */
   tip?: string
+  /** The admin's own words that end `text` — the merged card's rule name (20 Oct 2026): sharpened in, never scrambled. */
+  name?: string
 }
 
 export interface CardHead {
@@ -502,6 +517,10 @@ export function signInHead(who: string, appName: string | null, stated: number):
 export function signsIn(facts: readonly FactRow[]): { count: string; said: string } {
   return { count: facts.length === 0 ? '' : conditionsWord(facts.length), said: facts.map((f) => f.value).join(' · ') }
 }
+
+/* The run's name for a screen reader (Check access v3's canvas region, 20 Oct 2026): the sentence its first node says,
+   without the count — "Aisha Khan signs in to Google Workspace". */
+export const signInSentence = (who: string, app: string | null | undefined): string => (app ? `${who} signs in to ${app}` : who)
 
 /* The policies: the one that applies, and where it stands among the
    application's — "✓ Policy 1 of 4 applies · via Engineering". While the

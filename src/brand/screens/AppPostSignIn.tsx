@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Activity, ArrowLeft, ArrowUpRight, Check, Link2, ListChecks, Plus, Unlink } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, Modal, RowMenu, SearchBox, StatusPill, type MenuItem } from '../kit'
+import { Badge, Button, Callout, Confirm, Drawer, RowMenu, SearchBox, StatusPill, type MenuItem } from '../kit'
 import { EmptyState, NoMatches } from '../empty'
 import { useBrand } from '../store'
 import type { App, Policy } from '../data'
@@ -208,36 +208,25 @@ export function AppPostSignInTab({
 
       {/* A small confirm with the policy and the application named. Red only
           here: the row menu's Unlink is the trigger, this is the act. */}
-      <Modal
+      <Confirm
         open={!!unlinking?.open}
         onClose={() => unlinking && setUnlinking({ ...unlinking, open: false })}
+        tone="removed"
         title={unlinking ? `Unlink ${unlinking.policy.name} from ${app.name}?` : 'Unlink policy'}
-        width={480}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => unlinking && setUnlinking({ ...unlinking, open: false })}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              icon={Unlink}
-              onClick={() => {
-                if (!unlinking) return
-                setUnlinking({ ...unlinking, open: false })
-                unlink(unlinking.policy.id)
-              }}
-            >
-              Unlink
-            </Button>
-          </>
-        }
+        confirmLabel="Unlink"
+        confirmIcon={Unlink}
+        onConfirm={() => {
+          if (!unlinking) return
+          setUnlinking({ ...unlinking, open: false })
+          unlink(unlinking.policy.id)
+        }}
       >
         {unlinking && (
           <div className="bapr__confirm">
             <p>{unlinkCopy(unlinking.policy.name, app.id, app.name, linkOf(unlinking.policy, app.id)?.eventIds ?? [])}</p>
           </div>
         )}
-      </Modal>
+      </Confirm>
     </>
   )
 }

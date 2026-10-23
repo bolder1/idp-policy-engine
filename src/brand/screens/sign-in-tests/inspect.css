@@ -175,3 +175,32 @@
 /* An audience: its faces, then the count; the names are under the pointer. */
 .insp__trail { display: inline-flex; align-items: center; gap: var(--space-3); text-decoration: none; }
 .insp__trail:hover { color: var(--text-link); }
+
+/* --- What they see (InspectPanel.tsx `SeePage`, 20 Oct 2026) ------------------------------------------------------ */
+/* The sign-in on the overview card: the face and the person, an arrow, the application's mark and its name. */
+.insp__signin { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0; font-size: var(--fs-md); line-height: 1.3; }
+.insp__signer { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.insp__signarrow { flex: none; color: var(--text-tertiary); }
+/* A name inside a page: pressed, that thing's page takes this one's place. */
+.insp__name { min-width: 0; padding: 0; border: 0; background: none; font: inherit; font-weight: var(--fw-semibold); text-align: left; color: var(--text-primary); overflow-wrap: anywhere; cursor: pointer; }
+.insp__name:hover { color: var(--text-link); text-decoration: underline; }
+.insp__name:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); border-radius: var(--radius-sm); }
+.insp__name.is-static { cursor: default; }
+.insp__name.is-static:hover { color: inherit; text-decoration: none; }
+.insp__by .insp__name { font-weight: var(--fw-medium); }
+.insp__by > span[aria-hidden] { color: var(--text-tertiary); }
+/* The player, the panel's width; its own title is the bar's. */
+.insp__see .tsee > .tsee__title { display: none; }
+/* The steps, as the player's chips run: a number, the step, what its page asks for. */
+.insp__steps { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.insp__steps li { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); font-size: var(--fs-sm); }
+.insp__steps .insp__n { background: var(--surface-raised); }
+.insp__steptext { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.insp__steptext b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.insp__steptext span { color: var(--text-secondary); overflow-wrap: anywhere; }
+/* A Deny's cause and its Ref, for the admin. */
+.insp__reason { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-sunken); font-size: var(--fs-sm); }
+.insp__reason b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.insp__reason span { font-size: var(--fs-xs); color: var(--text-tertiary); }
+/* What they see from the strip of the policy that decided: a quiet link at its end. */
+.insp__verdict .insp__preview { flex: none; margin-left: auto; }

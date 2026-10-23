@@ -19,7 +19,7 @@ import {
   Upload,
 } from 'lucide-react'
 
-import { Badge, Button, IconButton, MenuButton, Note, NumberStepper, SearchBox, Tip, TipDot, TipMark, Toggle } from '../kit'
+import { Badge, Button, IconButton, MenuButton, Note, NumberStepper, SearchBox, Tip, TipDot, TipMark } from '../kit'
 import { AgentPrerequisites } from './agent-download'
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
@@ -1250,6 +1250,56 @@ function EnrolField({
   )
 }
 
+/* The two console checkboxes in Device registration (owner, 22 Oct 2026: "use
+   a checkbox with the same design and content, and apply this change
+   throughout the device flow").
+
+   A checkbox, not a switch, and the sentence is VISIBLE. The console draws
+   these two as checkboxes with their explanation underneath; this prototype
+   drew them as switches with the explanation hidden behind a `TipDot`, so the
+   content was already written — promoting it is not new copy. The owner's
+   standing rule is that product parity keeps OUR control types rather than the
+   console's; he reversed it for these two rows by name.
+
+   `role="checkbox"` on a button rather than a native input, following
+   `bfp2__selectall` above: `.bx-tick` (kit.css) is the console's one tick
+   mark, consolidated from five near-identical marks, and a native box draws
+   whatever the operating system draws — which is the thing that consolidation
+   was written to stop.
+
+   The explanations say "signing in" and "sign-in". The tips they came from
+   said "logging in" and "login", which this product's copy rules forbid and
+   `ui-copy.test.ts` catches in every spelling. */
+function EnrolCheck({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string
+  /** The console's own sentence, under the label. Not optional: a checkbox
+      with no explanation is the switch this replaced, minus its mark. */
+  hint: string
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      className={`bfp2__enrolcheck${checked ? ' is-on' : ''}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="bx-tick" aria-hidden>
+        <Check size={11} strokeWidth={3.2} />
+      </span>
+      <b className="bfp2__enrolchecklabel">{label}</b>
+      <span className="bfp2__enrolcheckhint">{hint}</span>
+    </button>
+  )
+}
+
 /* `FormRow` stood here — a mark, a label pushed left and a control pushed
    right. Its four callers were the enrolment questions, and they stack now;
    see `EnrolField` above for why a row is right for a list and wrong for a
@@ -1469,23 +1519,19 @@ export function EnrolmentFields({
         </p>
       )}
 
-      {/* The form size, not `sm`. An 18px switch beside a 40px dropdown and
-          a 40px number field read as a different class of control. */}
-      <EnrolField label="Enable mobile device restriction" tip="Restrict users from logging in on mobile devices." inline>
-        <Toggle
-          checked={restrictMobile}
-          onChange={(next) => onChange({ restrictMobile: next })}
-          label="Enable mobile device restriction"
-        />
-      </EnrolField>
+      <EnrolCheck
+        label="Enable mobile device restriction"
+        hint="Restrict users from signing in on mobile devices."
+        checked={restrictMobile}
+        onChange={(next) => onChange({ restrictMobile: next })}
+      />
 
-      <EnrolField label="Enable device auto-registration" tip="Silently register browser during login." inline>
-        <Toggle
-          checked={autoRegister}
-          onChange={(next) => onChange({ autoRegister: next })}
-          label="Enable device auto-registration"
-        />
-      </EnrolField>
+      <EnrolCheck
+        label="Enable device auto-registration"
+        hint="Silently register the browser during sign-in."
+        checked={autoRegister}
+        onChange={(next) => onChange({ autoRegister: next })}
+      />
     </div>
   )
 }

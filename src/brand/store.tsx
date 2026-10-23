@@ -56,7 +56,7 @@ import {
   withTokenState,
   type HardwareToken,
 } from './hardware-tokens'
-import type { AuthMethod } from './methods'
+import { allOn, type AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
 import type { BreakInAcceptance } from './screens/break-in-model'
@@ -745,7 +745,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   /* The seeded catalogue ships Display Token unconfigured; the seeded drawer
      has fobs issued. `withTokenState` reconciles the two from the first
      render, so the method row never disagrees with the inventory. */
-  const [methods, setMethods] = useState<AuthMethod[]>(() => withTokenState(seed.methods, seed.tokens))
+  const [methods, setMethods] = useState<AuthMethod[]>(() => allOn(withTokenState(seed.methods, seed.tokens)))
   /* The latest tokens, ahead of the next render. The actions return results
      synchronously, so they compute from here rather than from `hardwareTokens`
      — otherwise two calls in one handler (a CSV assigning to three people is

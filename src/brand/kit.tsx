@@ -18,13 +18,14 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CircleHelp,
   CornerDownRight,
+  EllipsisVertical,
   Info,
   type LucideIcon,
   Minus,
-  MoreHorizontal,
   PenLine,
   Plus,
   Search,
@@ -41,6 +42,8 @@ import { useReviewView, type ReviewView } from './review-view'
 import { footerEdge } from './footer-edge'
 import { SHOWCASE } from './showcase'
 import { playCue, switchTick } from './sound'
+import { TONE_ICON, type ToastTone } from './toast-tone'
+import { ToneMark } from './tone-mark'
 
 /* -----------------------------------------------------------------------------
    Brand kit — the primitives from IDP · 2 Core.
@@ -86,6 +89,8 @@ export function Button({
   keys,
   busy,
   expanded,
+  blocked,
+  describedBy,
 }: {
   children: ReactNode
   onClick?: () => void
@@ -105,14 +110,29 @@ export function Button({
   keys?: string
   /** Its work is running — Save policy's checks — so it is `aria-busy` until they finish. */
   busy?: boolean
+  /* Not pressable YET, and there is a reason worth announcing — the confirm's
+     ungated Delete. `aria-disabled` keeps it in the tab order so the reason can
+     be reached and read; a natively disabled button is skipped by the keyboard
+     and is far less likely to be discovered by a screen reader at all. ARIA
+     changes nothing about behaviour, so the click is withheld here too.
+
+     `disabled` is still the right answer where there is nothing to explain and
+     nothing would happen anyway — the rule this console already wrote for
+     itself on the condition popover. This prop is the other case, not a
+     replacement for it. */
+  blocked?: string
+  /** The element holding `blocked`'s text, so the reason is announced with the button. */
+  describedBy?: string
 }) {
   const px = size === 'sm' ? 13 : 14
   return (
     <button
       type={type}
       title={title}
-      disabled={disabled}
-      onClick={onClick}
+      disabled={blocked ? undefined : disabled}
+      aria-disabled={blocked ? true : undefined}
+      aria-describedby={describedBy}
+      onClick={blocked ? undefined : onClick}
       aria-pressed={pressed}
       aria-expanded={expanded}
       aria-keyshortcuts={keys}
@@ -240,7 +260,7 @@ export function MenuButton({
      whole control, so a missing one is a contradiction the component answers
      rather than draws. The overflow glyph is the same one the three callers
      that DO pass it chose. */
-  const Glyph = icon ?? (iconOnly ? MoreHorizontal : undefined)
+  const Glyph = icon ?? (iconOnly ? EllipsisVertical : undefined)
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLSpanElement | null>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
@@ -440,6 +460,60 @@ function MenuItems({ items, onPick }: { items: MenuItem[]; onPick: (item: MenuIt
    kebab before running the action, so a dialog the action opens restores focus
    to it. */
 
+/* --- Split button -------------------------------------------------------------
+   One object, two presses: the thing an admin does every time, and a chevron for
+   the rest of what can be done to the same subject.
+
+   The app's Policies tab head had a kebab, Replace policy and Edit side by side
+   (owner, 21 Oct 2026: "a better way to execute this"; then, of Edit: "make it a
+   dropdown button … move the options inside"). A plain `MenuButton` would have
+   collapsed all three, at the price of a second press on Edit — the one action
+   that brings an admin to this head at all. The split keeps Edit one press away
+   and still leaves the head one control.
+
+   It composes rather than reimplements: a `Button` for the action and a
+   `MenuButton` for the chevron, so the menu's outside press, Escape, arrow keys
+   and focus return are the ones already tested here. The two are drawn as one
+   object in kit.css — inner corners square, one shared edge.
+
+   Both halves take the same `variant`, because they are one button: a brand
+   action with a neutral chevron reads as two controls that happen to touch. */
+export function SplitButton({
+  label,
+  icon,
+  onPress,
+  items,
+  onSelect,
+  menuLabel,
+  variant = 'brand',
+  size = 'md',
+  align = 'end',
+  disabled,
+}: {
+  /** The action's own label, and the words the menu's accessible name is built from. */
+  label: string
+  icon?: LucideIcon
+  onPress: () => void
+  items: MenuItem[]
+  onSelect: (id: string) => void
+  /** The chevron's accessible name. Defaults to "More for {label}". */
+  menuLabel?: string
+  variant?: ButtonVariant
+  size?: 'sm' | 'md'
+  align?: 'start' | 'end'
+  /** Disables the action. The menu stays reachable: the other actions are not this one. */
+  disabled?: boolean
+}) {
+  return (
+    <span className="bx-split">
+      <Button variant={variant} size={size} icon={icon} onClick={onPress} disabled={disabled}>
+        {label}
+      </Button>
+      <MenuButton label={menuLabel ?? `More for ${label}`} icon={ChevronDown} iconOnly items={items} onSelect={onSelect} variant={variant} size={size} align={align} />
+    </span>
+  )
+}
+
 const ROWMENU_GAP = 4
 const ROWMENU_MARGIN = 8
 
@@ -448,7 +522,7 @@ export function RowMenu({
   items,
   onSelect,
   onOpenChange,
-  icon: Icon = MoreHorizontal,
+  icon: Icon = EllipsisVertical,
   size = 'sm',
   align = 'end',
   disabled,
@@ -1897,6 +1971,7 @@ export function Modal({
   width = DIALOG_W.form,
   padded = true,
   head,
+  bare = false,
 }: {
   open: boolean
   onClose: () => void
@@ -1907,6 +1982,9 @@ export function Modal({
   padded?: boolean
   /** Controls beside the title, before the close button. */
   head?: ReactNode
+  /** Draw no head row at all — for a dialog that states its own title inside
+      the body. The close control stays; `title` still names the panel. */
+  bare?: boolean
 }) {
   const panel = useRef<HTMLDivElement | null>(null)
   useDialogChrome(open, onClose, panel)
@@ -1935,11 +2013,20 @@ export function Modal({
             ref={panel}
             tabIndex={-1}
           >
-            <header className="bx-modal__head">
-              <h2>{title}</h2>
-              {head && <div className="bx-modal__extra">{head}</div>}
+            {bare ? (
+              /* No head row: the close control alone, floated over the body.
+                 For a dialog that draws its own title inside the body, where a
+                 head would state it twice (the hero confirm). `aria-label` on
+                 the panel still carries the title, so nothing is lost to a
+                 screen reader. */
               <DialogClose onClose={onClose} />
-            </header>
+            ) : (
+              <header className="bx-modal__head">
+                <h2>{title}</h2>
+                {head && <div className="bx-modal__extra">{head}</div>}
+                <DialogClose onClose={onClose} />
+              </header>
+            )}
             <div className={`bx-modal__body ${padded ? '' : 'is-flush'}`}>{children}</div>
             {footer && <footer className="bx-modal__foot">{footer}</footer>}
           </motion.div>
@@ -1947,6 +2034,417 @@ export function Modal({
       )}
     </AnimatePresence>,
     appRoot(),
+  )
+}
+
+/* --- The confirm ------------------------------------------------------------
+
+   One component for every dialog that asks before it changes something, in two
+   shapes (owner, 22 Oct 2026: "I want to have a revamp on the popups system",
+   then "A2, the spotlight", then "want to keep both for different use case").
+
+   WHY IT EXISTS. The survey found 34 dialogs on the Modal shell, of which
+   SIXTEEN ask before a change — eleven destructive — and every one looked
+   identical whatever it destroyed: a sentence and two buttons. The few severity
+   signals that did exist disagreed, with "Turn off" in the orange brand button
+   in three dialogs and red elsewhere. The blandness was never the missing icon;
+   it was that nothing told you which of the sixteen you were looking at.
+
+   THE TONE IS THE TOAST'S. `TONE_ICON` (toast-tone.ts) and the `--fb-*` colours
+   are the ones the toast has used since 22 Sep 2026, when the owner asked for
+   "colour based on the task performed, with an icon". A new palette here would
+   have been the console's THIRD severity vocabulary, after the toast's and the
+   Callout's.
+
+   TWO SHAPES. `hero` centres a spotlight, a mark and one sentence; `rows` puts
+   the mark beside the title and lists what is being changed. Centred hero copy
+   wraps at about thirty characters a line, so it cannot hold a list — which is
+   why both exist rather than one being a fallback. docs/specs/POPUPS.md has the
+   split: short high-stakes confirms take `hero`, anything with names to show
+   takes `rows`.
+
+   IT GREW UP TO ConfirmDelete, NOT THE OTHER WAY ROUND (owner, 22 Oct 2026, on
+   the zone and device-profile delete cards: "you didn't consider this cards fix
+   this experience as well"). The first version of this component took a flat
+   list of name-and-mark rows, which was a SIMPLIFICATION of what
+   `confirm-delete.tsx` already did — and migrating the richest confirms in the
+   product onto a poorer model would have made them worse. So the structure here
+   is ConfirmDelete's: a standing warning, sections that each carry their own
+   heading and sentence, rows that can be opened and can name a second line, a
+   typed word before the action arms, and a blocked state with no action at all.
+   -------------------------------------------------------------------------- */
+
+/** How many rows a section shows before it counts the rest (docs/specs/POPUPS.md). */
+const CONFIRM_ROWS = 5
+
+/** One thing a confirm is about to change, and what becomes of it. */
+export interface ConfirmRow {
+  id: string
+  /** The thing's own name, as the admin knows it. */
+  name: string
+  /* A second line under the name — the rules that use it, in ConfirmDelete's
+     usage lists. Without it the row is one line. */
+  detail?: string
+  /* A badge beside the name, inside the row's own link — ConfirmDelete's draft
+     marker on a policy that has unpublished changes. Beside the NAME, not in
+     the mark column: it is a fact about the thing, not about what is being done
+     to it. */
+  tag?: ReactNode
+  /** What happens to it, as a mark on the right: "Removed", "Loses access". */
+  mark?: string
+  /* `gone` for a loss, `moves` for a change of hands, omitted for a plain fact.
+     Per ROW, because one confirm can do both at once — a replace takes access
+     from one person and moves another — and a dialog-wide tone cannot say that.
+     The head carries the worst of them, which is the caller's to pick. */
+  kind?: 'gone' | 'moves'
+  /* Makes the row a button that opens the thing it names. The caller closes the
+     dialog itself, as ConfirmDelete's usage lists do: going somewhere and
+     leaving a modal open behind you is not a state this console has. */
+  onOpen?: () => void
+}
+
+/* A group of rows under its own heading. The heading carries the count and the
+   verb ("2 live policies move to draft") and the caption the consequence, so
+   the rows themselves stay names. */
+export interface ConfirmSection {
+  id: string
+  title?: string
+  caption?: ReactNode
+  rows: readonly ConfirmRow[]
+  /** The line under this section's rows: what else changes. */
+  more?: ReactNode
+}
+
+export function Confirm({
+  open,
+  onClose,
+  tone = 'warning',
+  shape = 'rows',
+  title,
+  children,
+  warning,
+  sections,
+  rows,
+  more,
+  blocked = false,
+  typeWord,
+  cancelLabel = 'Cancel',
+  closeLabel = 'Close',
+  confirmLabel,
+  confirmIcon,
+  onConfirm,
+  alt,
+  destructive = true,
+  width,
+  ack,
+  typeLabel,
+}: {
+  open: boolean
+  /** Escape, the scrim, Cancel and Close all land here. Never the confirm. */
+  onClose: () => void
+  tone?: ToastTone
+  shape?: 'hero' | 'rows'
+  title: string
+  /** The sentence under the title. One is enough; the sections say the rest. */
+  children?: ReactNode
+  /* A standing warning above everything — ConfirmDelete's "This permanently
+     deletes the zone. You can't undo it." Drawn as the kit's Callout in the
+     dialog's own tone, so it cannot drift from the head's mark. */
+  warning?: ReactNode
+  /** Grouped rows. Ignored by `hero`, which has nowhere to put them. */
+  sections?: readonly ConfirmSection[]
+  /** Sugar for a single section with no heading. */
+  rows?: readonly ConfirmRow[]
+  /** The line under everything: what else changes. */
+  more?: ReactNode
+  /* Nothing can be done from here: one Close, no destructive action. For
+     ConfirmDelete's refusal — a system policy cannot move to draft, so the
+     delete is not offered rather than offered and rejected. */
+  blocked?: boolean
+  /* Ask for this word before the action arms. The field resets every time the
+     dialog opens or its subject changes, so cancelling one object and opening
+     another never arrives pre-armed for the wrong thing. */
+  typeWord?: string
+  cancelLabel?: string
+  closeLabel?: string
+  confirmLabel?: string
+  confirmIcon?: LucideIcon
+  onConfirm?: () => void
+  /* A third way out, between cancelling and confirming — the leave guard's
+     "Save as draft", which is neither staying put nor losing the work. Rare by
+     design: a confirm with two escapes usually means the question is wrong, so
+     this exists for the one genuine three-way decision in the product rather
+     than as a general footer slot. It carries its own disabled reason, because
+     the leave guard can offer a save it cannot currently perform. */
+  alt?: { label: string; onClick: () => void; disabled?: boolean; title?: string }
+  /** False when the confirm destroys nothing: the primary is the brand button. */
+  destructive?: boolean
+  width?: number
+  /* The ladder's middle rung: one thing to agree to before the action arms
+     (docs/specs/POPUPS.md, edge case 6). It has to be a sentence that is only
+     true if the admin goes through with it — work they are taking on, not a
+     fact that holds either way, or it is the body said twice with a box beside
+     it. Ignored when `typeWord` is set: one rung at a time. */
+  ack?: ReactNode
+  /** Replaces "Type WORD to confirm" where the label should carry more, such as what cannot be undone. */
+  typeLabel?: ReactNode
+}) {
+  const Mark = TONE_ICON[tone]
+  const reduce = useReducedMotion()
+  const fieldId = useId()
+  const whyId = `${fieldId}-why`
+  const box = useRef<HTMLInputElement | null>(null)
+  const [typed, setTyped] = useState('')
+  const [acked, setAcked] = useState(false)
+
+  /* A fresh field for every subject. Without this, cancelling "Corporate
+     managed" and opening "BYOD phones" would arrive with the old word already
+     typed and the button already armed for a different object. */
+  useEffect(() => {
+    setTyped('')
+    setAcked(false)
+  }, [open, title])
+
+  /* Straight into the field: an admin who has decided wants to type, not to
+     hunt for the box. Modal's chrome only moves focus to the panel when it is
+     not already inside it, so this is not undone. */
+  useEffect(() => {
+    if (!open || !typeWord) return
+    const t = window.setTimeout(() => box.current?.focus(), 0)
+    return () => window.clearTimeout(t)
+  }, [open, typeWord])
+
+  /* The gate, whichever rung it is on. `typeWord` wins when both are passed,
+     because the JSX shows one rung at a time and arming on a tick nobody can
+     see would be a dialog that cannot be confirmed. */
+  const armed = typeWord ? typed.trim().toUpperCase() === typeWord.toUpperCase() : !ack || acked
+  /* Why it is not armed — for the button's description, and printed under the
+     gate only where the gate does not already say it. A typed field's own label
+     IS the instruction ("Type DELETE to …"), so repeating it underneath would be
+     the dialog saying one thing twice, which is the habit this pass exists to
+     break; there the button points at the label instead. The tick has no such
+     line, so it gets one. */
+  const why = armed ? undefined : typeWord ? `Type ${typeWord} to confirm` : 'Tick the box to confirm'
+  const whyShown = !!why && !typeWord
+  const labelId = `${fieldId}-label`
+
+  /* One section from `rows`, so the simple case does not have to build one. */
+  const groups: readonly ConfirmSection[] =
+    shape === 'hero' ? [] : (sections ?? (rows && rows.length > 0 ? [{ id: 'only', rows }] : []))
+
+  const foot = blocked ? (
+    <Button variant="secondary" onClick={onClose}>
+      {closeLabel}
+    </Button>
+  ) : (
+    <>
+      <Button variant="ghost" onClick={onClose}>
+        {cancelLabel}
+      </Button>
+      {/* `blocked` rather than `disabled`: there IS a reason, so the button
+          stays reachable by keyboard and the reason is announced with it. The
+          reason is also printed in the dialog (`__why`) instead of hidden in a
+          `title`, which no keyboard or touch user can reach. */}
+      <Button
+        variant={destructive ? 'danger' : 'brand'}
+        icon={confirmIcon}
+        blocked={why}
+        describedBy={why ? (whyShown ? whyId : labelId) : undefined}
+        onClick={onConfirm}
+      >
+        {confirmLabel}
+      </Button>
+      {alt && (
+        <Button variant="brand" disabled={alt.disabled} title={alt.title} onClick={alt.onClick}>
+          {alt.label}
+        </Button>
+      )}
+    </>
+  )
+
+  return (
+    /* Always `bare`: BOTH shapes draw their own title, the hero centred under
+       the badge and the rows beside the mark, so Modal's head row would state it
+       a second time. `title` still reaches the panel's `aria-label`. */
+    <Modal open={open} onClose={onClose} title={title} width={width ?? DIALOG_W.confirm} padded={false} bare footer={foot}>
+      <div className={`bx-confirm bx-confirm--${shape} is-${tone}`}>
+        {shape === 'hero' ? (
+          <div className="bx-confirm__hero">
+            {/* The rings ripple outward and the badge springs in, once, on open
+                (owner, 22 Oct 2026: "add a lottie style svg for the icons … a
+                good delete with animated svg"). Motion props rather than a
+                Lottie file: the effect is four circles and a scale, the runtime
+                is already here, and a JSON animation would need its own player,
+                its own colours and its own reduced-motion story.
+
+                Decorative, knowingly — against this console's own "no
+                decorative dots" — so it is hidden from assistive tech, and the
+                tone is carried by the gradient and the mark regardless, which
+                is what makes dropping the whole thing safe.
+
+                `reduce` short-circuits to no animation at all rather than a
+                faster one: a ripple is the kind of motion reduced-motion is
+                asking about. */}
+            {/* Three rings, not four, and they animate to full opacity: the
+                fade outward is in their colours now (kit.css), because four
+                hoops at one value read as a target rather than as light. The
+                sizes fit inside the band's fixed height, so none of them is
+                clipped flat against `overflow: hidden`. */}
+            <span className="bx-confirm__rings" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <motion.i
+                  key={i}
+                  initial={reduce ? false : { scale: 0.82, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.06 * i, type: 'spring', stiffness: 220, damping: 26 }}
+                  style={{ width: 96 + i * 48, height: 96 + i * 48 }}
+                />
+              ))}
+            </span>
+            <motion.span
+              className="bx-confirm__badge"
+              initial={reduce ? false : { scale: 0.72, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.06 }}
+            >
+              {/* Drawn, not printed — the hero is the one place big enough for
+                  it to read (tone-mark.tsx). The rows chip below keeps the
+                  plain Lucide glyph, and `TONE_ICON` stays the single answer to
+                  which mark a tone carries. */}
+              <ToneMark tone={tone} />
+            </motion.span>
+          </div>
+        ) : (
+          <span className="bx-confirm__chip" aria-hidden>
+            <Mark size={17} strokeWidth={2} aria-hidden />
+          </span>
+        )}
+
+        <div className="bx-confirm__text">
+          <h2 className="bx-confirm__title">{title}</h2>
+          {warning && (
+            <div className="bx-confirm__warn">
+              <Callout tone={tone === 'removed' || tone === 'error' ? 'negative' : tone === 'warning' ? 'notice' : 'info'}>{warning}</Callout>
+            </div>
+          )}
+          {/* A `div`, not a `p`: callers migrating off their own Modal bring
+              their own blocks — several paragraphs, a labelled fact, a list of
+              who moves where — and a `p` inside a `p` is invalid markup that
+              browsers silently reparent. The style is the same either way. */}
+          {children && <div className="bx-confirm__body">{children}</div>}
+
+          {groups.map((g) => {
+            const listed = g.rows.slice(0, CONFIRM_ROWS)
+            const hidden = g.rows.length - listed.length
+            return (
+              <section key={g.id} className="bx-confirm__group" aria-labelledby={g.title ? `${fieldId}-${g.id}` : undefined}>
+                {g.title && (
+                  <h3 id={`${fieldId}-${g.id}`} className="bx-confirm__grouphead">
+                    {g.title}
+                  </h3>
+                )}
+                {g.caption && <p className="bx-confirm__body">{g.caption}</p>}
+                <ul className="bx-confirm__rows">
+                  {listed.map((r) => (
+                    <li key={r.id} className="bx-confirm__row">
+                      {r.onOpen ? (
+                        <button type="button" className="bx-confirm__open" onClick={r.onOpen}>
+                          <span className="bx-confirm__lines">
+                            <span className="bx-confirm__namerow">
+                              <span className="bx-confirm__rowname">{r.name}</span>
+                              {r.tag}
+                            </span>
+                            {r.detail && <span className="bx-confirm__detail">{r.detail}</span>}
+                          </span>
+                          <ChevronRight size={15} strokeWidth={2} className="bx-confirm__chev" aria-hidden />
+                        </button>
+                      ) : (
+                        <span className="bx-confirm__lines">
+                          <span className="bx-confirm__namerow">
+                            <span className="bx-confirm__rowname">{r.name}</span>
+                            {r.tag}
+                          </span>
+                          {r.detail && <span className="bx-confirm__detail">{r.detail}</span>}
+                        </span>
+                      )}
+                      {r.mark &&
+                        (r.kind ? <span className={`bx-confirm__pill is-${r.kind}`}>{r.mark}</span> : <span className="bx-confirm__said">{r.mark}</span>)}
+                    </li>
+                  ))}
+                  {(hidden > 0 || g.more) && (
+                    <li className="bx-confirm__more">
+                      {hidden > 0 && `and ${hidden} more`}
+                      {hidden > 0 && g.more ? ' · ' : null}
+                      {g.more}
+                    </li>
+                  )}
+                </ul>
+              </section>
+            )
+          })}
+
+          {/* The dialog-wide line, after every section. A section's own `more`
+              sits inside its list; this one speaks for the whole change. */}
+          {more && <p className="bx-confirm__body">{more}</p>}
+
+        </div>
+
+        {/* THE GATE, outside the text column so it can take the card's width.
+            One rung at a time: where a word is asked for, the tick is not shown
+            as well. Two frictions stacked on one decision is not a ladder, it
+            is a toll booth. */}
+        {!blocked && (typeWord || ack) && (
+          <div className="bx-confirm__gate">
+            {typeWord ? (
+              <div className="bx-confirm__type">
+                <label id={labelId} htmlFor={fieldId}>
+                  {typeLabel ?? (
+                    <>
+                      Type <strong>{typeWord}</strong> to confirm
+                    </>
+                  )}
+                </label>
+                <input
+                  id={fieldId}
+                  type="text"
+                  ref={box}
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && armed) onConfirm?.()
+                  }}
+                />
+              </div>
+            ) : (
+              /* The console's own checkbox, not a native one and not a
+                 lookalike: the mark is the kit's `.bx-tick`, the same box the
+                 device profile's enrolment rows tick, on a button with
+                 `role="checkbox"` for the same reason they use one — a native
+                 box draws whatever the operating system draws. */
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={acked}
+                className={`bx-confirm__ack${acked ? ' is-on' : ''}`}
+                onClick={() => setAcked((v) => !v)}
+              >
+                <span className="bx-tick" aria-hidden>
+                  <Check size={11} strokeWidth={3.2} />
+                </span>
+                <span className="bx-confirm__acklabel">{ack}</span>
+              </button>
+            )}
+            {whyShown && (
+              <p id={whyId} className="bx-confirm__why">
+                {why}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }
 

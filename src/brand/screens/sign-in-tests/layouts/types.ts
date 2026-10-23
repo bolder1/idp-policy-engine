@@ -77,6 +77,9 @@ export interface RunLayoutProps {
       (inspect-model.ts). `fresh` starts the panel's way back over at it (the canvas bar's Details). Absent, names
       leave for the builder through the two above. */
   onInspect?: (target: InspectTarget, fresh?: boolean) => void
+  /** The panel's page now, and the way to shut it: Preview on the outcome is pressed while it shows What they see. */
+  inspected?: InspectTarget | null
+  onCloseInspect?: () => void
   /** "As each group": the sign-in runs again as "Anyone in <group>" (the group's id). */
   onAsGroup?: (groupId: string) => void
   /** The why in the page's right-hand panel: open, its body, the way to open it. */

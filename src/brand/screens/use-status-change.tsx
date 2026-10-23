@@ -1,3 +1,4 @@
+import { monitorOffered } from './status-options'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -325,7 +326,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
      to monitoring later, it stays closed until it is asked for again (`watchAfter`). */
   const viewMonitoring = (policyId: string) => setWatch({ policyId, open: true })
   const watched = watch ? store.policyById(watch.policyId) : undefined
-  const watching = !!watched && offersMonitoringView(watched, { monitor: store.features.monitorMode })
+  const watching = !!watched && offersMonitoringView(watched, { monitor: monitorOffered(store.features) })
   const watchNow = watchAfter(watch, watching)
   if (watchNow !== watch) setWatch(watchNow)
   const watchRows = useMemo(
@@ -555,7 +556,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
        through the Inactive → Monitoring confirmation, which says which of them
        is left out, rather than dropping them without a word. */
     const monitorInstead =
-      g.kind === 'turn-on' && turnOnExtras({ ...stored, status: g.from }, { monitor: store.features.monitorMode }).monitorInstead
+      g.kind === 'turn-on' && turnOnExtras({ ...stored, status: g.from }, { monitor: monitorOffered(store.features) }).monitorInstead
         ? () => {
             shut()
             const unsaved = options.unsaved === true || g.fixes > 0
@@ -573,7 +574,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
         policyName={g.name}
         result={g.result}
         run={g.run}
-        primaryLabel={g.kind === 'turn-on' ? 'Turn on' : g.kind === 'turn-off' ? 'Turn off' : 'Monitor'}
+        primaryLabel={g.kind === 'turn-on' ? 'Make active' : g.kind === 'turn-off' ? 'Make inactive' : 'Start monitoring'}
         onConfirm={confirm}
         onClose={shut}
         version={
@@ -596,7 +597,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
         onMonitorInstead={monitorInstead}
         monitoring={g.kind === 'turn-on' ? g.plan : null}
         onViewMonitoring={
-          g.kind === 'turn-on' && g.plan && store.features.monitorMode
+          g.kind === 'turn-on' && g.plan && monitorOffered(store.features)
             ? () => {
                 /* On the next tick, as the page's own switches are: the guard gives focus back first. */
                 shut()

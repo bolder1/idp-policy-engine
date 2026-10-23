@@ -97,6 +97,12 @@ import policiesPageSrc from './screens/Policies.tsx?raw'
    its two new files are named. */
 import classic2OneModelSrc from './screens/sign-in-tests/layouts/classic2-one-model.ts?raw'
 import classic2OneSrc from './screens/sign-in-tests/layouts/classic2-one.tsx?raw'
+/* Check access v3, the run on the builder's own canvas (20 Oct 2026, phase.ts BUILDER_CANVAS_CHECK), and the version
+   switch beside it: named for the same reason. */
+import boardRunSrc from './screens/sign-in-tests/layouts/board-run.tsx?raw'
+import boardRunModelSrc from './screens/sign-in-tests/layouts/board-run-model.ts?raw'
+import checkVersionSrc from './screens/sign-in-tests/check-version.ts?raw'
+import checkVersionSwitchSrc from './screens/sign-in-tests/CheckVersionSwitch.tsx?raw'
 import { CONDITION_CATALOGUE, scenarios, templates } from './data'
 import { TYPED_DECK } from './screens/gauntlet'
 
@@ -203,6 +209,11 @@ const NAMED: Record<string, string> = {
   /* Check access's merged Policy card (20 Oct 2026): its words and its two new pieces. */
   './screens/sign-in-tests/layouts/classic2-one-model.ts': classic2OneModelSrc,
   './screens/sign-in-tests/layouts/classic2-one.tsx': classic2OneSrc,
+  /* Check access v3 (20 Oct 2026): the run's words on the builder's cards, and the version switch. */
+  './screens/sign-in-tests/layouts/board-run.tsx': boardRunSrc,
+  './screens/sign-in-tests/layouts/board-run-model.ts': boardRunModelSrc,
+  './screens/sign-in-tests/check-version.ts': checkVersionSrc,
+  './screens/sign-in-tests/CheckVersionSwitch.tsx': checkVersionSwitchSrc,
 }
 
 /** Every piece of text a file could put on screen. */

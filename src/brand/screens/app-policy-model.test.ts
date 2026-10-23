@@ -220,13 +220,20 @@ describe('statusMenu', () => {
   it('offers an active policy Monitor and Turn off, then Remove from the application below a rule', () => {
     const items = statusMenu(box, app('box'), t.apps, { monitor: true, deletable: false })
     expect(items.map((i) => [i.id, i.label])).toEqual([
-      ['monitor', 'Monitor'],
-      ['inactive', 'Turn off'],
+      ['monitor', 'Monitoring'],
+      ['inactive', 'Inactive'],
       ['remove', 'Remove from Box'],
     ])
     expect(items[2].divide).toBe(true)
     expect(ids(box).length).toBe(3)
-    expect(statusMenu(box, app('box'), t.apps, { monitor: false, deletable: false }).map((i) => i.id)).toEqual(['inactive', 'remove'])
+    /* With monitoring not offered, the menu still NAMES it, disabled, rather than leaving a silent gap (owner,
+       22 Oct 2026: "Monitor should go to coming soon ... just add coming soon and hide the function"), and it
+       names it LAST, below Remove and behind a rule: what is coming sits with what is coming, so the run of
+       live switches is not broken in the middle by the one item that cannot be pressed (owner, same day: "move
+       it down with the other coming soon items"). The tab's own announced reads join that same tail. */
+    const withoutMonitoring = statusMenu(box, app('box'), t.apps, { monitor: false, deletable: false })
+    expect(withoutMonitoring.map((i) => i.id)).toEqual(['inactive', 'remove', 'monitor'])
+    expect(withoutMonitoring.find((i) => i.id === 'monitor')).toMatchObject({ label: 'Monitoring', hint: 'Coming soon', disabled: true, divide: true })
   })
 
   it('offers an inactive one Turn on and Monitor, and a monitoring one View monitoring', () => {
@@ -240,12 +247,18 @@ describe('statusMenu', () => {
     expect(statusMenu({ ...box, status: 'draft' }, app('box'), t.apps, { monitor: true, deletable: false })[0].divide).toBeUndefined()
   })
 
-  it('names the other applications on every switch of a shared policy, and never on Remove', () => {
+  it('names the two scopes on a shared policy: everywhere on the switches, only here on Remove', () => {
+    /* A status belongs to the policy, so a switch stops it on every application; Remove is the per-application
+       off switch. Shared, the two are named along that axis and each says what becomes of the rest (owner,
+       22 Oct 2026: "why don't we have 2 options — inactive for this app, or inactive for all"). */
     const items = statusMenu(outlook, app('outlook'), t.apps, { monitor: true, deletable: false })
-    for (const i of items.filter((x) => x.id !== 'remove')) expect(i.hint, i.id).toBe('With Dropbox')
+    for (const i of items.filter((x) => x.id !== 'remove')) {
+      expect(i.hint, i.id).toBe('Dropbox too')
+      expect(i.label, i.id).toMatch(/ everywhere$/)
+    }
     const remove = items.find((i) => i.id === 'remove')!
     expect(remove.label).toBe('Remove from Microsoft Outlook')
-    expect(remove.hint).toBeUndefined()
+    expect(remove.hint).toBe('Only Microsoft Outlook; the rest keep it')
     expect(statusMenu(box, app('box'), t.apps, { monitor: true, deletable: false }).every((i) => i.hint === undefined)).toBe(true)
   })
 

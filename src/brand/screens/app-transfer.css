@@ -47,12 +47,31 @@
 .bxl__row.is-used b { font-weight: var(--fw-regular, 400); color: var(--text-tertiary); }
 .bxl__row.is-used .applogo { filter: grayscale(1); opacity: 0.5; }
 .bxl__count { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
-.bxc { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
-.bxc__chosen { display: flex; flex-wrap: wrap; gap: var(--space-2); min-height: var(--space-10); padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-sunken); }
-.bxc__none { margin: 0; align-self: center; font-size: var(--fs-sm); color: var(--text-tertiary); }
+/* One height, whatever is in it (owner, 22 Oct 2026: "give me a fixed height for this popup, I don't like this
+   height changing based on items, so we can make things scannable; have a fixed height and add scroll").
+
+   The dialog grew and shrank as applications moved between the two halves, so the Save button walked up the screen
+   while you were still picking and the list you were reading jumped under the pointer. The body is one height now:
+   the chips take what they need up to three rows and scroll after that, and the list below takes the rest and
+   scrolls on its own. Both halves are labelled, so the added ones read as a part of the dialog rather than a loose
+   row of chips above the real content. */
+.bxc { display: flex; flex-direction: column; flex: none; gap: var(--space-5); min-width: 0; height: 420px; }
+.bxc__part { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; }
+/* The list half takes the room the chips do not. */
+.bxc__part.is-list { flex: 1; }
+.bxc__lab { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bxc__chosen { display: flex; flex-wrap: wrap; align-content: flex-start; gap: var(--space-2); height: var(--space-16); overflow-y: auto; }
+.bxc__none { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
 .bxc__chip { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--space-9); padding: 0 var(--space-2) 0 var(--space-3); border-radius: var(--radius-full); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); font-size: var(--fs-sm); color: var(--text-primary); }
 .bxc__chip button { display: inline-grid; place-items: center; width: var(--space-7); height: var(--space-7); border: 0; border-radius: var(--radius-full); background: none; color: var(--text-tertiary); cursor: pointer; }
 .bxc__chip button:hover { background: var(--surface-sunken); color: var(--text-primary); }
 .bxc__chip button:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
-.bxc__list { max-height: 240px; }
-.bxc__add { font-size: var(--fs-sm); color: var(--text-link); }
+/* Fills its half rather than sizing to its rows, so the box never changes height. */
+.bxc__list { flex: 1; max-height: none; min-height: 0; border-bottom: var(--bw-thin) solid var(--border-subtle); }
+/* Bigger rows, to scan down (owner, 22 Oct 2026: "make the things bigger"). */
+.bxc__list .bxl__row { gap: var(--space-5); min-height: var(--space-12); padding: var(--space-3) var(--space-4); font-size: var(--fs-base); }
+/* Nothing left to add: the list's own end, centred in the room it keeps. */
+.bxc__done { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4); margin: auto; padding: var(--space-8); text-align: center; list-style: none; }
+.bxc__donemark { display: grid; place-items: center; width: var(--space-11); height: var(--space-11); border-radius: var(--radius-full); background: var(--surface-sunken); color: var(--text-tertiary); }
+.bxc__done b { font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bxc__add { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-link); }

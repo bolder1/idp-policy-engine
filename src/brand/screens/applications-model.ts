@@ -96,6 +96,49 @@ export function replaceToast(oldName: string, newName: string, appName: string, 
   return `Replaced ${oldName} with ${newName} on ${appName}. ${after}`
 }
 
+/* What a replace is about to do, said BEFORE the write (owner, 22 Oct 2026:
+   "just fix the guards and confirms so nothing is silently lost").
+
+   Replace is a removal and an add in one press, and only the add was ever
+   announced: `attachNote` spoke for the policy going on, while the one coming
+   off was described nowhere until the toast had already written it. Two
+   consequences were therefore silent, and both lose something.
+
+   The first is the old policy's RULES. A published policy that loses its last
+   application becomes a draft, and the store settles it onto its saved draft's
+   rules (fixtures.ts `settled`), so the published rules it was enforcing are
+   gone. The remove dialog has said this since it was written; `removeCopy` is
+   that sentence, so this reuses it rather than writing a second version that
+   can drift from it.
+
+   The second is PROTECTION. Replacing a policy that decides sign-ins with a
+   draft, an inactive or a monitoring one leaves the application deciding
+   nothing of its own: it falls through to the tenant default. `attachNote`
+   says the new policy changes nothing "yet", which is true of the new policy
+   and quietly wrong about the application — nothing changing is not what
+   happens when the thing that was deciding comes off. */
+export interface ReplaceCopy {
+  /** What becomes of the policy coming off, in `removeCopy`'s words. */
+  policy: string
+  /** Only when the application ends up with nothing of its own deciding. */
+  protection: string | null
+}
+
+export function replaceCopy(
+  oldPolicy: Policy,
+  newPolicy: Policy,
+  app: Pick<App, 'id' | 'name'>,
+  fallbackName = 'the tenant default',
+): ReplaceCopy {
+  return {
+    policy: removeCopy(oldPolicy, app).policy,
+    protection:
+      engineDecides(oldPolicy) && !engineDecides(newPolicy)
+        ? `${oldPolicy.name} decides sign-ins to ${app.name} today. ${newPolicy.name} does not, so ${app.name} falls back to ${fallbackName}.`
+        : null,
+  }
+}
+
 /* Replace policy (APP-POLICY-TAB.md §5): the new policy goes on and the old
    one comes off in the same press, so the application never holds two (one
    application, one sign-in policy, 14 Oct 2026) — and ONE toast says so, with

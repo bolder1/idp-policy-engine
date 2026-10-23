@@ -1,7 +1,6 @@
 import { flushSync } from 'react-dom'
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  AlertTriangle,
   ArrowLeft,
   CopyPlus,
   Eye,
@@ -17,9 +16,9 @@ import {
 import {
   Badge,
   Button,
+  Confirm,
   Drawer,
   IconButton,
-  Modal,
   NameField,
   RowMenu,
   SaveBar,
@@ -738,24 +737,18 @@ function DiscardDialog({
   onDiscard: () => void
 }) {
   return (
-    <Modal
+    <Confirm
       open={open}
       onClose={onKeep}
+      tone="warning"
+      shape="hero"
       title={title}
-      width={440}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onKeep}>
-            Keep editing
-          </Button>
-          <Button variant="danger" onClick={onDiscard}>
-            Discard
-          </Button>
-        </>
-      }
+      cancelLabel="Keep editing"
+      confirmLabel="Discard"
+      onConfirm={onDiscard}
     >
-      <p className="bx-leave__body">What you have entered will not be saved.</p>
-    </Modal>
+      What you have entered will not be saved.
+    </Confirm>
   )
 }
 
@@ -1521,40 +1514,41 @@ function BasicDetailsForm({
           {/* Named, not counted, and before it happens rather than after.
               "4 signals" is a number nobody can act on; the names are what say
               whether the ones going are ones you wanted. */}
-          {pendingReach && (
-            <div className="bfp2__confirm">
-              <p className="bfp2__prereq">
-                <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-                <span>
-                  Removes {dropped.map((a) => a.name).join(', ')} and everything they are set to.
-                  {profile.registration === 'pre-approved' &&
-                    ' It also deletes the approved device roster, and users will register their own devices.'}
-                </span>
-              </p>
-              <div className="bfp2__confirmacts">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    refocusReach.current = true
-                    setPendingReach(null)
-                  }}
-                >
-                  Keep {reachLabel(profile.reach).toLowerCase()}
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    refocusReach.current = true
-                    commitReach(pendingReach)
-                  }}
-                >
-                  Switch and remove {dropped.length}
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* The first adopter of the kit's Confirm (owner, 22 Oct 2026). It
+              lists what goes, so it takes the `rows` shape; a hero cannot hold
+              six names. `warning` rather than `removed` because nothing is
+              deleted — the signals stop being checked, and the profile and its
+              roster survive unless the roster note below says otherwise. */}
+          <Confirm
+            open={pendingReach !== null}
+            onClose={() => {
+              refocusReach.current = true
+              setPendingReach(null)
+            }}
+            tone="warning"
+            shape="rows"
+            title={`Switch to ${reachLabel(pendingReach ?? profile.reach).toLowerCase()}?`}
+            rows={dropped.map((a) => ({ id: a.id, name: a.name, mark: 'Removed', kind: 'gone' as const }))}
+            more={
+              [
+                profile.registration === 'pre-approved' ? 'the approved device roster is deleted too' : null,
+                profile.usedIn > 0
+                  ? `${profile.usedIn === 1 ? 'one policy checks' : `${profile.usedIn} policies check`} fewer signals from the next sign-in`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ') || undefined
+            }
+            cancelLabel={`Keep ${reachLabel(profile.reach).toLowerCase()}`}
+            confirmLabel={`Switch and remove ${dropped.length}`}
+            onConfirm={() => {
+              refocusReach.current = true
+              if (pendingReach) commitReach(pendingReach)
+            }}
+          >
+            {reachLabel(pendingReach ?? profile.reach)} cannot read these signals, so they are removed from{' '}
+            <b>{profile.name.trim() || 'this profile'}</b> along with everything they are set to.
+          </Confirm>
 
           {/* The agent's prerequisites, under the answer that incurs them. Not
               while a switch away from the agent is waiting on its confirmation:

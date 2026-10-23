@@ -837,7 +837,7 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 .bm8__right .bm8__txn { margin-bottom: 2px; }
 /* How much of a family is on (22 Sep 2026): a grey chip on the name line,
    after Default, whole rather than clipped. */
-.bm8__name .bm8__state { flex: none; }
+.bm8__name .bm8__state { flex: none; --badge-max: 24ch; }
 
 /* --- One list, and the row that narrows it ---------------------------------------
    v1's toolbar. It replaces a tab bar, two section heads and their paragraphs:
@@ -1051,6 +1051,8 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 
 /* What the profile holds for a panel's methods, read only (user-config.tsx `ProfileFacts`). */
 .bmu__profile { margin: 0 0 var(--space-5); padding: var(--space-5); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.bmu__profilebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0 0 var(--space-3); }
+.bmu__profilebar .bmu__profilehead { margin: 0; }
 .bmu__profilehead { margin: 0 0 var(--space-3); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
 .bmu__profilegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-4); margin: 0; }
 .bmu__profilegrid dt { font-size: var(--fs-xs); color: var(--text-secondary); }
@@ -1126,3 +1128,27 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
   .bmu__scan { flex-direction: column; width: 100%; }
   .bmu__secret { border-left: 0; border-top: var(--bw-thin) solid var(--border-subtle); }
 }
+
+/* Grid Pattern's panel (21 Oct 2026): a 4 x 4 grid of numbers to pick four tiles from. */
+.bmu__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); max-width: 28ch; }
+.bmu__tile { aspect-ratio: 1; border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised); font: inherit; font-size: var(--fs-lg); font-weight: var(--fw-medium); color: var(--text-primary); cursor: pointer; }
+.bmu__tile:hover { background: var(--surface-sunken); }
+.bmu__tile.is-on { border-color: var(--blue); background: var(--blue); color: var(--text-on-brand); font-weight: var(--fw-semibold); }
+.bmu__tile.is-on:hover { background: var(--blue-hover, var(--blue)); }
+.bmu__tile:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+
+/* General settings (21 Oct 2026): the button at the tab bar's end, and the panel's rows. */
+.bm8__gen { display: flex; flex-direction: column; gap: var(--space-8); }
+.bm8__gen h3 { margin: 0 0 var(--space-3); font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bm8__grow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-4) 0; border-top: var(--bw-thin) solid var(--border-subtle); }
+.bm8__gtext { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.bm8__gtext b { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bm8__gtext span { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bm8__gctl { flex: none; }
+
+/* The general settings on the page's own tab (owner, 21 Oct 2026), the same rows the slide-over draws.
+
+   Held to a column: the rows put the label at one end and the control at the other, and on a full-width page that is a
+   switch half a screen from the words it answers. The measure is the blurb's, so the tab's text column lines up with
+   the page's own. */
+.bm8__genpane { max-width: 68ch; }

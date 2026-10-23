@@ -61,6 +61,22 @@ export function Face({
     `tips={false}`: faces printed beside their names, for the eye only — no hover, and nothing read twice. */
 export function FaceStack({ faces, max = 5, tips = true }: { faces: FaceItem[]; max?: number; tips?: boolean }) {
   const size = 'sm'
+  /* ONE of them, and the name is written out (owner, 22 Oct 2026: "for single I guess we can show the name;
+     change this globally as well").
+
+     Initials are a compression, and compression only pays where there is something to compress: "CO" beside a
+     face, with the word Contractors a hover away, is a riddle set for the reader when the row had room for the
+     answer. A stack of eight is the case the avatars were drawn for (owner, 21 Sep 2026: "the avatar, and on
+     hover the full name") and it keeps them. One is not a stack. */
+  if (faces.length === 1) {
+    const only = faces[0]
+    return (
+      <span className={`bx-faces is-${size} is-one`}>
+        <Face kind={only.kind} name={only.name} size={size} decorative />
+        <b className="bx-faces__name">{only.name}</b>
+      </span>
+    )
+  }
   /* One more than `max` shows the last face rather than a "+1" in its place. */
   const cut = faces.length > max + 1 ? max : faces.length
   const shown = faces.slice(0, cut)

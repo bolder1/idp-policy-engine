@@ -12,6 +12,8 @@ import {
   BEAT_MIN,
   CHECKED_MIN,
   CHECK_MIN,
+  MOTION_BEAT_MIN,
+  MOTION_QUICK_MS,
   NOTICE_MS,
   OFF_RULE_MIN,
   ONE_POLICY_GD_MIN,
@@ -28,6 +30,7 @@ import {
   presentTimeline,
   presentedStep,
   replayed,
+  skimRules,
   skipped,
   startState,
   storyOf,
@@ -752,6 +755,76 @@ describe('the merged Policy card: a shorter story', () => {
     expect(one.total).toBeLessThan(before.total)
     for (const plan of [AISHA, SANJAY, MAYA, planOf('Devon Rao', 'AWS Console', { policies: AWS_PAIR, patch: { device: { kind: 'preset', id: 'win10' } } as Partial<SignInForm> })]) {
       expect(presentTimeline(plan, storyOf(plan, ONE), ONE).total, plan.appName).toBeLessThanOrEqual(PRESENT_CAP_MS)
+    }
+  })
+})
+
+/* CHECK ACCESS V3 (20 Oct 2026; phase.ts BUILDER_CANVAS_CHECK): the run on the builder's own canvas reads a rule that
+   failed on who it is for, and a rule switched off, on its head alone — at MOTION_QUICK_MS from the first, never under
+   the rule beat's floor — and adds no time where there is none to skim. */
+describe('Check access v3: the skims', () => {
+  const ONE = { onePolicy: true }
+  const MOTION = { onePolicy: true, motion: true }
+  const CANVAS = { onePolicy: true, motion: true, canvas: true }
+  const AISHA = planOf('Aisha Khan', 'Google Workspace')
+  const SANJAY = planOf('Sanjay Bhatt', 'HRMS')
+  const AWS_MAYA = planOf('Maya Iyer', 'AWS Console')
+  const THOMAS = planOf('Thomas Byrne', 'AWS Console')
+  const PRIYA_HOME = planOf('Priya Sharma', 'AWS Console', { origin: 'home' })
+  const timed = (plan: EngineRun, opts: object) => presentTimeline(plan, storyOf(plan, ONE), opts)
+  /* When each presented step is really drawn: never before the engine (brisk, as Focus runs it) has reached it. */
+  const effective = (plan: EngineRun, opts: object): number => {
+    const tl = timed(plan, opts)
+    const engine = timeline(plan.steps, 'full', { brisk: true }).at
+    let at = 0
+    for (let k = 1; k < tl.dur.length; k++) at = Math.max(at + tl.dur[k - 1], engine[k] ?? 0)
+    return at
+  }
+
+  it('adds no time to Aisha Khan\'s run, which has nothing to skim', () => {
+    expect(skimRules(AISHA).size).toBe(0)
+    expect(timed(AISHA, CANVAS).total).toBe(timed(AISHA, MOTION).total)
+    expect(timed(AISHA, CANVAS).total).toBe(5160)
+  })
+
+  it('skims every who-miss from the first, each rule beat at its floor or longer', () => {
+    for (const plan of [AWS_MAYA, THOMAS, PRIYA_HOME]) {
+      const tl = timed(plan, CANVAS)
+      const skims = tl.skims ?? new Set<number>()
+      const who = plan.rules.map((r, i) => ({ r, i })).filter(({ r, i }) => i !== plan.landing && r.state === 'no-match' && r.failing !== null && r.checks[r.failing]?.category === 'who')
+      expect(who.length, plan.appName).toBeGreaterThan(0)
+      for (const { i } of who) expect(skims.has(i), `${plan.appName} rule ${i + 1}`).toBe(true)
+      for (const b of tl.beats) {
+        if (b.beat.kind !== 'rule') continue
+        expect(b.dur, `${plan.appName} ${b.beat.label}`).toBeGreaterThanOrEqual(MOTION_BEAT_MIN.rule)
+        if (b.beat.rule !== undefined && skims.has(b.beat.rule)) {
+          const first = b.beat.from
+          if (plan.steps[first]?.kind === 'rule') expect(tl.dur[first], `${plan.appName} ${b.beat.label}`).toBe(MOTION_QUICK_MS.rule)
+        }
+      }
+      expect([...skims].includes(plan.landing ?? -1), plan.appName).toBe(false)
+    }
+  })
+
+  it('reads a long walk no slower than the run\'s motion alone, drawn when the engine has got there', () => {
+    for (const plan of [THOMAS, PRIYA_HOME, AWS_MAYA]) {
+      expect(timed(plan, CANVAS).total, plan.appName).toBeLessThanOrEqual(timed(plan, MOTION).total)
+      expect(effective(plan, CANVAS), plan.appName).toBeLessThanOrEqual(effective(plan, MOTION))
+    }
+  })
+
+  it('never shrinks a notice, and keeps every showcase run under the cap', () => {
+    const conflict = AWS_MAYA.steps.findIndex((st) => !!st.notice)
+    if (conflict >= 0) expect(timed(AWS_MAYA, CANVAS).dur[conflict]).toBe(NOTICE_MS)
+    for (const plan of [AISHA, SANJAY, AWS_MAYA, THOMAS, PRIYA_HOME, DENY, KAVYA, DEPENDS, CONFLICT]) {
+      expect(timed(plan, CANVAS).total, plan.appName).toBeLessThanOrEqual(PRESENT_CAP_MS)
+    }
+  })
+
+  it('without the canvas, no timeline changes and none says it skims', () => {
+    for (const plan of [AISHA, THOMAS, PRIYA_HOME]) {
+      expect(timed(plan, MOTION).skims).toBeUndefined()
+      expect(timed(plan, ONE).skims).toBeUndefined()
     }
   })
 })

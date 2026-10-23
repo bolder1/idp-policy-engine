@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dialog layout, spacing and input — options</title>
+<style>
+  :root{
+    --overlay:#ffffff; --raised:#ffffff; --sunken:#f8f9fa; --page:#f1f3f5;
+    --b-subtle:#eef0f2; --b-default:#dee2e6; --b-strong:#ced4da;
+    --t-primary:#212529; --t-secondary:#495057; --t-tertiary:#5c636a; --t-link:#0d6efd; --t-place:#6c757d;
+    --ctl-border:#dee2e6; --ctl-border-focus:#86b7fe; --focus-halo:rgba(13,110,253,.2);
+    --brand:#eb5424; --danger:#dc3545;
+    --neg-bg:#fcebec; --neg-border:#f1b0b7; --neg-fg:#b02a37;
+    --not-bg:#fff6e0; --not-border:#ffe0a3; --not-fg:#7a5a00;
+    --card-dot:rgba(33,37,41,.13);
+    --el-overlay:0 16px 48px rgba(33,37,41,.18);
+    --el-high:0 8px 24px rgba(33,37,41,.12);
+    --hover:#f1f3f5;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mark:#0d6efd;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--t-primary);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 120px}
+
+  h1{font-size:24px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em}
+  .lede{color:var(--t-secondary);margin:0 0 32px;max-width:76ch}
+  h2{font-size:18px;font-weight:600;margin:0 0 4px}
+  h3{font-size:16px;font-weight:600;margin:0}
+  .sec{margin-top:56px}
+  .sec > p.note{color:var(--t-secondary);margin:0 0 24px;max-width:76ch}
+
+  .rule{height:1px;background:var(--b-default);margin:0 0 24px}
+  .kicker{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t-tertiary);margin:0 0 10px}
+
+  /* ---- findings ---- */
+  .finds{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:0 0 8px}
+  .find{background:var(--raised);border:1px solid var(--b-default);border-radius:8px;padding:16px 18px}
+  .find.bug{border-color:var(--neg-border);background:var(--neg-bg)}
+  .find h4{margin:0 0 6px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .find p{margin:0;font-size:13px;color:var(--t-secondary)}
+  .find code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:rgba(33,37,41,.06);padding:1px 5px;border-radius:4px}
+
+  /* ---- the dialog ---- */
+  .stage{background:
+      radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px,
+      linear-gradient(180deg,#eceff1 0%, #f6f7f8 100%);
+    border:1px solid var(--b-default);border-radius:10px;padding:32px 24px;display:grid;place-items:center}
+
+  .dlg{width:480px;max-width:100%;background:var(--overlay);border-radius:12px;box-shadow:var(--el-overlay);
+       display:flex;flex-direction:column;overflow:hidden;position:relative;text-align:left}
+  .dlg.w560{width:560px}
+  .dlg__x{position:absolute;top:12px;right:12px;width:34px;height:34px;display:grid;place-items:center;
+          border:0;background:none;border-radius:6px;color:var(--t-tertiary);cursor:pointer}
+  .dlg__x:hover{background:var(--hover);color:var(--t-primary)}
+  .dlg__main{padding:24px}
+  .dlg__foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:16px 20px;
+             border-top:1px solid var(--b-subtle);background:var(--raised)}
+
+  .head{display:flex;align-items:flex-start;gap:8px}
+  .chip{flex:none;width:34px;height:34px;border-radius:999px;display:grid;place-items:center;
+        background:var(--neg-bg);color:var(--neg-fg);border:1px solid var(--neg-border)}
+  .chip.notice{background:var(--not-bg);color:var(--not-fg);border-color:var(--not-border)}
+  .ttl{font-size:16px;font-weight:600;margin:0;padding-top:5px;padding-right:28px;line-height:1.35}
+  .body{font-size:14px;color:var(--t-secondary);margin:8px 0 0}
+  .body.strongfact{color:var(--t-primary)}
+
+  .callout{display:flex;gap:8px;align-items:flex-start;margin:8px 0 0;padding:10px 12px;border-radius:6px;
+           background:var(--neg-bg);border:1px solid var(--neg-border);color:var(--neg-fg);font-size:13px}
+
+  /* field */
+  .field{margin:16px 0 0;display:flex;flex-direction:column;gap:8px}
+  .field label{font-size:14px;color:var(--t-secondary)}
+  .field label strong{font-weight:600;color:var(--t-primary)}
+  .inp{height:40px;padding:0 12px;border:1px solid var(--ctl-border);border-radius:6px;background:transparent;
+       font:inherit;font-size:14px;color:var(--t-primary);width:100%}
+  .inp::placeholder{color:var(--t-place)}
+  .inp:focus{outline:none;border-color:var(--ctl-border-focus);box-shadow:0 0 0 4px var(--focus-halo)}
+  .inp.sized{width:15ch}
+  .inp.tiny{width:13ch;height:34px}
+
+  /* the broken one, reproduced exactly */
+  .inp--ua{all:revert;width:100%;font:inherit}
+
+  .tick{display:flex;gap:10px;align-items:flex-start;margin:16px 0 0;padding:12px;border:1px solid var(--b-default);
+        border-radius:6px;background:var(--sunken);cursor:pointer}
+  .tick .boxy{flex:none;width:18px;height:18px;border:1.5px solid var(--b-strong);border-radius:4px;background:#fff;
+        display:grid;place-items:center;margin-top:1px}
+  .tick.on .boxy{background:var(--t-primary);border-color:var(--t-primary);color:#fff}
+  .tick span.lbl{font-size:14px;color:var(--t-primary)}
+
+  .btn{height:40px;padding:0 12px;border-radius:6px;font:inherit;font-size:13px;font-weight:500;border:1px solid transparent;
+       display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:none;color:var(--t-secondary)}
+  .btn:hover{background:var(--hover)}
+  .btn--danger{background:var(--danger);border-color:var(--danger);color:#fff}
+  .btn--danger:hover{background:#c42b3a;border-color:#c42b3a}
+  .btn--danger[aria-disabled="true"]{opacity:.5}
+  .btn--sec{border-color:var(--b-default);color:var(--t-primary)}
+
+  /* rows block */
+  .rows{margin:8px 0 0;border:1px solid var(--b-subtle);border-radius:6px;overflow:hidden}
+  .rows h5{margin:0;padding:8px 12px;font-size:13px;font-weight:600;background:var(--sunken);
+           border-bottom:1px solid var(--b-subtle);color:var(--t-primary)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;font-size:13px}
+  .row + .row{border-top:1px solid var(--b-subtle)}
+  .row .nm{color:var(--t-primary)}
+  .row .dt{display:block;font-size:13px;color:var(--t-tertiary)}
+  .pill{flex:none;white-space:nowrap;font-size:12px;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--neg-bg);color:var(--neg-fg)}
+
+  /* annotation */
+  .anno{position:relative}
+  .tagline{position:absolute;left:calc(100% + 10px);white-space:nowrap;font-size:12px;font-weight:600;color:var(--neg-fg);
+           background:var(--neg-bg);border:1px solid var(--neg-border);border-radius:4px;padding:1px 6px}
+  .tagline.ok{color:#0f7b3d;background:#e6f4ea;border-color:#b7e0c4}
+
+  /* option grid */
+  .opts{display:grid;gap:20px}
+  .opts.two{grid-template-columns:repeat(auto-fit,minmax(430px,1fr))}
+  .opts.three{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+  .opt{background:var(--raised);border:1px solid var(--b-default);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+  .opt.pick{border-color:var(--brand);box-shadow:0 0 0 3px rgba(235,84,36,.12)}
+  .opt__h{padding:14px 18px;border-bottom:1px solid var(--b-subtle);display:flex;align-items:baseline;gap:10px}
+  .opt__h .tag{font-size:12px;font-weight:700;color:var(--t-tertiary);letter-spacing:.04em}
+  .opt.pick .opt__h .tag{color:var(--brand)}
+  .opt__h p{margin:0;font-size:13px;color:var(--t-secondary)}
+  .opt__stage{flex:1;padding:24px;display:grid;place-items:center;background:
+      radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px,
+      linear-gradient(180deg,#eceff1 0%, #f6f7f8 100%)}
+  .opt__stage .dlg{width:100%;max-width:440px;box-shadow:var(--el-high)}
+  .opt__why{padding:14px 18px;border-top:1px solid var(--b-subtle);font-size:13px;color:var(--t-secondary)}
+  .opt__why ul{margin:6px 0 0;padding-left:18px}
+  .opt__why li{margin:3px 0}
+  .opt__why b{color:var(--t-primary);font-weight:600}
+
+  .src{font-size:12px;color:var(--t-tertiary);margin-top:10px}
+  .src a{color:var(--t-link)}
+
+  table.cmp{border-collapse:collapse;width:100%;font-size:13px;background:var(--raised);border:1px solid var(--b-default);border-radius:8px;overflow:hidden}
+  table.cmp th,table.cmp td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--b-subtle)}
+  table.cmp th{background:var(--sunken);font-weight:600;font-size:12px;letter-spacing:.03em;text-transform:uppercase;color:var(--t-tertiary)}
+  table.cmp tr:last-child td{border-bottom:0}
+  table.cmp td.n{font-variant-numeric:tabular-nums}
+  .bad{color:var(--neg-fg);font-weight:600}
+  .good{color:#0f7b3d;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Dialog layout, spacing and inputs</h1>
+  <p class="lede">Measured from the running build, then checked against Material&nbsp;3, Carbon, Primer, Fluent&nbsp;2, Apple HIG and Atlassian. Two of the problems turned out to be defects with one right answer, so they are fixed in every option below rather than offered as a choice. What is left is three real decisions.</p>
+
+  <!-- ============ FINDINGS ============ -->
+  <section class="sec" style="margin-top:0">
+    <p class="kicker">Found in the build, not in a style guide</p>
+    <div class="finds">
+      <div class="find bug">
+        <h4>The typed field has no styling at all</h4>
+        <p>The console styles text fields with <code>input[type='text']</code>. Our field has no <code>type</code> attribute, so it matches nothing: it renders as the browser's own box — <b>27px tall, 2px inset bevel, square corners, 14px text</b>, where every other field in the console is 40px with a 1px hairline and 6px corners. This is the whole of "the input looks dysfunctional". One attribute fixes it.</p>
+      </div>
+      <div class="find bug">
+        <h4>The close button is at the top <em>left</em></h4>
+        <p>It is <code>position: static</code> in a flex column, so it takes its own 34px row above the card and sits at the left edge. Its own comment says it "floats over the body". Every system checked puts it top-right, out of the flow. That row is also the empty band above the title.</p>
+      </div>
+      <div class="find">
+        <h4>Seven gaps in one dialog</h4>
+        <p>Measured top to bottom: <b>32</b> dead band · <b>8</b> mark→title · <b>4</b> title→callout · <b>8</b> callout→body · <b>12</b> body→label · <b>4</b> label→input · <b>20</b> to the footer. Each part carries its own margin instead of the column carrying one gap.</p>
+      </div>
+      <div class="find">
+        <h4>The dialog grows 80px for the field</h4>
+        <p>A typed word switches the width from 480 to 560, so the same delete is two different sizes depending on whether it asks you to type. Published widths sit at 480–600, so either is fine — but not both.</p>
+      </div>
+    </div>
+    <p class="src">Verified in the browser at <code>localhost:5173</code> with <code>getComputedStyle</code> and <code>getBoundingClientRect</code>; sources: Material Web <code>_dialog.scss</code>, Carbon modal style page, Primer <code>Dialog.module.css</code>, Fluent <code>react-dialog</code> constants, Apple HIG Alerts, Atlassian modal.</p>
+  </section>
+
+  <!-- ============ NOW ============ -->
+  <section class="sec">
+    <h2>Where it stands now</h2>
+    <p class="note">The real dialog, rebuilt here to the measured numbers — including the browser-default input, so the comparison is honest.</p>
+    <div class="stage">
+      <div class="dlg w560" style="box-shadow:var(--el-high)">
+        <div style="display:flex"><button class="dlg__x" style="position:static;margin:-2px -6px 0 0" aria-label="Close">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button></div>
+        <div class="dlg__main" style="padding:0 20px 20px">
+          <div class="head">
+            <span class="chip">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </span>
+            <div style="flex:1;min-width:0">
+              <h3 class="ttl" style="padding-top:0">Delete Slack access?</h3>
+              <div class="callout" style="margin-top:4px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:2px;flex:none"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                <span>This permanently deletes the policy. You can't undo it.</span>
+              </div>
+              <p class="body">Protects Slack. Sign-ins there will use the Global Default Policy.</p>
+              <div class="field" style="gap:4px;margin-top:12px">
+                <label>Type <strong>DELETE</strong> to confirm</label>
+                <input class="inp--ua" aria-label="Type DELETE to confirm">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dlg__foot">
+          <button class="btn">Cancel</button>
+          <button class="btn btn--danger" aria-disabled="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Delete</button>
+        </div>
+      </div>
+    </div>
+    <p class="src">The verb "delete" is said four times — title, callout, field label, button — and the red mark plus the red callout both say danger for the same fact. The callout is the one element carrying nothing specific to this policy: a hard delete is the only delete this console has, so "permanently / can't undo" is a constant, not news.</p>
+  </section>
+
+  <!-- ============ DECISION 1 ============ -->
+  <section class="sec">
+    <div class="rule"></div>
+    <p class="kicker">Decision 1 of 3</p>
+    <h2>How much the dialog says</h2>
+    <p class="note">Every option has the frame fixed: close top-right, 24px padding, 8px title→body, 24px before the footer, 480px held. Only the words differ. No system checked pairs a title with a restating callout <em>and</em> a restating sentence; Apple is explicit that the title carries the meaning and the message exists only if it adds value.</p>
+
+    <div class="opts three">
+
+      <!-- C1 -->
+      <div class="opt">
+        <div class="opt__h"><span class="tag">C1</span><h3>Keep the callout</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head">
+                <span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+                <h3 class="ttl">Delete Slack access?</h3>
+              </div>
+              <div class="callout">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:2px;flex:none"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                <span>This permanently deletes the policy. You can't undo it.</span>
+              </div>
+              <p class="body">Protects Slack. Sign-ins there will use the Global Default Policy.</p>
+              <div class="field"><label>Type <strong>DELETE</strong> to confirm</label><input class="inp" aria-label="Type DELETE to confirm"></div>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">
+          Same words, fixed spacing and a real field.
+          <ul><li>Nothing to re-approve on copy.</li><li><b>Still four "delete"s</b> and two red blocks for one fact.</li><li>Tallest of the three.</li></ul>
+        </div>
+      </div>
+
+      <!-- C2 -->
+      <div class="opt pick">
+        <div class="opt__h"><span class="tag">C2 · recommended</span><h3>One line, permanence in the field</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head">
+                <span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+                <h3 class="ttl">Delete Slack access?</h3>
+              </div>
+              <p class="body strongfact">Slack sign-ins will use the Global Default Policy.</p>
+              <div class="field"><label>Type <strong>DELETE</strong> to delete it for good</label><input class="inp" aria-label="Type DELETE to delete it for good"></div>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">
+          The callout goes; the field label carries the permanence, where it is read at the moment of arming.
+          <ul><li><b>One red element</b>, one statement of consequence.</li><li>The body is now the only line, so it reads as the fact rather than as filler.</li><li>Needs your nod on the label wording.</li></ul>
+        </div>
+      </div>
+
+      <!-- C3 -->
+      <div class="opt">
+        <div class="opt__h"><span class="tag">C3</span><h3>One line, permanence folded in</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head">
+                <span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+                <h3 class="ttl">Delete Slack access?</h3>
+              </div>
+              <p class="body strongfact">This can't be undone. Slack sign-ins will use the Global Default Policy.</p>
+              <div class="field"><label>Type <strong>DELETE</strong> to confirm</label><input class="inp" aria-label="Type DELETE to confirm"></div>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">
+          Both facts in one sentence, no red block, the field label untouched.
+          <ul><li>Keeps the familiar "Type DELETE to confirm".</li><li>Leads with the constant instead of the consequence.</li><li>Atlassian's rule — state what happens, once — is satisfied either way.</li></ul>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ DECISION 2 ============ -->
+  <section class="sec">
+    <div class="rule"></div>
+    <p class="kicker">Decision 2 of 3</p>
+    <h2>The field itself</h2>
+    <p class="note">All three are the console's real 40px field, 1px hairline, 6px corners, 8px below its label — the gap every other form in the console uses. No design system publishes a width for this field, so sizing is our call, not an industry rule.</p>
+
+    <div class="opts three">
+
+      <div class="opt">
+        <div class="opt__h"><span class="tag">F1</span><h3>Full width</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><h3 class="ttl">Delete Slack access?</h3></div>
+              <p class="body strongfact">Slack sign-ins will use the Global Default Policy.</p>
+              <div class="field"><label>Type <strong>DELETE</strong> to delete it for good</label><input class="inp" aria-label="Type DELETE"></div>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">What we have, styled properly. Carbon is the one system that says an input may span the full measure even where prose does not.<ul><li>No judgement call.</li><li>A 480px box for a six-letter word.</li></ul></div>
+      </div>
+
+      <div class="opt pick">
+        <div class="opt__h"><span class="tag">F2 · recommended</span><h3>Sized to the word</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><h3 class="ttl">Delete Slack access?</h3></div>
+              <p class="body strongfact">Slack sign-ins will use the Global Default Policy.</p>
+              <div class="field"><label>Type <strong>DELETE</strong> to delete it for good</label><input class="inp sized" aria-label="Type DELETE"></div>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">The box says how much is wanted. 15ch holds DELETE with room to spare and still fits a longer word.<ul><li><b>The field stops shouting</b> and the sentence above it leads again.</li><li>Needs a floor so a long word still fits — it grows, never shrinks.</li></ul></div>
+      </div>
+
+      <div class="opt">
+        <div class="opt__h"><span class="tag">F3</span><h3>On the footer, by the button</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><h3 class="ttl">Delete Slack access?</h3></div>
+              <p class="body strongfact">Slack sign-ins will use the Global Default Policy. This can't be undone.</p>
+            </div>
+            <div class="dlg__foot" style="justify-content:space-between">
+              <input class="inp tiny" placeholder="DELETE" aria-label="Type DELETE to confirm">
+              <span style="display:flex;gap:8px"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></span>
+            </div>
+          </div>
+        </div>
+        <div class="opt__why">The arming step sits where the action is, so the body stays prose and the dialog loses a whole block.<ul><li><b>Shortest of the three.</b></li><li>The word moves into a placeholder, which disappears as you type — weaker than a label, and no system does this.</li></ul></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ DECISION 3 ============ -->
+  <section class="sec">
+    <div class="rule"></div>
+    <p class="kicker">Decision 3 of 3</p>
+    <h2>When to ask for typing at all</h2>
+    <p class="note">Today every policy delete demands the word, including one the dialog itself says "decides no sign-ins" — I hit that case in the build. Nielsen Norman: reserve typing for the rare and dangerous or it becomes another habit. Cloudscape's test is whether the thing can't be recreated or deleting breaks something else. <b>There is no published study showing typed confirmation reduces mistaken deletions</b> — it is convention, so it should be spent where it buys something.</p>
+
+    <div class="opts three">
+
+      <div class="opt">
+        <div class="opt__h"><span class="tag">T1</span><h3>Always, as today</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><h3 class="ttl">Delete HRMS access?</h3></div>
+              <p class="body strongfact">Assigned to HRMS. It decides no sign-ins.</p>
+              <div class="field"><label>Type <strong>DELETE</strong> to delete it for good</label><input class="inp sized" aria-label="Type DELETE"></div>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">One rule, no edge cases.<ul><li><b>This is the real dialog from the build</b> — it says nothing happens, then asks you to type.</li><li>Trains the reflex it is meant to interrupt.</li></ul></div>
+      </div>
+
+      <div class="opt pick">
+        <div class="opt__h"><span class="tag">T2 · recommended</span><h3>Only when sign-ins change</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><h3 class="ttl">Delete HRMS access?</h3></div>
+              <p class="body strongfact">Assigned to HRMS. It decides no sign-ins.</p>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">A policy that decides nothing gets a plain confirm; one that is deciding live sign-ins still asks for the word. The dialog's own test, finally applied.<ul><li><b>Typing means something again</b> when it does appear.</li><li>Two shapes of the same dialog to keep honest.</li></ul></div>
+      </div>
+
+      <div class="opt">
+        <div class="opt__h"><span class="tag">T3</span><h3>A checkbox in between</h3></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip notice"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg></span><h3 class="ttl">Delete Corporate offices?</h3></div>
+              <div class="rows">
+                <h5>2 live policies move to draft</h5>
+                <div class="row"><span><span class="nm">HRMS access from corporate offices</span><span class="dt">Office network</span></span><span class="pill">To draft</span></div>
+                <div class="row"><span><span class="nm">Finance tools</span><span class="dt">HQ only</span></span><span class="pill">To draft</span></div>
+              </div>
+              <label class="tick on"><span class="boxy"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m20 6-11 11-5-5"/></svg></span><span class="lbl">They stop deciding sign-ins until their rules use another zone.</span></label>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger">Delete</button></div>
+          </div>
+        </div>
+        <div class="opt__why">The middle rung <code>POPUPS.md</code> already promises — "nothing → checkbox → typed name" — but which was never built. GitHub uses exactly this step before its typed field.<ul><li>Turns a sentence nobody reads into one they must act on.</li><li><b>Three rungs to maintain</b> instead of two.</li></ul></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ SCALE ============ -->
+  <section class="sec">
+    <div class="rule"></div>
+    <h2>The scale behind every option</h2>
+    <p class="note">Where the systems agree, I took the agreement. The one value they genuinely disagree on is the gap before the footer — Fluent 8, Primer 16, Material 24, Carbon 48 — and 24 is the middle of that for a short confirm.</p>
+    <table class="cmp">
+      <tr><th>Part</th><th>Now</th><th>Proposed</th><th>Token</th><th>Where it comes from</th></tr>
+      <tr><td>Close button</td><td class="bad">top-left, own 34px row</td><td class="good">top-right, floated</td><td>—</td><td>Material, Carbon, Primer, Fluent, Atlassian</td></tr>
+      <tr><td>Outer padding</td><td class="n">0 20 20</td><td class="n good">24</td><td><code>--space-8</code></td><td>Material 24, Fluent 24, Atlassian 24</td></tr>
+      <tr><td>Mark → title</td><td class="n">8</td><td class="n">8</td><td><code>--space-4</code></td><td>already right</td></tr>
+      <tr><td>Title → body</td><td class="n bad">4</td><td class="n good">8</td><td><code>--space-4</code></td><td>Material 8, Fluent 8</td></tr>
+      <tr><td>Body → field</td><td class="n bad">12</td><td class="n good">16</td><td><code>--space-6</code></td><td>Primer 16</td></tr>
+      <tr><td>Label → input</td><td class="n bad">4</td><td class="n good">8</td><td><code>--space-4</code></td><td>our own forms, every one of them</td></tr>
+      <tr><td>Input height</td><td class="n bad">27 (browser default)</td><td class="n good">40</td><td><code>--ctl-height-md</code></td><td>our own control height</td></tr>
+      <tr><td>Input border</td><td class="bad">2px inset bevel, square</td><td class="good">1px hairline, 6px</td><td><code>--ctl-border</code> / <code>--ctl-radius</code></td><td>our own fields</td></tr>
+      <tr><td>Body → footer</td><td class="n">20</td><td class="n good">24</td><td><code>--space-8</code></td><td>Material 24 (range is 8–48)</td></tr>
+      <tr><td>Between buttons</td><td class="n">8</td><td class="n">8</td><td><code>--space-4</code></td><td>Material, Fluent, Primer</td></tr>
+      <tr><td>Width</td><td class="bad">480, or 560 with a field</td><td class="good">480 for both</td><td>—</td><td>Material 560, Fluent 600, Primer 640 max</td></tr>
+      <tr><td>Button order</td><td class="good">Cancel, then Delete</td><td class="good">unchanged</td><td>—</td><td>Apple, Atlassian, Material, Fluent</td></tr>
+    </table>
+  </section>
+
+  <!-- ============ RECOMMENDED ============ -->
+  <section class="sec">
+    <div class="rule"></div>
+    <h2>Put together: C2 + F2 + T2</h2>
+    <p class="note">The same delete, in the two shapes it would now have. Left: a policy that decides no sign-ins — a plain confirm. Right: one that is deciding live sign-ins — the word is asked for, and means something.</p>
+    <div class="opts two">
+      <div class="opt">
+        <div class="opt__h"><span class="tag">Nothing is riding on it</span></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><h3 class="ttl">Delete HRMS access?</h3></div>
+              <p class="body strongfact">Assigned to HRMS. It decides no sign-ins.</p>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger">Delete</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="opt">
+        <div class="opt__h"><span class="tag">Live sign-ins change</span></div>
+        <div class="opt__stage">
+          <div class="dlg">
+            <button class="dlg__x" aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <div class="dlg__main">
+              <div class="head"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><h3 class="ttl">Delete Slack access?</h3></div>
+              <p class="body strongfact">Slack sign-ins will use the Global Default Policy.</p>
+              <div class="field"><label>Type <strong>DELETE</strong> to delete it for good</label><input class="inp sized" aria-label="Type DELETE"></div>
+            </div>
+            <div class="dlg__foot"><button class="btn">Cancel</button><button class="btn btn--danger" aria-disabled="true">Delete</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="src">Two more things I would change once you have picked, both small: the disabled Delete carries a <code>title</code> tooltip that repeats the field label and is not reachable by keyboard or touch — it should be <code>aria-disabled</code> with the label as its description. And the library deletes say their consequence twice, once in each section heading and again in its caption; those merge into the heading.</p>
+  </section>
+
+</div>
+</body>
+</html>

@@ -43,7 +43,7 @@ import { AppTransfer } from './app-transfer'
 import { decidesFor, deleteDetail, listPhrase, ownerOf } from './app-policies'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
-import { rowMenu, statusOptions, type RowMenuId } from './status-options'
+import { rowMenu, statusOptions, type RowMenuId, monitorOffered } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { SHOWCASE } from '../showcase'
 import { screenOffered } from '../edition-screens'
@@ -513,7 +513,7 @@ function SignInPolicies() {
                       policy={p}
                       gauntlet={grades.get(p.id)}
                       showExposure={showExposure}
-                      monitor={store.features.monitorMode}
+                      monitor={monitorOffered(store.features)}
                       trySignIn={store.features.trySignIn}
                       onOpen={() => setDetails({ id: p.id, open: true })}
                       onAction={(a) => act(p, a)}
@@ -556,7 +556,7 @@ function SignInPolicies() {
                   menu: (
                     <RowMenu
                       label={`Actions for ${p.name}`}
-                      items={policyMenu(p, { monitor: store.features.monitorMode, trySignIn: store.features.trySignIn })}
+                      items={policyMenu(p, { monitor: monitorOffered(store.features), trySignIn: store.features.trySignIn })}
                       onSelect={(id) => act(p, id as RowAction)}
                     />
                   ),
@@ -575,6 +575,7 @@ function SignInPolicies() {
           open={dialogOpen}
           name={current.name}
           noun="policy"
+          requireTyped
           detail={deleteDetail(current, store.policies, store.apps, store.users, store.groups) ?? undefined}
           onCancel={closeDialog}
           onConfirm={() => {
@@ -841,6 +842,7 @@ function PostSignInPolicies() {
           open={deleteOpen}
           name={current.name}
           noun="policy"
+          requireTyped
           detail={postDeleteDetail(current, store.apps)}
           onCancel={() => setDeleteOpen(false)}
           onConfirm={() => {

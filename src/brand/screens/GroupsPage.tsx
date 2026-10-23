@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Drawer, IconButton, Modal, NameField, RowMenu, SearchBox, Tabs, TipDot, type MenuItem } from '../kit'
+import { Button, Confirm, Drawer, IconButton, NameField, RowMenu, SearchBox, Tabs, TipDot, type MenuItem } from '../kit'
 import { EmptyState, NoMatches } from '../empty'
 import { Face } from '../faces'
 import { AppLogo } from '../logos/AppLogo'
@@ -606,28 +606,17 @@ function AssignmentTab({ group }: { group: Group }) {
 
       <AssignDrawer open={assigning} group={group} onClose={() => setAssigning(false)} />
 
-      <Modal
+      <Confirm
         open={asking}
         onClose={() => setAsking(false)}
+        tone="removed"
         title={pending ? `Unassign ${pending.who} from ${group.name}?` : 'Unassign users'}
-        width={480}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setAsking(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (asking && pending) write(pending.ids)
-                setAsking(false)
-                landFocus()
-              }}
-            >
-              Unassign
-            </Button>
-          </>
-        }
+        confirmLabel="Unassign"
+        onConfirm={() => {
+          if (asking && pending) write(pending.ids)
+          setAsking(false)
+          landFocus()
+        }}
       >
         {pending && (
           <div className="bgrp__effect">
@@ -635,7 +624,7 @@ function AssignmentTab({ group }: { group: Group }) {
             <p>{listNames(pending.apps, 3)}</p>
           </div>
         )}
-      </Modal>
+      </Confirm>
     </>
   )
 }

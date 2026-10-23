@@ -1,6 +1,6 @@
 import { Check, PenLine, RotateCcw, X } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties } from 'react'
 
 import { Face } from '../../../faces'
 import { Tip } from '../../../kit'
@@ -44,6 +44,10 @@ import type { RunLayoutProps } from './types'
    a second line beside the two buttons. Gliding between the
    two (classic2-glide.ts) it is a box and what it says one piece, carried with it
    unstretched — one piece, so its parts never cross each other on the way.
+
+   Under the run's motion (RUN_MOTION, `stating`) the sentence states itself as
+   the run starts: who, "signs in to", the application, the count, each
+   sharpening in a beat after the last (classic2-motion.css), a name never split.
    -------------------------------------------------------------------------- */
 
 export interface SignInNodeProps {
@@ -53,9 +57,11 @@ export interface SignInNodeProps {
   lit?: boolean
   /** The chain is laid across: two lines, and the identity chips measured again for the room. */
   across?: boolean
+  /** The run's sign beat (RUN_MOTION): the sentence states itself, unit by unit. */
+  stating?: boolean
 }
 
-export function SignInNode({ run, lit = false, across = false }: SignInNodeProps) {
+export function SignInNode({ run, lit = false, across = false, stating = false }: SignInNodeProps) {
   const { form, rows, asGroup, plan, running, unrun, changed, expected, editing, onPressPerson, onReplay, onPickIdentity, onInspect } = run
   const { users, groups, apps, zones } = useBrand()
   const person = users.find((u) => u.id === form.personId) ?? null
@@ -69,6 +75,8 @@ export function SignInNode({ run, lit = false, across = false }: SignInNodeProps
   /* Marked once the run on screen has landed (the run handed here is the presented one), as the row's were. */
   const chips = useMemo(() => identityChips(run.identities, !running), [run.identities, running])
   const { box, piece } = useGlide(0, 'start')
+  /* Each unit's place in the sentence as it states itself: only while it does, so a settled node carries no style. */
+  const unit = (i: number) => (stating ? { style: { '--i': i } as CSSProperties } : null)
 
   /* What the press says it edits, and what the sign-in is: the count and the run's state are words of the same press. */
   const label = [whoLabel(chips ? chips.map((c) => c.name).join(', ') : who, appName), count, state?.words].filter(Boolean).join(', ')
@@ -83,18 +91,26 @@ export function SignInNode({ run, lit = false, across = false }: SignInNodeProps
     e.stopPropagation()
     fn()
   }
+  const stateWords = state && (
+    <span className={`rl-c2__nstate is-${state.kind}`}>
+      {state.kind === 'expected' && state.met !== null && (state.met ? <Check size={12} strokeWidth={2.6} aria-hidden /> : <X size={12} strokeWidth={2.6} aria-hidden />)}
+      {state.words}
+    </span>
+  )
   const what = (
     <>
       {app ? (
         <>
-          <span className="rl-c2__nverb">signs in to</span>
+          <span className="rl-c2__nverb" {...unit(1)}>
+            signs in to
+          </span>
           {openApp ? (
-            <button type="button" className="rl-c2__napp rl-c2__nlink" title={`Details of ${app.name}`} onClick={stop(openApp)}>
+            <button type="button" className="rl-c2__napp rl-c2__nlink" title={`Details of ${app.name}`} onClick={stop(openApp)} {...unit(2)}>
               <AppLogo appId={app.id} name={app.name} size={16} />
               <b className="bb__start__at">{app.name}</b>
             </button>
           ) : (
-            <span className="rl-c2__napp">
+            <span className="rl-c2__napp" {...unit(2)}>
               <AppLogo appId={app.id} name={app.name} size={16} />
               <b className="bb__start__at">{app.name}</b>
             </span>
@@ -107,23 +123,22 @@ export function SignInNode({ run, lit = false, across = false }: SignInNodeProps
           them itself, and a press on the pill slides the count under a pointer that has not moved, so its tip opened
           and stayed, over the chain, until the panel was shut. */}
       {count && (editing ? (
-        <span className="rl-c2__ncount">{count}</span>
+        <span className="rl-c2__ncount" {...unit(3)}>
+          {count}
+        </span>
       ) : (
         <Tip text={said}>
-          <span className="rl-c2__ncount">{count}</span>
+          <span className="rl-c2__ncount" {...unit(3)}>
+            {count}
+          </span>
         </Tip>
       ))}
-      {state && (
-        <span className={`rl-c2__nstate is-${state.kind}`}>
-          {state.kind === 'expected' && state.met !== null && (state.met ? <Check size={12} strokeWidth={2.6} aria-hidden /> : <X size={12} strokeWidth={2.6} aria-hidden />)}
-          {state.words}
-        </span>
-      )}
+      {stateWords}
     </>
   )
   return (
     <motion.div
-      className={`bb__start rl-c2__start rl-c2__node${across ? ' is-across' : ''}${lit ? ' is-lit' : ''}${editing ? ' is-on' : ''}${chips ? ' has-ids' : ''}`}
+      className={`bb__start rl-c2__start rl-c2__node${across ? ' is-across' : ''}${lit ? ' is-lit' : ''}${editing ? ' is-on' : ''}${chips ? ' has-ids' : ''}${stating ? ' is-stating' : ''}`}
       data-node="sign-in"
       onClick={onPressPerson}
       {...box}
@@ -140,28 +155,34 @@ export function SignInNode({ run, lit = false, across = false }: SignInNodeProps
           /* Not one button here: the name and the application are presses of their own inside it. */
           <span className="rl-c2__nmain is-split">
             {!chips && (group || person) && (
-              <span className="rl-c2__nface" aria-hidden>
+              <span className="rl-c2__nface" aria-hidden {...unit(0)}>
                 {group ? <Face kind="group" name={group} size="sm" decorative /> : person && <Face kind="user" name={person.name} size="sm" decorative />}
               </span>
             )}
             {!chips &&
               (openPerson ? (
-                <button type="button" className="rl-c2__nname rl-c2__nlink" title={`Details of ${who}`} onClick={stop(openPerson)}>
+                <button type="button" className="rl-c2__nname rl-c2__nlink" title={`Details of ${who}`} onClick={stop(openPerson)} {...unit(0)}>
                   {who}
                 </button>
               ) : (
-                <span className={person || group ? 'rl-c2__nname' : 'rl-c2__nnone'}>{who}</span>
+                <span className={person || group ? 'rl-c2__nname' : 'rl-c2__nnone'} {...unit(0)}>
+                  {who}
+                </span>
               ))}
             {what}
           </span>
         ) : (
           <button type="button" className="rl-c2__nmain" aria-label={label} title="Edit the sign-in">
             {!chips && (group || person) && (
-              <span className="rl-c2__nface" aria-hidden>
+              <span className="rl-c2__nface" aria-hidden {...unit(0)}>
                 {group ? <Face kind="group" name={group} size="sm" decorative /> : person && <Face kind="user" name={person.name} size="sm" decorative />}
               </span>
             )}
-            {!chips && <span className={person || group ? 'rl-c2__nname' : 'rl-c2__nnone'}>{who}</span>}
+            {!chips && (
+              <span className={person || group ? 'rl-c2__nname' : 'rl-c2__nnone'} {...unit(0)}>
+                {who}
+              </span>
+            )}
             {what}
           </button>
         )}

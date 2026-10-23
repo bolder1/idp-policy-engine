@@ -47,8 +47,11 @@ export interface View {
      left edge reads as "scrolled", which a column that cannot scroll sideways
      never is.
    · The top of the world may rise until its bottom meets the stage's bottom, and
-     never fall below the stage's top. A chain shorter than the stage sits at
-     the top, which is where a list is read from. */
+     never fall below the stage's top.
+   · A chain shorter than the stage stands in its middle (owner, 20 Oct 2026: "can
+     we start with the centre instead of the top"): an empty or short policy opens
+     centred, and as rules are added it rises, until it is taller than the stage
+     and is read from the top again. It was pinned to the top before. */
 export function lockedView(
   v: View,
   size: { stageW: number; stageH: number; worldW: number; worldH: number },
@@ -56,8 +59,9 @@ export function lockedView(
 ): View {
   const z = Math.min(zRange.max, Math.max(zRange.min, v.z))
   const x = (size.stageW - size.worldW * z) / 2
-  const minY = Math.min(0, size.stageH - size.worldH * z)
-  return { x, y: Math.min(0, Math.max(minY, v.y)), z }
+  const room = size.stageH - size.worldH * z
+  if (room > 0) return { x, y: room / 2, z }
+  return { x, y: Math.min(0, Math.max(room, v.y)), z }
 }
 
 /* The y that shows one band of the world — its top and bottom in unscaled
@@ -262,6 +266,13 @@ export interface CanvasViewOpts {
      scrolled out of sight past either end. Wheel and drag move only `y`; zoom
      anchors only vertically. A graph, which is wide, leaves it off. */
   lockX?: boolean
+  /* Switched off, not overridden (Check access v3, 20 Oct 2026: the builder's Board drawn inside another camera, the run's
+     RunStage). The hooks are still called in the same order, but nothing listens and nothing is painted: no wheel (its
+     non-passive preventDefault would stop the host's own scroll over the cards), no pointer pan, no focus-in glide, no
+     mount fit, no resize re-clamp, and no transform or custom property written on the world or the stage. `apply`,
+     `glide`, `fit` and `zoomBy` become no-ops. Read once, at mount: a canvas does not change camera mid-life. The
+     condition canvas never passes it. */
+  still?: boolean
 }
 
 export function useCanvasView(
@@ -304,7 +315,7 @@ export function useCanvasView(
     (v: View) => {
       const w = world.current
       const s = stage.current
-      if (!w || !s) return
+      if (!w || !s || o.current.still) return
       /* translate3d, not translate: it keeps the world on its own compositor
          layer, so a pan is a layer move rather than a repaint of every node. */
       w.style.transform = `translate3d(${v.x}px, ${v.y}px, 0) scale(${v.z})`
@@ -369,6 +380,7 @@ export function useCanvasView(
   const fit = useCallback(() => fitTo(280), [fitTo])
 
   useLayoutEffect(() => {
+    if (o.current.still) return
     // Once, on mount, and instantly — an opening animation on the first paint
     // is a canvas that arrives late rather than one that arrives.
     const id = requestAnimationFrame(() => fitTo(0))
@@ -398,7 +410,7 @@ export function useCanvasView(
   const size = useRef<{ w: number; h: number } | null>(null)
   useLayoutEffect(() => {
     const s = stage.current
-    if (!s || typeof ResizeObserver === 'undefined') return
+    if (!s || typeof ResizeObserver === 'undefined' || o.current.still) return
     size.current = { w: s.clientWidth, h: s.clientHeight }
     const ro = new ResizeObserver(() => {
       const prev = size.current
@@ -440,7 +452,7 @@ export function useCanvasView(
      re-centring on every Tab. */
   useEffect(() => {
     const s = stage.current
-    if (!s) return
+    if (!s || o.current.still) return
     const onFocusIn = (e: FocusEvent) => {
       const el = e.target as HTMLElement | null
       if (!el || !s.contains(el)) return
@@ -464,7 +476,7 @@ export function useCanvasView(
   /* --- Pan ----------------------------------------------------------------- */
   const onPointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (e.button !== 0) return
+      if (e.button !== 0 || o.current.still) return
       if (!o.current.isPannableTarget(e.target as HTMLElement)) return
       const v = viewRef.current
       pan.current = { px: e.clientX, py: e.clientY, x: v.x, y: v.y }
@@ -501,7 +513,7 @@ export function useCanvasView(
   /* --- Zoom, about the cursor. Non-passive so the page does not scroll. ---- */
   useEffect(() => {
     const s = stage.current
-    if (!s) return
+    if (!s || o.current.still) return
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       if (e.ctrlKey || e.metaKey) {

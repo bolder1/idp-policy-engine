@@ -127,7 +127,8 @@ describe('the head (oneHead): "Policy", the policy, the row that decided', () =>
   it('names the rule that decided, its number once — no "Rule 1 of 3", no "Policy 1 of 2 applies"', () => {
     const h = oneHead(AISHA, last(AISHA))
     expect(h).toMatchObject({ kicker: ONE_KICKER, title: 'Access the app through corporate devices only', reading: false })
-    expect(h.meta).toEqual({ tone: 'ok', mark: 'check', text: 'Rule 1 · Low risk — password' })
+    /* `name` (20 Oct 2026): the admin's own words that end the line, so the run's motion sharpens them in, never scrambled. */
+    expect(h.meta).toEqual({ tone: 'ok', mark: 'check', text: 'Rule 1 · Low risk — password', name: 'Low risk — password' })
     expect(JSON.stringify(h)).not.toMatch(/of \d|applies/)
   })
 
@@ -192,7 +193,7 @@ describe('the rows: each says what it does', () => {
   it('a later rule that also applies with another answer: "Also matches · not used", its badge in its tone', () => {
     const also = CONFLICT.rules.findIndex((r) => !!r.alsoChecks)
     expect(also).toBeGreaterThan(0)
-    expect(oneRowWord(CONFLICT.rules[also], rowOf(CONFLICT, also), true, false)).toEqual({ word: ONE_ALSO_RULE, also: true })
+    expect(oneRowWord(CONFLICT.rules[also], rowOf(CONFLICT, also), true, false)).toEqual({ word: ONE_ALSO_RULE, also: true, lead: ONE_ALSO_RULE })
     expect(oneRowBadge(CONFLICT.rules[also], null, rowOf(CONFLICT, also), true)).toMatchObject({ muted: false })
     /* Before the walk is over it is only a rule not reached yet. */
     expect(oneRowWord(CONFLICT.rules[also], rowOf(CONFLICT, also), false, false)).toBeNull()
@@ -202,8 +203,9 @@ describe('the rows: each says what it does', () => {
     const hit = CONFLICT.landing ?? -1
     const r = CONFLICT.rules[hit]
     expect(r.via?.say).toMatch(/^via /)
-    expect(oneRowWord(r, rowOf(CONFLICT, hit), true, false)).toEqual({ word: `Matches · ${r.via?.say}`, also: false })
-    expect(oneRowWord(r, rowOf(CONFLICT, hit), true, true)).toEqual({ word: 'Matches', also: false })
+    /* `lead` (20 Oct 2026): the machine's part of the word, resolved by the run's motion; the group's name after it is sharpened in. */
+    expect(oneRowWord(r, rowOf(CONFLICT, hit), true, false)).toEqual({ word: `Matches · ${r.via?.say}`, also: false, lead: 'Matches' })
+    expect(oneRowWord(r, rowOf(CONFLICT, hit), true, true)).toEqual({ word: 'Matches', also: false, lead: 'Matches' })
     /* A row that did not decide keeps its own word. */
     expect(oneRowWord(CONFLICT.rules[0], rowOf(CONFLICT, 0), true, false)).toBeNull()
   })

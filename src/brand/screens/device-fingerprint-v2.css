@@ -1189,14 +1189,17 @@
    press, and the press NAMES what it will take — the panel it replaces deleted
    attributes the moment a card was clicked, and showed a warning describing the
    direction you had not chosen. */
-.bfp2__confirm {
-  display: flex; flex-direction: column; gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--fb-notice-border); border-radius: var(--radius-md);
-  background: var(--fb-notice-bg);
+/* The switch-away confirmation, now a centred dialog rather than a strip in
+   the form (owner, 22 Oct 2026). The names it lists are the reason it exists,
+   so they get a list of their own rather than a comma run. */
+.bfp2__dlgline { margin: 0 0 var(--space-4); color: var(--text-body); }
+.bfp2__dlgline:last-child { margin-bottom: 0; }
+.bfp2__dlglist {
+  margin: 0 0 var(--space-4);
+  padding-inline-start: var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-1);
+  color: var(--text-primary);
 }
-.bfp2__confirm .bfp2__prereq { margin: 0; padding: 0; border: 0; background: none; }
-.bfp2__confirmacts { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
 /* =============================================================================
    THE DETAIL PAGE, IN TWO TABS
    ========================================================================== */
@@ -1529,6 +1532,10 @@
 }
 
 /* The six drawings' switch and the four new drawings (16 Oct 2026). */
+/* The note's heading on one line (21 Oct 2026): the button drops under it when the two do not fit side by side. */
+.bagent__note .bx-note__head { flex-wrap: wrap; }
+.bagent__note .bx-note__text { flex: 1 1 auto; min-width: min-content; }
+.bagent__note .bx-note__title { white-space: nowrap; }
 .bagent__wrap { display: flex; flex-direction: column; gap: var(--space-4); }
 .bagent__switch { align-self: flex-start; }
 .bagent__toggle {
@@ -1580,3 +1587,32 @@
 .bagent-split__words ul { margin: 0; padding-left: var(--space-6); display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
 .bagent-split__get ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 @media (max-width: 600px) { .bagent-split { grid-template-columns: minmax(0, 1fr); } }
+
+/* The two console checkboxes in Device registration (owner, 22 Oct 2026). The
+   whole row is the control, so the whole row is the hit target. The tick keeps
+   a column of its own so the two labels line up with each other and the
+   sentence sits under the LABEL, never under the mark — which is what makes it
+   read as the console's checkbox rather than an icon with a paragraph. */
+.bfp2__enrolcheck {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+/* The sentence starts at the ROW's left edge, under the mark, rather than
+   indented to the label (owner, 22 Oct 2026: "it should start with the check
+   box not with the headings"). So the label alone takes the mark's second
+   column and the sentence spans both — which also means the sentence keeps the
+   full width of the column instead of losing the mark's width to an indent. */
+.bfp2__enrolchecklabel { grid-column: 2; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bfp2__enrolcheckhint { grid-column: 1 / -1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bfp2__enrolcheck:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }

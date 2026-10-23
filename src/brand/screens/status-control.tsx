@@ -6,7 +6,7 @@ import { ChevronDown } from 'lucide-react'
 import { StatusPill } from '../kit'
 import type { RuleSet } from '../policy-draft'
 import { useBrand } from '../store'
-import { offersMonitoringView, portalRoot, statusOptions } from './status-options'
+import { offersMonitoringView, portalRoot, statusOptions, monitorOffered } from './status-options'
 import { useStatusChange } from './use-status-change'
 
 import './status-control.css'
@@ -48,8 +48,8 @@ export function StatusControl({
   const startAt = useRef<'first' | 'last'>('first')
   const menuId = useId()
 
-  const options = policy ? statusOptions(policy, { monitor: store.features.monitorMode }) : []
-  const canView = !!policy && offersMonitoringView(policy, { monitor: store.features.monitorMode })
+  const options = policy ? statusOptions(policy, { monitor: monitorOffered(store.features) }) : []
+  const canView = !!policy && offersMonitoringView(policy, { monitor: monitorOffered(store.features) })
 
   const items = () => Array.from(pop.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
 

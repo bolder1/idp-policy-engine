@@ -236,6 +236,44 @@ export function attachableTo(appId: string, policies: Policy[]): Policy[] {
    renders the policy as **Salesforce** on six different surfaces. The screen
    cannot produce a bad id; this refuses one anyway, because the guard is the
    difference between a future bug being loud and being a mystery. */
+/* REPLACE POLICY MAKES A DRAFT COPY (owner, 22 Oct 2026: "the pick becomes a draft copy on this app alone,
+   nothing changes until I activate it").
+
+   Replacing used to swap at once: the new policy went on, the old one came off, and because that moved real
+   sign-ins it had to be checked first — "Before saving: applications", a six-section page that opened OVER the
+   drawer the admin was reading and never once said "replace". The owner's answer is to take the risk out of the
+   press rather than to explain it better. A draft decides nobody (`engineDecides`), so copying the pick onto
+   this application as a draft changes nothing for anybody; the admin reads it, turns it on when ready, and the
+   check belongs at THAT moment, where "Before turning on" already lives.
+
+   Off: the live swap, which is still what `replaceOnApp` and the guard's `alsoAfter` wiring are for. Kept,
+   not deleted. */
+export const REPLACE_MAKES_DRAFT: boolean = true
+
+/* REMOVE RUNS THE CHECKS (owner, 23 Oct 2026: "take the Before saving page off Remove as well, so the two
+   paths are consistent").
+
+   Replace stopped running "Before saving: applications" because a replace now lands as a draft copy and
+   moves nobody (`REPLACE_MAKES_DRAFT`). Remove is NOT that: taking a deciding policy off an application
+   changes who gets in at the next sign-in, and there is no draft to defer it behind. The owner weighed that
+   and chose consistency, which is his call to make; this comment records what the press now rests on, so
+   nobody has to reconstruct it.
+
+   WHAT IS LEFT is the remove confirm (AppProtection.tsx `RemoveDialog`), and it is not thin: it names what
+   becomes of the policy (`removeCopy` — stays on N others, or becomes a draft and whether its saved draft
+   replaces the published rules) and then lists, from the engine, every group and person this policy decides
+   for here and the policy that decides for them once it is gone (`deciderChanges` / `visibleMoves`). An
+   admin still cannot remove a policy without being told, by name, who moves where.
+
+   WHAT IS GIVEN UP is the rest of that page: the saved sign-ins that would newly fail, with the person and
+   the decision they expected; the modelled totals over the whole tenant; and the break-in test. Those are
+   the things a confirm cannot carry without becoming the page it replaced.
+
+   On: the 22 Oct behaviour, where a removal that moves anybody opens the checks first. Nothing behind this
+   is deleted — `useAppsGuard` still runs for an add here, and for the builder's own Applications pane,
+   which is a different gesture and is deliberately untouched. */
+export const REMOVE_RUNS_CHECKS: boolean = false
+
 export function attachTo(p: Policy, appId: string, apps: App[]): Policy {
   if (!apps.some((a) => a.id === appId)) {
     throw new Error(`attachTo: no application with id ${appId}`)

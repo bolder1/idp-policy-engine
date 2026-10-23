@@ -1028,7 +1028,18 @@ export interface Timeline {
   total: number
 }
 
-export function timeline(steps: readonly EngineStep[], pace: Pace): Timeline {
+/* The merged card has no search to watch (RUN_MOTION, 20 Oct 2026): the steps that drew it only need a breath. Focus
+   asks for it on v3 (TryJourney.tsx `brisk`), so the picture it presents is never held waiting on the engine's front —
+   the policies' search, its lap round the one found, its opening — which no card draws any more. */
+export const BRISK_FRONT_MS = { find: 200, scan: 160, found: 300, decides: 160, expand: 240 } as const
+const BRISK_KINDS: ReadonlySet<StepKind> = new Set(Object.keys(BRISK_FRONT_MS) as StepKind[])
+
+export interface TimelineOptions {
+  /** The front steps at BRISK_FRONT_MS (a scan its own, not a share of SCAN_MS); the rows' share is the full pace's. */
+  brisk?: boolean
+}
+
+export function timeline(steps: readonly EngineStep[], pace: Pace, opts: TimelineOptions = {}): Timeline {
   if (pace === 'instant') return { at: steps.map(() => 0), dur: steps.map(() => 0), total: 0 }
   const scans = steps.filter((s) => s.kind === 'scan').length
   const scanMs = scans > 0 ? Math.min(SCAN_MS.max, Math.max(SCAN_MS.min, SCAN_MS.budget / scans)) : 0
@@ -1037,8 +1048,11 @@ export function timeline(steps: readonly EngineStep[], pace: Pace): Timeline {
   const rows = steps.reduce((n, s, i) => (ROW_STEPS.has(s.kind) ? n + base[i] : n), 0)
   const share = rows > 0 ? Math.min(1, Math.max(MIN_ROW_SHARE, (CAP_MS - fixed) / rows)) : 1
   const mult = pace === 'edit' ? EDIT_SHARE : 1
+  /* Brisk (RUN_MOTION): the front only, after the rows' share is worked out above with the full front, so every row —
+     and every timeline asked for without it — is exactly as it was. */
+  const front = (s: EngineStep): number | null => (opts.brisk && !s.notice && BRISK_KINDS.has(s.kind) ? BRISK_FRONT_MS[s.kind as keyof typeof BRISK_FRONT_MS] : null)
   /* Down, never up: rounded to the nearest, a long run came 2 ms past the cap. */
-  const dur = steps.map((s, i) => (s.notice ? CONFLICT_MS : Math.floor(base[i] * (ROW_STEPS.has(s.kind) ? share : 1) * mult)))
+  const dur = steps.map((s, i) => (s.notice ? CONFLICT_MS : Math.floor((front(s) ?? base[i] * (ROW_STEPS.has(s.kind) ? share : 1)) * mult)))
   const at: number[] = []
   let t = 0
   for (const d of dur) {

@@ -650,6 +650,17 @@ button.apol__row:hover { background: var(--int-ghost-bg-hover); }
 .apol__band { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: var(--space-8); align-items: start; }
 .apol__pair { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-8); align-items: start; }
 .apol__band.is-solo { grid-template-columns: minmax(0, 1fr); }
+/* The policy alone (APP_POLICY_FOCUS, 21 Oct 2026): the rules canvas wide, the facts and the links in a column beside it. */
+.apol__focus { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-8); align-items: start; }
+/* The canvas is as tall as its cards and no taller: no frame to fill (the glance's fixed height is for two panels side by side). */
+.apol__focus .apol__panel { grid-template-rows: auto; }
+.apol__focus .apol__frame { border: 0; border-radius: 0; box-shadow: none; background: none; }
+.apol__focus .apol__frame { height: auto; min-height: 0; }
+.apol__focus .apol__frame > .apol__body.apol__rulesbody { height: auto; overflow: visible; }
+/* The builder's chain at the builder's own card size, in the middle (owner, 21 Oct 2026: "don't stretch the rule card, same size as the builder"). */
+.apol__rulesbody.is-plain { display: flex; justify-content: center; padding: var(--space-6) var(--space-5); }
+.apol__rulesbody.is-plain > .insp__canvas { height: auto; width: auto; --bb-card: var(--bb-card-edit); }
+@media (max-width: 1120px) { .apol__focus { grid-template-columns: minmax(0, 1fr); } }
 .apol__rail { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
 .apol__rail > .apol__sec + .apol__sec { padding-top: var(--space-6); border-top: var(--bw-thin) solid var(--border-subtle); }
 
@@ -966,3 +977,194 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
   .apol__bar .btoolbar__filter.apol__rulefilter { flex: 1 1 0; }
   .apol__actfoot.is-picked .blist__range { display: none; }
 }
+/* In the middle of the page, the connectors at the table's rhythm (as the slider's framed canvas has them). */
+.apol__rulesbody.is-plain > .insp__canvas .bb__world { display: flex; justify-content: center; }
+.apol__rulesbody.is-plain > .insp__canvas { flex: 1 1 auto; }
+.apol__rulesbody.is-plain .bb__link { height: calc(var(--table-row-h) - var(--ctl-height-sm) - var(--space-1)); }
+/* The start pill only says where the sign-in arrives; it opens nothing here, so no chevron. */
+.apol__rulesbody.is-plain .bb__start__go { display: none; }
+
+/* The policy alone fills the page and holds still (owner, 21 Oct 2026: "a fixed canvas height, a full-page preview with
+   no scroll, and scroll inside the canvas if needed"): the page stops at the window, the canvas takes what the head
+   leaves, and it scrolls inside itself. */
+.bshell__main > .bpage.bapp:has(.apol__focus) { flex: 1 1 0; min-height: 0; overflow: hidden; grid-template-rows: auto auto auto minmax(0, 1fr); }
+/* The canvas takes the page's deep bottom padding (owner, 22 Oct 2026: "can see some space from the bottom part,
+   stretch the canvas", then "make the height a little bit more for the canvas"). 56px of gutter is for a page that
+   ends where its content does and scrolls the window; this one stops AT the window and scrolls inside itself, so
+   that gutter was just a band of nothing under the frame. It keeps the 32px the page gives its sides, so the canvas
+   sits in an even margin rather than against the glass. */
+.bshell__main > .bpage.bapp:has(.apol__focus) { padding-bottom: var(--space-9); }
+.bpage.bapp:has(.apol__focus) > #bapp-panel { min-height: 0; display: flex; flex-direction: column; }
+.bpage.bapp:has(.apol__focus) .apol__wrap { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+/* The tab is wrapped in the setup tabs' own grid (ApplicationPage.tsx `WorkColumn`), so the full-height chain above
+   has two more links to pass through before it reaches the canvas: the grid, which starts its rows at the top by
+   default and would leave the frame its content's height, and the work column, which has to be allowed to shrink
+   before its scroller will.
+
+   Every rule here aims at `.bapp__polcols`, this tab's OWN wrapper, and never at a `bz7__cols` by its position in the
+   page. The setup tabs build one of those straight inside #bapp-panel as well (app-setup-forms.tsx), so a rule
+   written at that level reaches Basic, Advanced, Attributes and the rest — which is how they ended up on the full
+   page for an hour on 22 Oct while Policies took a column, the exact opposite of what was asked for. */
+/* THE TAB TAKES THE PAGE (owner, 22 Oct 2026, looking at the column: "looks odd go full screen").
+
+   It went half, then 1.4 : 1 against an empty half, and both read as a boxed panel adrift in a wide page — the
+   canvas is a stage, and a stage with nothing beside it wants the room. The setup tabs keep their half: they are
+   forms, and a form at 590px is a form, which is what he asked for in the same breath. One column here, so the
+   second track and its empty half are gone rather than set to zero.
+
+   To put a column back, this is the only line to change: a second track and a ratio, and everything below still
+   holds. */
+.bapp__polcols { grid-template-columns: minmax(0, 1fr); }
+.bpage.bapp:has(.apol__focus) > #bapp-panel > .bapp__polcols { flex: 1 1 0; min-height: 0; align-items: stretch; }
+.bpage.bapp:has(.apol__focus) > #bapp-panel > .bapp__polcols > .bz7__work { min-height: 0; }
+/* No breakpoint of its own any more: one column is already what zones-final.css collapses `bz7__cols` to below
+   1120px, so the tab reads the same the whole way down. */
+.apol:has(> .apol__focus) { flex: 1 1 0; min-height: 0; }
+.apol__focus { flex: 1 1 0; min-height: 0; }
+.apol__focus .apol__panel,
+.apol__focus .apol__frame { height: 100%; min-height: 0; }
+.apol__focus .apol__panel { grid-template-rows: minmax(0, 1fr); }
+.apol__focus .apol__frame { grid-template-rows: minmax(0, 1fr); }
+.apol__focus .apol__frame.has-foot { grid-template-rows: minmax(0, 1fr) var(--apol-foot-h); }
+.apol__focus .apol__frame > .apol__body.apol__rulesbody { height: 100%; overflow: auto; }
+.apol__rulesbody.is-plain > .insp__canvas { min-height: 100%; }
+/* The name sits on the buttons' middle line. */
+.apol:has(> .apol__focus) > .apol__head { align-items: center; }
+.apol__focus { align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+/* A rail with nothing in it still took a row AND the gap above it — another 24px of nothing under the canvas. Both
+   things it carries are behind flags, so on most applications it is empty. */
+.apol__focus > .apol__rail:empty { display: none; }
+/* Scrolling inside the canvas (21 Oct 2026): the body is a plain scroller and the canvas inside it is as tall as its chain
+   or the body, whichever is more, so its ground goes all the way down; a short chain sits in the middle, a long one
+   starts at the top and scrolls. */
+.apol__focus .apol__rulesbody.is-plain { display: block; padding: 0; }
+.apol__rulesbody.is-plain > .insp__canvas { display: flex; flex-direction: column; width: 100%; height: auto; min-height: 100%; box-sizing: border-box; }
+.apol__rulesbody.is-plain > .insp__canvas > .bb__stage { margin-block: auto; flex: none; }
+
+/* --- The rule head on this canvas: the number, the name, and what belongs to the name ------------------------
+   A fixed name track stood here from 22 Oct, so every rule’s outcome pill began at one x ("fix the alignment in
+   the headings"). The pills went the same day — the decision is the card’s own colour on hover now, and
+   "Complete" went with it — so the track was lining up nothing, and the one mark left on the chain, the padlock
+   on Nothing else matched, sat out at the track’s edge rather than beside the words it qualifies (owner: "push
+   it beside the heading, where the headings end").
+
+   So the head is content-sized again, as the builder’s is: the number, the name, then whatever that name
+   carries. If a pill ever returns to these heads, the track and the reasoning behind it are in this file’s
+   history for 22 Oct 2026. */
+
+/* --- Editing a policy more than one application shares (shared-policy-fork.tsx) ------------------------------
+   The applications first and with weight — logo, name, and the people this policy decides for there — because the
+   admin's question is what else moves, and a count answers it where a caution does not. The one they stand on
+   wears the console's blue, the colour selection takes here: it has to be found at a glance in a list of four.
+
+   Then the three ways, each with the applications it acts on as its mark and its tag in a column of its own on
+   the right. The tag sat beside the title first and the title clipped it ("Google Worksp…"); a column cannot. */
+.bapp__forksaid { margin: 0 0 var(--space-5); font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
+.bapp__forksaid em { font-style: normal; font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* The marks for a row, and for the dialog's own head: overlapped, as the applications cell stacks them. */
+.bapp__forkmarks { display: inline-flex; align-items: center; flex: none; }
+.bapp__forkmarks > :not(:first-child) { margin-inline-start: -6px; }
+.bapp__forkmarks .applogo { box-shadow: 0 0 0 var(--bw-thin) var(--surface-raised); }
+.bapp__forkmarks i {
+  margin-inline-start: var(--space-2);
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary);
+}
+
+.bapp__forkapps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+/* Logo · name · mark · people. Four tracks, four children on every row without exception — see .bapp__forkmark. */
+.bapp__forkapps li {
+  display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-2);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bapp__forkapps li:last-child { border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.bapp__forkapps b { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bapp__forkapps > li > span:last-child { justify-self: end; font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
+/* The mark's own cell, always present and always the same size, so nothing moves when a preview puts a tag in
+   it or takes one out (22 Oct 2026: "it looks broken, with things moving based on hover"). It holds the tag at
+   the start of the track — stretched across it, the badge drew a pale band the width of the widest row and read
+   as a progress bar rather than a tag ("the reached tag could be better"). */
+.bapp__forkapps > li > .bapp__forkmark {
+  display: inline-flex; align-items: center; justify-self: start;
+  min-height: var(--space-9);
+}
+
+/* THE LIST AS A PREVIEW. A way under the pointer or the keyboard marks what it would touch, in the list the
+   admin has already read, so "all of them" and "this one" are seen side by side rather than described. The
+   whole thing is one opacity-and-colour change on a static list: no layout moves, because a row that resized
+   under the pointer would make the list jump while being pointed at. */
+.bapp__forkapps li { transition: opacity var(--dur-fast) var(--ease-standard); }
+/* The copy touches this application alone, so the rest step back rather than disappear — they are still what
+   the policy is on, which is the fact the dialog opened with. */
+.bapp__forkapps li.is-aside { opacity: 0.45; }
+
+/* The two ways, as a column of rows under the list they act on (22 Oct 2026: a footer trail was tried and put
+   back — these are two answers to the dialog's question, not a form's Save and Cancel). */
+.bapp__forkways { margin-top: var(--space-7); display: flex; flex-direction: column; gap: var(--space-3); }
+.bapp__forkway {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5); text-align: left; cursor: pointer;
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); color: var(--text-muted);
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bapp__forkway:hover { background: var(--surface-sunken); border-color: var(--border-strong); }
+.bapp__forkway:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
+.bapp__forkway > .bapp__forktext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bapp__forkway strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bapp__forkway em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bapp__forkway .bx-badge { justify-self: end; flex: none; }
+/* The action's glyph, one fixed size however many applications the policy is on. It holds the track the logo
+   stack used to, so the rows keep their one left edge. */
+.bapp__forkicon {
+  display: grid; place-items: center; flex: none;
+  width: var(--space-9); height: var(--space-9);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken); color: var(--text-secondary);
+}
+.bapp__forkway:hover .bapp__forkicon { background: var(--surface-raised); color: var(--text-primary); }
+
+
+
+/* Expand all / Collapse all on the app's rules canvas (owner, 22 Oct 2026; app-policy-view.tsx `FoldAll` says why).
+   Pinned to the frame, over the canvas's own ground at the bottom right, where the chain never reaches: the chain
+   is centred and the ground runs past it. Quiet — it is a way to read, not a decision — and it rises on hover the
+   way the canvas's own controls do. */
+.apol__frame:has(.apol__rulesbody.is-plain) { position: relative; }
+.apol__foldall {
+  /* Clear of the body's scrollbar, which starts about 15px in from the frame's edge: at the 16px the rest of this
+     sheet insets by, the control sat 3px over the bar and made it awkward to take hold of. */
+  position: absolute; right: var(--space-8); bottom: var(--space-5); z-index: 1;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: var(--ctl-height-sm); padding: 0 var(--space-4);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); color: var(--text-secondary);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); cursor: pointer;
+  box-shadow: var(--el-low);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.apol__foldall:hover { background: var(--surface-sunken); border-color: var(--border-strong); color: var(--text-primary); }
+
+/* The decision is NOT drawn on these cards (owner, 22 Oct 2026). The head’s outcome pill went first — "the user
+   can open and see the result, so I don’t want to showcase that twice" — and two attempts to carry it in colour
+   instead went with it: a tone band down the leading edge at rest ("that sloppy border, that thick one"), then a
+   tone glow and a gradient filament on hover ("remove colours from hover, have a basic hover, don’t like this
+   concept"). So the card keeps the canvas’s own plain hover, and the decision is read by opening the rule,
+   where it is written in words. The tone variables are still set on the card by board.css if this is ever
+   wanted again. */
+
+/* No state pill on this canvas either (owner, 22 Oct 2026, of "Complete": "remove this as well").
+   In the builder it is news — a rule being built is not finished yet. Here every rule is finished by definition:
+   the tab reads a live policy, so "Complete" on every row in turn says nothing and takes the eye off the names.
+   The head is the number and the name; the decision is the edge, and the padlock still marks the row that cannot
+   be touched.
+
+   Every read-only canvas this tab draws, not just the one with a policy: the no-policy view reads the Global
+   Default the same way, and the Replace drawer previews the policy being picked the same way again. Scoped to
+   `.apol` was a trap — it hid the pill on the focus layout alone, so the same chain wore "Complete" on the empty
+   state and inside the drawer (owner, 22 Oct, of the no-policy view: "update this as well based on our current
+   one"). A read-only canvas never builds anything, so it never has build news to report. */
+.apol .insp__canvas .bb__state,
+.bx-drawer .insp__canvas .bb__state { display: none; }

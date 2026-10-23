@@ -15,7 +15,7 @@ import { cardTone, checkPills, outcomeOf } from '../testing/trace-pills'
 import type { Selection } from './model'
 import { UNREACHABLE_CODES } from './parts'
 import type { CardHighlight } from './card-highlight'
-import { RuleCard, TerminalCard, type CardRoute } from './RuleCard'
+import { RuleCard, TerminalCard, type CardRoute, type RunCard } from './RuleCard'
 import { WhichGate } from './RouteGate'
 import { ruleStage, type ColumnView, type RouteModel, type StageId } from './try-sign-in'
 import { revealKeepsWhich, revealKey } from './try-sign-in-run'
@@ -101,6 +101,56 @@ export interface TestChain {
 }
 
 
+/* CHECK ACCESS V3: THE CHAIN READ BY A RUN (20 Oct 2026; owner: "the v3 is mainly based on how we have it in the
+   builder's edit part … the same policy rule cards in the whole canvas … reuse the same cards and the same canvas").
+   The run's own chain (layouts/board-run.tsx) hands Board this, and Board draws the policy's cards as it always does —
+   the same RuleCard and TerminalCard, the same IfBlock, the same connectors, Nothing else matched last — read by the
+   run instead of edited:
+
+     · no start node (the run's sign-in stands above Board), no dock, no Guided setup door, no drag, no `+`, no hint
+     · its camera switched off (`useCanvasView` `still`): the run's own stage scrolls and follows, so the world
+       carries no transform and the stage no view of its own
+     · the Centred skin whatever a viewer picked (the run is one column, its lane on the right)
+     · each rule card and its connector in a slot of their own (`.bb__runslot`), which carries its piece of the
+       lane — the route the sign-in took past the cards it never reached — on its own pseudo-element (board-run.css)
+     · `end` after the last row: the outcome, on the same column
+
+   `card(id)` is the card's `RunCard` by rule id, or 'fallback' for the last row (Board's own key for it); `link(slot)`
+   the connector above card `slot` (the last row's is `slot = rules.length`); `lane(slot)` its pieces of the lane. */
+/* THE GROUPS (20 Oct 2026, evening; owner: "Whatever is not reached can be collapsed … If the user wants, he can expand
+   it … I don't want to just utilize so much space"). A run may fold runs of its cards: the rules never reached, under
+   the card that decided, and walked misses that say the same. Board wraps each run of slots in a group of its own —
+   its `head` (the label on the connector, or the stack's card) above a body that folds by CSS — and draws the slots
+   inside it as it draws every other. The wrappers are there from the run's first frame (`idle` until the walk is
+   over), so a card is never re-parented, and so never remounted, mid-run. No transform, no Motion on a group. */
+export interface BoardRunGroup {
+  id: string
+  kind: 'tail' | 'stack'
+  /** The first and last slot it holds (`policy.rules` indexes; `rules.length` is the last row's). */
+  from: number
+  to: number
+  /** More classes on the wrapper: ` is-idle`, ` is-open`, ` is-play`, the lane's. */
+  cls: string
+  head: ReactNode
+  bodyId: string
+  /** The body's name once it is a group: "Not reached", "Rules 1–3". */
+  label: string
+  /** Before the walk is over: the slots stand as they always do — no role, no name, never inert. */
+  idle: boolean
+  inert: boolean
+}
+
+export interface BoardRunView {
+  /** Before every id the cards draw, so the run never repeats the edit board's ids (the builder keeps it mounted). */
+  idPrefix: string
+  card: (id: string) => RunCard | undefined
+  link: (slot: number) => { cls: string; i: number }
+  lane: (slot: number) => { cls: string; i: number } | null
+  /** The runs of slots it folds, in order and never overlapping. */
+  groups?: readonly BoardRunGroup[]
+  end?: ReactNode
+}
+
 export function Board({
   policy,
   destination,
@@ -134,6 +184,7 @@ export function Board({
   onHoverLast,
   cardHead,
   foldOnPress,
+  run,
 }: {
   policy: Policy
   /* Where a sign-in is arriving, in words — the application this policy
@@ -215,6 +266,8 @@ export function Board({
      the card. The builder passes neither. */
   cardHead?: (id: string) => ReactNode
   foldOnPress?: boolean
+  /** Check access v3: the chain read by a run (`BoardRunView`). Absent, the builder's canvas. */
+  run?: BoardRunView
 }) {
   const stage = useRef<HTMLDivElement | null>(null)
   const world = useRef<HTMLDivElement | null>(null)
@@ -281,6 +334,8 @@ export function Board({
     zMin: ZMIN,
     zMax: ZMAX,
     cssPrefix: 'bb',
+    /* Read by a run, the run's own stage is the camera: this one is switched off (canvas-view.ts `still`). */
+    still: !!run,
   })
 
   /* The refit, on a change of key only — never on mount, which the canvas
@@ -763,6 +818,104 @@ export function Board({
      one lets through is the LINE the chain already draws between the two
      cards; computing it again so a card could print it inside itself was the
      same fact told twice. */
+
+  if (run) {
+    /* A slot: one connector and the card under it, carrying its piece of the lane (board-run.css). */
+    const slot = (at: number, card: ReactNode, key: string) => {
+      const lane = run.lane(at)
+      const link = run.link(at)
+      return (
+        <div key={key} className={`bb__runslot${lane ? ` ${lane.cls}` : ''}`} style={lane ? ({ '--bbr-lane-i': lane.i } as CSSProperties) : undefined}>
+          <div className={`bb__link is-bare${link.cls ? ` ${link.cls}` : ''}`} style={{ '--rl-c2-link-i': link.i } as CSSProperties} aria-hidden />
+          {card}
+        </div>
+      )
+    }
+    const slotAt = (ri: number): ReactNode => {
+      const r = policy.rules[ri]
+      if (!r) {
+        return slot(
+          policy.rules.length,
+          <TerminalCard
+            rule={terminal}
+            resolve={resolve}
+            selected={false}
+            expanded={expandedOf('fallback')}
+            onToggleExpand={() => onToggleExpand('fallback')}
+            onSelect={() => onSelect({ kind: 'fallback' })}
+            traced={traced?.includes('fallback')}
+            foldOnPress
+            cardRef={() => {}}
+            run={run.card('fallback')}
+            idPrefix={run.idPrefix}
+          />,
+          'fallback',
+        )
+      }
+      return slot(
+        ri,
+        <RuleCard
+          rule={r}
+          index={ri}
+          openPart={null}
+          state={stateOf(r, ri)}
+          shadowed={false}
+          dragging={false}
+          expanded={expandedOf(r.id)}
+          onToggleExpand={() => onToggleExpand(r.id)}
+          resolve={resolve}
+          canUp={false}
+          canDown={false}
+          locked
+          onOpen={() => onSelect({ kind: 'rule', id: r.id, part: 'who' })}
+          onToggle={() => {}}
+          onMove={() => {}}
+          onDuplicate={() => {}}
+          onDelete={() => {}}
+          onGrip={() => {}}
+          fresh={fresh?.includes(r.id)}
+          traced={traced?.includes(r.id)}
+          foldOnPress
+          onHover={() => {}}
+          cardRef={() => {}}
+          run={run.card(r.id)}
+          idPrefix={run.idPrefix}
+        />,
+        r.id,
+      )
+    }
+    /* The slots in order, a group's inside its wrapper; every slot keeps its own key. */
+    const slots: ReactNode[] = []
+    for (let at = 0; at <= policy.rules.length; ) {
+      const g = run.groups?.find((x) => x.from === at && x.to >= at)
+      if (!g) {
+        slots.push(slotAt(at))
+        at++
+        continue
+      }
+      const inside: ReactNode[] = []
+      for (let k = g.from; k <= Math.min(g.to, policy.rules.length); k++) inside.push(slotAt(k))
+      slots.push(
+        <div key={g.id} className={`bbr__group is-${g.kind}${g.cls}`}>
+          {g.head}
+          <div id={g.bodyId} className="bbr__groupbody" role={g.idle ? undefined : 'group'} aria-label={g.idle ? undefined : g.label} inert={g.inert}>
+            <div className="bbr__groupinner">{inside}</div>
+          </div>
+        </div>,
+      )
+      at = Math.max(at + 1, g.to + 1)
+    }
+    return (
+      <div ref={stage} className="bb__stage is-centre is-run">
+        <div ref={world} className="bb__world">
+          <div className="bb__chain">
+            {slots}
+            {run.end}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

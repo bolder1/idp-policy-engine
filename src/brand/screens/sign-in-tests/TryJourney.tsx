@@ -19,14 +19,14 @@ import { CHANGED_BY_WORDS, changedBy, factsOf, type FormField, type SignInForm }
 import type { AttemptsFrom } from './attempts'
 import { engineRun, type EngineRun } from './engine-run'
 import { LAST_ROW } from '../testing/evidence'
-import type { InspectTarget } from './inspect-model'
+import type { InspectTarget, SeeRun } from './inspect-model'
 import { Answer, EngineJourney, EngineLine } from './EngineJourney'
 import { HowItWorks } from './HowItWorks'
 import { heroFinding, type FoldAsk, type FoldMode } from './journey'
 import type { RunIdentity, RunLayoutProps } from './layouts/types'
 import { OWN_EDIT, OWN_TOP, type RunLayoutId } from './run-layout'
 import { SignInNode } from './SignInCard'
-import { OPEN_AT_ONCE } from './phase'
+import { useRunFlags } from './check-version'
 import { identityOf, personPick, type TryPage } from './sign-in-card'
 import { useEngineRun } from './use-engine-run'
 
@@ -232,7 +232,10 @@ export interface TryJourneyProps {
   onOpenPolicy?: (policyId: string) => void
   onOpenRule?: (policyId: string, ruleId: string) => void
   /** A policy or rule pressed on the run opens in the page's right-hand panel instead of leaving (inspect-model.ts), with the run on screen. */
-  onInspect?: (target: InspectTarget, plan: EngineRun, fresh?: boolean) => void
+  onInspect?: (target: InspectTarget, plan: EngineRun, fresh?: boolean, see?: SeeRun | null) => void
+  /** What the right-hand panel shows now, and the way to shut it: the outcome's Preview is pressed while it shows What they see (20 Oct 2026). */
+  inspected?: InspectTarget | null
+  onCloseInspect?: () => void
   /* The why in the page's right-hand panel (EngineJourney.tsx `why`): open,
      the panel's body, and the way to open or shut it. Absent, under the answer. */
   why?: { open: boolean; slot: HTMLElement | null; onOpen: (open: boolean) => void }
@@ -284,6 +287,8 @@ export function TryJourney({
   onOpenPolicy,
   onOpenRule,
   onInspect,
+  inspected = null,
+  onCloseInspect,
   why,
   breakIn = null,
   onReviewBreakIn,
@@ -302,6 +307,10 @@ export function TryJourney({
   const env = useSimEnv()
   const names = useNameLookup()
   const reduced = useReducedMotion() === true
+  /* The version's word on it (check-version.ts, 20 Oct 2026): phase.ts says what is available, Classic turns it off.
+     Named as the flag so every line that read the flag reads it unchanged. */
+  const runFlags = useRunFlags()
+  const OPEN_AT_ONCE = runFlags.openAtOnce
   const lib = useMemo(() => ({ zones, fingerprints }), [zones, fingerprints])
   /* The group chosen in the Person picker, by name, for the person node. */
   const asGroupName = asGroup ? (groups.find((g) => g.id === asGroup)?.name ?? null) : null
@@ -371,6 +380,11 @@ export function TryJourney({
     () => screensOf(res, { policies, substitute, methods, defaultMethodId, person: users.find((u) => u.id === form.personId) ?? null }),
     [res, policies, substitute, methods, defaultMethodId, users, form.personId],
   )
+  /* The sign-in What they see is of, handed to the panel with every name pressed on the run. */
+  const seeRun = useMemo<SeeRun | null>(
+    () => (form.appId && screens.length > 0 ? { screens, appId: form.appId, personId: asGroupName ? null : form.personId, group: asGroupName } : null),
+    [screens, form.appId, form.personId, asGroupName],
+  )
   /* Inside a policy, the draft giving another answer than the tenant does
      today is the answer's to say, from both `columns`: "Live [Allow on 1
      factor] → Your edits [Allow with 2FA]" (EngineJourney.tsx `Answer`). */
@@ -399,6 +413,10 @@ export function TryJourney({
     runId,
     replay: page.replay,
     pace: page.pace,
+    /* v3 draws no search of the policies to watch: Focus asks the engine's front steps for a breath each (RUN_MOTION,
+       20 Oct 2026; engine-run.ts BRISK_FRONT_MS), so the picture is never held waiting on them. The page and the
+       builder's Check access alike (run-layout.ts IN_POLICY_LAYOUT is Focus). */
+    brisk: layout === 'focus2' && runFlags.motion,
     reduced,
     say,
     sentence,
@@ -501,6 +519,17 @@ export function TryJourney({
     if (journey && !pending && !reduced) playAgain()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs as the view changes
   }, [layout])
+  /* The version is a view too (owner, 20 Oct 2026, of Classic and v3 — check-version.ts): switched with a run on screen,
+     the same run plays again in the other version, by the same 4 Oct rule ("whenever I change one view to another,
+     restart the flow"). The sign-in, the form and the open panel stay as they are; under reduced motion it is simply
+     drawn again in the other version. Classic tells its story once a session, so it is usually drawn sharp. */
+  const versionShown = useRef(runFlags.version)
+  useEffect(() => {
+    if (versionShown.current === runFlags.version) return
+    versionShown.current = runFlags.version
+    if (journey && !pending && !reduced) playAgain()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs as the version changes
+  }, [runFlags.version])
   /* Skip lands the run where it is (the clock's `land`). */
   const skip = () => clock.land()
   const { loadBoard } = session
@@ -886,7 +915,9 @@ export function TryJourney({
               onAdd={onAddField}
               onOpenPolicy={openPolicy}
               onOpenRule={openRule}
-              onInspect={onInspect ? (t, fresh) => onInspect(t, shown, fresh) : undefined}
+              onInspect={onInspect ? (t, fresh) => onInspect(t, shown, fresh, seeRun) : undefined}
+              inspected={inspected}
+              onCloseInspect={onCloseInspect}
               onAsGroup={onAsGroup}
               why={why}
               onTryForm={onTryForm}

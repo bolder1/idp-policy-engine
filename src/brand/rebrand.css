@@ -295,8 +295,9 @@
 [data-brand='rebrand'] .bx-btn--ghost:not(:disabled):hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
 
 [data-brand='rebrand'] .bx-btn--danger { background: transparent; color: var(--fb-negative-fg); border-color: var(--int-danger-bg); }
-[data-brand='rebrand'] .bx-btn--danger:not(:disabled):hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--int-danger-bg-hover); }
-[data-brand='rebrand'] .bx-btn--danger:disabled { color: var(--int-neutral-text); border-color: var(--int-neutral-border); }
+[data-brand='rebrand'] .bx-btn--danger:not(:disabled):not([aria-disabled='true']):hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--int-danger-bg-hover); }
+[data-brand='rebrand'] .bx-btn--danger:disabled,
+[data-brand='rebrand'] .bx-btn--danger[aria-disabled='true'] { color: var(--int-neutral-text); border-color: var(--int-neutral-border); }
 
 /* An open trigger is an active state. */
 [data-brand='rebrand'] .bx-menu__trigger.is-open { background: var(--blue-soft); border-color: transparent; color: var(--blue-strong); }

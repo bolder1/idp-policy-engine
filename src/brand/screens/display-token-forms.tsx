@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type RefObject } from 'react'
 import { Check, Download, Eye, EyeOff, FileText, KeyRound, Plus, Upload, Users } from 'lucide-react'
 
-import { Button, Modal, Note, NumberStepper, SearchBox, TipDot } from '../kit'
+import { Button, Confirm, Note, NumberStepper, SearchBox, TipDot } from '../kit'
 import { Picker } from '../picker'
 import { initials } from '../data'
 import { EmptyState, NoMatches } from '../empty'
@@ -694,23 +694,17 @@ export function DiscardDialog({
   onDiscard: () => void
 }) {
   return (
-    <Modal
+    <Confirm
       open={open}
       onClose={onKeep}
+      tone="warning"
+      shape="hero"
       title={title}
-      width={440}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onKeep}>
-            Keep editing
-          </Button>
-          <Button variant="danger" onClick={onDiscard}>
-            Discard
-          </Button>
-        </>
-      }
+      cancelLabel="Keep editing"
+      confirmLabel="Discard"
+      onConfirm={onDiscard}
     >
-      <p className="bx-leave__body">What you have entered will not be saved.</p>
-    </Modal>
+      What you have entered will not be saved.
+    </Confirm>
   )
 }

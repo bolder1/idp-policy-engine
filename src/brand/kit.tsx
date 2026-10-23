@@ -1548,8 +1548,18 @@ const TIP_MARGIN = 8
 
    Keyboard focus is not made to wait: somebody tabbing along has asked for the name already. Only focus that
    :focus-visible calls keyboard opens a tip; a click's focus does not, so pressing a button does not throw its own
-   tip over the thing it just opened. */
+   tip over the thing it just opened.
+
+   The 2 s is global, info marks (TipDot, TipMark) included: the owner asked for it on "any button" and "globally".
+   A shorter wait for the marks was tried and put back to the same 2 s; TIP_MARK_DELAY is kept as the one place to
+   change it if he asks.
+
+   The pointer path listens to POINTER events and skips touch. A tap sends compatibility mouse events after the touch
+   (mouseover, mouseenter, then mousedown), and a mousedown that closes the tip — so a press on a button does not leave
+   its name over what it opened — closed the tip the same tap had just opened. A touch opens and closes the tip with
+   its own tap (`onTouchStart`), and nothing the mouse path does can undo that. */
 const TIP_DELAY = 2000
+const TIP_MARK_DELAY = TIP_DELAY
 const TIP_WARM = 1000
 let tipWarmUntil = 0
 
@@ -1558,11 +1568,14 @@ export function Tip({
   children,
   placement = 'bottom',
   width,
+  delay = TIP_DELAY,
 }: {
   text: ReactNode
   children: ReactNode
   placement?: 'top' | 'bottom'
   width?: number
+  /** How long a resting pointer waits before the first tip shows (ms). Default: a control's name, 2 s. */
+  delay?: number
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number; side: 'top' | 'bottom' } | null>(null)
@@ -1588,8 +1601,8 @@ export function Tip({
       wait.current = window.setTimeout(() => {
         wait.current = null
         setOpen(true)
-      }, TIP_DELAY)
-  }, [cancelWait])
+      }, delay)
+  }, [cancelWait, delay])
   /* Close, and keep the group warm for a moment if a tip was actually showing. */
   const shown = useRef(false)
   useEffect(() => {
@@ -1674,9 +1687,16 @@ export function Tip({
     <span
       ref={anchor}
       className="bx-tip"
-      onMouseEnter={hover}
-      onMouseLeave={leave}
-      onMouseDown={leave}
+      /* A mouse or a pen; never a finger (see TIP_DELAY). */
+      onPointerEnter={(e) => {
+        if (e.pointerType !== 'touch') hover()
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType !== 'touch') leave()
+      }}
+      onPointerDown={(e) => {
+        if (e.pointerType !== 'touch') leave()
+      }}
       onFocusCapture={(e) => {
         if ((e.target as HTMLElement).matches?.(':focus-visible')) setOpen(true)
       }}
@@ -1725,8 +1745,9 @@ export function Tip({
     An `Info` icon, not a `?` on a disc (owner, 21 Sep 2026: "use info icon in
     the tooltip"). The icon is its own circle, so the mark has no disc behind it. */
 export function TipDot({ text, label = 'Why this matters' }: { text: ReactNode; label?: string }) {
+  /* The same wait as every tip (see TIP_MARK_DELAY). */
   return (
-    <Tip text={text}>
+    <Tip text={text} delay={TIP_MARK_DELAY}>
       <button type="button" className="bx-tipdot" aria-label={label}>
         <Info size={14} strokeWidth={2} aria-hidden />
       </button>
@@ -1746,7 +1767,7 @@ export function TipDot({ text, label = 'Why this matters' }: { text: ReactNode; 
    than treating the hover as the only way to the sentence. */
 export function TipMark({ text }: { text: ReactNode }) {
   return (
-    <Tip text={text}>
+    <Tip text={text} delay={TIP_MARK_DELAY}>
       {/* The press stops here. The mark lives inside a row-sized button, and on
           a touch screen the tap that opens the tip is also a click — which
           bubbled to the row and ticked or unticked it while you were only asking
@@ -2168,6 +2189,14 @@ export interface ConfirmSection {
 /** The confirm's lists of rows, drawn (true) or summed up as chips on the hero card (false). See `Confirm`. */
 const CONFIRM_LISTS: boolean = false
 
+/** How many of a section's names the hero card shows as pills before it counts the rest. */
+const CONFIRM_PEEK = 3
+/* The longest caption the hero card keeps. The card is a summary under a centred sentence, so a caption that would
+   run to a paragraph is the list's to say (CONFIRM_LISTS), not the card's; ConfirmDelete's consequence line fits. */
+const CONFIRM_PEEK_CAPTION = 90
+const peekCaption = (c: ReactNode): boolean =>
+  typeof c === 'string' ? c.length > 0 && c.length <= CONFIRM_PEEK_CAPTION : c != null && typeof c !== 'boolean'
+
 export function Confirm({
   open,
   onClose,
@@ -2282,10 +2311,16 @@ export function Confirm({
   const listed: readonly ConfirmSection[] = sections ?? (rows && rows.length > 0 ? [{ id: 'only', rows }] : [])
   /* LISTS HIDDEN, A SIMPLE CARD INSTEAD (owner, 23 Oct 2026: "discard this style of popup where we showcase the full
      list — keep it but hide, and replace with how we did for agent-based: simple card with context"). With
-     CONFIRM_LISTS off every confirm is drawn as the hero; what the list named is summed up as up to three chips and a
-     count, under the sentence, so the dialog still says what it touches. Turn the flag on for the lists as they were. */
+     CONFIRM_LISTS off every confirm is drawn as the hero, and its lists become one sunken card under the sentence:
+     each section keeps its heading, a short caption and its own `more`, with up to three of its names as pills under
+     them. The heading and the caption ARE the consequence — ConfirmDelete's "2 live policies move to draft", "They
+     stop deciding sign-ins until …" — so a card that kept only the names said what it touched and not what happens
+     to it, and pooled the live and the later policies into one set nobody could tell apart. A name that opens its
+     thing stays a way there: its pill is a button, which is the refused delete's only road to the rule it asks the
+     admin to change. Turn the flag on for the lists as they were. */
   const drawn = shape === 'rows' && !CONFIRM_LISTS ? 'hero' : shape
-  const peek = drawn !== shape ? listed.flatMap((g) => g.rows) : []
+  const peeks: readonly ConfirmSection[] =
+    drawn !== shape ? listed.filter((g) => g.rows.length > 0 || !!g.title || !!g.more) : []
   const groups: readonly ConfirmSection[] = drawn === 'hero' ? [] : listed
 
   const foot = blocked ? (
@@ -2392,13 +2427,43 @@ export function Confirm({
               who moves where — and a `p` inside a `p` is invalid markup that
               browsers silently reparent. The style is the same either way. */}
           {children && <div className="bx-confirm__body">{children}</div>}
-          {peek.length > 0 && (
-            <ul className="bx-confirm__peek">
-              {peek.slice(0, 3).map((r) => (
-                <li key={r.id}>{r.name}</li>
-              ))}
-              {peek.length > 3 && <li className="is-more">+{peek.length - 3} more</li>}
-            </ul>
+          {peeks.length > 0 && (
+            <div className="bx-confirm__peek">
+              {peeks.map((g) => {
+                const shown = g.rows.slice(0, CONFIRM_PEEK)
+                const headId = `${fieldId}-peek-${g.id}`
+                return (
+                  <section key={g.id} className="bx-confirm__peekgroup" aria-labelledby={g.title ? headId : undefined}>
+                    {g.title && (
+                      <h3 id={headId} className="bx-confirm__peekhead">
+                        {g.title}
+                      </h3>
+                    )}
+                    {peekCaption(g.caption) && <p className="bx-confirm__peekline">{g.caption}</p>}
+                    {shown.length > 0 && (
+                      <ul className="bx-confirm__chips">
+                        {shown.map((r) => (
+                          <li key={r.id}>
+                            {/* The kit's own pill, as a button when the name opens what it names. The button IS the
+                                pill (the status trigger's rule): a caret inside a chip says "goes somewhere". */}
+                            {r.onOpen ? (
+                              <button type="button" className="bx-badge bx-badge--neutral bx-confirm__peekopen" onClick={r.onOpen}>
+                                <span className="bx-badge__label">{r.name}</span>
+                                <ChevronRight size={12} strokeWidth={2} aria-hidden />
+                              </button>
+                            ) : (
+                              <Badge tone="neutral">{r.name}</Badge>
+                            )}
+                          </li>
+                        ))}
+                        {g.rows.length > shown.length && <li className="is-more">+{g.rows.length - shown.length} more</li>}
+                      </ul>
+                    )}
+                    {g.more && <p className="bx-confirm__peekline">{g.more}</p>}
+                  </section>
+                )
+              })}
+            </div>
           )}
 
           {groups.map((g) => {
@@ -2525,14 +2590,11 @@ export function Confirm({
    its committing elsewhere — the button said "Review & enforce". Three screens
    now edit a named object through a local draft (device profiles, zones, risk
    profiles), and rather than write a second bar beside a dead one, the dead one
-   became the shared one. What survived from it is the part worth keeping: it
-   NAMES what changed rather than saying "unsaved changes", and it caps the
-   naming at two so a long edit does not produce a long strip.
-
-   `changes` rather than a boolean, for that reason. "You have unsaved changes"
-   is true of every form ever built; "name · 3 added" is the thing somebody is
-   being asked to confirm — and on a tabbed or scrolling page it is what names
-   edits made where they cannot currently see them. */
+   became the shared one. It named what changed ("name · 3 added") until
+   23 Oct 2026, when the footer lost its words (see SaveBar); the naming lives
+   on in Review changes, which lists every change by section. `changes` is
+   still taken, and callers still say it, so the words can come back without
+   touching every page. */
 /** One line of a draft's review: what changed, as it was and as it will be saved.
     The optional fields (section, kind, name inside the section, consequence)
     are `ReviewLine`'s — see review-rows.ts. */
@@ -2566,8 +2628,9 @@ export interface ReviewGuard {
        nothing else. The body is `ChangeList`, shared with the device profile
        wizard's Review.
 
-   Keep editing goes back to the page with the draft intact. No Discard:
-   leaving the page already asks Save, Discard or Keep editing.
+   Keep editing goes back to the page with the draft intact. No Discard in
+   here: the save footer under the page carries one (23 Oct 2026), leaving the
+   page asks too, and a third button would break the popups' two.
 
    Two ways to hold the save, said in two places. `blocked` is the page's own
    validity, and its reason leads the body. `stop` is a check the page ran on
@@ -2777,16 +2840,22 @@ function footerHost(): HTMLElement | null {
      `sticky` to its bottom, so on a short page it sits at the bottom of the
      window and on a long one it stays pinned while the page scrolls under it —
      and, being in the flow, it never covers the last control.
-   - One button. Given review rows it says "Review & save" and opens Review
-     changes, whose primary commits; without rows it saves directly.
-   - No Discard. Every way off the page asks first (the leave dialog offers
-     Discard), so a red button beside Save was a second, easier way to lose work.
+   - Two buttons and no words (owner, 23 Oct 2026). Discard, when the page
+     passes `onDiscard`, throws the edits away; the save — "Review & save" given
+     review rows, opening Review changes, whose primary commits, or `saveLabel`
+     straight away without them — keeps them. The footer said what changed and
+     why Save was off until then; the review lists what changed, and a reason
+     belongs under the field it is about.
+   - Blocked, the save stays in the tab order (Button `blocked`): it is
+     `aria-disabled`, it announces the reason with itself, and pressing it does
+     nothing. A natively disabled button is skipped by the keyboard and gives a
+     touch user nothing at all.
    - `guard`: what the save would do beyond the page — the policies that read a
      zone, the saved sign-ins it moves (spec D.6). Read while the review is
      open, and again whenever the page hands over a new one (a fix made, an
      expectation changed), and appended under Also changes. A check that stops
-     the save holds the review's Save, never this footer's: the footer only
-     opens the review, where the reason can be read. */
+     the save holds the review's Save, never this footer's: the row that failed
+     says why, in the review. */
 export function SaveBar({
   open,
   onSave,
@@ -2805,7 +2874,8 @@ export function SaveBar({
   /** The commit's label: on the button when there is nothing to review, in Review changes otherwise. */
   saveLabel?: string
   blocked?: boolean
-  /** Why Save is blocked. Shown in the footer in place of the change list, and on the button. */
+  /* Why Save is blocked. Never printed in the footer: the page says it under the field. Here it is the save's
+     description (read with the button), its title, and the line that leads Review changes. */
   blockedReason?: string
   /** The draft against what is saved. Given and not empty, the one button reviews before saving. */
   review?: ReviewRow[]
@@ -2851,6 +2921,8 @@ export function SaveBar({
   }, [open])
 
   const reason = blocked && blockedReason ? blockedReason : null
+  const barId = useId()
+  const reasonId = `${barId}-why`
   const reviews = !!review && review.length > 0
 
   /* Nothing to review can leave a review open: it closes with the rows. */
@@ -2891,16 +2963,26 @@ what changed. What is left is two buttons: throw it away, or save it. */}
               Discard
             </Button>
           )}
-          {/* Blocked, the one button is off; its reason is under the field that caused it and in the button's title. */}
+          {/* Blocked with a reason, the save is `blocked` rather than `disabled` (Confirm's rule): reachable by Tab and
+              touch, read with its reason, and pressing it saves nothing. The reason's element is hidden — the footer
+              carries no words — and the page prints it under the field. Blocked with nothing to explain, plain
+              `disabled` is still the right answer (see Button). */}
           <Button
             variant="brand"
             icon={Check}
-            disabled={blocked}
+            disabled={blocked && !reason}
+            blocked={reason ?? undefined}
+            describedBy={reason ? reasonId : undefined}
             title={reason ?? undefined}
             onClick={reviews ? () => setReviewing(true) : onSave}
           >
             {reviews ? 'Review & save' : saveLabel}
           </Button>
+          {reason && (
+            <span id={reasonId} className="u-sr-only">
+              {reason}
+            </span>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

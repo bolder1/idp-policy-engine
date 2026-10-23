@@ -306,6 +306,10 @@
 [data-brand='rebrand'] .bx-iconbtn { border-radius: 6px; }
 [data-brand='rebrand'] .bx-iconbtn--neutral { background: transparent; border-color: transparent; }
 [data-brand='rebrand'] .bx-iconbtn--neutral:not(:disabled):hover { background: var(--state-hover-bg); border-color: transparent; }
+/* The press, one step past that hover (kit.css has the console's; this hover outweighs it). The `:where()` keeps the
+   weight at the hover's, so a trash button's red (kit.css, one element heavier) still holds through the press. */
+[data-brand='rebrand'] .bx-iconbtn--neutral:not(:disabled):where(:not(.is-on)):active,
+[data-brand='rebrand'] .bx-rowmenu:not(:disabled):where(:not(.is-open)):active { background: var(--state-press-bg); }
 [data-brand='rebrand'] .bx-iconbtn.is-on { background: var(--blue-soft); border-color: transparent; color: var(--blue-strong); }
 
 /* --- Menus ---------------------------------------------------------------------- */

@@ -278,8 +278,12 @@ describe('the board walkthrough', () => {
        anticipate, must still be able to reach step 5. */
     expect(tourSource).not.toMatch(/disabled=\{!done\}/)
     expect(tourSource).not.toMatch(/disabled=\{!\s*done/)
-    // Back is the one control that IS disabled, and only at the start.
-    expect(tourSource).toContain('disabled={at === 0}')
+    /* Back was the one control that WAS disabled, at the start. Since 23 Oct
+       2026 it is not drawn there instead (two buttons at most, and no press
+       that does nothing), and Skip went: it did what the × does. */
+    expect(tourSource).toContain('{at > 0 && (')
+    expect(tourSource).not.toContain('disabled={at === 0}')
+    expect(tourSource).not.toContain('btr__skip')
   })
 
   it('offers to do every step itself', () => {

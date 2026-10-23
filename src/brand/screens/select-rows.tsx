@@ -12,6 +12,10 @@ import { Button } from '../kit'
 
 /* --- Slider footer ---------------------------------------------------------------------- */
 
+/* Two buttons at most (owner, 23 Oct 2026: "3 looks very bad"). With a second
+   way forward — Save and add another, Duplicate and add — Cancel goes, as it
+   does from the kit's Confirm with `alt`: the slider's ×, Escape and the scrim
+   already close it, through the same `onCancel` the caller gave the Drawer. */
 export function SliderActions({
   onCancel,
   primary,
@@ -23,9 +27,11 @@ export function SliderActions({
 }) {
   return (
     <>
-      <Button variant="ghost" onClick={onCancel}>
-        Cancel
-      </Button>
+      {!another && (
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      )}
       {another && (
         <Button variant="secondary" onClick={another.run}>
           {another.label}

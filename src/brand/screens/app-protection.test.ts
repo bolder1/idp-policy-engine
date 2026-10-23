@@ -78,8 +78,16 @@ describe('the protection panel runs the apps checks', () => {
     expect(code).toContain("{appsGuard.checking ? 'Checking…' : primary}")
     expect(code).toContain('busy={appsGuard.checking}')
     /* Disabled, it would drop focus to the page, and Keep editing on the
-       checks' page would have nothing to hand focus back to. */
-    expect(code).toContain("disabled={choice === null || (choice === 'existing' && !pickId)}")
+       checks' page would have nothing to hand focus back to. Since 23 Oct 2026
+       it is not disabled for an unanswered form either: the footer has no
+       words, so a press with nothing chosen is what shows the reason, under
+       the question in the form. */
+    expect(code).toContain('<Button variant="brand" busy={appsGuard.checking} onClick={submit}>')
+    expect(code).toContain('{tried && choice === null && (')
+    expect(code).toContain('{tried && !pickId && (')
+    /* And what the attach will do is said under the picker, not in the footer. */
+    expect(between('actions={', '<div ref={body}>')).not.toContain('bapr__note')
+    expect(between('<div ref={body}>', '<RemoveDialog')).toContain('{note && <p className="bapr__note">{note}</p>}')
     expect(between('function submit()', 'const detach')).toContain('appsGuard.checking) return')
   })
 

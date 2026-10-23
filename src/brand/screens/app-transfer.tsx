@@ -1,6 +1,6 @@
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Check, ChevronDown, Plus, X } from 'lucide-react'
-import { useState, type DragEvent } from 'react'
+import { useState, type DragEvent, type ReactNode } from 'react'
 
 import type { App } from '../data'
 import { NoMatches } from '../empty'
@@ -30,6 +30,9 @@ interface PickerProps {
   onChange: (ids: string[]) => void
   /** The policy an application is already on, by name. Undefined when it is free. */
   takenBy: (appId: string) => string | undefined
+  /** What an empty list means for this policy, said under the chips while none is picked (the builder's
+      Applications panel, 23 Oct 2026). The caller decides when there is anything to say. */
+  emptyNote?: ReactNode
 }
 
 const VIEWS: { value: AppPickerView; label: string }[] = [
@@ -51,6 +54,8 @@ export function AppTransfer(props: PickerProps) {
         </div>
       )}
       {view === 'list' ? <AppChecklist {...props} /> : view === 'chips' ? <AppChips {...props} /> : <AppLists {...props} />}
+      {/* The chips say it under themselves; the two compared drawings, under the picker. */}
+      {view !== 'chips' && props.picked.length === 0 && props.emptyNote}
     </div>
   )
 }
@@ -238,7 +243,7 @@ function AppChecklist({ apps, picked, onChange, takenBy }: PickerProps) {
    Search first, then what the policy protects as removable chips right under it, then the applications that can still be
    added, each with its own Add. An added application leaves the list and lands as a chip, so the two never show the same
    thing twice; the ones in use on another policy are not offered (Two lists says why). */
-function AppChips({ apps, picked, onChange, takenBy }: PickerProps) {
+function AppChips({ apps, picked, onChange, takenBy, emptyNote }: PickerProps) {
   const [q, setQ] = useState('')
   const reduced = useReducedMotion()
   const on = new Set(picked)
@@ -269,6 +274,7 @@ function AppChips({ apps, picked, onChange, takenBy }: PickerProps) {
           </AnimatePresence>
           {chosen.length === 0 && <p className="bxc__none">None added yet</p>}
         </div>
+        {chosen.length === 0 && emptyNote}
       </div>
       <div className="bxc__part is-list">
         <p className="bxc__lab" id="bxc-add">

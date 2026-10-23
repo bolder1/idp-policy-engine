@@ -2,14 +2,14 @@ import { monitorOffered } from './status-options'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
-import { Button, Modal } from '../kit'
-import { appsOf, enforces, type App, type Policy, type PolicyStatus } from '../data'
+import { Confirm } from '../kit'
+import { appsOf, enforces, type Policy, type PolicyStatus } from '../data'
 import { guardSignIns } from '../draft-checks'
 import { commitToast, lastSaved, monitorBlocker, published, sameRules, turnOnBlocker, type RuleSet } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
 import { isPostSignIn, turnOnIssue } from '../post-sign-in'
 import { playCue } from '../sound'
-import { listPhrase } from './app-policies'
+import { AppFacts } from './app-facts'
 import { diagnose } from './diagnostics'
 import { GuardDrawer, type GuardVersion } from './guard-page'
 import { editsTip, isStale, overridePatch, patchSignIns, tryRunGuard, guardOpens, type EditsFrom, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from './guard'
@@ -21,7 +21,7 @@ import {
   guardFor,
   offersMonitoringView,
   portalRoot,
-  statusConfirmCopy,
+  statusConfirmParts,
   statusToast,
   turnOnExtras,
   watchAfter,
@@ -63,13 +63,6 @@ import {
    Before turning on links back to it from the While monitoring row. It shows
    while the policy is monitoring, and closes the moment it is not.
    -------------------------------------------------------------------------- */
-
-/* The applications, as words in a sentence. Null when there are none. */
-function appsPhrase(policy: Policy, apps: App[]): string | null {
-  if (policy.isSystem) return 'every application'
-  const named = appsOf(policy, apps)
-  return named.length === 0 ? null : listPhrase(named.map((a) => a.name))
-}
 
 interface Ask {
   policy: Policy
@@ -130,8 +123,17 @@ export interface StatusChangeOptions {
 
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 
+/* `confirmed`: the admin has already answered this switch in a dialog of the caller's own (the shared policy's scope
+   dialog, status-scope-dialog.tsx), so the one-line confirm is not asked a second time. Nothing else is skipped: a
+   blocker still refuses, and the Before turning off checks still open when somebody is newly let in — those say
+   something the caller's dialog did not. */
+export interface StatusRequestOptions {
+  edits?: RuleSet
+  confirmed?: boolean
+}
+
 export function useStatusChange(options: StatusChangeOptions = {}): {
-  request: (policy: Policy, target: StatusTarget, opts?: { edits?: RuleSet }) => void
+  request: (policy: Policy, target: StatusTarget, opts?: StatusRequestOptions) => void
   /** Opens the Monitoring page for a monitoring policy (spec C §3.4). */
   viewMonitoring: (policyId: string) => void
   dialog: ReactNode
@@ -238,7 +240,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
     }
   }
 
-  const request = (given: Policy, target: StatusTarget, opts: { edits?: RuleSet } = {}) => {
+  const request = (given: Policy, target: StatusTarget, opts: StatusRequestOptions = {}) => {
     const policy = store.policyById(given.id) ?? given
     const unsaved = options.unsaved === true
 
@@ -262,7 +264,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
         if (here) options.onRevealRule?.(null)
         return
       }
-      if (!asksFirst(policy.status, target, false)) return commit(policy, target, edits)
+      if (opts.confirmed || !asksFirst(policy.status, target, false)) return commit(policy, target, edits)
       setAsk({ policy, target, blocker: null, fix: null, unsaved: false, edits })
       setOpen(true)
       return
@@ -309,7 +311,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
       blocker = monitorBlocker(policy)
       if (blocker) fix = 'apps'
     }
-    if (!blocker && !asksFirst(policy.status, target, unsaved || !!policy.pendingDraft)) {
+    if (!blocker && (opts.confirmed || !asksFirst(policy.status, target, unsaved || !!policy.pendingDraft))) {
       commit(policy, target)
       return
     }
@@ -365,88 +367,97 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
     /* Already in this policy's builder, "Open policy" would go nowhere. */
     const here = (screen.name === 'board' || screen.name === 'builder') && screen.policyId === policy.id
 
+    /* Both on the kit's Confirm, as the hero card (owner, 23 Oct 2026: short titles, the policy named once in the
+       body, logos beside application names, two buttons; the Remove dialog is the model). They were hand-built
+       Modals with the policy's name in the title and "Turn off" in the orange brand button — the inconsistency the
+       kit's Confirm was made to end. */
     if (blocker) {
+      /* The one fix, as the primary, or none: already in this policy's builder, "Open policy" would go nowhere, and
+         the dialog is then a refusal with one Close. */
+      const fixIt =
+        fix === 'apps'
+          ? {
+              label: 'Assign applications',
+              run: () => {
+                if (options.onAssignApps) {
+                  options.onAssignApps(policy)
+                  return
+                }
+                const from = screen.name === 'builder' ? 'builder' : screen.name === 'policies' ? 'policies' : 'board'
+                store.go({ name: 'policy-details', policyId: policy.id, from })
+              },
+            }
+          : fix === 'open' && !here
+            ? { label: 'Open policy', run: () => store.go({ name: 'board', policyId: policy.id }) }
+            : null
       dialog = (
-        <Modal
+        /* `error`, as ConfirmDelete's refusal: the toast reads "Can't …" as one. */
+        <Confirm
           open={open}
           onClose={close}
-          title={target === 'monitor' ? `Can't monitor ${name}` : `Can't turn on ${name}`}
-          width={480}
-          footer={
-            <>
-              <Button variant="secondary" onClick={close}>
-                Close
-              </Button>
-              {fix === 'apps' && (
-                <Button
-                  variant="brand"
-                  onClick={() => {
-                    close()
-                    if (options.onAssignApps) {
-                      options.onAssignApps(policy)
-                      return
-                    }
-                    const from = screen.name === 'builder' ? 'builder' : screen.name === 'policies' ? 'policies' : 'board'
-                    store.go({ name: 'policy-details', policyId: policy.id, from })
-                  }}
-                >
-                  Assign applications
-                </Button>
-              )}
-              {fix === 'open' && !here && (
-                <Button
-                  variant="brand"
-                  onClick={() => {
-                    close()
-                    store.go({ name: 'board', policyId: policy.id })
-                  }}
-                >
-                  Open policy
-                </Button>
-              )}
-            </>
-          }
+          tone="error"
+          shape="hero"
+          title={target === 'monitor' ? "Can't monitor this policy" : "Can't turn on this policy"}
+          blocked={!fixIt}
+          cancelLabel="Close"
+          destructive={false}
+          confirmLabel={fixIt?.label}
+          onConfirm={() => {
+            close()
+            fixIt?.run()
+          }}
         >
-          <div className="bx-confirm">
+          <div className="bapr__confirm is-card">
+            <p>
+              <b>{name}</b>
+            </p>
             <p>{blocker}</p>
           </div>
-        </Modal>
+        </Confirm>
       )
     } else {
-      /* The words live in `statusConfirmCopy`, where a test pins them:
-         Monitoring reads the stored rules — never the builder's edits, never a
-         saved draft — and Inactive → Monitoring says which is held back. */
-      const copy = statusConfirmCopy(policy, target, unsaved, appsPhrase(policy, store.apps))
+      /* The words live in `statusConfirmParts`, where a test pins them (as `statusConfirmCopy` joins them):
+         Monitoring reads the stored rules — never the builder's edits, never a saved draft — and Inactive →
+         Monitoring says which is held back. The policy is drawn where the words say "It", and its applications as
+         logos; the tenant default has no list, it is on every application. */
+      const copy = statusConfirmParts(policy, target, unsaved)
+      const named = policy.isSystem ? [] : appsOf(policy, store.apps)
+      /* Turning off stops a live policy deciding, so it is the red one. Inactive → Monitoring changes nobody's
+         sign-in, so it is only information; the rest change who is let in, and warn. */
+      const quiet = target === 'monitor' && policy.status !== 'active'
 
       dialog = (
-        <Modal
+        <Confirm
           open={open}
           onClose={close}
+          tone={quiet ? 'info' : 'warning'}
+          shape="hero"
           title={copy.title}
-          width={480}
-          footer={
-            <>
-              <Button variant="ghost" onClick={close}>
-                Cancel
-              </Button>
-              <Button
-                variant="brand"
-                onClick={() => {
-                  commit(policy, target, edits)
-                  close()
-                }}
-              >
-                {copy.verb}
-              </Button>
-            </>
-          }
+          confirmLabel={copy.verb}
+          destructive={target === 'inactive'}
+          onConfirm={() => {
+            commit(policy, target, edits)
+            close()
+          }}
         >
-          <div className="bx-confirm">
-            {copy.lines.map((line) => (
+          <div className="bapr__confirm is-card">
+            <p>
+              <b>{name}</b> {copy.lead.does}
+              {policy.isSystem ? (
+                ` ${copy.lead.where} every application`
+              ) : named.length > 0 ? (
+                <>
+                  {' '}
+                  {copy.lead.where} <AppFacts apps={named} />
+                </>
+              ) : null}
+              {copy.lead.rest}
+            </p>
+            {copy.notes.map((line) => (
               <p key={line}>{line}</p>
             ))}
           </div>
-        </Modal>
+        </Confirm>
       )
     }
   }

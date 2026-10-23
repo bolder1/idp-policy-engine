@@ -32,7 +32,7 @@ import { DOCK_TAB_LABEL } from '../testing/test-dock'
 import { ACCESS_CHECK } from '../sign-in-tests/names'
 import type { SignInFacts } from '../sign-in-facts'
 import { Board } from './Board'
-import { BAR_DEMO, BAR_TOUR } from './bar-tools'
+import { BAR_DEMO, BAR_TOUR, RULE_ON_OFF } from './bar-tools'
 import { useShows } from './builder-version'
 import { PolicyNotice } from './PolicyNotice'
 import { DescribePanel } from './DescribePanel'
@@ -187,7 +187,12 @@ export function BoardBuilder({
   arriveFix?: ArriveFix
 }) {
   const guideMe = useShows('guideMe')
-  const panelResize = useShows('arrange')
+  /* The keys and the palette are doors too (builder-version.ts: "every piece is hidden where its door is"): ⌥↑ / ⌥↓
+     move a rule only where the grip does, ⌘Z / ⇧⌘Z step only where the dock has Undo and Redo, and T opens Check
+     access only where the bar has its button. `arrange` also keeps the Applications panel small (`appsSmall`). */
+  const arrange = useShows('arrange')
+  const showHistory = useShows('history')
+  const showTesting = useShows('testing')
   const store = useBrand()
   /* The edition, which this surface ignored entirely.
 
@@ -460,15 +465,16 @@ export function BoardBuilder({
   /* The two ends the panel's own button steps between, and the test that says
      which end you are at.
 
-     560 is the width a condition row needs to stay on one line — see the note
-     on `inspW`. 380 is under the 430px container query, so the narrow state is
-     genuinely a different shape rather than a squeezed one: the rows fold to
-     two deliberate lines and the panel becomes a column you can still read
-     beside a canvas you are arranging.
+     600 is the widest the panel goes ("this size looks good as a max"). The
+     narrow end is 480, the least `setW` allows: it was 380, under the 430px
+     container query, but `setW` has clamped to 480–600 since 23 Oct 2026, so a
+     press toward 380 landed on 480, `wide` was always true and the button could
+     only ever say Narrow. The button is hidden (bar-tools.ts
+     `PANEL_WIDTH_BUTTON`); this keeps it working for the day it comes back.
 
      `> NARROW` rather than `=== WIDE`, because the grip can leave the width
-     anywhere in 320–720 and the button still has to know which way to go. */
-  const NARROW = 380
+     anywhere in 480–600 and the button still has to know which way to go. */
+  const NARROW = 480
   const wide = inspW > NARROW
 
   const onGrab = useCallback(
@@ -532,8 +538,10 @@ export function BoardBuilder({
   /* A post sign-in policy's links are a standing fact too: they are made from
      the applications' pages while the board may be open, so the stored ones
      are read here and a save never writes old links back. */
+  /* A copy's mark is one of them (23 Oct 2026): a rename takes it off the stored policy (store.tsx `keepsCopyMark`),
+     and the bar's highlight and the canvas's copy note read the draft, so it is overlaid even when it is gone. */
   const facts = useMemo(
-    () => (saved ? { name: saved.name, appIds: saved.appIds, audience: saved.audience, ...(saved.session ? { session: saved.session } : null) } : null),
+    () => (saved ? { name: saved.name, appIds: saved.appIds, audience: saved.audience, copiedFrom: saved.copiedFrom, ...(saved.session ? { session: saved.session } : null) } : null),
     [saved],
   )
   /* Guided setup's applications, while a history entry holds a list the stored policy does not (`pendingApps`). */
@@ -615,8 +623,10 @@ export function BoardBuilder({
      evaluates, so the board and the gauntlet name things the same way. */
   const env = useSimEnv()
 
-  /* Only an app access policy decides sign-ins, so only one can be tried. */
-  const canTest = features.trySignIn && draft.type === 'App Access'
+  /* Only an app access policy decides sign-ins, so only one can be tried. And only from the version that shows
+     Check access (V3): before it, T, the palette and a route that arrives in Check access (the Policies row menu,
+     Access checks' Open policy) all open the builder on its chain, as the bar has no button to close it with. */
+  const canTest = features.trySignIn && draft.type === 'App Access' && showTesting
   const testOn = testing && canTest && !!saved
   /* The commit that opens or closes test mode switches the grid's columns
      without their transition (`.bb.is-snap`), so the canvas that takes the
@@ -655,7 +665,7 @@ export function BoardBuilder({
   /* The Applications panel is a short list and a Save, so in the first build it is a small panel of its own that does
      not resize (owner, 23 Oct 2026: "remove the drag function from here and make the slider smaller, why such a big
      one for applications"). The rule panel's size, 600, is the largest the panel goes ("this size looks good as a max"). */
-  const appsSmall = !panelResize && selection.kind === 'apps'
+  const appsSmall = !arrange && selection.kind === 'apps'
   const colW = testOn ? (checkWide ? CHECK_PANEL_WIDE : CHECK_PANEL_NARROW) : appsSmall ? 400 : inspW
   /* Check access takes the board first: `T` closes the panel as × does (`describeOpen`, above). */
   /* Read as text gives the column up to either of them. */
@@ -856,9 +866,10 @@ export function BoardBuilder({
        The walkthrough card is a non-modal dialog beside the board, and the
        edits it makes are meant to be undone, so it does not block undo. Not
        under Check access either, for the same reason: the chain is hidden
-       under its canvas. */
+       under its canvas. Nor before the version with the dock's Undo and Redo
+       (V1, `showHistory`): a toast's own Undo still takes a removal back. */
     const blocking = !!document.querySelector('[role="dialog"]:not([aria-modal="false"]), .bx-scrim')
-    if (action && !typing && !blocking && !testOn) {
+    if (action && showHistory && !typing && !blocking && !testOn) {
       e.preventDefault()
       if (action === 'redo') redoStep()
       else undoStep()
@@ -876,9 +887,12 @@ export function BoardBuilder({
        control, not behind a dialog — the guards above — not in the rule
        editor, and not on a policy that decides no sign-in. Tested before the
        rule bindings stand down in the test panel: T is test mode's own
-       toggle, so it closes it from the panels it opened. */
+       toggle, so it closes it from the panels it opened. It opens only where
+       the bar offers the button: from V3 (`canTest`), on a policy with a rule
+       (`offerTest`, owner 19 Oct 2026). */
     if (e.key.toLowerCase() === 't' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.defaultPrevented && !inControl) {
-      if (!canTest || (t instanceof Element && !t.closest(CHECK_PANELS) && !!t.closest(`.bb__insp, ${DESCRIBE_SURFACE}`))) return
+      if (!canTest || (!testOn && draft.rules.length === 0)) return
+      if (t instanceof Element && !t.closest(CHECK_PANELS) && !!t.closest(`.bb__insp, ${DESCRIBE_SURFACE}`)) return
       e.preventDefault()
       toggleTest()
       return
@@ -954,11 +968,12 @@ export function BoardBuilder({
 
     /* ⌥↑ / ⌥↓ move the rule; bare ↑ / ↓ move the selection. Same axis, and
        the modifier is the difference between reading the chain and editing
-       it — which is the distinction every list editor draws this way. */
+       it — which is the distinction every list editor draws this way. The move
+       comes with the grip, Move up and Move down (V1, `arrange`). */
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const dir = e.key === 'ArrowUp' ? -1 : 1
       if (e.altKey) {
-        if (at < 0) return
+        if (at < 0 || !arrange) return
         e.preventDefault()
         move(at, at + dir)
       } else {
@@ -996,8 +1011,10 @@ export function BoardBuilder({
     }
     /* Unmodified `e`, because it is a toggle you reach for repeatedly while
        narrowing down which rule is doing something. It says what it did,
-       because nothing near the keyboard shows it. */
-    if (e.key.toLowerCase() === 'e' && at >= 0 && !cmd && !e.altKey) {
+       because nothing near the keyboard shows it. Only while the rule on/off
+       switch is shown (bar-tools.ts `RULE_ON_OFF`, hidden 23 Oct 2026): with no
+       switch on screen, a stray E turned a rule off with no way back but E. */
+    if (RULE_ON_OFF && e.key.toLowerCase() === 'e' && at >= 0 && !cmd && !e.altKey) {
       e.preventDefault()
       const on = !rules[at].enabled
       patchRule(at, { enabled: on })
@@ -1361,8 +1378,9 @@ export function BoardBuilder({
 
   /* Describe it's thread, reopened from the palette as from the door on the canvas. Guided setup is offered there
      whenever it is on the canvas: any App Access policy but the system one, draft or live. */
+  /* Guide me only where its door on the canvas is (Full, `guideMe`). */
   const describeDoorCmd = GUIDED_SETUP
-    ? guidedOffered(features.describePolicy, saved) && !describeOpen && !testOn
+    ? guideMe && guidedOffered(features.describePolicy, saved) && !describeOpen && !testOn
     : !!saved && describeOffered(features.describePolicy, saved) && describeState.turns.length > 0 && !describeOpen && !testOn
   /* Under Check access the chain is hidden under its canvas, so the palette
      offers only what still means something there: the policy's save, the
@@ -1377,13 +1395,16 @@ export function BoardBuilder({
           { id: 'del', label: `Delete rule ${selAt + 1} · ${selName}`, kbd: 'Del', icon: Trash2, danger: true },
         ] as Cmd[])
       : []),
-    ...(toPublish ? ([{ id: 'publish', label: features.publish ? 'Review and publish' : 'Review and save', kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
-    ...((canUndo(hist) || backToChooser) && editing ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
-    ...(canRedo(hist) && editing ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
+    /* In the bar's words: ⌘↵ saves at once, as the bar's button does (the review went, 23 Sep 2026). */
+    ...(toPublish ? ([{ id: 'publish', label: features.publish ? 'Publish policy' : 'Save policy', kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
+    /* Undo and Redo where the dock has them (V1, `showHistory`). */
+    ...((canUndo(hist) || backToChooser) && editing && showHistory ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
+    ...(canRedo(hist) && editing && showHistory ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
     /* Not in test mode, where the column is never hidden (the ⌘\ handler says why). */
     ...(hasSubject && !testOn ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: chord(['mod'], '\\', MAC), icon: PanelRightClose }] as Cmd[]) : []),
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
-    ...(canTest ? ([{ id: 'try', label: testOn ? `Close ${ACCESS_CHECK}` : ACCESS_CHECK, kbd: 'T', icon: LogIn }] as Cmd[]) : []),
+    /* Where the bar offers its button: from V3, on a policy with a rule (T's own test, above). */
+    ...(canTest && (draft.rules.length > 0 || testOn) ? ([{ id: 'try', label: testOn ? `Close ${ACCESS_CHECK}` : ACCESS_CHECK, kbd: 'T', icon: LogIn }] as Cmd[]) : []),
     ...(testOn ? views.map((v) => ({ id: `view:${v}`, label: DOCK_TAB_LABEL[v], icon: VIEW_ICON[v] }) as Cmd) : []),
     ...(describeDoorCmd ? ([{ id: 'describe', label: GUIDED_SETUP ? 'Guide me' : 'Describe it', icon: GUIDED_SETUP ? ListChecks : PenLine }] as Cmd[]) : []),
     ...(editing ? draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd) : []),
@@ -1406,6 +1427,9 @@ export function BoardBuilder({
      press after anything else has changed would undo THAT instead, so it says
      where the full history is rather than guessing. Call it straight after the
      commit it describes, in the same event. */
+  /* Where the full history is: the dock's Undo, from V1. The first build has no Undo but the toast's own, so there
+     the toast says only why nothing changed, in the words the other surfaces use. */
+  const laterChanges = showHistory ? `Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).` : 'Other changes came after it.'
   const offerUndo = (what: string) => {
     const after = lastCommitted.current
     store.showToast(what, {
@@ -1416,7 +1440,7 @@ export function BoardBuilder({
           moveHistory(undo(histNow.current))
           store.showToast('Restored')
         } else {
-          store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
+          store.showToast(laterChanges)
         }
       },
     })
@@ -1739,7 +1763,7 @@ export function BoardBuilder({
           if (!alive.current) return
           const back = undoDescribed(histNow.current, after, s)
           if (!back) {
-            store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
+            store.showToast(laterChanges)
             return
           }
           /* The thread, the name, the audience and the applications as this
@@ -1840,7 +1864,7 @@ export function BoardBuilder({
     const e = guidedLog.find((x) => x.id === id)
     if (!e || !e.after || !e.wrote) return
     if (histNow.current.present !== e.after) {
-      store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
+      store.showToast(laterChanges)
       return
     }
     moveHistory(undo(histNow.current))
@@ -2461,7 +2485,9 @@ export function BoardBuilder({
 
       {/* The inspector's alone: Check access's panels take the page's two
           widths from their own button, and no grip. */}
-      {!testOn && !appsSmall && (panelShown || readOpen || fixesShown) && (
+      {!testOn && selection.kind !== 'apps' && (panelShown || readOpen || fixesShown) && (
+        /* Not beside Applications in any version: it is a short form, as tall as its list, so a full-height grip ran
+           past it over nothing (owner, 23 Oct 2026: "remove the drag function from here"). */
         <div
           className="bb__grip"
           role="separator"
@@ -2643,7 +2669,8 @@ export function BoardBuilder({
           was reached. */}
       <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard shortcuts" width={480}>
         <dl className="bb__keys">
-          {keys && boardShortcuts({ mac: MAC, commands: features.commands, testing: features.trySignIn && !post, publish: features.publish }).map(([k, what]) => (
+          {/* Only the keys that do something on this build: the version's and the flags' (shortcuts.ts). */}
+          {keys && boardShortcuts({ mac: MAC, commands: features.commands, testing: canTest && !post, publish: features.publish, arrange, history: showHistory, onOff: RULE_ON_OFF }).map(([k, what]) => (
             <div key={k}>
               <dt>
                 {k.split(' ').map((part) => (

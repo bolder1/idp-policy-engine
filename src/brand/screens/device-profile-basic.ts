@@ -30,8 +30,9 @@ export const basicDetailsSet = (p: Pick<FingerprintProfile, 'restrictionSet'>): 
    the stored profile then ran on answers nobody gave. That is a
    saved-but-unfinished profile, which the console does not have (unfinished
    means draft). So Create profile waits for an answer on the Basic details
-   tab, and says so in the footer, on the button, in Review changes and in the
-   leave dialog (review, 15 Sep 2026).
+   tab, and says so on the button, in Review changes and in the leave dialog
+   (review, 15 Sep 2026) — and, since the footer lost its words (23 Oct 2026),
+   under the restriction type question on the page, as the question.
 
    Still creatable on every default: a press on the reach already shown sets
    the flag, which keeps the earlier owner decision that a trusted device is

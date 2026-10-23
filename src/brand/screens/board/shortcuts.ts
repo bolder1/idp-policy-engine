@@ -37,27 +37,38 @@ export interface ShortcutOptions {
   mac: boolean
   /** The command palette exists (Full edition). */
   commands: boolean
-  /** Check access is on the board (every edition that has it): T opens it, and Escape closes it first. */
+  /** Check access is on the board (every edition that has it, from builder V3): T opens it, and Escape closes it first. */
   testing: boolean
-  /** There is a publish step; Lite reviews and saves. */
+  /** There is a publish step; Lite saves. */
   publish: boolean
+  /* The builder's version and flags hide pieces at their doors (builder-version.ts, bar-tools.ts), and the keys are
+     doors too, so the sheet lists a key only where it does something: ⌥↑ / ⌥↓ from V1 (`arrange`), undo and redo
+     from V1 (`history`), and E only while the rule on/off switch is shown (`RULE_ON_OFF`, hidden 23 Oct 2026). */
+  /** Rules can be reordered: ⌥↑ / ⌥↓ move the selected one. */
+  arrange: boolean
+  /** The dock has Undo and Redo. */
+  history: boolean
+  /** The rule on/off switch is shown: E flips the selected rule. */
+  onOff: boolean
 }
 
 /** Each entry is the keys, space-separated for one <kbd> each, and what they do. */
 export function boardShortcuts(o: ShortcutOptions): [string, string][] {
   const c = (mods: Modifier[], key: string) => chord(mods, key, o.mac)
+  const when = (on: boolean, row: [string, string]): [string, string][] => (on ? [row] : [])
   return [
     ['↑ ↓', 'Select the previous or next rule'],
-    [`${c(['alt'], '↑')} ${c(['alt'], '↓')}`, 'Move the selected rule up or down'],
+    ...when(o.arrange, [`${c(['alt'], '↑')} ${c(['alt'], '↓')}`, 'Move the selected rule up or down']),
     ['[ ]', 'Previous or next section'],
     [c(['mod'], 'D'), 'Duplicate the selected rule'],
     ['Del', 'Delete the selected rule'],
-    ['E', 'Switch the selected rule on or off'],
-    ...(o.testing ? ([['T', ACCESS_CHECK]] as [string, string][]) : []),
-    ...(o.commands ? ([[c(['mod'], 'K'), 'Command palette']] as [string, string][]) : []),
-    [c(['mod'], 'Enter'), o.publish ? 'Review and publish' : 'Review and save'],
+    ...when(o.onOff, ['E', 'Switch the selected rule on or off']),
+    ...when(o.testing, ['T', ACCESS_CHECK]),
+    ...when(o.commands, [c(['mod'], 'K'), 'Command palette']),
+    /* In the bar's words: ⌘↵ saves at once, as the bar's button does. */
+    [c(['mod'], 'Enter'), o.publish ? 'Publish policy' : 'Save policy'],
     [c(['mod'], '\\'), 'Show or hide the panel'],
-    [`${c(['mod'], 'Z')} ${c(['mod', 'shift'], 'Z')}`, 'Undo, redo'],
+    ...when(o.history, [`${c(['mod'], 'Z')} ${c(['mod', 'shift'], 'Z')}`, 'Undo, redo']),
     ['Esc', o.testing ? `Close ${ACCESS_CHECK}, then clear the selection` : 'Clear the selection'],
     ['?', 'Keyboard shortcuts'],
   ]

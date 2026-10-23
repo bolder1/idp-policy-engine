@@ -228,11 +228,16 @@ html[data-theme='dark'] {
 .bx-iconbtn--neutral { border-color: var(--int-neutral-border); background: var(--int-neutral-bg); }
 .bx-iconbtn--neutral:not(:disabled):hover { background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); color: var(--text-primary); }
 .bx-iconbtn--ghost:not(:disabled):hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+/* A press answers at once, one step darker than the hover: what the button opens can take a frame, and until then
+   nothing said it had been pressed. Colour only, no movement. A pressed toggle (`is-on`) keeps its own fill. */
+.bx-iconbtn--ghost:not(:disabled):not(.is-on):active { background: var(--int-ghost-bg-active); }
+.bx-iconbtn--neutral:not(:disabled):not(.is-on):active { background: var(--int-neutral-bg-active); }
 /* Quiet until reached for, then unmistakable. A destructive icon button that
    is red at rest turns every list into an alarm; one that is never red is a
-   delete you press by accident. */
-.bx-iconbtn--danger { color: var(--fb-negative-fg); }
-.bx-iconbtn--danger:not(:disabled):hover { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+   delete you press by accident. So it rests in the row's grey and goes red
+   under the pointer or keyboard focus (destructive triggers are neutral). */
+.bx-iconbtn--danger { color: var(--text-secondary); }
+.bx-iconbtn--danger:not(:disabled):is(:hover, :focus-visible) { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bx-iconbtn.is-on { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
 .bx-iconbtn:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 
@@ -450,6 +455,8 @@ html[data-theme='dark'] {
 .bx-rowmenu--md { width: var(--ctl-height-md); height: var(--ctl-height-md); }
 .bx-rowmenu:not(:disabled):hover,
 .bx-rowmenu.is-open { background: var(--surface-inset); color: var(--text-primary); }
+/* The press, a step past the inset hover — the step button's press (`.bx-step__btn`). An open menu keeps its fill. */
+.bx-rowmenu:not(:disabled):not(.is-open):active { background: var(--border-subtle); }
 .bx-rowmenu:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 .bx-menu__pop.bx-rowmenu__pop {
   position: fixed; right: auto;
@@ -1285,18 +1292,8 @@ html[data-theme='dark'] {
   /* Over the page it pins above, under popovers, dialogs and the toast. */
   z-index: 20;
 }
-.bx-savebar__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.bx-savebar__text strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bx-savebar__text span {
-  /* The SaveBar's only line now, so it reads at body size rather than as a
-     caption under a heading that has gone. The device-profile wizard still
-     puts a heading over it — see `.bdpw__foot`. */
-  font-size: var(--fs-md); color: var(--text-secondary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* Why Save is off. Notice, not red: nothing is being destroyed. It wraps rather
-   than ellipsises — the reason is the one line here that must be read whole. */
-.bx-savebar__text span.is-blocked { color: var(--fb-notice-fg); font-weight: var(--fw-medium); white-space: normal; }
+/* No `__text` any more: the footer carries buttons only (owner, 23 Oct 2026), so its line and the blocked reason's
+   notice colour went with it. */
 .bx-savebar > .bx-btn { flex: none; min-width: 148px; }
 @media (max-width: 720px) {
   .bx-savebar { padding: var(--space-5) var(--footer-r, 20px) var(--space-5) var(--footer-l, 20px); }
@@ -2206,26 +2203,20 @@ html[data-theme='dark'] {
 @keyframes bx-hero-glow { from { opacity: 0.35; scale: 0.9; } to { opacity: 1; scale: 1.1; } }
 @media (prefers-reduced-motion: reduce) { .bx-confirm__hero::before { animation: none; opacity: 0.7; } }
 
-/* ICON MICRO-MOTION, AND DELETE THAT READS AS DELETE (owner, 23 Oct 2026: "for all the action items and icons on hover
-   add some micro interaction, the Lottie-like motion", "in delete use red, change it globally, so the user feels it").
-   Small, short and on the icon only: a lift on icon buttons, a nudge on menu items, a shake on a trash can. Plain CSS
-   on the svg, never on an element Motion drives, and none of it under reduced motion. */
-.bx-iconbtn svg, .bx-rowmenu svg, .bx-menu__item svg { transition: transform 200ms var(--ease-standard), color 150ms var(--ease-standard); }
-.bx-iconbtn:not(:disabled):hover svg { transform: scale(1.14); }
-.bx-rowmenu:not(:disabled):hover svg { transform: scale(1.18); }
-.bx-menu__item:not(:disabled):hover svg { transform: translateX(1px) rotate(-6deg) scale(1.1); }
-.bx-btn:not(:disabled):not([aria-busy='true']):hover > svg:first-child { transform: translateY(-1px); transition: transform 180ms var(--ease-standard); }
-
-/* A trash can goes red under the pointer, as a button and as a menu row, whatever variant it is. */
-.bx-iconbtn:not(:disabled):has(svg.lucide-trash-2):hover { color: var(--fb-negative-fg); background: var(--fb-negative-bg); border-color: var(--fb-negative-border); }
-.bx-iconbtn:not(:disabled):has(svg.lucide-trash-2):hover svg { animation: bx-shake 380ms ease-in-out; }
-.bx-menu__item.is-danger:not(:disabled):hover svg { color: var(--fb-negative-fg); }
-.bx-menu__item.is-danger:not(:disabled):hover svg.lucide-trash-2 { animation: bx-shake 380ms ease-in-out; }
-@keyframes bx-shake { 20% { rotate: -10deg; } 40% { rotate: 8deg; } 60% { rotate: -5deg; } 80% { rotate: 3deg; } }
-@media (prefers-reduced-motion: reduce) {
-  .bx-iconbtn svg, .bx-rowmenu svg, .bx-menu__item svg, .bx-btn > svg { transition: none; }
-  .bx-iconbtn:hover svg, .bx-rowmenu:hover svg, .bx-menu__item:hover svg, .bx-btn:hover > svg:first-child { transform: none; animation: none; }
+/* DELETE THAT READS AS DELETE (owner, 23 Oct 2026: "in delete use red, change it globally, so the user feels it").
+   A trash can goes red under the pointer and under keyboard focus — an icon button, a labelled neutral or ghost
+   button ("Delete rule"), and a danger menu row, icon and label together. Grey at rest in every one of them: a
+   destructive trigger is neutral until reached for. The danger Button is already red and keeps its own hover. Colour
+   only: the icon micro-motion that came with it (a lift, a tilt, a shake) was taken out the same day ("remove the
+   interactions from the action icons, not good"). */
+.bx-iconbtn svg, .bx-menu__item svg { transition: color var(--dur-fast) var(--ease-standard); }
+.bx-iconbtn:not(:disabled):has(svg.lucide-trash-2):is(:hover, :focus-visible),
+.bx-btn:is(.bx-btn--neutral, .bx-btn--ghost):not(:disabled):not([aria-disabled='true']):has(> svg.lucide-trash-2):is(:hover, :focus-visible) {
+  color: var(--fb-negative-fg); background: var(--fb-negative-bg); border-color: var(--fb-negative-border);
 }
+/* The label goes red on focus as well as hover (`.bx-menu__item.is-danger:focus strong`), and hover moves focus, so
+   the icon follows both: arrowing to Delete shows the same row the pointer does. */
+.bx-menu__item.is-danger:not(:disabled):is(:hover, :focus) svg { color: var(--fb-negative-fg); }
 
 /* READABLE POPUPS (owner, 23 Oct 2026: "make things more readable for all the popups … hierarchy in the type, logos
    and icons … scannable; right now it feels like just a bold line, where should I focus?"). The title is the one
@@ -2233,17 +2224,31 @@ html[data-theme='dark'] {
    chips the eye can take in at once. */
 .bx-confirm--hero .bx-confirm__title { font-size: var(--fs-xl, 18px); line-height: 1.35; letter-spacing: -0.005em; }
 .bx-confirm__body b, .bx-confirm__body strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
+/* One card for every section the hidden lists had: its heading and short caption (the consequence), its names as the
+   kit's own pills (Badge, neutral — one pill family), and its `more`. The pill caps at the card rather than at a
+   table cell's 14ch, because a policy name clipped to "Developer tool…" no longer says which policy. */
 .bx-confirm__peek {
-  list-style: none; margin: var(--space-5) auto 0; padding: var(--space-4);
-  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2);
+  --badge-max: 100%;
+  margin: var(--space-5) auto 0; padding: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-4);
   background: var(--surface-sunken); border-radius: var(--radius-lg);
 }
-.bx-confirm__peek li {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  padding: 2px var(--space-3); border-radius: var(--radius-full, 9999px);
-  background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle);
-  font-size: var(--fs-sm); color: var(--text-primary);
+.bx-confirm__peekgroup { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); min-width: 0; }
+.bx-confirm__peekhead { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bx-confirm__peekline { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bx-confirm__chips {
+  list-style: none; margin: 0; padding: 0; max-width: 100%;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2);
 }
-.bx-confirm__peek li.is-more { background: none; border-color: transparent; color: var(--text-secondary); }
+.bx-confirm__chips > li { display: inline-flex; min-width: 0; max-width: 100%; }
+.bx-confirm__chips > li.is-more { align-items: center; font-size: var(--pill-fs); color: var(--text-secondary); }
+/* The neutral pill's grey fill all but vanishes on the sunken card, so here it takes the raised surface and a hairline:
+   the same pill, lifted off its ground. */
+.bx-confirm__chips .bx-badge--neutral { background: var(--surface-raised); border-color: var(--border-subtle); }
+/* A pill that opens what it names: the pill itself is the button, with a caret inside it. */
+.bx-badge.bx-confirm__peekopen { cursor: pointer; }
+.bx-badge.bx-confirm__peekopen > svg { flex: none; color: var(--text-tertiary); }
+.bx-badge.bx-confirm__peekopen:hover { border-color: var(--border-strong); color: var(--text-link); }
+.bx-badge.bx-confirm__peekopen:hover > svg { color: var(--text-link); }
 /* A fact line in a confirm's body: a logo or icon, then the words — for the dialogs that name applications. */
 .bx-confirm__fact { display: inline-flex; align-items: center; gap: var(--space-2); vertical-align: bottom; font-weight: var(--fw-semibold); color: var(--text-primary); }

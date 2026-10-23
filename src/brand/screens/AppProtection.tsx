@@ -111,10 +111,10 @@ export function AppProtection({
   }, [justAdded])
 
   /* The same after an attach from this form, however it was written: at once,
-     on a clean check, or from the checks' page. The button that asked is
-     disabled by then (nothing is picked), so the checks' page handing focus
-     back to it as it closes would leave focus on the page behind. A frame
-     later, after that hand-back, focus goes to the new row. */
+     on a clean check, or from the checks' page. The choice is spent by then
+     (nothing is picked), so the button that asked has nothing left to do, and
+     the checks' page hands focus back to it as it closes. A frame later, after
+     that hand-back, focus goes to the new row. */
   useEffect(() => {
     if (!flash) return
     const id = requestAnimationFrame(() =>
@@ -211,18 +211,17 @@ export function AppProtection({
     setNaming(false)
   }
 
+  /* What the attach will do, under the picker it is about. It was the footer's sentence beside Close, with the two
+     blocked reasons ("Choose new or existing to continue.", "Pick a policy to attach.") and "Nothing changes for users
+     until it is published." for a new one (owner, 23 Oct 2026: "don't use this kind of lines in the footer, use it
+     inside the form or the element"). The blocked reasons are now said under their questions once the primary has
+     been pressed; a new policy's hint already says it is created as a draft. */
   const note =
-    choice === null
-      ? 'Choose new or existing to continue.'
-      : choice === 'new'
-        ? 'Nothing changes for users until it is published.'
-        : !picked
-          ? 'Pick a policy to attach.'
-          : gone
-            ? ''
-            : /* With the attach applied, so a live policy another one shadows
-                 here says it never decides rather than "takes effect". */
-              attachNote(picked, app.name, { appId: app.id, policies: store.policies, users: store.users, apps: store.apps })
+    choice === 'existing' && picked && !gone
+      ? /* With the attach applied, so a live policy another one shadows
+           here says it never decides rather than "takes effect". */
+        attachNote(picked, app.name, { appId: app.id, policies: store.policies, users: store.users, apps: store.apps })
+      : null
 
   const primary =
     choice === 'new'
@@ -305,20 +304,17 @@ export function AppProtection({
             </>
           ) : (
             <>
-              <p className="bapr__note">{note}</p>
               <Button variant="ghost" onClick={onClose}>
                 Close
               </Button>
               {/* Busy, not disabled, while the checks run: a disabled button
                   drops focus to the page, and the checks' page hands focus back
                   to this one when Keep editing closes it. A second press
-                  meanwhile does nothing (`submit`). */}
-              <Button
-                variant="brand"
-                disabled={choice === null || (choice === 'existing' && !pickId)}
-                busy={appsGuard.checking}
-                onClick={submit}
-              >
+                  meanwhile does nothing (`submit`). Never disabled for an
+                  unanswered form either (26 Sep 2026: "Next is never
+                  disabled"): pressed with nothing chosen, the form says what is
+                  missing under the question it is about. */}
+              <Button variant="brand" busy={appsGuard.checking} onClick={submit}>
                 {appsGuard.checking ? 'Checking…' : primary}
               </Button>
             </>
@@ -433,7 +429,10 @@ export function AppProtection({
                     name={`bapr-${app.id}`}
                     value="new"
                     checked={choice === 'new'}
-                    onChange={() => setChoice('new')}
+                    onChange={() => {
+                      setChoice('new')
+                      setTried(false)
+                    }}
                   />
                   <span className="bapr__choicename">Write a new policy</span>
                   <span className="bapr__choicehint">Created as a draft on {app.name}. You name it next.</span>
@@ -446,13 +445,24 @@ export function AppProtection({
                     value="existing"
                     disabled={none}
                     checked={choice === 'existing'}
-                    onChange={() => setChoice('existing')}
+                    onChange={() => {
+                      setChoice('existing')
+                      setTried(false)
+                    }}
                   />
                   <span className="bapr__choicename">Use an existing policy</span>
                   {/* Disabled with a reason, and the reason matches the tenant: a
                       day-one tenant has no other policies at all. */}
                   <span className="bapr__choicehint">{existingHint(options.length, otherPolicies)}</span>
                 </label>
+
+                {/* Under the question, once the primary was pressed with neither
+                    picked, and worded after it (26 Sep 2026). */}
+                {tried && choice === null && (
+                  <p className="bz7__fielderr" role="alert">
+                    Choose how to add protection.
+                  </p>
+                )}
 
                 {choice === 'existing' && (
                   <div className="bapr__pick">
@@ -475,9 +485,16 @@ export function AppProtection({
                         setGone(false)
                       }}
                     />
+                    {/* The Picker's red edge says which field; this says what it wants. */}
+                    {tried && !pickId && (
+                      <p className="bz7__fielderr bapr__pickerr" role="alert">
+                        Choose a policy.
+                      </p>
+                    )}
 
                     <p className="bapr__nodefault">The tenant default isn't listed. It already applies to every application.</p>
 
+                    {note && <p className="bapr__note">{note}</p>}
                     {picked && alsoOn && <AlsoNote picked={picked} />}
                   </div>
                 )}

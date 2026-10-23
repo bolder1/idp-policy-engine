@@ -248,15 +248,17 @@ export function Tour({
             <p>{stop.body}</p>
           </div>
 
+          {/* Two buttons at most (owner, 23 Oct 2026). Skip went: it did what
+              the × does. Back is not drawn on the first stop rather than drawn
+              disabled, so the card never offers a press that does nothing. */}
           <footer className="btr__foot">
             {/* Spacer. The progress dots that sat here repeated "Stop N of M". */}
             <span className="btr__dots" aria-hidden />
-            <button type="button" className="btr__skip" onClick={leave}>
-              Skip
-            </button>
-            <Button variant="ghost" size="sm" icon={ArrowLeft} disabled={i === 0} onClick={back}>
-              Back
-            </Button>
+            {i > 0 && (
+              <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={back}>
+                Back
+              </Button>
+            )}
             <Button variant="primary" size="sm" icon={last ? Swords : undefined} iconRight={last ? undefined : ArrowRight} onClick={next}>
               {last ? (stop.finish ?? 'Finish') : 'Next'}
             </Button>

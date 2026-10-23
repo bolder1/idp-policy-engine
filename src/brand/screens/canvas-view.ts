@@ -273,6 +273,10 @@ export interface CanvasViewOpts {
      `glide`, `fit` and `zoomBy` become no-ops. Read once, at mount: a canvas does not change camera mid-life. The
      condition canvas never passes it. */
   still?: boolean
+  /* Ctrl+wheel and a trackpad pinch zoom about the cursor; false keeps the zoom where it is (the board's first build,
+     23 Oct 2026, which has no zoom buttons and no Fit to come back with). The wheel is still taken, so the page does
+     not zoom instead, and a plain wheel still pans. Read live, so a version switch takes effect at once. Absent, on. */
+  zoomGesture?: boolean
 }
 
 export function useCanvasView(
@@ -517,6 +521,7 @@ export function useCanvasView(
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       if (e.ctrlKey || e.metaKey) {
+        if (o.current.zoomGesture === false) return
         const r = s.getBoundingClientRect()
         const px = e.clientX - r.left
         const py = e.clientY - r.top

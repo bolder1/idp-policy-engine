@@ -26,7 +26,7 @@ import {
   Star,
 } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, IconButton, MenuButton, Modal, Note, SearchBox, TipDot, Toggle } from '../kit'
+import { Badge, Button, Callout, Confirm, Drawer, IconButton, MenuButton, Note, SearchBox, TipDot, Toggle } from '../kit'
 import { AUTH_GENERAL_SEED, VERIFICATION_RULES_DRAWER, type AuthGeneral } from './auth-general'
 import { GeneralSettings, GeneralSettingsDrawer } from './auth-general-settings'
 import { MethodsTour } from '../tour/MethodsTour'
@@ -478,7 +478,9 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     const handover = [...readyIds.filter((x) => configuredIds.includes(x)), ...readyIds.filter((x) => !configuredIds.includes(x))]
     if (useAsk.on) {
       const now = enrolment.active && enrolment.active !== useAsk.id ? methods.find((x) => x.id === enrolment.active) : undefined
-      return [`${useMethod.name} becomes your active method. You will use it to verify it is you when you sign in.`, ...(now ? [`${now.name} stops being used.`] : [])]
+      /* The fact alone (23 Oct 2026, the popups pass: no sentences explaining the UI). It went on to say "You will use
+         it to verify it is you when you sign in", which is what an active method is. */
+      return [`${useMethod.name} becomes your active method.`, ...(now ? [`${now.name} stops being used.`] : [])]
     }
     const to = methods.find((x) => x.id === activateIn(enrolment, useAsk.id, false, handover).handedTo)
     return [to ? `${to.name} becomes your active method instead.` : `${useMethod.name} is no longer used to verify it is you.`]
@@ -732,63 +734,40 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
         </>
       )}
 
-      <Modal
+      {/* Both on the kit's Confirm, as the hero card (23 Oct 2026, the popups pass: one confirm language, two buttons,
+          red only for the act that takes something away). They were hand-built 440-wide Modals with Turn off in the
+          orange brand button. The facts stay the body: what becomes active, the rules that name the method, where the
+          default goes. */}
+      <Confirm
         open={!!useAsk && !!useMethod}
         onClose={() => setUseAsk(null)}
-        title={useMethod ? (useAsk?.on ? `Use ${useMethod.name}?` : `Turn off ${useMethod.name}?`) : ''}
-        width={440}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setUseAsk(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="brand"
-              onClick={() => {
-                if (useAsk) activate(useAsk.id, useAsk.on)
-                setUseAsk(null)
-              }}
-            >
-              {useAsk?.on ? 'Turn on' : 'Turn off'}
-            </Button>
-          </>
-        }
+        tone="warning"
+        shape="hero"
+        title={useMethod ? (useAsk?.on ? `Use ${useMethod.name}?` : `Turn off ${useMethod.name}?`) : 'Use method'}
+        confirmLabel={useAsk?.on ? 'Turn on' : 'Turn off'}
+        destructive={!useAsk?.on}
+        onConfirm={() => {
+          if (useAsk) activate(useAsk.id, useAsk.on)
+          setUseAsk(null)
+        }}
       >
-        <div className="bx-confirm">
-          {useLines.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-        </div>
-      </Modal>
+        {useLines.join(' ')}
+      </Confirm>
 
-      <Modal
+      <Confirm
         open={offOpen}
         onClose={() => setOffOpen(false)}
-        title={off ? `Turn off ${off.name}?` : ''}
-        width={440}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setOffOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="brand"
-              onClick={() => {
-                if (off && offOpen) applyEnabled(off.id, false)
-                setOffOpen(false)
-              }}
-            >
-              Turn off
-            </Button>
-          </>
-        }
+        tone="warning"
+        shape="hero"
+        title={off ? `Turn off ${off.name}?` : 'Turn off method'}
+        confirmLabel="Turn off"
+        onConfirm={() => {
+          if (off && offOpen) applyEnabled(off.id, false)
+          setOffOpen(false)
+        }}
       >
-        <div className="bx-confirm">
-          {(off?.lines ?? []).map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-        </div>
-      </Modal>
+        {(off?.lines ?? []).join(' ')}
+      </Confirm>
 
       {!isUser && (
         <MethodsTour
@@ -1869,7 +1848,7 @@ function CategoryDrawer({
              branches on `pageSetup` but the guard watches the CARD's draft, so
              once setup moved into the card (18 Sep 2026) this button sat on
              screen beside a dirty form and threw it away without asking. */
-          <Button variant="secondary" onClick={() => leaveThen(onClose, false)}>
+          <Button variant="ghost" onClick={() => leaveThen(onClose, false)}>
             Close
           </Button>
         )

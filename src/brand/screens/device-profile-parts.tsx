@@ -639,6 +639,9 @@ function AttrPickRow({
    device registers silently). It is `DEVICES_NOTE` in profile-notes.ts now:
    the same panel, said once and fixed (owner, 18 Sep 2026). */
 
+/* What an empty list holds the save for — `profileIssue`'s words, said where the list is. */
+const emptyHeld = (mode: ProfileMode) => (mode === 'os' ? 'Add at least one check.' : 'Add at least one signal.')
+
 /* --- The checks: what this profile is set to, and one door to change it ---------
 
    The page shows only what is ON — each check with its value at the end of the
@@ -670,6 +673,7 @@ function AttrPickRow({
 export function ChosenList({
   draft,
   fullEmpty = false,
+  saving = false,
   awaitingReach = false,
   title,
   tip,
@@ -682,6 +686,11 @@ export function ChosenList({
   /** Draw the empty state as a page's, with the primary Add: for a new profile,
       where this list is all there is to do. */
   fullEmpty?: boolean
+  /* The page's own save footer is up. It holds the view's one orange button, so
+     the full empty state's Add turns secondary, and an empty list is then the
+     reason that footer's save is held — so the empty state says that, in the
+     words of `profileIssue`, rather than its first-visit invitation. */
+  saving?: boolean
   /* The agent question above this list is still open, so there is no Add.
 
      Which signals exist is that question's answer — 20 agentless, 38 with an
@@ -763,26 +772,28 @@ export function ChosenList({
           icon={ShieldOff}
           title={`No ${noun.many} yet`}
           blurb={
-            draft.mode === 'os'
-              ? 'Choose what a device must pass before it can sign in.'
-              : 'Choose the signals that recognise a device.'
+            saving
+              ? emptyHeld(draft.mode)
+              : draft.mode === 'os'
+                ? 'Choose what a device must pass before it can sign in.'
+                : 'Choose the signals that recognise a device.'
           }
           action={
-            <Button variant="brand" icon={Plus} onClick={onEdit}>
+            <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={onEdit}>
               Add {noun.many}
             </Button>
           }
         />
       ) : ordered.length === 0 ? (
+        /* The true reason. "A profile with no checks lets every device through"
+           stood here while the save it sat over was held for "Add at least one
+           check." — said only in a tooltip once the footer lost its words
+           (23 Oct 2026). */
         <EmptyState
           compact
           icon={ShieldOff}
           title={`No ${noun.many}`}
-          blurb={
-            draft.mode === 'os'
-              ? 'A profile with no checks lets every device through.'
-              : 'Add at least one signal to recognise a device.'
-          }
+          blurb={draft.mode === 'os' ? emptyHeld('os') : 'Add at least one signal to recognise a device.'}
           action={
             <Button variant="secondary" size="sm" onClick={onEdit}>
               <Plus size={14} strokeWidth={2.2} aria-hidden />

@@ -177,28 +177,45 @@ describe('the keyboard sheet', () => {
   })
 
   /* Check access on T: Try a sign-in until the rename (owner, 1 Oct 2026; names.ts). */
+  /* The whole builder (V1 and up, the on/off switch shown), so every row the sheet can list is on it. */
+  const ALL = { arrange: true, history: true, onOff: true }
+
   it('lists no palette in Lite, Check access on T, and no Mac glyphs on Windows', () => {
-    const lite = boardShortcuts({ mac: false, commands: false, testing: true, publish: false })
+    const lite = boardShortcuts({ mac: false, commands: false, testing: true, publish: false, ...ALL })
     expect(lite.find(([k]) => k === 'T')?.[1]).toBe('Check access')
     expect(lite.find(([k]) => k === 'Esc')?.[1]).toBe('Close Check access, then clear the selection')
     const text = lite.map(([k, v]) => `${k} ${v}`).join('\n')
     expect(text).not.toMatch(/Command palette/)
     expect(text).not.toMatch(/rehearsal/)
     expect(text).not.toMatch(/[⌘⌥⇧]/)
-    expect(text).toMatch(/Review and save/)
+    /* ⌘↵ in the bar's words: it saves at once, and the review it once opened is gone (23 Sep 2026). */
+    expect(lite.find(([k]) => k === 'Ctrl+Enter')?.[1]).toBe('Save policy')
     expect(lite.find(([k]) => k === '[ ]')?.[1]).toBe('Previous or next section')
     expect(lite.some(([k]) => /Backspace/.test(k))).toBe(false)
   })
 
   it('lists the palette and publish in Full', () => {
-    const full = boardShortcuts({ mac: true, commands: true, testing: true, publish: true })
+    const full = boardShortcuts({ mac: true, commands: true, testing: true, publish: true, ...ALL })
     expect(full.some(([k, v]) => k === '⌘K' && v === 'Command palette')).toBe(true)
-    expect(full.some(([, v]) => v === 'Review and publish')).toBe(true)
+    expect(full.some(([, v]) => v === 'Publish policy')).toBe(true)
   })
 
   it('lists no T, and a plain Escape, where there is no Try a sign-in', () => {
-    const without = boardShortcuts({ mac: false, commands: false, testing: false, publish: false })
+    const without = boardShortcuts({ mac: false, commands: false, testing: false, publish: false, ...ALL })
     expect(without.some(([k]) => k === 'T')).toBe(false)
     expect(without.find(([k]) => k === 'Esc')?.[1]).toBe('Clear the selection')
+  })
+
+  /* Builder V0 with the rule on/off switch hidden (builder-version.ts, bar-tools.ts `RULE_ON_OFF`): no key for a piece
+     the build does not show, and Escape does not name Check access. */
+  it('lists only what the first build has', () => {
+    const v0 = boardShortcuts({ mac: false, commands: false, testing: false, publish: false, arrange: false, history: false, onOff: false })
+    const keys = v0.map(([k]) => k)
+    expect(keys).not.toContain('Alt+↑ Alt+↓')
+    expect(keys).not.toContain('Ctrl+Z Ctrl+Shift+Z')
+    expect(keys).not.toContain('E')
+    expect(keys).not.toContain('T')
+    expect(v0.find(([k]) => k === 'Esc')?.[1]).toBe('Clear the selection')
+    expect(keys).toEqual(['↑ ↓', '[ ]', 'Ctrl+D', 'Del', 'Ctrl+Enter', 'Ctrl+\\', 'Esc', '?'])
   })
 })

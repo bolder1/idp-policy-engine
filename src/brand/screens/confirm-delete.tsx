@@ -147,6 +147,10 @@ export function ConfirmDelete({
      So a zone nobody uses gets the card, and a zone four live policies depend
      on gets the four names. */
   const bare = live.length === 0 && later.length === 0 && stuck.length === 0
+  /* A policy's name is the admin's own and often long ("Developer tools — office and device checks"), so its title is
+     short and the name is said once, in bold, at the top of the body (owner, 23 Oct 2026: short titles, never a long
+     policy name inside the title; the Remove dialog is the model). A zone's or a profile's name stays in the title. */
+  const policyNoun = noun === 'policy'
 
   return (
     <Confirm
@@ -154,7 +158,7 @@ export function ConfirmDelete({
       onClose={onCancel}
       tone="removed"
       shape={bare ? 'hero' : 'rows'}
-      title={`Delete ${name}?`}
+      title={policyNoun ? 'Delete this policy?' : `Delete ${name}?`}
       /* NO STANDING CALLOUT (owner, 22 Oct 2026, choosing C2). It restated the
          title — "Delete X?" then "This permanently deletes the X" — and its
          second clause is true of every delete in this console, so it was a
@@ -209,7 +213,16 @@ export function ConfirmDelete({
       ]}
       more={impact && live.length === 0 && later.length === 0 ? `No policy uses this ${noun}.` : undefined}
     >
-      {detail}
+      {policyNoun ? (
+        <div className="bapr__confirm is-card">
+          <p>
+            <b>{name}</b>
+          </p>
+          {detail && <p>{detail}</p>}
+        </div>
+      ) : (
+        detail
+      )}
     </Confirm>
   )
 }

@@ -125,10 +125,15 @@ Hidden means kept, not deleted. Flip the flag and the door comes back with every
 | `TRAIL_BAR`, `OUTCOME_EXTRAS` | `layouts/Focus2Layout.tsx` (file-local) | `false` | Focus's walkthrough bar; the v2 outcome extras (question links, group box, thumbnail) | Owner, 5 Oct: remove the bar; "the older version is good for this card" |
 | `VERIFICATION_RULES_DRAWER` | `screens/auth-general.ts` | `false` | The Verification rules button beside the Authentication methods heading, and the slide-over it opens. Off, the General settings tab is the only way in | Owner, 21 Oct: "hide this for now" |
 | `MORE_GENERAL_SETTINGS` | `screens/auth-general.ts` | `false` | On General settings, everything but who two-step verification is required of: the Sign-in section, the Changes to methods section, and the Me row. Gated inside `GeneralSettings`, so the slide-over loses them too | Owner, 22 Oct: "Hide this two", then "hide this as well … The me" |
-| `HEAD_READS` | `screens/app-policy-view.tsx` | `false` | Whether Sign-in activity and Check access open from the app Policies head's menu. Off, both are listed with "Coming soon" and disabled; `check()` and the activity panel stay wired | Owner, 22 Oct: "for the rest we can tell coming soon, will work on this two later" |
+| `HEAD_READS` | `screens/app-policy-view.tsx` | `false` | Whether Sign-in activity and Check access open from the app Policies head's ⋯ menu. Off, neither is on the menu (since 23 Oct it lists only what can be done; on 22 Oct both were listed, disabled, with "Coming soon"); `check()` and the activity panel stay wired | Owner, 22 Oct: "for the rest we can tell coming soon, will work on this two later"; 23 Oct: "remove this sub heading … show only Inactive" |
 | `REPLACE_MAKES_DRAFT` | `screens/app-policies.ts` | `true` | Replace policy copies the pick onto this application as a draft instead of swapping the live policy in one press. On, the drawer's primary reads "Add as a draft", no checks run on the pick, and the tab shows a "Draft waiting" note. Off, the 22 Oct live swap returns: `replaceOnApp`, the apps guard and its `alsoAfter` wiring, all still in place | Owner, 22 Oct: "the pick becomes a draft copy on this app alone, nothing changes until I activate it" |
 | `REMOVE_RUNS_CHECKS` | `screens/app-policies.ts` | `false` | Whether taking a policy off an application runs "Before saving: applications" first. Off, the remove confirm is the whole of it — it already names what becomes of the policy and, from the engine, every group and person who moves and to which policy. Gates the Policies tab and the protection panel; the builder's own Applications pane is a different gesture and still runs the checks | Owner, 23 Oct: "take the Before saving page off Remove as well, so the two paths are consistent" |
-| `MONITOR_MODE` | `screens/status-options.ts` | `false` | Whether Monitoring is a real status switch. Off, it is named on the policy menu, disabled, with "Coming soon", and sits at the end of the menu with the other announced items | Owner, 22 Oct: "Monitor should go to coming soon … just add coming soon and hide the function", then "move it down with the other coming soon items" |
+| `MONITOR_MODE` | `screens/status-options.ts` | `false` | Whether Monitoring is a real status switch. Off, no screen offers the switch or View monitoring. `statusMenu` (`app-policy-model.ts`) still announces it as a disabled Monitoring row with "Coming soon", but the app Policies tab's ⋯ menu drops disabled rows since 23 Oct, so it is not drawn there | Owner, 22 Oct: "Monitor should go to coming soon … just add coming soon and hide the function", then "move it down with the other coming soon items"; 23 Oct: the ⋯ menu shows only what can be done |
+| `RULE_ON_OFF` | `screens/board/bar-tools.ts` | `false` | The rule on/off switch on the rule card and in the panel's rule head, the E key that switched the selected rule, and E's row in the ? sheet. The card still reads `rule.enabled` | Owner, 23 Oct: "Hide the toggle and remove this active inactive rule function as of now" |
+| `PANEL_WIDTH_BUTTON` | `screens/board/bar-tools.ts` | `false` | The rule panel's Narrow / Widen button. The panel is 600 wide to start and at most, and the grip drags it between 480 and 600; back on, the button steps between those two (`NARROW` in `BoardBuilder.tsx`) | Owner, 23 Oct: "Remove this function as well, hide it … a better, bigger, single-stack form size" |
+| `CONFIRM_LISTS` | `src/brand/kit.tsx` (file-local) | `false` | Whether a kit `Confirm` draws its lists of rows. Off, every confirm is the hero card: the sentence, then each section's heading, short caption and `more` with up to three of its names as pills (a name that opens its thing stays a button) | Owner, 23 Oct: "discard this style of popup where we showcase the full list — keep it but hide, and replace with … simple card with context" |
+| `MOVES_LIST` | `screens/AppProtection.tsx` (file-local) | `false` | The per-group and per-person "Sign-ins move to" list in the Remove dialog (`RemoveDialog`). Off, the card says where the sign-ins go in one line and shows the applications that keep the policy as logos | Owner, 23 Oct: "make it more readable … add logos and icons … simple card with context" |
+| Builder versions (`SINCE`, `useShows`) | `screens/board/builder-version.ts` | V0, locked | Which build of the builder is on screen, V0 to Full, behind a lock. See [Builder versions](#builder-versions) | Owner, 23 Oct: "a switch from V0 to Vn with the current build, so I can give the developer a good walkthrough of what to build when" |
 
 ### Waiting on the owner's pick (2 Oct 2026, updated 6 Oct)
 
@@ -203,6 +208,43 @@ Product owners say most admins add policies from the application, right after cr
 - **Gate on 10 Oct:** tsc 0, oxlint 27, vitest 5114 pass (`ui-copy` and `player-ui` pass alone), build ok. Browser-checked in the owner's :5173 and with `tools/rigs/app-pages/check.cjs` (screens, sound counts, phone width).
 - **Open questions for the owner:** (1) the live console's add-from-app flow is group-first ("Assign Group": groups, then First factor / MFA / Adaptive); ours keeps the audience on the policy. Ask for groups when adding from an app? (2) Should a template set the policy's audience? (3) These pages count directory members while the Who picker uses each group's stated size: keep both? (4) What should a group's "Make Default" change?
 - **Not built (toasts say so):** add, edit or delete users, roles and groups; group and membership custom fields; deleting an app; App Access Configuration; reordering policies from the app page.
+
+## 21-23 Oct 2026: builder versions, the shared-policy slider, and two-button popups
+
+Committed on 23 Oct as bb57bd8, f8bc83b and 3248a84, on `main` and the day branch `2026-10-23-popups-check-versions-auth-general`. The review fixes made after 3248a84 the same evening are uncommitted. The owner's rulings for the day are the memory note `rulings-23-oct-versions-popups-savebar.md`. The new flags are in the [table above](#flags-what-is-hidden-and-why).
+
+### Builder versions
+
+The builder is drawn as one of five builds, each the one before plus a named piece, so the developer can be walked through what to build first (`screens/board/builder-version.ts`).
+
+| Version | Adds |
+|---|---|
+| V0 | Build a policy: the name and status, Save draft and Save policy, the start node, rules and the places to insert one, folding a card and Expand all, the panel's Who, If and Then with Duplicate and Delete. A deny has its message only. |
+| V1 | Arrange it: reorder (the grip, Move up and Move down), undo and redo, fit and zoom, Copy who, and who the policy is narrowed to in the start node's sentence |
+| V2 | A deny's Next step and Contact, and Discard in the bar |
+| V3 | Check access and Past sign-ins |
+| Full | Guide me on the canvas |
+
+- `SINCE` names the first version of each piece, and `useShows(feature)` reads it where the piece's door is. Nothing is removed from the code: a higher version brings the piece back as it was.
+- **Locked, it is V0.** Whatever was stored, a locked builder is V0 and the switch is not drawn, so nothing on screen says there are versions (owner: "don't let the developer know what the current version is").
+- **Ctrl+P** asks for a password. Once it is right, a Builder version dropdown sits in the bar (`BuilderVersionSwitch.tsx`, mounted in `BoardBar.tsx`). Its last row, **Lock again**, goes back to V0 and hides the switch, and Ctrl+P does the same.
+- Only the password's SHA-256 is in the repository, which is public. Never write the password into a tracked file. It is a door for a walkthrough, not security.
+- The choice and the lock are kept in localStorage (`idp.builder.version`, `idp.builder.unlocked`). Restore both after a browser check.
+- **The server render is Full, unlocked**, so the tests (static markup) see the whole builder and the switch.
+
+### Screens and popups
+
+- **Shared-policy slider** (`shared-policy-fork.tsx`). On an application's Policies tab, Edit policy on a policy more than one application uses opens a right slider, "Edit shared policy", with the policy named under the title.
+  - Two option cards, one picked, in blue: **Edit for all** (picked first) and **Duplicate for** the application, with its logo.
+  - Under them, the applications using it, this one first. Each says what the pick does to it: Changes, or Gets the copy and Keeps this policy. A search appears past six.
+  - Foot: Cancel and one brand button named for the pick. The earlier fork dialog's hover previews were removed ("remove the whole hover").
+- **The builder's sticky note** (`board/PolicyNotice.tsx`). A sticky note on the canvas, left of the rules beside the start node, with the applications as logos.
+  - "Shared policy": a save reaches every application the policy is on, and everyone it covers there.
+  - "A copy of …", on a draft copy: only the application it was copied for is on it, and the original keeps its other applications. A rename takes the note away.
+  - Not drawn for post sign-in policies.
+- **Turn off a shared policy** (`status-scope-dialog.tsx`). The app tab's ⋯ menu has one Inactive row. On a shared policy it asks "Turn off this policy?", with the applications as logos and two answers of equal width: **Only** the application (with its logo), which is Remove, and **Everywhere**, which makes the policy Inactive on all of them. The × is the way out. The answer is the confirmation, so no second confirm follows; Everywhere still runs the Before turning off checks when somebody would be newly let in, and Only here has Remove's Undo.
+- **Popups have two buttons at most**, of equal width on the hero card. A kit `Confirm` given `alt` drops its Cancel. Titles are short and never hold a long policy name; applications carry their logos (`app-facts.tsx`). The Remove dialog (`AppProtection.tsx` `RemoveDialog`) is the model.
+- **The save bar has no words**: Discard and the save, nothing else. A blocked save's reason is under its field.
 
 ## 16-20 Oct 2026: full-view canvases, Guided setup, the app's Policies tab at a glance, and Check access for one policy per app
 
@@ -299,7 +341,7 @@ All uncommitted on `main`. The gate on 15 Oct is in the last bullet.
   - **Access checks:** `session.prefill` fills Access checks without running.
   - **Replace:** `replaceOnApp` makes Replace one write with one Undo.
   - Break-in stays behind `BREAK_IN_ON_APP = false`.
-- **Footers end with the form (owner, 15 Oct).** Every `.bx-savebar` puts its words and buttons inside the form column. `footer-edge.ts` measures `.bz7__cols > :first-child`, else a `data-footer-edge` element, else `.bpage` inside its padding. The device profile wizard's progress bar is the form's width above 1120px. This supersedes the 16 Sep full-width stepper.
+- **Footers end with the form (owner, 15 Oct).** Every `.bx-savebar` puts its words and buttons inside the form column (since 23 Oct it has no words, only Discard and the save; see [21-23 Oct](#21-23-oct-2026-builder-versions-the-shared-policy-slider-and-two-button-popups)). `footer-edge.ts` measures `.bz7__cols > :first-child`, else a `data-footer-edge` element, else `.bpage` inside its padding. The device profile wizard's progress bar is the form's width above 1120px. This supersedes the 16 Sep full-width stepper.
 - **Open for the owner:**
   1. The picker drawing.
   2. The kit's face overlap clips two-letter initials such as "MB" (a kit-wide −5px).

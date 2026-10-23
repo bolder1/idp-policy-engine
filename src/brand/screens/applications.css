@@ -113,7 +113,6 @@
 .bapr__list { margin-top: var(--space-6); }
 .bapr__listhead { margin-bottom: var(--space-4); }
 .bapr__listhead h3 { font-size: var(--fs-base); font-weight: var(--fw-semibold); }
-.bapr__listhead p { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-tertiary); }
 
 .bapr__stack {
   list-style: none;
@@ -238,16 +237,19 @@
    a broken picker. */
 .bapr__nodefault { margin-top: calc(-1 * var(--space-2)); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
 
+/* What the attach will do, under the picker. It was the footer's line beside
+   Close, pushed left by an auto margin (23 Oct 2026: no words in footers). */
 .bapr__note {
-  margin-right: auto;
-  max-width: 34ch;
   font-size: var(--fs-sm);
   color: var(--text-tertiary);
   line-height: 1.45;
 }
+/* The form's blocked reasons sit in its gaps, so the line's own top margin goes;
+   the picker's tucks under its field, as the tenant-default line does. */
+.bapr__form > .bz7__fielderr { margin: 0; }
+.bapr__pick > .bapr__pickerr { margin: calc(-1 * var(--space-2)) 0 0; }
 
 .bapr__confirm { display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--fs-base); line-height: 1.55; color: var(--text-body); }
-.bapr__confirm em { font-style: normal; font-weight: var(--fw-medium); color: var(--text-primary); }
 
 /* --- An application's own page (ApplicationPage.tsx) ----------------------
 
@@ -278,6 +280,9 @@
 .bapp__tabbar::-webkit-scrollbar { display: none; }
 .bapp__tabbar > .bx-tabs { display: flex; width: max-content; min-width: 100%; }
 .bapp__tabbar .bx-tabs__tab { flex: none; white-space: nowrap; }
+/* Basic's mark while its problem holds the save (ApplicationPage `tabOptions`,
+   23 Oct 2026): the field's red, so the tab and the line under the field read as one. */
+.bapp__tabbar .bx-tabs__tab svg.lucide-circle-alert { color: var(--fb-negative-fg); }
 
 /* The logo before the name, kept its size; the name takes what is left. Level
    with the rename field's input while it is open, as the pills are. */
@@ -1052,81 +1057,10 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
    carries. If a pill ever returns to these heads, the track and the reasoning behind it are in this file’s
    history for 22 Oct 2026. */
 
-/* --- Editing a policy more than one application shares (shared-policy-fork.tsx) ------------------------------
-   The applications first and with weight — logo, name, and the people this policy decides for there — because the
-   admin's question is what else moves, and a count answers it where a caution does not. The one they stand on
-   wears the console's blue, the colour selection takes here: it has to be found at a glance in a list of four.
-
-   Then the three ways, each with the applications it acts on as its mark and its tag in a column of its own on
-   the right. The tag sat beside the title first and the title clipped it ("Google Worksp…"); a column cannot. */
-.bapp__forksaid { margin: 0 0 var(--space-5); font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
-.bapp__forksaid em { font-style: normal; font-weight: var(--fw-medium); color: var(--text-primary); }
-
-/* The marks for a row, and for the dialog's own head: overlapped, as the applications cell stacks them. */
-.bapp__forkmarks { display: inline-flex; align-items: center; flex: none; }
-.bapp__forkmarks > :not(:first-child) { margin-inline-start: -6px; }
-.bapp__forkmarks .applogo { box-shadow: 0 0 0 var(--bw-thin) var(--surface-raised); }
-.bapp__forkmarks i {
-  margin-inline-start: var(--space-2);
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary);
-}
-
-.bapp__forkapps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
-/* Logo · name · mark · people. Four tracks, four children on every row without exception — see .bapp__forkmark. */
-.bapp__forkapps li {
-  display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: var(--space-4);
-  padding: var(--space-4) var(--space-2);
-  border-top: var(--bw-thin) solid var(--border-subtle);
-  font-size: var(--fs-md); color: var(--text-secondary);
-}
-.bapp__forkapps li:last-child { border-bottom: var(--bw-thin) solid var(--border-subtle); }
-.bapp__forkapps b { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bapp__forkapps > li > span:last-child { justify-self: end; font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
-/* The mark's own cell, always present and always the same size, so nothing moves when a preview puts a tag in
-   it or takes one out (22 Oct 2026: "it looks broken, with things moving based on hover"). It holds the tag at
-   the start of the track — stretched across it, the badge drew a pale band the width of the widest row and read
-   as a progress bar rather than a tag ("the reached tag could be better"). */
-.bapp__forkapps > li > .bapp__forkmark {
-  display: inline-flex; align-items: center; justify-self: start;
-  min-height: var(--space-9);
-}
-
-/* THE LIST AS A PREVIEW. A way under the pointer or the keyboard marks what it would touch, in the list the
-   admin has already read, so "all of them" and "this one" are seen side by side rather than described. The
-   whole thing is one opacity-and-colour change on a static list: no layout moves, because a row that resized
-   under the pointer would make the list jump while being pointed at. */
-.bapp__forkapps li { transition: opacity var(--dur-fast) var(--ease-standard); }
-/* The copy touches this application alone, so the rest step back rather than disappear — they are still what
-   the policy is on, which is the fact the dialog opened with. */
-.bapp__forkapps li.is-aside { opacity: 0.45; }
-
-/* The two ways, as a column of rows under the list they act on (22 Oct 2026: a footer trail was tried and put
-   back — these are two answers to the dialog's question, not a form's Save and Cancel). */
-.bapp__forkways { margin-top: var(--space-7); display: flex; flex-direction: column; gap: var(--space-3); }
-.bapp__forkway {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) max-content; align-items: center; gap: var(--space-4);
-  padding: var(--space-4) var(--space-5); text-align: left; cursor: pointer;
-  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
-  background: var(--surface-raised); color: var(--text-muted);
-  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
-}
-.bapp__forkway:hover { background: var(--surface-sunken); border-color: var(--border-strong); }
-.bapp__forkway:focus-visible { outline: none; box-shadow: 0 0 0 var(--bw-thick) var(--focus-ring); }
-.bapp__forkway > .bapp__forktext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.bapp__forkway strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bapp__forkway em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); }
-.bapp__forkway .bx-badge { justify-self: end; flex: none; }
-/* The action's glyph, one fixed size however many applications the policy is on. It holds the track the logo
-   stack used to, so the rows keep their one left edge. */
-.bapp__forkicon {
-  display: grid; place-items: center; flex: none;
-  width: var(--space-9); height: var(--space-9);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken); color: var(--text-secondary);
-}
-.bapp__forkway:hover .bapp__forkicon { background: var(--surface-raised); color: var(--text-primary); }
-
-
+/* --- Editing a policy more than one application shares --------------------------------------------------------
+   The centred fork dialog's `.bapp__fork*` rules stood here (22 Oct 2026): the applications list as a hover preview
+   and the ways as rows under it. The slider replaced the dialog on 23 Oct, and its rules are `.bfork*`, further
+   down; the dialog's are in this file's history. */
 
 /* Expand all / Collapse all on the app's rules canvas (owner, 22 Oct 2026; app-policy-view.tsx `FoldAll` says why).
    Pinned to the frame, over the canvas's own ground at the bottom right, where the chain never reaches: the chain
@@ -1173,7 +1107,6 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
    as plain rows that scroll with the drawer. */
 .bfork { display: flex; flex-direction: column; gap: var(--space-4); }
 .bfork__said { margin: var(--space-2) 0 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bfork__said em { font-style: normal; font-weight: var(--fw-medium); color: var(--text-primary); }
 .bfork__search { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); padding-bottom: var(--space-2); }
 .bfork__list { list-style: none; margin: 0; padding: 0; }
 .bfork__list li {
@@ -1183,7 +1116,7 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
 }
 .bfork__list li b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-regular, 400); color: var(--text-primary); }
 .bfork__list .bfork__none { display: block; color: var(--text-tertiary); }
-.bfork__btnapp { display: inline-flex; align-items: center; gap: var(--space-2); }
+.bfork__btnapp { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The slider's choice and what it changes (shared-policy-fork.tsx). Two option cards, one picked, selection in blue;
    each row says what the picked option does to it, and the rows a copy leaves alone fade back. */
@@ -1214,7 +1147,11 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
 .bscope__logos li { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
 .bscope__logos li.is-here { box-shadow: 0 0 0 2px var(--fb-info-dot, var(--tint-blue-fg)); background: var(--fb-info-bg); }
 .bscope__more { font-size: var(--fs-sm); color: var(--text-secondary); }
-.bscope__said { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
+.bscope__said { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
+.bscope__said b { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* Two answers of equal weight, equal width, as every popup now has. */
+.bx-modal:has(.bscope) .bx-modal__foot { justify-content: center; }
+.bx-modal:has(.bscope) .bx-modal__foot > .bx-btn { flex: 1 1 0; min-width: 0; max-width: 200px; justify-content: center; }
 
 /* The Remove dialog as a card (AppProtection.tsx RemoveDialog): centred lines, the keepers as logos. */
 .bapr__confirm.is-card { align-items: center; gap: var(--space-3); }

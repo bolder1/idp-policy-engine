@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Copy, Pencil, type LucideIcon } from 'lucide-react'
 
 import { AppLogo } from '../logos/AppLogo'
@@ -76,7 +76,7 @@ export function SharedPolicyFork({
   const shown = q.trim() ? on.filter((a) => a.name.toLowerCase().includes(q.trim().toLowerCase())) : on
 
   const ways: { id: Way; icon: LucideIcon; title: ReactNode; line: string }[] = [
-    { id: 'edit', icon: Pencil, title: 'Edit for all', line: `Your changes reach all ${on.length} applications.` },
+    { id: 'edit', icon: Pencil, title: 'Edit for all', line: on.length === 2 ? 'Your changes reach both applications.' : `Your changes reach all ${on.length} applications.` },
     {
       id: 'duplicate',
       icon: Copy,
@@ -88,6 +88,18 @@ export function SharedPolicyFork({
       ),
       line: 'A copy for this application only. The others keep this policy.' },
   ]
+
+  /* The two cards are a radio group, so they act as one: a single Tab stop (the picked card) and the arrow keys to
+     move, picking as they go, round from the last to the first. Two Tab stops and dead arrows was a group in name only. */
+  const wayRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const onWaysKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0
+    if (step === 0) return
+    e.preventDefault()
+    const next = (ways.findIndex((w) => w.id === way) + step + ways.length) % ways.length
+    setWay(ways[next].id)
+    wayRefs.current[next]?.focus()
+  }
 
   const go = () => {
     onClose()
@@ -114,13 +126,17 @@ export function SharedPolicyFork({
       }
     >
       <div className={`bfork is-${way}`}>
-        <div className="bfork__ways" role="radiogroup" aria-label="How to change it">
-          {ways.map((w) => (
+        <div className="bfork__ways" role="radiogroup" aria-label="How to change it" onKeyDown={onWaysKey}>
+          {ways.map((w, i) => (
             <button
               key={w.id}
+              ref={(el) => {
+                wayRefs.current[i] = el
+              }}
               type="button"
               role="radio"
               aria-checked={way === w.id}
+              tabIndex={way === w.id ? 0 : -1}
               className={way === w.id ? 'bfork__way is-on' : 'bfork__way'}
               onClick={() => setWay(w.id)}
             >

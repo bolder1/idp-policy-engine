@@ -349,8 +349,9 @@ describe('turning one on and off', () => {
   })
 
   it('says events, not sign-ins, when it asks, with or without applications', () => {
+    /* The title no longer names the policy (23 Oct 2026, the popups pass): the dialog names it once in the body. */
     expect(statusConfirmCopy(collab, 'active', false, 'Slack and GitHub Enterprise')).toEqual({
-      title: 'Turn on Collaboration tools?',
+      title: 'Turn on this policy?',
       lines: ['It starts acting on events in Slack and GitHub Enterprise.'],
       verb: 'Turn on',
     })

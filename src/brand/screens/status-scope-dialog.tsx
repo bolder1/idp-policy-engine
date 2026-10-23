@@ -17,6 +17,13 @@ import type { App, Policy } from '../data'
    out), each naming its scope. The illustration is the applications themselves as
    logos, arriving one after another with this one ringed, so the scope is seen
    before it is read.
+
+   THIS IS THE CONFIRMATION (23 Oct 2026, the popups pass: "if something can be
+   removed, remove it"). Both answers used to open a second dialog — Everywhere
+   the status switch's own "Turn off?", Only here the Remove dialog — so the admin
+   answered one question twice. The caller writes the answer as given. The line
+   that spelled the two buttons out as a sentence went too, and Only here carries
+   the application's logo, as the fork slider's Duplicate does.
    -------------------------------------------------------------------------- */
 
 export function StatusScopeDialog({
@@ -35,9 +42,9 @@ export function StatusScopeDialog({
   /** Every application the policy is on, this one included. */
   apps: App[]
   onClose: () => void
-  /** The policy goes inactive on every application it is on. */
+  /** The policy goes inactive on every application it is on. Already confirmed here: the caller asks nothing more. */
   onEverywhere: () => void
-  /** Only this application stops using it. */
+  /** Only this application stops using it. Already confirmed here, as Remove's own confirm would have. */
   onHere: () => void
 }) {
   const reduce = useReducedMotion()
@@ -46,7 +53,7 @@ export function StatusScopeDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title={`Turn off ${policy.name}`}
+      title="Turn off this policy?"
       width={480}
       footer={
         <>
@@ -57,7 +64,9 @@ export function StatusScopeDialog({
               onHere()
             }}
           >
-            Only {app.name}
+            <span className="bfork__btnapp">
+              Only <AppLogo appId={app.id} name="" size={16} /> {app.name}
+            </span>
           </Button>
           <Button
             variant="secondary"
@@ -87,7 +96,10 @@ export function StatusScopeDialog({
           ))}
           {apps.length > shown.length && <li className="bscope__more">+{apps.length - shown.length}</li>}
         </ul>
-        <p className="bscope__said">Used by {apps.length} applications. Turn it off for all of them, or only here.</p>
+        <p className="bscope__said">
+          <b>{policy.name}</b>
+          <span>Used by {apps.length} applications.</span>
+        </p>
       </div>
     </Modal>
   )

@@ -823,6 +823,7 @@ function ProfilePage({
   onBack: () => void
   onChange: (p: FingerprintProfile) => void
 }) {
+  const store = useBrand()
   const [tab, setTab] = useState<ProfileTab>('basic')
   const [editing, setEditing] = useState(false)
   /* Whether the heading is the name field — the pencil's rename. */
@@ -870,6 +871,24 @@ function ProfilePage({
   const dirty = changedNow || (isNew && touched)
   const shownReview = isNew ? profileReview({ ...profile, name: '' }, draft) : review
 
+  /* The footer's Discard (owner, 23 Oct 2026). The latch goes with the edits:
+     a new profile discarded is back to the clean, just-named page, as a new
+     zone is — with it kept, the footer stayed up on the seed and a second press
+     did nothing. Undo in the toast, as the builder's Discard has one, puts both
+     back. */
+  const discard = () => {
+    const was = { draft, touched }
+    setDraft(profile)
+    setTouched(false)
+    store.showToast('Changes discarded', {
+      label: 'Undo',
+      run: () => {
+        setDraft(was.draft)
+        setTouched(was.touched)
+      },
+    })
+  }
+
   /* Why the draft can't be saved yet: a blank or taken name, no checks, a
      version that isn't one, a roster that is missing or can't be matched. The
      save bar, Review changes and the leave dialog all say the same thing.
@@ -877,6 +896,12 @@ function ProfilePage({
      `basicSetupIssue` for why that blocks Create profile rather than creating
      a profile whose own tab says it isn't finished. */
   const issue = profileIssue(draft, otherNames) ?? basicSetupIssue(draft, isNew)
+  /* The footer carries no words (23 Oct 2026), so a new trusted device held for
+     want of basic details says so under the question that answers it — on the
+     Basic details tab, and above the Signals list — in the create wizard's own
+     words for the same question. Only once the footer is up: an untouched page
+     has nothing to save yet. */
+  const reachHeld = dirty && basicSetupIssue(draft, isNew) !== null ? 'Choose a device restriction type.' : null
 
   /* Focus lands on the heading when the page opens. The control that opened it
      (a row's name, a menu item, Create profile) left with the list. */
@@ -999,10 +1024,11 @@ function ProfilePage({
      name another profile has is refused by the field itself.
 
      A new profile is not stored, so its name goes in the draft, as it always
-     did, and waits for Create profile. A taken one is still the footer's to
-     refuse there, as it was, and a blank one keeps the name it had. */
+     did, and waits for Create profile. A taken one is refused by the field
+     there too, under it in red: it was the footer's to refuse, and the footer
+     has no words now (23 Oct 2026). A blank one keeps the name it had. */
   const renameIssue = (name: string) => nameIssue(name, otherNames)
-  const nameProblem = (typed: string) => (isNew ? null : nameRefusal(profile, typed, renameIssue))
+  const nameProblem = (typed: string) => nameRefusal(isNew ? draft : profile, typed, renameIssue)
   const keepTypedName = (typed: string) => {
     if (isNew) {
       const name = typed.trim()
@@ -1115,7 +1141,7 @@ function ProfilePage({
 
           <div id="bfp2-panel" role="tabpanel" className="bfp2__panel">
             {tab === 'basic' ? (
-              <BasicDetailsTab draft={draft} onChange={changeBasic} />
+              <BasicDetailsTab draft={draft} onChange={changeBasic} held={reachHeld} />
             ) : (
               /* The zone page's two columns, under the tabs as they are there:
                  the list on the left, what describes it on the right. */
@@ -1144,6 +1170,11 @@ function ProfilePage({
                         />
                       </header>
                       <ChoiceTiles labelledBy={reachAskId} options={reachChoices()} value={null} onPick={answerReach} />
+                      {reachHeld && (
+                        <p className="bdpw__said" role="status">
+                          {reachHeld}
+                        </p>
+                      )}
                     </section>
                   )}
                   <ChosenList
@@ -1152,6 +1183,7 @@ function ProfilePage({
                        arrive regardless — so Add is not offered for a
                        catalogue whose size is still undecided. */
                     awaitingReach={needsReach}
+                    saving={dirty}
                     onEdit={() => setEditing(true)}
                     onConfig={setConfig}
                     onWeight={setWeight}
@@ -1174,6 +1206,9 @@ function ProfilePage({
             <ChosenList
               draft={draft}
               fullEmpty={isNew}
+              /* While the footer is up it holds the view's one orange button,
+                 and the empty list then says why the save is held. */
+              saving={dirty}
               onEdit={() => setEditing(true)}
               onConfig={setConfig}
               onWeight={setWeight}
@@ -1187,8 +1222,8 @@ function ProfilePage({
       )}
 
       {/* The kit's footer, not a local one. Zones and risk profiles commit the
-          same way. It has no Discard: leaving the page is where edits are
-          thrown away, through the leave dialog. */}
+          same way: Discard and the save, no words (23 Oct 2026). Why the save
+          is held is said in the form, beside what it is about. */}
       <SaveBar
         open={dirty}
         changes={isNew ? ['New profile'] : profileChangeParts(profile, draft)}
@@ -1198,7 +1233,7 @@ function ProfilePage({
         blocked={issue !== null}
         blockedReason={issue ?? undefined}
         onSave={save}
-        onDiscard={() => setDraft(profile)}
+        onDiscard={discard}
       />
 
       <ChecksDrawer
@@ -1380,9 +1415,12 @@ function EditableName({
 function BasicDetailsTab({
   draft,
   onChange,
+  held,
 }: {
   draft: FingerprintProfile
   onChange: (patch: Partial<FingerprintProfile>) => void
+  /** Why Create profile waits on the restriction type, said under it. Null when it does not. */
+  held?: string | null
 }) {
   return (
     /* The Signals tab's two columns, and the zone page's: the form on the left,
@@ -1390,7 +1428,7 @@ function BasicDetailsTab({
        were, because they are the same grid. */
     <div className="bz7__cols">
       <div className="bz7__work">
-        <BasicDetailsForm profile={draft} onChange={onChange} />
+        <BasicDetailsForm profile={draft} onChange={onChange} held={held} />
       </div>
       {/* One panel, answered or not: it describes the choices, so it does not
           have to wait for them or change with them. */}
@@ -1427,11 +1465,14 @@ function BasicDetailsTab({
 function BasicDetailsForm({
   profile,
   onChange,
+  held,
 }: {
   profile: FingerprintProfile
   /** A patch onto the page's draft. A reach switch sends a whole profile: it
       rewrites `enabled`, `config` and `weights` along with `reach`. */
   onChange: (patch: Partial<FingerprintProfile>) => void
+  /** Why Create profile waits on the restriction type. Null when it does not. */
+  held?: string | null
 }) {
   /* The reach a press is proposing, or null when none is. Not a copy of the
      current value — this is "somebody has asked for a change and not yet
@@ -1462,8 +1503,9 @@ function BasicDetailsForm({
     /* Pressing the tile that is ALREADY the answer still answers it.
 
        A profile nobody has set up shows its default reach checked while
-       `restrictionSet` is false, and the save footer refuses with "Set up basic
-       details" until that flag turns true. The slider's Apply used to turn it —
+       `restrictionSet` is false, and Create profile is held ("Set up basic
+       details", said under these tiles as the question) until that flag turns
+       true. The slider's Apply used to turn it —
        Apply on untouched defaults counted as an answer, deliberately. With the
        slider gone, a press that returned early here left no press in the form
        that could ever turn it, and the profile could not be created. */
@@ -1502,6 +1544,14 @@ function BasicDetailsForm({
             value={profile.reach}
             onPick={pressReach}
           />
+          {/* The default shows checked, and a press on it is the answer (see
+              `pressReach`), so the line asks for the press rather than a
+              different tile. */}
+          {held && (
+            <p className="bdpw__said" role="status">
+              {held}
+            </p>
+          )}
 
           {/* A hard stop with the reason and nothing to count (owner, 23 Oct
               2026: "they need all these numbers and the list removed. They
@@ -1524,8 +1574,13 @@ function BasicDetailsForm({
               if (pendingReach) commitReach(pendingReach)
             }}
           >
+            {/* `withReach` (fingerprint.ts) also drops an uploaded roster and puts registration back to self, because a
+                roster is matched on MAC, which only the agent reads. A pre-approved profile is told so, in one clause:
+                the plain card still names what it destroys. */}
             Agent-based signals need the Device Agent. Switching removes them from{' '}
-            <b>{profile.name.trim() || 'this profile'}</b>, along with their settings.
+            <b>{profile.name.trim() || 'this profile'}</b>, along with their settings
+            {profile.registration === 'pre-approved' && profile.roster ? ' and the approved device roster' : ''}
+            {profile.registration === 'pre-approved' ? ', and users register their own devices' : ''}.
           </Confirm>
 
           {/* The agent's prerequisites, under the answer that incurs them. Not
@@ -1600,6 +1655,7 @@ function ChecksDrawer({
   const offered = offeredAttributes(profile.mode, profile.reach)
   const any = offered.some((a) => a.always || picked.includes(a.id))
   const reason = any ? null : profile.mode === 'os' ? 'Add at least one check.' : 'Add at least one signal.'
+  const reasonId = useId()
   const same = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id))
   const changed = !same(picked, profile.enabled)
 
@@ -1629,20 +1685,30 @@ function ChecksDrawer({
         width={560}
         actions={
           <>
-            {reason && (
-              <span className="bfp2__footreason" role="status">
-                {reason}
-              </span>
-            )}
             <Button variant="ghost" onClick={close}>
               Cancel
             </Button>
-            <Button variant="brand" disabled={!any} title={reason ?? undefined} onClick={() => onSave(picked)}>
+            {/* `blocked`, not `disabled`: reachable, read with the line in the
+                form that says why, and a press saves nothing. */}
+            <Button
+              variant="brand"
+              blocked={reason ?? undefined}
+              describedBy={reason ? reasonId : undefined}
+              onClick={() => onSave(picked)}
+            >
               Save
             </Button>
           </>
         }
       >
+        {/* Why Save is held, over the list whose ticks decide it. It was the
+            footer's line beside Cancel (owner, 23 Oct 2026: "don't use this
+            kind of lines in the footer, use it inside the form"). */}
+        {reason && (
+          <p id={reasonId} className="bdpw__said bfp2__pickheld" role="status">
+            {reason}
+          </p>
+        )}
         <AttrStep
           mode={profile.mode}
           reach={profile.reach}

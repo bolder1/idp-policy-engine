@@ -98,12 +98,10 @@
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--border-subtle); background: var(--surface-sunken);
 }
-/* A spacer that pushes Skip, Back and Next to the end. It held progress dots,
-   which repeated the step count and are out of the console. */
+/* A spacer that pushes Back and Next to the end. It held progress dots,
+   which repeated the step count and are out of the console. `.btr__skip` went
+   with the Skip link (23 Oct 2026): it did what the card's × does. */
 .btr__dots { flex: 1; }
-
-.btr__skip { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 var(--space-3); }
-.btr__skip:hover { color: var(--text-primary); text-decoration: underline; }
 
 @media (max-width: 560px) {
   .btr__card { width: calc(100vw - 24px); left: 12px !important; }

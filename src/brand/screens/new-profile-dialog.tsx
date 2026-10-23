@@ -69,7 +69,7 @@ export function NewProfileDialog({
       width={560}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="brand" disabled={problem !== null} title={problem ?? undefined} onClick={go}>

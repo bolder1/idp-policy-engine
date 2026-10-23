@@ -35,7 +35,8 @@ export const RULE_ON_OFF: boolean = false
 
 /* The panel's Narrow / Widen button, hidden (owner, 23 Oct 2026: "Remove this
    function as well, hide it ... a better, bigger, single-stack form size"). The
-   panel is one width now, 640 to start, and the grip in the gutter still drags
-   it between 480 and 880. Hidden, not deleted: turning this on brings the
-   button back, though the narrow end it steps to is now only 380 wide. */
+   panel is one width now, 600 to start and at most, and the grip in the gutter
+   still drags it between 480 and 600. Hidden, not deleted: turning this on
+   brings the button back, stepping between those two ends (`NARROW` in
+   BoardBuilder.tsx). */
 export const PANEL_WIDTH_BUTTON: boolean = false

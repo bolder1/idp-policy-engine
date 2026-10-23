@@ -209,11 +209,76 @@ export function statusToast(name: string, from: PolicyStatus, to: StatusTarget):
      because something is held back from it — the builder's edits, else a saved
      draft — and names which.
    - A post sign-in policy decides no sign-in at all: Turn on and Turn off
-     say it starts or stops acting on events in its applications. */
+     say it starts or stops acting on events in its applications.
+
+   SHORT TITLES, THE POLICY IN THE BODY (owner, 23 Oct 2026: short titles, never
+   a long policy name inside the title; logos beside application names; the
+   Remove dialog is the model). "Turn off Device compliance for Outlook and
+   Dropbox?" is now "Turn off this policy?", and the first line names the policy
+   once, in bold, where these words say "It", with its applications as logos.
+   That is why the first line comes in pieces (`statusConfirmParts`): the dialog
+   draws them, `statusConfirmCopy` joins the same pieces into words, so what is
+   drawn and what a test pins cannot drift. For the same reason Inactive →
+   Monitoring now opens with the policy too: "It watches sign-ins to HRMS without
+   changing them", where it said "Sign-ins to HRMS don't change". */
 export interface StatusConfirm {
   title: string
   lines: string[]
   verb: string
+}
+
+/** The first line of a status confirm: "It {does} {where} {applications}{rest}". */
+export interface StatusLead {
+  /** What the policy starts or stops doing, after its name: "stops deciding sign-ins". */
+  does: string
+  /** The word before its applications: sign-ins go to them, events happen in them. */
+  where: 'to' | 'in'
+  /** The rest of the sentence after the applications, full stop included. */
+  rest: string
+}
+
+export interface StatusConfirmParts {
+  title: string
+  verb: string
+  lead: StatusLead
+  /** The lines after it: what is held back. */
+  notes: string[]
+}
+
+export function statusConfirmParts(
+  policy: Pick<Policy, 'status' | 'pendingDraft'> & { type?: PolicyType },
+  target: StatusTarget,
+  unsaved: boolean,
+): StatusConfirmParts {
+  if (policy.type === 'Session' && target !== 'monitor') {
+    return target === 'active'
+      ? { title: 'Turn on this policy?', lead: { does: 'starts acting on events', where: 'in', rest: '.' }, notes: [], verb: 'Turn on' }
+      : { title: 'Turn off this policy?', lead: { does: 'stops acting on events', where: 'in', rest: '.' }, notes: [], verb: 'Turn off' }
+  }
+  if (target === 'active') {
+    return {
+      title: 'Turn on this policy?',
+      lead: { does: 'starts deciding sign-ins', where: 'to', rest: '.' },
+      notes: policy.pendingDraft ? ['Your saved draft is not included.'] : [],
+      verb: 'Turn on',
+    }
+  }
+  if (target === 'inactive') return { title: 'Turn off this policy?', lead: { does: 'stops deciding sign-ins', where: 'to', rest: '.' }, notes: [], verb: 'Turn off' }
+  if (policy.status === 'active') {
+    return {
+      title: 'Monitor this policy?',
+      lead: { does: 'stops deciding sign-ins', where: 'to', rest: ' and records what it would decide.' },
+      notes: [],
+      verb: 'Monitor',
+    }
+  }
+  const heldBack = unsaved ? 'Your unsaved changes are not included.' : policy.pendingDraft ? 'Your saved draft is not included.' : null
+  return {
+    title: 'Monitor this policy?',
+    lead: { does: 'watches sign-ins', where: 'to', rest: ' without changing them.' },
+    notes: heldBack ? [heldBack] : [],
+    verb: 'Monitor',
+  }
 }
 
 export function statusConfirmCopy(
@@ -222,27 +287,8 @@ export function statusConfirmCopy(
   unsaved: boolean,
   apps: string | null,
 ): StatusConfirm {
-  const { name } = policy
-  const to = apps ? ` to ${apps}` : ''
-  if (policy.type === 'Session' && target !== 'monitor') {
-    const inApps = apps ? ` in ${apps}` : ''
-    return target === 'active'
-      ? { title: `Turn on ${name}?`, lines: [`It starts acting on events${inApps}.`], verb: 'Turn on' }
-      : { title: `Turn off ${name}?`, lines: [`It stops acting on events${inApps}.`], verb: 'Turn off' }
-  }
-  if (target === 'active') {
-    return {
-      title: `Turn on ${name}?`,
-      lines: [`It starts deciding sign-ins${to}.`, ...(policy.pendingDraft ? ['Your saved draft is not included.'] : [])],
-      verb: 'Turn on',
-    }
-  }
-  if (target === 'inactive') return { title: `Turn off ${name}?`, lines: [`It stops deciding sign-ins${to}.`], verb: 'Turn off' }
-  if (policy.status === 'active') {
-    return { title: `Switch ${name} to monitoring?`, lines: [`It stops deciding sign-ins${to} and records what it would decide.`], verb: 'Monitor' }
-  }
-  const heldBack = unsaved ? 'Your unsaved changes are not included.' : policy.pendingDraft ? 'Your saved draft is not included.' : null
-  return { title: `Monitor ${name}?`, lines: [`Sign-ins${to} don't change.`, ...(heldBack ? [heldBack] : [])], verb: 'Monitor' }
+  const { title, verb, lead, notes } = statusConfirmParts(policy, target, unsaved)
+  return { title, verb, lines: [`It ${lead.does}${apps ? ` ${lead.where} ${apps}` : ''}${lead.rest}`, ...notes] }
 }
 
 /* Whether the toast after a save offers "Monitor" (owner, 25 Sep 2026: Draft →

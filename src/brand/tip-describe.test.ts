@@ -103,7 +103,12 @@ describe('the description, while the tip is open', () => {
        description lives exactly as long. */
     expect(tip).toContain("matches?.(':focus-visible')) setOpen(true)")
     expect(tip).toContain('onBlurCapture={leave}')
-    expect(tip).toContain('onMouseEnter={hover}')
+    /* The pointer path is pointer events with touch skipped (23 Oct 2026): a tap's compatibility mousedown closed the
+       tip the tap had just opened, so the mouse handlers went and a finger answers only to `onTouchStart`. */
+    expect(tip).toContain('onPointerEnter={(e) => {')
+    expect(tip).toContain("if (e.pointerType !== 'touch') hover()")
+    expect(tip).not.toContain('onMouseDown={leave}')
+    expect(tip).toContain('onTouchStart={() => setOpen((v) => !v)}')
     /* The icon button's tip is its label: described by nothing. */
     const icon = kitSrc.slice(kitSrc.indexOf('export function IconButton('), kitSrc.indexOf('export function IconButton(') + 1200)
     expect(icon).toContain('<Tip text={label}>')

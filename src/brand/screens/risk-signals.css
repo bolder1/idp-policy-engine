@@ -49,6 +49,9 @@
   margin: 0 0 var(--space-5);
   font-size: var(--fs-xs); line-height: 1.5; color: var(--text-tertiary);
 }
+/* Why the save is held, between that line and the list it is about (23 Oct
+   2026): the device profile wizard's line, amber as this page's name error is. */
+.bdpw__said.brs__held { margin: calc(-1 * var(--space-3)) 0 var(--space-5); }
 
 /* --- Search ---------------------------------------------------------------- */
 /* `.brs__search` stood here — a fourth copy of the same box, at a fourth height

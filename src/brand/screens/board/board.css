@@ -945,6 +945,11 @@
    the hover, which put it back — a flicker you could not grab. The badge says
    it is under the pointer with its ground instead. */
 button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--surface-sunken)); }
+/* The still number: a card that cannot be reordered — the builder's first build (no `arrange`, 23 Oct 2026), a
+   read-only canvas, a run — draws its position as a span. It moves nothing, so no grab, a touch that starts on it
+   pans as anywhere else, and no hover scale inviting a drag. Every surface, not each one scoped in turn. */
+.bb__idx.is-still { cursor: inherit; touch-action: auto; }
+.bb__idx.is-still:hover { transform: none; }
 /* The number stays; the grip goes outside the card.
 
    It used to be a SWAP inside the 30px badge — number at rest, grip on hover —
@@ -2004,6 +2009,20 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__ifwho { display: flex; align-items: center; gap: var(--space-3); min-height: 26px; }
 
+/* A smaller open card (owner, 23 Oct 2026: "we can make the card smaller, why so much space?").
+
+   Every space in the card's reading one step down the scale: the block's padding and the gap between its lines, the
+   card's foot, and a condition row's air. The keyword lines (`who`, `if`, `then`) hold one word, so they take a 20px
+   line rather than a control row's 26; the who and the action hold a 22px chip, so they take 24. Nothing is removed,
+   the type is untouched (12px stays the floor) and the folded card keeps its height. Canvases only, and not a run
+   (`.is-run`), whose rows carry marks and bands that need the room; the panel's editor is not a card. */
+.bb__stage:not(.is-run) .bb__cardbody { padding-bottom: var(--space-4); gap: var(--space-3); }
+.bb__stage:not(.is-run) .bb__cardbody > .bb__if { padding: var(--space-4); gap: var(--space-1); }
+.bb__stage:not(.is-run) .bb__cardbody .bb__ifrow { min-height: var(--space-7); }
+.bb__stage:not(.is-run) .bb__cardbody .bb__ifrow.is-cond { min-height: var(--space-8); padding: var(--space-1) 0; }
+.bb__stage:not(.is-run) .bb__cardbody .bb__ifwho,
+.bb__stage:not(.is-run) .bb__cardbody .bb__ifaction { min-height: var(--space-8); }
+
 .bb__ifchip {
   display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%;
   height: 22px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
@@ -2307,7 +2326,9 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifutil svg { flex: none; opacity: 0.8; }
 .bb__ifutil:hover { background: var(--surface-sunken); color: var(--text-primary); }
 .bb__ifutil:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__ifutil.is-danger:hover { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-primary); }
+/* The group's trash reads red under the pointer, as the kit's delete icons do (owner, 23 Oct 2026: "in delete use red,
+   change it globally"). Colour only: no hover motion on icons. */
+.bb__ifutil.is-danger:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 
 /* Dashed means one thing on this surface: something is about to be added.
 
@@ -3253,15 +3274,16 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__addnote b { font-weight: var(--fw-medium); color: var(--text-secondary); }
 
 /* --- The start node's pane: which applications ---------------------------------
-   A lede, a search, the list, and a Save pinned under it. The list is the
-   Who dialog's rows with the application's mark added, so ticking an app and
-   ticking a group look like the same act. */
-.bb__apps { display: flex; flex-direction: column; min-height: 100%; }
+   A search, the chips, the list, and Cancel and Save under them. As tall as
+   what is in it (owner, 23 Oct 2026: "make the form smaller, no need to
+   stretch for no reason, redo"): nothing here fills the panel's height, so the
+   buttons sit under the last row rather than at the foot of the canvas. */
+.bb__apps { display: flex; flex-direction: column; }
 .bb__apps__lede {
   margin: 0; padding: var(--space-5) var(--space-5) 0;
   font-size: var(--fs-sm); line-height: 1.5; color: var(--text-tertiary);
 }
-.bb__apps__body { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); flex: 1; }
+.bb__apps__body { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
 .bb__apps__count { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 .bb__apps__list {
   display: flex; flex-direction: column;
@@ -3281,15 +3303,26 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   font-weight: var(--fw-medium); color: var(--text-primary);
 }
 .bb__apps__item em { flex: none; font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); }
-/* Pinned to the bottom of the panel, so Save is in reach at any scroll. */
+/* The rule panel's foot, drawn the same way (`.bb__inspfoot`): a row at the right, Cancel then the panel's grey save,
+   no words (23 Oct 2026). Under the form rather than at the panel's floor; sticky only for a list longer than the
+   window, so Save stays in reach while it scrolls. */
 .bb__apps__foot {
-  position: sticky; bottom: calc(var(--space-8) * -1);
-  display: flex; flex-direction: column; gap: var(--space-3);
-  margin-bottom: calc(var(--space-8) * -1);
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  position: sticky; bottom: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   background: var(--surface-raised);
   border-top: 1px solid var(--border-subtle);
 }
+.bb__apps__foot .bx-btn--neutral:last-child {
+  background: var(--int-neutral-bg-active);
+  border-color: var(--int-neutral-border);
+  color: var(--text-primary);
+}
+.bb__apps__foot .bx-btn--neutral:last-child:not(:disabled):hover {
+  background: var(--int-neutral-border);
+  border-color: var(--int-neutral-border-hover);
+}
+/* Under the chips, while none is left: what saving an empty list does. */
 .bb__apps__note { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--fb-notice-fg, var(--text-secondary)); }
 
 /* A post sign-in policy's linked applications, read only (AppsPane.tsx
@@ -3317,12 +3350,23 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__linked__events { font-size: var(--fs-sm); line-height: 1.45; color: var(--text-tertiary); }
 
 /* Who, then Applications, as two of the inspector's sections (13 Oct 2026).
-   The applications' lede, search and list hang off their heading against the
-   guide rule like a rule's Who does, so the section takes the room the pane
-   gave the list and the body loses its own frame padding. */
-.bb__apps__sec { flex: 1; }
+   The section's body loses its own frame padding; the section is as tall as
+   what is in it (23 Oct 2026), so it no longer takes the room the pane had. */
 .bb__apps__sec .bb__apps__body { padding: 0; }
 .bb__apps__sec .bb__apps__lede { padding: 0; }
+
+/* The panel itself, as tall as its form (Inspector.tsx `is-apps`): it starts at the canvas's top inset and ends under
+   its buttons, and only a list longer than the window makes it full height and scroll. */
+.bb__insp.is-apps { align-self: start; max-height: calc(100% - 2 * var(--space-5)); }
+.bb__insp.is-apps .bb__inspbody { flex: 0 1 auto; padding-bottom: 0; }
+/* The chips' own height, not the dialog's fixed one (app-transfer.css, 22 Oct 2026, which is about the popup): the
+   chips take the rows they fill, and the list takes its rows. One step smaller than the popup's rows, because this
+   is a panel form rather than a dialog to scan. */
+.bb__apps .bxc { height: auto; }
+.bb__apps .bxc__chosen { height: auto; }
+.bb__apps .bxc__part.is-list { flex: none; }
+.bb__apps .bxc__list { flex: none; }
+.bb__apps .bxc__list .bxl__row { gap: var(--space-4); min-height: var(--space-11); padding: var(--space-2) var(--space-3); }
 /* The audience's answer when nothing narrows it: said as the answer it is. */
 .bb__aud__all {
   display: flex; align-items: center; gap: var(--space-3);
@@ -3554,9 +3598,8 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 /* One line folded; the card opened to be read says its whole name. */
 .insp__canvas.is-framed .bb__titlebtn strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .insp__canvas.is-framed .bb__card.is-open .bb__titlebtn strong { white-space: normal; overflow-wrap: anywhere; }
-/* The number alone (RuleCard `foldOnPress`): nothing to grab, and a swipe that starts on it scrolls. */
-.insp__canvas.is-framed .bb__idx.is-still { cursor: inherit; touch-action: auto; }
-.insp__canvas.is-framed .bb__idx.is-still:hover { transform: none; }
+/* The number alone (RuleCard `foldOnPress`): nothing to grab, and a swipe that starts on it scrolls — the unscoped
+   `.bb__idx.is-still` rule, beside `.bb__idx`, says so for every still number. */
 .insp__canvas.is-framed .bb__lockmark { display: none; }
 /* Any skin draws the fold inside the head (Centred's merge), so the trail never floats over a 16px connector. */
 .insp__canvas.is-framed .bb__cardhead { grid-template-columns: auto minmax(0, 1fr) auto; }
@@ -3932,6 +3975,15 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
   z-index: 4; width: 220px;
 }
 .bb__notice .bz7n-sticky { margin: 0; pointer-events: auto; }
+/* Always on the canvas. Beside the chain it needs its 220px, the gap and a little edge: 260px left of the 520px chain,
+   which the centred world has only on a stage 1040px wide or more. The world is centred and never pans sideways, and
+   the stage clips, so on a narrower stage (a laptop, or any panel open) the note was cut off or gone. There it stands
+   above the start node instead, in the chain's own flow, with the same tilt (a Motion prop on the paper, so nothing
+   here transforms it). The container is the stage, and only while it holds a note. */
+.bb__stage:has(.bb__notice) { container: bbstage / inline-size; }
+@container bbstage (max-width: 1039.98px) {
+  .bb__notice { position: relative; right: auto; top: auto; align-self: center; margin-bottom: var(--space-7); }
+}
 .bb__sticky__text { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
 /* A copy's name, highlighted. */
 .bbtop__title.is-copy { background: var(--fb-info-bg); border-radius: var(--radius-md); padding: 0 var(--space-3); }

@@ -134,7 +134,9 @@ export function Inspector({
   const editingRule = !!(rule && part)
 
   return (
-    <aside className={`bb__insp ${leaving ? 'is-leaving' : ''} ${swap ? 'is-swap' : ''}`} aria-label="Inspector">
+    /* `is-apps`: the Applications panel is as tall as its form, not the canvas (owner, 23 Oct 2026: "make the form
+       smaller, no need to stretch for no reason"); board.css. */
+    <aside className={`bb__insp ${leaving ? 'is-leaving' : ''} ${swap ? 'is-swap' : ''}${selection.kind === 'apps' ? ' is-apps' : ''}`} aria-label="Inspector">
       <div className={`bb__inspbar${editingRule ? ' is-rule' : ''}`}>
         {editingRule && rule ? (
           <>
@@ -276,7 +278,7 @@ export function Inspector({
           </>
         ) : selection.kind === 'apps' ? (
           <motion.div key="apps" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-            <AppsPane policyId={draft.id} onSaved={onAppsSaved} />
+            <AppsPane policyId={draft.id} onSaved={onAppsSaved} onCancel={onClose} />
           </motion.div>
         ) : selection.kind === 'fallback' ? (
           /* Branching on `kind`, not on `rule` being truthy. The old test sent

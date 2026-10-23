@@ -10,7 +10,8 @@ import { ARRIVAL_LABEL, blankPostSignInPolicy, eventsFor, linkApp, linkOf, linke
 import { freeName } from '../policy-name'
 import { listNames } from '../rule-who'
 import { playCue } from '../sound'
-import { denyNotice, eventGroups, eventNames, linkChoices, linkIssue, unlinkCopy } from './app-page-model'
+import { AppLogo } from '../logos/AppLogo'
+import { denyNotice, eventGroups, eventNames, linkChoices, linkIssue, unlinkEvents } from './app-page-model'
 import { PageBar } from './page-bar'
 
 /* -----------------------------------------------------------------------------
@@ -207,12 +208,16 @@ export function AppPostSignInTab({
       />
 
       {/* A small confirm with the policy and the application named. Red only
-          here: the row menu's Unlink is the trigger, this is the act. */}
+          here: the row menu's Unlink is the trigger, this is the act. The
+          Remove dialog's card (owner, 23 Oct 2026: short titles, logos beside
+          application names): the title names the application, and the sentence
+          names the policy once, in `unlinkCopy`'s words (`unlinkEvents`). */}
       <Confirm
         open={!!unlinking?.open}
         onClose={() => unlinking && setUnlinking({ ...unlinking, open: false })}
         tone="removed"
-        title={unlinking ? `Unlink ${unlinking.policy.name} from ${app.name}?` : 'Unlink policy'}
+        shape="hero"
+        title={`Unlink from ${app.name}?`}
         confirmLabel="Unlink"
         confirmIcon={Unlink}
         onConfirm={() => {
@@ -222,8 +227,15 @@ export function AppPostSignInTab({
         }}
       >
         {unlinking && (
-          <div className="bapr__confirm">
-            <p>{unlinkCopy(unlinking.policy.name, app.id, app.name, linkOf(unlinking.policy, app.id)?.eventIds ?? [])}</p>
+          <div className="bapr__confirm is-card">
+            <p>
+              <b>{unlinking.policy.name}</b> stops deciding {unlinkEvents(app.id, linkOf(unlinking.policy, app.id)?.eventIds ?? [])} on{' '}
+              <span className="bx-confirm__fact">
+                <AppLogo appId={app.id} name="" size={16} />
+                {app.name}
+              </span>
+              .
+            </p>
           </div>
         )}
       </Confirm>

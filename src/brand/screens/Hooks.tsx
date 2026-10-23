@@ -296,7 +296,7 @@ function HookForm({
       width={680}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="brand" onClick={attemptSave}>

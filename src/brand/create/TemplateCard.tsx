@@ -442,11 +442,8 @@ export function TemplatePreview({
             </p>
           ))}
 
-          <p className="bprev__note">
-            Evaluated top to bottom. The first rule that matches decides the sign-in, and the
-            rest are skipped.
-          </p>
-
+          {/* No line on how the list is read, and none under it on the last row (23 Oct 2026, the popups pass: no
+              sentences explaining the UI). The numbered stack is the order, and the last row is drawn apart. */}
           <ol className="bprev__stack">
             {m.rules.map((r, i) => (
               <li key={`${i}-${r.name}`} className="bprev__node">
@@ -484,8 +481,6 @@ export function TemplatePreview({
               </span>
             </li>
           </ol>
-
-          {onUse && <p className="bprev__foot">The last row is this policy's own. The template does not change it.</p>}
         </>
       )}
     </Modal>

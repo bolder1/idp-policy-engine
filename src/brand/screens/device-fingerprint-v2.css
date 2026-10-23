@@ -250,11 +250,10 @@
   border-color: var(--fb-notice-border);
 }
 
-/* Why the drawer's main button is disabled, at the start of its footer. */
-.bfp2__footreason {
-  margin-right: auto; min-width: 0;
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fb-notice-fg);
-}
+/* Why the Edit checks drawer's Save is held: the wizard's line, over the list
+   rather than at the start of the footer (23 Oct 2026: no words in footers).
+   First in the body, so it takes no top margin and leaves room under itself. */
+.bdpw__said.bfp2__pickheld { margin: 0 0 var(--space-4); }
 
 /* --- Step two, the picker -----------------------------------------------------------
    A bar, then two columns: categories left, that category's attributes right.

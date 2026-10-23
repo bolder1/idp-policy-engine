@@ -310,7 +310,7 @@ export function BoardTour({
     onClose()
   }, [onClose])
 
-  /* Done, and only Done, earns the little celebration (sound.ts); Skip and Escape leave quietly. */
+  /* Done, and only Done, earns the little celebration (sound.ts); the × and Escape leave quietly. */
   const next = useCallback(() => {
     if (last) {
       playCue('celebrate')
@@ -464,15 +464,17 @@ export function BoardTour({
             reduce={!!reduce}
           />
 
+          {/* Two buttons at most (owner, 23 Oct 2026). Skip went: it did what
+              the × does. Back is not drawn on the first step rather than drawn
+              disabled, so the card never offers a press that does nothing. */}
           <footer className="btr__foot">
             {/* Spacer. The progress dots that sat here repeated "Step N of M". */}
             <span className="btr__dots" aria-hidden />
-            <button type="button" className="btr__skip" onClick={leave}>
-              Skip
-            </button>
-            <Button variant="ghost" size="sm" icon={ArrowLeft} disabled={at === 0} onClick={back}>
-              Back
-            </Button>
+            {at > 0 && (
+              <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={back}>
+                Back
+              </Button>
+            )}
             {/* Never disabled, even with the task outstanding. The card reports
                 the state of the task; it does not hold the door. */}
             <Button

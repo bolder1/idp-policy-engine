@@ -5,6 +5,7 @@ import {
   AppWindow,
   ArrowLeft,
   Check,
+  CircleAlert,
   FileCode2,
   KeyRound,
   ListPlus,
@@ -51,7 +52,8 @@ import {
   type NewDraft,
 } from './app-page-model'
 import { AppGroupsTab, AppUsersTab } from './app-people-tabs'
-import { REMOVE_RUNS_CHECKS, REPLACE_MAKES_DRAFT, attachTo, attachableTo, deleteDetail, detachFrom } from './app-policies'
+import { REMOVE_RUNS_CHECKS, REPLACE_MAKES_DRAFT, attachTo, attachableTo, deleteFacts, detachFrom } from './app-policies'
+import { DeleteFactsLine } from './app-facts'
 import { SetupTabBody, type SetupPatch } from './app-setup-forms'
 import { appStanding, type StandRow } from './app-standing'
 import { addToApp, removeFromApp, replaceOnApp } from './applications-model'
@@ -105,7 +107,12 @@ const TAB_ICON: Record<AppTab, LucideIcon> = {
   endpoints: Waypoints,
 }
 
-const tabOptions = (tabs: readonly AppTab[]) => tabs.map((t) => ({ value: t, label: TAB_LABEL[t], icon: TAB_ICON[t] }))
+/* `held`: Basic has a problem that holds the save. The save footer carries no words (owner, 23 Oct 2026) and stays
+   up on every tab, so Basic's own mark becomes the alert mark, red as the field's line is (`.bapp__tabbar` in
+   applications.css), and the tab the reason is on can be found from wherever the save was tried. The button reads
+   the reason itself to a screen reader (SaveBar `blockedReason`). A mark, not a count: tabs never carry numbers. */
+const tabOptions = (tabs: readonly AppTab[], held = false) =>
+  tabs.map((t) => ({ value: t, label: TAB_LABEL[t], icon: held && t === 'basic' ? CircleAlert : TAB_ICON[t] }))
 
 /* Policies sent to the board from an application — New policy, Add a copy,
    and the unsaved application's New policy — go through `SENT_TO_BOARD`
@@ -427,7 +434,7 @@ function AppPage({
           panelId="bapp-panel"
           value={tab}
           onChange={(t) => show(t)}
-          options={tabOptions(tabs)}
+          options={tabOptions(tabs, dirty && !!problem)}
         />
       </div>
 
@@ -455,8 +462,10 @@ function AppPage({
         )}
       </div>
 
-      {/* Held while Basic has a problem: the reason is the footer's words, and
-          the field it is about says it too. */}
+      {/* Held while Basic has a problem. The footer has no words (23 Oct 2026):
+          the field it is about says why, on Basic, and the Basic tab carries the
+          mark from every other tab (`tabOptions`). Discard has Undo in the
+          toast, as the builder's has. */}
       <SaveBar
         open={dirty}
         changes={changes.map((c) => c.label)}
@@ -465,7 +474,11 @@ function AppPage({
         onSave={saveSetup}
         blocked={!!problem}
         blockedReason={problem ?? undefined}
-        onDiscard={() => setDraft(stored)}
+        onDiscard={() => {
+          const was = draft
+          setDraft(stored)
+          store.showToast('Changes discarded', { label: 'Undo', run: () => setDraft(was) })
+        }}
       />
     </div>
   )
@@ -733,6 +746,15 @@ function PoliciesTab({
     else if (id === 'remove') remove(row)
     else if (id === 'delete') setDeleting({ policy: p, open: true })
   }
+  /* A shared policy's Inactive, answered in its scope dialog (status-scope-dialog.tsx). That dialog IS the
+     confirmation (owner, 23 Oct 2026: "if something can be removed, remove it"), so neither answer asks again:
+     Everywhere writes the switch past its one-line confirm, keeping the toast and the Before turning off checks for
+     somebody newly let in; Only here takes the policy off this application as Remove's confirm does, with its Undo. */
+  const turnOffShared = (row: StandRow) => (where: 'everywhere' | 'here') => {
+    if (where === 'everywhere') statusChange.request(row.policy, 'inactive', { confirmed: true })
+    else detach(row.policy.id)
+  }
+  const deleteNamed = deleting ? deleteFacts(deleting.policy, store.policies, store.apps, store.users, store.groups) : null
 
   return (
     <>
@@ -764,6 +786,7 @@ function PoliciesTab({
               }}
               onDuplicate={() => addCopy(shown.policy.id)}
               onMenu={onMenu(shown)}
+              onTurnOffShared={turnOffShared(shown)}
               onRemoveOther={remove}
               onTab={onTab}
             />
@@ -808,7 +831,7 @@ function PoliciesTab({
           name={deleting.policy.name}
           noun="policy"
           requireTyped
-          detail={deleteDetail(deleting.policy, store.policies, store.apps, store.users, store.groups) ?? undefined}
+          detail={deleteNamed && <DeleteFactsLine facts={deleteNamed} />}
           onCancel={() => setDeleting({ ...deleting, open: false })}
           onConfirm={() => {
             setDeleting({ ...deleting, open: false })
@@ -1049,7 +1072,8 @@ function NewAppPage({ entry }: { entry: CatalogApp }) {
           panelId="bapp-panel"
           value={tab}
           onChange={move}
-          options={tabOptions(tabs)}
+          /* After a refused Save, as Basic's own lines are. */
+          options={tabOptions(tabs, tried && !!problem)}
         />
       </div>
 

@@ -28,9 +28,10 @@ import './policy-details.css'
    widen it should meet the screen they filled in, not a different arrangement of
    the same three fields.
 
-   It commits through the kit save bar, as the library pages do: the bar names
-   what changed, Review changes lays the saved values beside the new ones, and
-   Save stores them and goes back to where you came from.
+   It commits through the kit save bar, as the library pages do: the bar holds
+   Discard and the save and no words (23 Oct 2026), Review changes lays the
+   saved values beside the new ones, and Save stores them and goes back to
+   where you came from.
    -------------------------------------------------------------------------- */
 
 export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string; from?: PolicyDetailsFrom }) {
@@ -198,9 +199,18 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
         }}
         blocked={!!blocked}
         blockedReason={blocked ?? undefined}
+        /* With Undo in the toast (owner, 23 Oct 2026), as the builder's Discard has. */
         onDiscard={() => {
+          const was = { name, appIds }
           setName(saved?.name ?? '')
           setAppIds(saved?.appIds ?? [])
+          store.showToast('Changes discarded', {
+            label: 'Undo',
+            run: () => {
+              setName(was.name)
+              setAppIds(was.appIds)
+            },
+          })
         }}
         review={diff?.rows}
       />

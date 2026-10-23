@@ -113,10 +113,10 @@ export function BoardBar({
      rescued when it actually landed on <body> after a leave: a click or Tab to
      a real control keeps it. */
   const pencil = useRef<HTMLSpanElement | null>(null)
-  /* The name the policy arrived with. A copy's name is highlighted only while it is still this one: once it is
-     renamed the admin has made it their own (owner, 23 Oct 2026: "if the user renamed it once, we can remove the
-     color"). */
-  const arrivedAs = useRef(policy.name)
+  /* A copy's name is highlighted until it is renamed: then the admin has made it their own (owner, 23 Oct 2026: "if
+     the user renamed it once, we can remove the color"). The rename takes `copiedFrom` off the policy in the store
+     (store.tsx `keepsCopyMark`), so the highlight stays gone on the next visit too; it was a ref of the name the bar
+     mounted with, which a revisit after the rename took as the copy's name and lit again. */
   const focusPencil = (onlyIfLost = false) =>
     requestAnimationFrame(() => {
       const at = document.activeElement
@@ -222,7 +222,7 @@ export function BoardBar({
             {/* A copy nobody has finished says so on its name: highlighted (owner, 23 Oct 2026: "add a highlighter on the
                 policy name so the user gets it that it is copied"; the Copy tag beside it was removed the same day). It goes
                 when the copy is turned on. */}
-            <h1 className={policy.copiedFrom && policy.status === 'draft' && policy.name === arrivedAs.current ? 'bbtop__title is-copy' : 'bbtop__title'} title={policy.name}>
+            <h1 className={policy.copiedFrom && policy.status === 'draft' ? 'bbtop__title is-copy' : 'bbtop__title'} title={policy.name}>
               {policy.name}
             </h1>
             <span className="bbtop__pencil" ref={pencil}>
@@ -437,9 +437,10 @@ export function BoardBarActions({
       )}
 
       {/* Always present, as in the trail; enabled only with something to throw away. */}
-      {/* A disabled button says why. Discard is destructive, so it is the
-          kit's danger outline. */}
-      {discard && <Button variant="danger" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
+      {/* A disabled button says why. Discard is destructive, but a trigger
+          stays neutral and the red is inside its confirm: secondary, as the
+          kit SaveBar's Discard is (23 Oct 2026). */}
+      {discard && <Button variant="secondary" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
         Discard
       </Button>}
       <Button variant="secondary" size="sm" disabled={!unsaved} title={unsaved ? undefined : 'No changes to save'} onClick={onSaveDraft}>

@@ -61,8 +61,9 @@ const supportNote = (many: boolean) =>
 
 const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')
 
-/* What the last action did, said in the slider's own footer beside Done rather
-   than in the app's toast. The toast sits outside this panel, where Tab never
+/* What the last action did, said inside the slider — at the top of its list, not
+   in its footer (owner, 23 Oct 2026: no text lines in footers) and not in the
+   app's toast. The toast sits outside this panel, where Tab never
    goes while the panel is open, and top right, which is where this panel draws
    its first row. Here Undo is inside the panel, reachable by keyboard, and
    covers nothing. It stays until the next action: nothing times out. */
@@ -642,24 +643,9 @@ export function CaChainDrawer({
       head={head}
       actions={
         page === 'list' ? (
-          <>
-            {said && (
-              <p className="bm8__casaid">
-                {/* Said by the live region in the body; the Undo is a real control. */}
-                <span className="bm8__casaidtext" title={said.text} aria-hidden>
-                  {said.text}
-                </span>
-                {said.undo && (
-                  <Button variant="ghost" size="sm" onClick={said.undo}>
-                    Undo
-                  </Button>
-                )}
-              </p>
-            )}
-            <Button variant="brand" onClick={onClose}>
-              Done
-            </Button>
-          </>
+          <Button variant="brand" onClick={onClose}>
+            Done
+          </Button>
         ) : (
           <>
             <Button variant="ghost" onClick={back}>
@@ -706,6 +692,19 @@ export function CaChainDrawer({
       </div>
       <div ref={bodyRef} className={`bm8__cabody${dragging && page === 'list' ? ' is-over' : ''}`}>
         <motion.div key={page} {...slide}>
+          {page === 'list' && said && (
+            <p className="bm8__casaid">
+              {/* Said by the live region below; the Undo is a real control, inside the panel where Tab can reach it. */}
+              <span className="bm8__casaidtext" title={said.text} aria-hidden>
+                {said.text}
+              </span>
+              {said.undo && (
+                <Button variant="ghost" size="sm" onClick={said.undo}>
+                  Undo
+                </Button>
+              )}
+            </p>
+          )}
           {page === 'list' ? list : add}
         </motion.div>
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlignLeft,
   AppWindow,
@@ -40,7 +40,8 @@ import { scenarioFromPolicy } from '../template-from-policy'
 import { SaveTemplateDialog } from './builder-dialogs'
 import { ConfirmDelete } from './confirm-delete'
 import { AppTransfer } from './app-transfer'
-import { decidesFor, deleteDetail, listPhrase, ownerOf } from './app-policies'
+import { decidesFor, deleteFacts, ownerOf } from './app-policies'
+import { AppFacts, DeleteFactsLine } from './app-facts'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
 import { rowMenu, statusOptions, type RowMenuId, monitorOffered } from './status-options'
@@ -576,7 +577,7 @@ function SignInPolicies() {
           name={current.name}
           noun="policy"
           requireTyped
-          detail={deleteDetail(current, store.policies, store.apps, store.users, store.groups) ?? undefined}
+          detail={deleteLine(deleteFacts(current, store.policies, store.apps, store.users, store.groups))}
           onCancel={closeDialog}
           onConfirm={() => {
             markLeaving(current.id)
@@ -664,12 +665,20 @@ function postSignInMenu(policy: Policy): MenuItem[] {
 
 /* What the delete confirmation adds about a post sign-in policy: where it is
    acting, while it is. `deleteDetail` speaks of protecting sign-ins, which
-   this type never does. */
-function postDeleteDetail(policy: Policy, apps: readonly { id: string; name: string }[]): string | undefined {
+   this type never does. The applications with their logos, as the sign-in
+   delete names its own (owner, 23 Oct 2026: logos beside application names). */
+function postDeleteDetail(policy: Policy, apps: readonly { id: string; name: string }[]): ReactNode {
   if (policy.status !== 'active') return undefined
-  const named = apps.filter((a) => policy.appIds.includes(a.id)).map((a) => a.name)
-  return named.length > 0 ? `Acts on events in ${listPhrase(named)}.` : undefined
+  const named = apps.filter((a) => policy.appIds.includes(a.id))
+  return named.length > 0 ? (
+    <>
+      Acts on events in <AppFacts apps={named} />.
+    </>
+  ) : undefined
 }
+
+/* The sign-in delete's line about its applications, drawn with their logos (app-facts.tsx), or nothing to add. */
+const deleteLine = (facts: ReturnType<typeof deleteFacts>): ReactNode => (facts ? <DeleteFactsLine facts={facts} /> : undefined)
 
 function PostSignInPolicies() {
   const store = useBrand()
@@ -1139,10 +1148,13 @@ function AssignAppsDialog({
   }
 
   return (
+    /* A short title, and the policy named once under it as the caption line (owner, 23 Oct 2026: short titles, never a
+       long policy name inside the title). The sentence that said what assigning means went with it: the list is the
+       question. */
     <Modal
       open={open}
       onClose={onClose}
-      title={`Applications for ${policy.name}`}
+      title="Applications"
       width={760}
       footer={
         <>
@@ -1156,6 +1168,7 @@ function AssignAppsDialog({
       }
     >
       <div className="bassign">
+        <p className="bassign__lede">{policy.name}</p>
         {noApps ? (
           <EmptyState
             compact
@@ -1176,8 +1189,6 @@ function AssignAppsDialog({
           />
         ) : (
           <>
-            <p className="bassign__lede">Every sign-in to one of these is checked against this policy.</p>
-
             {/* All applications on the left, the ones in this policy on the right (app-transfer.tsx). */}
             <AppTransfer
               apps={store.apps}

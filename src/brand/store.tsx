@@ -596,6 +596,16 @@ function freeId<T extends { id: string }>(all: readonly T[], item: T, prefix: st
   return item.id && !taken.includes(item.id) ? item.id : newId(prefix, taken, name)
 }
 
+/* A copy stays a copy only under the name it was given (owner, 23 Oct 2026: "if the user renamed it once, we can
+   remove the color"). `copiedFrom` is the store's own: `duplicatePolicy` sets it, a rename anywhere takes it away
+   for good, and no save brings it back — a builder opened before the rename still holds the old record, and Save
+   policy would otherwise write the mark back over the new name. With it go the name's highlight and the canvas's
+   copy note (BoardBar.tsx, PolicyNotice.tsx). */
+function keepsCopyMark(p: Policy, before: Policy | undefined): Policy {
+  const { copiedFrom: _mark, ...rest } = p
+  return before?.copiedFrom && p.name === before.name ? { ...rest, copiedFrom: before.copiedFrom } : rest
+}
+
 const MISSING_TINT = '#94a3b8'
 
 /* A person put in a group: it becomes their first group when they have none,
@@ -1094,12 +1104,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
          an action, though never for having no application (`settled`). */
       savePolicy: (p) => {
         const before = policiesRef.current.find((x) => x.id === p.id)
-        const after = settled(asStored(p))
+        const after = settled(asStored(keepsCopyMark(p, before)))
         if (before && changedBeyondStamp(before, after)) setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), groups, directory.people, appsRef.current))
         setPolicies((all) =>
           all.map((x) => {
             if (x.id !== p.id) return x
-            const next = settled(asStored(p))
+            const next = settled(asStored(keepsCopyMark(p, x)))
             return changedBeyondStamp(x, next) ? { ...next, lastModified: 'Just now', modifiedBy: 'You' } : x
           }),
         )

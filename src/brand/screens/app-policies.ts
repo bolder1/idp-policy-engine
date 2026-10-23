@@ -160,17 +160,47 @@ export function deleteDetail(
   users: readonly User[] = [],
   groups: readonly Group[] = [],
 ): string | null {
+  const facts = deleteFacts(policy, policies, apps, users, groups)
+  if (!facts) return null
+  const say = (list: readonly App[]) => listPhrase(list.map((a) => a.name))
+  if (facts.protects.length === 0) return `Assigned to ${say(facts.assigned)}. It decides no sign-ins.`
+  const to = facts.fallsTo
+  if (!to) return `Protects ${say(facts.protects)}.`
+  if (to.apps === 'all') return `Protects ${say(facts.protects)}. Sign-ins there will use the ${to.policy.name}.`
+  return `Protects ${say(facts.protects)}. Sign-ins to ${say(to.apps)} will use the ${to.policy.name}.`
+}
+
+/* The same line as the things it names, so the delete confirm can draw each
+   application with its logo (owner, 23 Oct 2026: "logos beside application
+   names"; app-facts.tsx `DeleteFactsLine`). `deleteDetail` words it. */
+export interface DeleteFacts {
+  /** The applications it decides sign-ins on. Empty when it decides none, and `assigned` names them instead. */
+  protects: App[]
+  /** The applications it is on, when it decides sign-ins on none of them. */
+  assigned: App[]
+  /** The tenant default its sign-ins go to once it has gone, and on which of `protects` ('all': every one). Null when none go there. */
+  fallsTo: { policy: Policy; apps: App[] | 'all' } | null
+}
+
+export function deleteFacts(
+  policy: Policy,
+  policies: readonly Policy[],
+  apps: readonly App[],
+  users: readonly User[] = [],
+  groups: readonly Group[] = [],
+): DeleteFacts | null {
   const named = apps.filter((a) => policy.appIds.includes(a.id))
   if (named.length === 0) return null
   const deciding = named.filter((a) => decidesOn(a.id, policy, policies, users))
-  if (deciding.length === 0) return `Assigned to ${listPhrase(named.map((a) => a.name))}. It decides no sign-ins.`
-  const names = listPhrase(deciding.map((a) => a.name))
+  if (deciding.length === 0) return { protects: [], assigned: named, fallsTo: null }
   const alone = decidedOnlyBy(policy, policies, users, groups)
   const fallback = policies.find(coversEveryApp)
-  if (alone.length === 0 || !fallback) return `Protects ${names}.`
-  if (alone.length === deciding.length) return `Protects ${names}. Sign-ins there will use the ${fallback.name}.`
-  const aloneNames = listPhrase(deciding.filter((a) => alone.includes(a.id)).map((a) => a.name))
-  return `Protects ${names}. Sign-ins to ${aloneNames} will use the ${fallback.name}.`
+  if (alone.length === 0 || !fallback) return { protects: deciding, assigned: [], fallsTo: null }
+  return {
+    protects: deciding,
+    assigned: [],
+    fallsTo: { policy: fallback, apps: alone.length === deciding.length ? 'all' : deciding.filter((a) => alone.includes(a.id)) },
+  }
 }
 
 /* One application, one policy (owner, 14 Oct 2026). The sign-in policy an application belongs to, or undefined. The tenant

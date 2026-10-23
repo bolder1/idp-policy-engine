@@ -23,6 +23,9 @@ import { useBrand } from '../../store'
 
    Not for post sign-in policies, which have no applications of their own. A
    copy that has been turned on is just a policy, so its note goes with the draft.
+   So does a copy that has been renamed (23 Oct 2026, with the name's highlight):
+   the rename takes `copiedFrom` off the policy (store.tsx `keepsCopyMark`), and
+   the builder's draft reads it from the store, so the note goes at once.
 
    A STICKY NOTE, ON THE LEFT BESIDE THE RULES (owner, 23 Oct 2026: "we can use
    the sticky note and add it on the left side of the canvas beside the rules").

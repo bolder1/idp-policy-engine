@@ -283,7 +283,8 @@ describe('Before turning off and switching to monitoring', () => {
       expect(guardFor(open, status, { guarded: true, turnsOn: () => true, newlyAllows: () => guardOpens(r) }), kind).toBeNull()
       expect(asksFirst('active', status, false)).toBe(true)
     }
-    expect(statusConfirmCopy(open, 'inactive', false, 'HRMS')).toEqual({ title: `Turn off ${HRMS.name}?`, lines: ['It stops deciding sign-ins to HRMS.'], verb: 'Turn off' })
+    /* The title is short since 23 Oct 2026; the dialog names the policy in the body. */
+    expect(statusConfirmCopy(open, 'inactive', false, 'HRMS')).toEqual({ title: 'Turn off this policy?', lines: ['It stops deciding sign-ins to HRMS.'], verb: 'Turn off' })
   })
 })
 

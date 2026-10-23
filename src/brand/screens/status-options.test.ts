@@ -9,6 +9,7 @@ import {
   offersMonitoringView,
   rowMenu,
   statusConfirmCopy,
+  statusConfirmParts,
   statusOptions,
   statusToast,
   turnOnExtras,
@@ -98,17 +99,28 @@ describe('statusConfirmCopy', () => {
   const draft: PolicyDraft = { rules: [], savedAt: '25 Sep 2026', savedBy: 'Asha' }
   const hrms = (status: 'active' | 'inactive' | 'monitor', pendingDraft?: PolicyDraft) => ({ name: 'HRMS', status, pendingDraft })
 
+  /* Short titles that never hold the policy's name (owner, 23 Oct 2026, the popups pass): the dialog names the policy
+     once, in bold, where the first line says "It". They read "Turn on HRMS?" before. */
   it('says what starts or stops being decided when turning on or off', () => {
     expect(statusConfirmCopy(hrms('inactive'), 'active', false, 'HRMS')).toEqual({
-      title: 'Turn on HRMS?',
+      title: 'Turn on this policy?',
       lines: ['It starts deciding sign-ins to HRMS.'],
       verb: 'Turn on',
     })
     expect(statusConfirmCopy(hrms('active'), 'inactive', false, 'HRMS')).toEqual({
-      title: 'Turn off HRMS?',
+      title: 'Turn off this policy?',
       lines: ['It stops deciding sign-ins to HRMS.'],
       verb: 'Turn off',
     })
+  })
+
+  it('draws the same words as the dialog draws them: the policy for "It", the applications after the word before them', () => {
+    const parts = statusConfirmParts(hrms('active'), 'monitor', false)
+    expect(parts.lead).toEqual({ does: 'stops deciding sign-ins', where: 'to', rest: ' and records what it would decide.' })
+    expect(statusConfirmCopy(hrms('active'), 'monitor', false, 'HRMS').lines[0]).toBe(`It ${parts.lead.does} ${parts.lead.where} HRMS${parts.lead.rest}`)
+    for (const target of ['active', 'inactive', 'monitor'] as const) {
+      expect(statusConfirmParts(hrms('inactive'), target, false).title).not.toContain('HRMS')
+    }
   })
 
   it('tells Turn on that a saved draft is not what turns on', () => {
@@ -119,20 +131,23 @@ describe('statusConfirmCopy', () => {
   })
 
   it('asks Active → Monitoring in the M1 words, and only those', () => {
-    const m1 = { title: 'Switch HRMS to monitoring?', lines: ['It stops deciding sign-ins to HRMS and records what it would decide.'], verb: 'Monitor' }
+    /* "Switch HRMS to monitoring?" until 23 Oct 2026: the title no longer names the policy. */
+    const m1 = { title: 'Monitor this policy?', lines: ['It stops deciding sign-ins to HRMS and records what it would decide.'], verb: 'Monitor' }
     expect(statusConfirmCopy(hrms('active'), 'monitor', false, 'HRMS')).toEqual(m1)
     /* Spec C §3.3: the held-back line is M2's. M1 says the same with edits or a draft. */
     expect(statusConfirmCopy(hrms('active', draft), 'monitor', true, 'HRMS')).toEqual(m1)
   })
 
+  /* M2 opens with the policy since 23 Oct 2026, as every first line does, so the dialog can name it there: it read
+     "Sign-ins to HRMS don't change." The meaning is the same — nobody's sign-in changes. */
   it('asks Inactive → Monitoring in the M2 words, naming what is held back', () => {
     expect(statusConfirmCopy(hrms('inactive'), 'monitor', true, 'HRMS')).toEqual({
-      title: 'Monitor HRMS?',
-      lines: ["Sign-ins to HRMS don't change.", 'Your unsaved changes are not included.'],
+      title: 'Monitor this policy?',
+      lines: ['It watches sign-ins to HRMS without changing them.', 'Your unsaved changes are not included.'],
       verb: 'Monitor',
     })
     expect(statusConfirmCopy(hrms('inactive', draft), 'monitor', false, 'HRMS').lines).toEqual([
-      "Sign-ins to HRMS don't change.",
+      'It watches sign-ins to HRMS without changing them.',
       'Your saved draft is not included.',
     ])
     /* Unsaved edits are the nearer thing, so they are the one named. */
@@ -141,7 +156,7 @@ describe('statusConfirmCopy', () => {
 
   it('leaves out the applications when there are none to name', () => {
     expect(statusConfirmCopy(hrms('active'), 'inactive', false, null).lines).toEqual(['It stops deciding sign-ins.'])
-    expect(statusConfirmCopy(hrms('inactive'), 'monitor', false, null).lines).toEqual(["Sign-ins don't change."])
+    expect(statusConfirmCopy(hrms('inactive'), 'monitor', false, null).lines).toEqual(['It watches sign-ins without changing them.'])
   })
 })
 

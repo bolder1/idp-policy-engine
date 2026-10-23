@@ -228,7 +228,11 @@ export function denyNotice(policy: Pick<Policy, 'rules' | 'fallback'>, appId: st
    What happens to the policy itself is the store's, and the toast after the
    write says it when its status moved. */
 export const unlinkCopy = (policyName: string, appId: string, appName: string, eventIds: readonly string[]): string =>
-  `${policyName} stops deciding ${listNames(eventNames(appId, eventIds), 2) || 'its events'} on ${appName}.`
+  `${policyName} stops deciding ${unlinkEvents(appId, eventIds)} on ${appName}.`
+
+/* The events in that line, alone: the dialog draws the policy in bold and the application with its logo around them
+   (AppPostSignIn.tsx, 23 Oct 2026), and says them in these words. */
+export const unlinkEvents = (appId: string, eventIds: readonly string[]): string => listNames(eventNames(appId, eventIds), 2) || 'its events'
 
 // --- The side panel ----------------------------------------------------------------------
 

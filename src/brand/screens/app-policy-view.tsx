@@ -375,9 +375,9 @@ export const RULES_CANVAS = true
 
 /* The two reads in the policy head's menu — Sign-in activity and Check access — open what they name. Off (owner,
    22 Oct 2026, of that menu: "Replace policy on top, and for the rest we can tell coming soon, will work on this two
-   later"): both are still listed, in the house's announced-not-offered shape (RiskSignals, ConditionPopover) — the
-   label, "Coming soon" under it, and the row disabled, so neither the pointer nor the arrow keys can reach it.
-   Everything behind them is kept and still wired: flip this and the same two items open the panel and the run. */
+   later"). Off, they are not on the menu at all (owner, 23 Oct 2026: "only what can be done, no sub-lines"); they
+   were listed disabled with "Coming soon" under them until then. Everything behind them is kept and still wired:
+   flip this and the same two items are on the menu and open the panel and the run. */
 export const HEAD_READS: boolean = false
 
 /** What an announced-but-unbuilt row says under its name, in the console's own wording (Applications.tsx, RiskSignals). */
@@ -1176,6 +1176,7 @@ export function AppPolicyView({
   onReplace,
   onDuplicate,
   onMenu,
+  onTurnOffShared,
   onRemoveOther,
   onTab,
 }: {
@@ -1196,6 +1197,9 @@ export function AppPolicyView({
   onDuplicate: () => void
   /** The status pill's menu, and B's Turn on and View monitoring. */
   onMenu: (id: StatusMenuId) => void
+  /* A shared policy's Inactive, answered in its scope dialog: already confirmed there, so the switch or the removal
+     is written without a second question (ApplicationPage.tsx `turnOffShared`). */
+  onTurnOffShared: (where: 'everywhere' | 'here') => void
   onRemoveOther: (row: StandRow) => void
   onTab: Tab
 }) {
@@ -1284,6 +1288,8 @@ export function AppPolicyView({
                 .filter((i) => !i.disabled)
                 .map(({ hint: _hint, ...i }) => ({
                   ...i,
+                  /* The dialog asks where, so the row says only what (owner: "show only Inactive"). */
+                  ...(i.id === 'inactive' && policy.appIds.length > 1 ? { label: 'Inactive' } : null),
                   icon: STATUS_ICON[i.id as StatusMenuId],
                   ...(i.id === 'remove' || i.id === 'delete' ? { danger: true } : null),
                 })),
@@ -1394,8 +1400,8 @@ export function AppPolicyView({
         app={app}
         apps={appsOf(policy, store.apps)}
         onClose={() => setScopeOpen(false)}
-        onEverywhere={() => onMenu('inactive')}
-        onHere={() => onMenu('remove')}
+        onEverywhere={() => onTurnOffShared('everywhere')}
+        onHere={() => onTurnOffShared('here')}
       />
       <SharedPolicyFork
         open={forkOpen}

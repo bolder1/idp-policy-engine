@@ -458,11 +458,18 @@ export function DeviceProfileWizard({
       )}
     </>
   )
+  /* The slide-over's footer: two buttons at most (owner, 23 Oct 2026: popups
+     have two, "the × is the way out"). Cancel on the first step, where there is
+     no Back; Back and the main button after it, and the drawer's ×, Escape and
+     the scrim go through the same `cancel` and its leave guard. The page's own
+     footer keeps Cancel throughout: it has no × to stand in for it. */
   const navButtons = (
     <>
-      <Button variant="ghost" onClick={cancel}>
-        Cancel
-      </Button>
+      {here === 0 && (
+        <Button variant="ghost" onClick={cancel}>
+          Cancel
+        </Button>
+      )}
       {backAndMain}
     </>
   )

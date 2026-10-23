@@ -87,6 +87,7 @@ import {
   setSignalOn,
   setSignalTier,
   tierFor,
+  weightFor,
   type RiskProfile,
   type Platform,
   type RiskSignal,
@@ -569,7 +570,8 @@ function NameRiskProfileModal({
             {shownProblem}
           </p>
         )}
-        <p>Starts with every signal on at its shipped priority. Nothing changes until you use it.</p>
+        {/* "Starts with every signal on at its shipped priority. Nothing changes until you use it." stood here: a
+            sentence about how the page behaves (23 Oct 2026, the popups pass). The profile page shows both. */}
       </div>
     </Modal>
   )
@@ -599,6 +601,7 @@ function RiskProfileDetail({
   onBack: () => void
   onSave: (p: RiskProfile) => void
 }) {
+  const store = useBrand()
   const [draft, setDraft] = useState<RiskProfile>(profile)
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string>(ALL)
@@ -622,6 +625,21 @@ function RiskProfileDetail({
 
   const dirty = !sameRiskProfile(draft, profile)
   const problem = riskProfileProblem(draft, otherNames)
+  /* Why the footer's save is held, said over the list (23 Oct 2026: the footer
+     has no words, the reason goes in the form). The name field refuses a bad
+     name itself, so here it is the platform rule, and with one platform left
+     with nothing on the line names it: that is the half of the list to look at. */
+  const silent = LIVE_PLATFORMS.filter((pl) => weightFor(draft, pl.id) === 0)
+  const held =
+    dirty && problem ? (silent.length === 1 ? `Turn on at least one ${silent[0].label} signal.` : problem) : null
+
+  /* The footer's Discard (owner, 23 Oct 2026), with Undo in the toast as the
+     builder's Discard has. */
+  const discard = () => {
+    const was = draft
+    setDraft(profile)
+    store.showToast('Changes discarded', { label: 'Undo', run: () => setDraft(was) })
+  }
 
   /* Opened from a row, a create or a duplicate, and the control that did it is
      gone: the heading takes focus. */
@@ -877,6 +895,12 @@ function RiskProfileDetail({
         <TipDot label="About risk signals" text="Browser sign-ins carry none of these signals." />
       </p>
 
+      {held && (
+        <p className="bdpw__said brs__held" role="status">
+          {held}
+        </p>
+      )}
+
       {shown.length === 0 ? (
         <NoMatches
           noun="signals"
@@ -903,8 +927,8 @@ function RiskProfileDetail({
         <SignalTable items={shown} profile={draft} onToggle={toggle} onTier={setTier} />
       )}
 
-      {/* No Discard: leaving the page is where edits are thrown away, through
-          the leave dialog. */}
+      {/* Discard and the save, no words (23 Oct 2026). Why the save is held is
+          the line over the list. */}
       <SaveBar
         open={dirty}
         changes={riskChangeNames(profile, draft)}
@@ -915,7 +939,7 @@ function RiskProfileDetail({
         }}
         blocked={!!problem}
         blockedReason={problem ?? undefined}
-        onDiscard={() => setDraft(profile)}
+        onDiscard={discard}
       />
     </>
   )

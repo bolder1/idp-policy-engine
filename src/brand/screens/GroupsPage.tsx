@@ -26,7 +26,8 @@ import { SHOWCASE } from '../showcase'
 import { playCue } from '../sound'
 import { useBrand } from '../store'
 import { listNames } from '../rule-who'
-import { nameTaken, type Group } from '../data'
+import { nameTaken, type App, type Group } from '../data'
+import { AppFacts } from './app-facts'
 import { appsChangedByMembership, appsNaming } from './app-standing'
 import {
   assignLabel,
@@ -476,7 +477,8 @@ function landFocus() {
 interface PendingUnassign {
   ids: string[]
   who: string
-  apps: string[]
+  /** The applications themselves, not their names: the confirm draws each with its logo (23 Oct 2026). */
+  apps: App[]
 }
 
 function AssignmentTab({ group }: { group: Group }) {
@@ -516,7 +518,7 @@ function AssignmentTab({ group }: { group: Group }) {
       landFocus()
       return
     }
-    setPending({ ids, who: whoSaid(names(ids)), apps: moved.map((a) => a.name) })
+    setPending({ ids, who: whoSaid(names(ids)), apps: moved })
     setAsking(true)
   }
 
@@ -621,7 +623,10 @@ function AssignmentTab({ group }: { group: Group }) {
         {pending && (
           <div className="bgrp__effect">
             <span className="u-label">Sign-ins change on</span>
-            <p>{listNames(pending.apps, 3)}</p>
+            {/* With their logos (owner, 23 Oct 2026: logos beside application names), in `listNames`'s words. */}
+            <p>
+              <AppFacts apps={pending.apps} />
+            </p>
           </div>
         )}
       </Confirm>
@@ -668,7 +673,7 @@ function AssignDrawer({ open, group, onClose }: { open: boolean; group: Group; o
     () =>
       live.length === 0
         ? []
-        : appsChangedByMembership(store.apps, store.policies, store.users, membershipAfter(store.users, live, group.id, true)).map((a) => a.name),
+        : appsChangedByMembership(store.apps, store.policies, store.users, membershipAfter(store.users, live, group.id, true)),
     [live, store.apps, store.policies, store.users, group.id],
   )
 
@@ -719,7 +724,9 @@ function AssignDrawer({ open, group, onClose }: { open: boolean; group: Group; o
         {moved.length > 0 && (
           <div className="bgrp__effect">
             <span className="u-label">Sign-ins change on</span>
-            <p>{listNames(moved, 3)}</p>
+            <p>
+              <AppFacts apps={moved} />
+            </p>
           </div>
         )}
       </div>

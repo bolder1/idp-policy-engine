@@ -409,7 +409,8 @@ describe('the way back, and the keys', () => {
 
   it('no rule shortcut, undo or redo reaches the chain hidden under the canvas; T still closes it from its panels', () => {
     expect(builderSrc).toContain("if (testOn && e.key !== 'Escape' && e.key !== '?') return")
-    expect(builderSrc).toContain('if (action && !typing && !blocking && !testOn) {')
+    /* `showHistory` too: ⌘Z steps only where the dock has Undo (builder V1 and up, 23 Oct 2026). */
+    expect(builderSrc).toContain('if (action && showHistory && !typing && !blocking && !testOn) {')
     expect(builderSrc).toContain("const TEST_SURFACES = '.bb__insp, .sit-panel, .bx-apop'")
     expect(builderSrc).toContain('!t.closest(CHECK_PANELS) && !!t.closest(`.bb__insp, ${DESCRIBE_SURFACE}`)')
   })

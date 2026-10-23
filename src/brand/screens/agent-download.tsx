@@ -345,11 +345,22 @@ function AgentDownload(): ReactNode {
       setOpen(false)
       wrap.current?.querySelector<HTMLButtonElement>('.bagent__trigger button')?.focus()
     }
+    /* Its place is measured once, on open, so a scroll of the page column or a resize of the window would leave it
+       floating where the button used to be: either closes it, as a click away does. Capture, because the page scrolls
+       in its own column and a scroll does not bubble; a scroll inside the panel itself is its own. */
+    const away = (e: Event) => {
+      if (e.target instanceof Node && wrap.current?.contains(e.target)) return
+      setOpen(false)
+    }
     document.addEventListener('pointerdown', outside)
     document.addEventListener('keydown', key)
+    window.addEventListener('scroll', away, true)
+    window.addEventListener('resize', away)
     return () => {
       document.removeEventListener('pointerdown', outside)
       document.removeEventListener('keydown', key)
+      window.removeEventListener('scroll', away, true)
+      window.removeEventListener('resize', away)
     }
   }, [open])
 

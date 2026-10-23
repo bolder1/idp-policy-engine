@@ -571,12 +571,13 @@ export function ZoneDetail({
   /** A stored zone only: saves a usable new name straight to the store. */
   onRename?: (name: string) => void
 }) {
+  const store = useBrand()
   /* The edit buffer. A zone is what live rules match against, so nothing here
      writes to the store until the save bar commits. */
   const [draft, setDraft] = useState<Zone>(zone)
   const [pending, setPending] = useState<Pending>({ typed: 0, unread: 0 })
-  /* Bumped by Save, so the sections drop their half-typed rows, filter and
-     notes along with the draft they were typed against. */
+  /* Bumped by Save and Discard, so the sections drop their half-typed rows,
+     filter and notes along with the draft they were typed against. */
   const [resetKey, setResetKey] = useState(0)
 
   /* Dirty only once something has actually changed. A zone just named in the
@@ -665,11 +666,30 @@ export function ZoneDetail({
         ? (ZONE_BLOCKED[blockedBy.id] ?? `${blockedBy.title}.`)
         : null
 
-  /* No discard here: the footer has none, and leaving through the leave dialog's
-     Discard unmounts this page and its draft together. */
   const commit = () => {
     onSave(draft)
     setResetKey((k) => k + 1)
+  }
+
+  /* The footer's Discard (owner, 23 Oct 2026). It throws away what Save would
+     have kept, the same way: the draft and its name back to the zone, and the
+     sections remounted so their half-typed and unreadable rows go too — those
+     are not in the draft, and left behind they kept `pending.typed` above 0 and
+     the footer up after the press. Undo in the toast, as the builder's Discard
+     has one, puts the draft back; a half-typed row is not part of it. */
+  const discard = () => {
+    const was = { draft, name: draftName }
+    setDraft(zone)
+    setDraftName(zone.name)
+    setPending({ typed: 0, unread: 0 })
+    setResetKey((k) => k + 1)
+    store.showToast('Changes discarded', {
+      label: 'Undo',
+      run: () => {
+        setDraft(was.draft)
+        setDraftName(was.name)
+      },
+    })
   }
 
   /* What saving it would do to the policies that name it, and to the saved
@@ -862,12 +882,14 @@ export function ZoneDetail({
           <div className="bz7__work">
             {/* Both panels stay mounted, so a half-typed row survives a tab switch. */}
             <div role="tabpanel" id="bz7-panel-net" aria-labelledby="bz7-tab-net" hidden={tab !== 'net'}>
-              <AddressSection key={`net-${resetKey}`} draft={draft} onChange={setDraft} onPending={setPending} />
+              {/* `saving`: while the footer is up it holds the view's one orange
+                  button, so an empty section's Add turns secondary. */}
+              <AddressSection key={`net-${resetKey}`} draft={draft} onChange={setDraft} onPending={setPending} saving={dirty} />
               {/* The Inline tip's fold stood under each section (1 Oct 2026);
                   every note is in the aside again. */}
             </div>
             <div role="tabpanel" id="bz7-panel-place" aria-labelledby="bz7-tab-place" hidden={tab !== 'place'}>
-              <PlaceSection key={`place-${resetKey}`} draft={draft} onChange={setDraft} />
+              <PlaceSection key={`place-${resetKey}`} draft={draft} onChange={setDraft} saving={dirty} />
             </div>
           </div>
 
@@ -899,7 +921,8 @@ export function ZoneDetail({
         </div>
       </section>
 
-      {/* Blocked while the draft has an error, with the reason in the bar. */}
+      {/* Blocked while the draft has an error. The footer has no words (23 Oct
+          2026): the reason is the aside's issue or the row's own line. */}
       <SaveBar
         open={dirty}
         changes={isNew ? ['New zone'] : changes}
@@ -907,10 +930,7 @@ export function ZoneDetail({
         onSave={commit}
         blocked={!!blockedReason}
         blockedReason={blockedReason ?? undefined}
-        onDiscard={() => {
-          setDraft(zone)
-          setDraftName(zone.name)
-        }}
+        onDiscard={discard}
         review={zoneReviewRows(isNew ? { ...zone, name: '' } : zone, draft)}
         guard={library.guard}
       />
@@ -977,7 +997,7 @@ function DuplicateZoneModal({
       width={480}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="brand" disabled={!ok} onClick={go}>
@@ -1058,7 +1078,7 @@ function NameOnlyModal({
       width={480}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="brand" disabled={!ok} onClick={go}>
@@ -1149,11 +1169,14 @@ export function AddressSection({
   draft,
   onChange,
   onPending,
+  saving = false,
 }: {
   draft: Zone
   onChange: (z: Zone) => void
   /** Told how many rows hold text that is not in the draft, and how many of those failed. */
   onPending?: (p: Pending) => void
+  /** The page's own save footer is up and holds the view's one orange button. */
+  saving?: boolean
 }) {
   const sectionRef = useRef<HTMLElement | null>(null)
   const [filter, setFilter] = useState('')
@@ -1397,7 +1420,7 @@ export function AddressSection({
           blurb="Add addresses, CIDR blocks, ranges or ASNs. Left empty, any network matches."
           action={
             <>
-              <Button variant="brand" icon={Plus} onClick={addRow}>
+              <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={addRow}>
                 Add IP
               </Button>
               {quick}
@@ -1660,7 +1683,16 @@ const addSel = (mode: SearchMode) => `button[data-add="${mode}"], [data-add="${m
    from this session would be matched at. Constant, as the address is. */
 const HERE: Place | null = placeAtAddress(CURRENT_IP)
 
-export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
+export function PlaceSection({
+  draft,
+  onChange,
+  saving = false,
+}: {
+  draft: Zone
+  onChange: (z: Zone) => void
+  /** The page's own save footer is up and holds the view's one orange button. */
+  saving?: boolean
+}) {
   const sectionRef = useRef<HTMLElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const kmUid = useId()
@@ -1837,7 +1869,7 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
             <>
               <span className="bz7__emptyadds">
                 <span data-add="place">
-                  <Button variant="brand" icon={Plus} onClick={() => openNew('place')}>
+                  <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={() => openNew('place')}>
                     Add location
                   </Button>
                 </span>

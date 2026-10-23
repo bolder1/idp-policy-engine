@@ -264,14 +264,16 @@ export function MethodsTour({
             )}
           </div>
 
+          {/* Two buttons at most (owner, 23 Oct 2026). Skip went: it did what
+              the × does. Back is not drawn on the first stop rather than drawn
+              disabled, so the card never offers a press that does nothing. */}
           <footer className="btr__foot">
             <span className="btr__dots" aria-hidden />
-            <button type="button" className="btr__skip" onClick={leave}>
-              Skip
-            </button>
-            <Button variant="ghost" size="sm" icon={ArrowLeft} disabled={i === 0} onClick={back}>
-              Back
-            </Button>
+            {i > 0 && (
+              <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={back}>
+                Back
+              </Button>
+            )}
             <Button variant="primary" size="sm" iconRight={last ? undefined : ArrowRight} onClick={act}>
               {last ? 'Done' : 'Next'}
             </Button>

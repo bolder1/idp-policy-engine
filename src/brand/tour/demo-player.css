@@ -139,9 +139,12 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 0 0 1px rgb(255 255 255 / 0.22), 0 10px 40px rgb(0 0 0 / 0.45);
-  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), background 0.18s;
+  /* Colour only. The button is a motion.button and Motion owns its transform (the spring in): a CSS scale on hover
+     never showed past Motion's inline transform, and a transform transition smeared the spring. No hover lift in its
+     place either (23 Oct 2026: no hover motion on icons). */
+  transition: background 0.18s;
 }
-.dpl__big:hover { background: rgb(255 255 255 / 0.22); transform: scale(1.06); }
+.dpl__big:hover { background: rgb(255 255 255 / 0.22); }
 .dpl__big:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand), 0 10px 40px rgb(0 0 0 / 0.45); }
 /* Optically centred: a play triangle's mass sits left of its bounding box. */
 .dpl__big svg { margin-left: 4px; }

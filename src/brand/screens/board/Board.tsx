@@ -343,6 +343,8 @@ export function Board({
     cssPrefix: 'bb',
     /* Read by a run, the run's own stage is the camera: this one is switched off (canvas-view.ts `still`). */
     still: !!run,
+    /* Ctrl+wheel and a pinch zoom only where the dock has zoom and Fit, its way back (builder V1 and up). */
+    zoomGesture: showZoom,
   })
 
   /* The refit, on a change of key only — never on mount, which the canvas
@@ -1338,7 +1340,8 @@ export function Board({
             history and zoom are three groups in it, split by hairlines. */}
         <div className="bb__float bb__dockbar" role="toolbar" aria-label="View">
           {aside}
-          {aside && <span className="bb__float__sep" />}
+          {/* A hairline only between groups: in the first build Expand all is the whole pill. */}
+          {aside && ((showHistory && tools) || showZoom) && <span className="bb__float__sep" />}
           {showHistory && tools}
           {showHistory && tools && <span className="bb__float__sep" />}
           {/* Three buttons and no level (owner, 22 Sep 2026: "the % value is no

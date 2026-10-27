@@ -7,6 +7,7 @@ import { Badge, Button, Callout, Confirm, Drawer, Note, RowMenu, StatusPill, Tip
 import { EmptyState } from '../empty'
 import { Picker } from '../picker'
 import { AppLogo } from '../logos/AppLogo'
+import { PolicyFact, PolicyFacts } from './app-facts'
 import { Face } from '../faces'
 import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
@@ -680,7 +681,7 @@ export function RemoveDialog({
       {policy && (
         <div className="bapr__confirm is-card">
           <p>
-            <b>{policy.name}</b> stops deciding sign-ins on{' '}
+            <PolicyFact name={policy.name} /> stops deciding sign-ins on{' '}
             <span className="bx-confirm__fact">
               <AppLogo appId={app.id} name="" size={16} />
               {app.name}
@@ -689,7 +690,7 @@ export function RemoveDialog({
           </p>
           {targets.length > 0 && (
             <p>
-              Its sign-ins go to <b>{targets.join(', ')}</b>.
+              Its sign-ins go to <PolicyFacts names={targets} />.
             </p>
           )}
           {others.length > 0 && (

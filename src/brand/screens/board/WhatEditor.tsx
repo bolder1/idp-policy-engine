@@ -22,7 +22,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { TipDot, Toggle } from '../../kit'
+import { CheckRow } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import { Picker } from '../../picker'
 import { DENIAL_REASONS } from '../sign-in-tests/phase'
@@ -261,27 +261,22 @@ export function WhatEditor({
      "Any enabled method", which names nobody. */
   const pushSecond = twoStep && ((rule.secondFactor === 'specific' && methods.includes(PUSH)) || (rule.secondFactor === 'chain' && (rule.methodChain ?? []).includes(PUSH)))
   const pushOptions = (
+    /* Checks with their sentences under them, as the device profile's rows are (owner, 27 Oct 2026: "add check and
+       subheading … same for all the other options inside policy builder"). The sentences are the info dots' own words,
+       promoted, so nothing here is new copy. */
     <div className="bb__opts">
-      <Prop
-        label={
-          <>
-            Require biometric to approve
-            <TipDot text="The tap has to be confirmed with a fingerprint or face." label="About Require biometric to approve" />
-          </>
-        }
-      >
-        <Toggle checked={rule.pushBiometric ?? true} onChange={(pushBiometric) => onPatch({ pushBiometric })} label="Require biometric to approve" size="sm" />
-      </Prop>
-      <Prop
-        label={
-          <>
-            Number matching
-            <TipDot text="The user picks the number shown, so no push is approved by reflex." label="About Number matching" />
-          </>
-        }
-      >
-        <Toggle checked={rule.pushNumberMatching ?? true} onChange={(pushNumberMatching) => onPatch({ pushNumberMatching })} label="Number matching" size="sm" />
-      </Prop>
+      <CheckRow
+        label="Require biometric to approve"
+        hint="The tap has to be confirmed with a fingerprint or face."
+        checked={rule.pushBiometric ?? true}
+        onChange={(pushBiometric) => onPatch({ pushBiometric })}
+      />
+      <CheckRow
+        label="Number matching"
+        hint="The user picks the number shown, so no push is approved by reflex."
+        checked={rule.pushNumberMatching ?? true}
+        onChange={(pushNumberMatching) => onPatch({ pushNumberMatching })}
+      />
     </div>
   )
 
@@ -414,26 +409,18 @@ export function WhatEditor({
               <div className="bb__opts">
                 {/* The live console's two options for this first factor, in its words (owner, 26 Oct 2026). Off until ticked, as
                     its boxes are. */}
-                <Prop
-                  label={
-                    <>
-                      Enable sign-in from other IPs
-                      <TipDot text="When enabled, users can open the magic link from a different IP address than where it was requested." label="About sign-in from other IPs" />
-                    </>
-                  }
-                >
-                  <Toggle checked={rule.magicLinkOtherIps ?? false} onChange={(magicLinkOtherIps) => onPatch({ magicLinkOtherIps })} label="Enable sign-in from other IPs" size="sm" />
-                </Prop>
-                <Prop
-                  label={
-                    <>
-                      Enable sign-in from other devices
-                      <TipDot text="When enabled, users can open the magic link from a different device than where it was requested." label="About sign-in from other devices" />
-                    </>
-                  }
-                >
-                  <Toggle checked={rule.magicLinkOtherDevices ?? false} onChange={(magicLinkOtherDevices) => onPatch({ magicLinkOtherDevices })} label="Enable sign-in from other devices" size="sm" />
-                </Prop>
+                <CheckRow
+                  label="Enable sign-in from other IPs"
+                  hint="When enabled, users can open the magic link from a different IP address than where it was requested."
+                  checked={rule.magicLinkOtherIps ?? false}
+                  onChange={(magicLinkOtherIps) => onPatch({ magicLinkOtherIps })}
+                />
+                <CheckRow
+                  label="Enable sign-in from other devices"
+                  hint="When enabled, users can open the magic link from a different device than where it was requested."
+                  checked={rule.magicLinkOtherDevices ?? false}
+                  onChange={(magicLinkOtherDevices) => onPatch({ magicLinkOtherDevices })}
+                />
               </div>
             )}
             {/* Only reachable by a rule saved before the merge: no choice in the
@@ -558,9 +545,14 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
           who knows the console reads the setting they already know, and the
           label and the field it writes finally say the same thing. Each
           switch's accessible name is its visible label, word for word. */}
-      <Prop label="Remember MFA">
-        <Toggle checked={rule.rememberMfa} onChange={(rememberMfa) => onPatch({ rememberMfa })} label="Remember MFA" size="sm" />
-      </Prop>
+      {/* Checks with a sentence under each, as the device profile's rows are (owner, 27 Oct 2026). The first two sentences
+          are new: these three never had one. The label stays the console's, word for word. */}
+      <CheckRow
+        label="Remember MFA"
+        hint="Don't ask for the second factor again on the same device for a number of days."
+        checked={rule.rememberMfa}
+        onChange={(rememberMfa) => onPatch({ rememberMfa })}
+      />
       {rule.rememberMfa && (
         <>
           <Prop label="For" indent>
@@ -604,12 +596,18 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
           Force MFA independent, not inside one"). It was the second row under Remember MFA, so it could only be reached
           by turning that on, and read as a sub-setting of it. The two are separate answers: whether a device is
           remembered, and whether MFA is asked at every sign-in regardless. */}
-      <Prop label="Force MFA on each login">
-        <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Force MFA on each login" size="sm" />
-      </Prop>
-      <Prop label="Allow end users to disable 2FA">
-        <Toggle checked={rule.allowDisable2fa} onChange={(allowDisable2fa) => onPatch({ allowDisable2fa })} label="Allow end users to disable 2FA" size="sm" />
-      </Prop>
+      <CheckRow
+        label="Force MFA on each login"
+        hint="Ask for the second factor at every sign-in, even on a device that is remembered."
+        checked={rule.forceMfaEachLogin ?? false}
+        onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })}
+      />
+      <CheckRow
+        label="Allow end users to disable 2FA"
+        hint="People can turn off two-step verification for their own account."
+        checked={rule.allowDisable2fa}
+        onChange={(allowDisable2fa) => onPatch({ allowDisable2fa })}
+      />
       {rule.allowDisable2fa && (
         <p className="bb__diag is-warning">
           {/* The icon is not decoration here — `.bb__diag` colours only its

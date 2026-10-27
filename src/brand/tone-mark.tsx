@@ -75,20 +75,29 @@ function Dot({ at, reduce, cx, cy }: { at: number; reduce: boolean; cx: number; 
 }
 
 /* The enclosing ring the three circular marks share, started at twelve
-   o'clock. A circle draws from three o'clock by default; `pathOffset` moves
-   where the dash begins, and it is set in both initial and animate so Motion
-   holds it rather than animating it. */
+   o'clock. A circle draws from three o'clock by default, so the group that
+   holds it is turned a quarter back with a plain SVG `transform` attribute —
+   not on the motion element, whose own transform Motion owns.
+
+   It was `pathOffset: 0.75`, which looks like "start at twelve" and is not:
+   Motion makes the offset a `stroke-dashoffset` against a dash as long as the
+   path and a gap as long again, so a full-length stroke shifted by three
+   quarters shows ONE quarter of the ring (27 Oct 2026: the info, success and
+   error badges ended as a lone arc beside the glyph). Rotating the circle
+   leaves the dash at offset 0, and the finished ring is whole. */
 function Ring({ reduce }: { reduce: boolean }) {
   if (reduce) return <circle cx="12" cy="12" r="10" />
   return (
-    <motion.circle
-      cx="12"
-      cy="12"
-      r="10"
-      initial={{ pathLength: 0, pathOffset: 0.75, opacity: 0 }}
-      animate={{ pathLength: 1, pathOffset: 0.75, opacity: 1 }}
-      transition={{ pathLength: { delay: AFTER, duration: 0.38, ease: EASE }, opacity: { delay: AFTER, duration: 0.01 } }}
-    />
+    <g transform="rotate(-90 12 12)">
+      <motion.circle
+        cx="12"
+        cy="12"
+        r="10"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ pathLength: { delay: AFTER, duration: 0.38, ease: EASE }, opacity: { delay: AFTER, duration: 0.01 } }}
+      />
+    </g>
   )
 }
 

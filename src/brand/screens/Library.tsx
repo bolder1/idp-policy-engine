@@ -12,6 +12,7 @@ import { freeName } from '../policy-name'
 import { useBrand } from '../store'
 import type { Scenario } from '../data'
 import { buildTemplate, templateBlocker, type TemplateLibrary } from './board/apply-template'
+import { ConfirmDelete } from './confirm-delete'
 
 /* -----------------------------------------------------------------------------
    Policy templates.
@@ -42,6 +43,8 @@ export function Templates() {
   const [cat, setCat] = useState<string>('All')
   const [preview, setPreview] = useState<Scenario | null>(null)
   const [using, setUsing] = useState<Scenario | null>(null)
+  /* The tenant's own template the admin is about to take away. */
+  const [deleting, setDeleting] = useState<Scenario | null>(null)
 
   /* Built the way Use builds them — this tenant's people, zones and device
      profiles — so a card shows the rules Use would create, as the gallery does. */
@@ -86,6 +89,7 @@ export function Templates() {
       m={cardOf(s)}
       onUse={usable(s) ? () => startUse(s) : undefined}
       onPreview={() => setPreview(s)}
+      onDelete={s.provided ? undefined : () => setDeleting(s)}
     />
   )
 
@@ -97,7 +101,7 @@ export function Templates() {
         <EmptyState
           icon={LayoutTemplate}
           title="No templates yet"
-          blurb="Save a policy as a template from its menu on the Policies page."
+          blurb="Save a policy as a template from its ⋯ menu, on the Policies page, an application or the builder."
           action={
             <Button variant="brand" onClick={toPolicies}>
               Go to policies
@@ -148,7 +152,7 @@ export function Templates() {
                       compact
                       icon={LayoutTemplate}
                       title="No templates of your own"
-                      blurb="Save a policy as a template from its menu on the Policies page."
+                      blurb="Save a policy as a template from its ⋯ menu, on the Policies page, an application or the builder."
                       action={<Button onClick={toPolicies}>Go to policies</Button>}
                     />
                   )}
@@ -191,6 +195,24 @@ export function Templates() {
           store.showToast(`${policy.name} created${left || missing ? '.' : ''}${left}${missing}`)
           setUsing(null)
           store.go({ name: 'board', policyId: id })
+        }}
+      />
+
+      {/* Taking one of this tenant's own templates away, through the one delete confirm every library object uses. A
+          template is a copy of rules, so nothing points at it: the confirm says the policies already made from it stay
+          as they are, and the toast offers Undo, which puts it back. */}
+      <ConfirmDelete
+        open={deleting !== null}
+        name={deleting?.name ?? ''}
+        noun="template"
+        detail="Policies already made from it are not changed."
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => {
+          const gone = deleting
+          if (!gone) return
+          setDeleting(null)
+          store.removeScenario(gone.id)
+          store.showToast(`${gone.name} deleted`, { label: 'Undo', run: () => store.addScenario(gone) })
         }}
       />
     </div>

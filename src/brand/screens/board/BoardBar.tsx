@@ -1,9 +1,9 @@
 import { ArrowLeft } from 'lucide-react'
-import { AlignLeft, ChevronRight, GraduationCap, LogIn, Pencil } from 'lucide-react'
+import { AlignLeft, ChevronRight, GraduationCap, LayoutTemplate, LogIn, Pencil } from 'lucide-react'
 import { useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { DemoButton } from '../../tour/DemoButton'
-import { Button, IconButton, NameField } from '../../kit'
+import { Button, IconButton, NameField, RowMenu } from '../../kit'
 import type { Policy } from '../../data'
 import { ChangeState } from '../../leave-guard'
 import type { RuleSet } from '../../policy-draft'
@@ -348,6 +348,7 @@ export function BoardBarActions({
   onSaveDraft,
   onDiscard,
   onSave,
+  onSaveTemplate,
 }: {
   /** Read as text is open in the panel's slot. */
   reading: boolean
@@ -389,6 +390,9 @@ export function BoardBarActions({
   onSaveDraft: () => void
   onDiscard: () => void
   onSave: () => void
+  /* Save this policy as a template (owner, 27 Oct 2026). Absent where it cannot be: a post sign-in policy, or one with
+     no rule on its canvas, so the ⋯ is not drawn with nothing in it. */
+  onSaveTemplate?: () => void
 }) {
   const showTesting = useShows('testing')
   const discard = useShows('discard')
@@ -498,6 +502,17 @@ export function BoardBarActions({
           {checking ? 'Checking…' : features.publish ? 'Publish policy' : 'Save policy'}
         </Button>
       </span>
+      {/* The policy's other doors, after the verbs that end a draft, the way an application's head ends in its ⋯: Save as
+          template (owner, 27 Oct 2026: "add an option for save as template"). Not for a post sign-in policy, which
+          decides no sign-in and so has nothing to reuse, and not with no rule on the canvas. */}
+      {onSaveTemplate && !post && (
+        <RowMenu
+          label="More for this policy"
+          size="sm"
+          items={[{ id: 'template', label: 'Save as template', icon: LayoutTemplate }]}
+          onSelect={() => onSaveTemplate()}
+        />
+      )}
     </>
   )
 }

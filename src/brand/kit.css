@@ -348,6 +348,16 @@ html[data-theme='dark'] {
 .bx-menu__item.is-danger:focus strong,
 .bx-menu__item.is-danger:hover strong { color: var(--fb-negative-fg); }
 .bx-menu__item:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+/* A pill after the label (MenuItem `pill`): the row's own reason, at the end of the line. It is a span, so the
+   `> span` rule above would stretch it into a column; this one outweighs that and keeps it a pill. */
+.bx-menu__item > .bx-menu__pill { flex: none; flex-direction: row; align-self: center; }
+/* The split's menu is sized by what its rows say: a row that names who a change reaches ("Edit for all 3 apps on this
+   policy") stays on one line and widens the menu, instead of breaking at the 232px floor. */
+.bx-split .bx-menu__item strong { white-space: nowrap; }
+/* A disabled row fades its icon and words, not its pill: "On hold" is what the row has to say. */
+.bx-menu__item.has-pill:disabled { opacity: 1; }
+.bx-menu__item.has-pill:disabled > svg,
+.bx-menu__item.has-pill:disabled > span:not(.bx-menu__pill) { opacity: var(--disabled-opacity); }
 
 /* --- Split button ---------------------------------------------------------------
    An action and its chevron drawn as ONE object (SplitButton), the way every design
@@ -1563,6 +1573,30 @@ html[data-theme='dark'] {
   color: var(--surface-raised);
 }
 
+/* A check with its sentence under it (kit `CheckRow`), drawn as the device profile's enrolment rows are
+   (`.bfp2__enrolcheck`, device-fingerprint-v2.css). The tick keeps a column of its own so every label in a list lines
+   up, and the sentence starts at the ROW's left edge, under the mark, so it keeps the column's whole width instead of
+   losing the mark's width to an indent. The whole row is the control, so the whole row is the hit target. */
+.bx-checkrow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.bx-checkrow__label { grid-column: 2; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bx-checkrow__hint { grid-column: 1 / -1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bx-checkrow:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bx-checkrow:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+
 /* The leave dialog body — one line, secondary. See LeaveDialog in leave-guard.tsx. */
 /* `.bx-leave__body` was here until 22 Oct 2026. All five discard dialogs drew
    it; all five now use the kit's `Confirm`, which supplies `.bx-confirm__body`,
@@ -2259,3 +2293,25 @@ html[data-theme='dark'] {
 .bx-badge.bx-confirm__peekopen:hover > svg { color: var(--text-link); }
 /* A fact line in a confirm's body: a logo or icon, then the words — for the dialogs that name applications. */
 .bx-confirm__fact { display: inline-flex; align-items: center; gap: var(--space-2); vertical-align: bottom; font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* A policy (PolicyFact) or a template (TemplateFact) in a sentence: one tag, the kind on the left (the shield and the word
+   Policy; the layout mark and the word Template) and the name on the right, so it is never mistaken for the sentence's
+   own words.
+
+   A LONG NAME IS CUT, NOT WRAPPED (owner, 27 Oct 2026, of a name that ran to two lines and stretched the tag into a bar
+   the width of the card: "if the name is too big … maybe truncate the content so it doesn't break the design"). The tag
+   has a width of its own — `--fact-max`, raised by any context with room to spare, as `--badge-max` is for the badge —
+   and the name takes what is left of it on one line, ending in an ellipsis; the whole name is the tag's `title`. So the
+   tag is one line high at any length, and a sentence round it breaks where a word would, not inside it. */
+.bx-confirm__fact.bx-confirm__fact--tag {
+  gap: 0; align-items: stretch; vertical-align: middle; max-width: min(100%, var(--fact-max, 22rem)); text-align: start;
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken); overflow: hidden;
+}
+.bx-confirm__kind {
+  flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-inline-end: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-inset); color: var(--text-muted);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+.bx-confirm__factname { min-width: 0; padding: var(--space-1) var(--space-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -547,6 +547,9 @@ export interface BrandStore {
   scenarios: Scenario[]
   /** Adds at the top. Returns the stored id. */
   addScenario: (s: Scenario) => string
+  /** Takes one of this tenant's own templates away. Policies already made from it are copies and are not touched; a
+      template Xecurify ships is not this tenant's to remove, so it is left. */
+  removeScenario: (id: string) => void
 
   /** A message, and optionally one action beside it (Undo). The tone is read
       off the message unless it is given. */
@@ -997,6 +1000,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setScenarios((all) => [{ ...s, id }, ...all])
         return id
       },
+      removeScenario: (id: string) => setScenarios((all) => all.filter((s) => s.id !== id || s.provided)),
       policies,
 
       screen,

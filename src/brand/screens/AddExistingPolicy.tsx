@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 
 import { Badge, Button, Callout, Drawer, Modal, SearchBox, TipDot } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
+import { AppFacts, PolicyFact } from './app-facts'
 import { NoMatches } from '../empty'
 import { useBrand } from '../store'
 import { appsOf, type App, type Policy } from '../data'
@@ -299,7 +300,7 @@ export function AddExistingPolicy({
       {/* The popup says what it replaces first: the title is the job, this line is the object. */}
       {popup && replacing && (
         <p className="bapp__for">
-          On <b>{app.name}</b>, in place of <b>{replacing.name}</b>
+          On <AppFacts apps={[app]} />, in place of <PolicyFact name={replacing.name} />
         </p>
       )}
 

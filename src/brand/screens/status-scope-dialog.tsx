@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'motion/react'
 
 import { AppLogo } from '../logos/AppLogo'
+import { PolicyFact } from './app-facts'
 import { Button, Modal } from '../kit'
 import type { App, Policy } from '../data'
 
@@ -97,7 +98,7 @@ export function StatusScopeDialog({
           {apps.length > shown.length && <li className="bscope__more">+{apps.length - shown.length}</li>}
         </ul>
         <p className="bscope__said">
-          <b>{policy.name}</b>
+          <PolicyFact name={policy.name} />
           <span>Used by {apps.length} applications.</span>
         </p>
       </div>

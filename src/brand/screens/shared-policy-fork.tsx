@@ -5,6 +5,7 @@ import { AppLogo } from '../logos/AppLogo'
 import { Badge, Button, Confirm, Drawer, Modal, SearchBox } from '../kit'
 import { appsOf, type App, type Policy } from '../data'
 import { useBrand } from '../store'
+import { PolicyFact } from './app-facts'
 import { FORK_IN_POPUP } from './app-policies'
 
 /* -----------------------------------------------------------------------------
@@ -90,7 +91,7 @@ export function ForkCard({ way, policy, app, others }: { way: Way; policy: Polic
     return (
       <div className="bapr__confirm is-card">
         <p>
-          Changes to <b>{policy.name}</b> reach {n === 2 ? 'both applications' : `all ${n} applications`}.
+          Changes to <PolicyFact name={policy.name} /> reach {n === 2 ? 'both applications' : `all ${n} applications`}.
         </p>
         <KeepsRow label="Also on" apps={others} />
       </div>
@@ -102,7 +103,7 @@ export function ForkCard({ way, policy, app, others }: { way: Way; policy: Polic
     return (
       <div className="bapr__confirm is-card">
         <p>
-          A draft copy of <b>{policy.name}</b> for {here}.
+          A draft copy of <PolicyFact name={policy.name} /> for {here}.
         </p>
         <p>It decides nothing until you replace this policy with it.</p>
       </div>
@@ -111,7 +112,7 @@ export function ForkCard({ way, policy, app, others }: { way: Way; policy: Polic
   return (
     <div className="bapr__confirm is-card">
       <p>
-        A copy of <b>{policy.name}</b> for {here} only.
+        A copy of <PolicyFact name={policy.name} /> for {here} only.
       </p>
       <p>The others keep the original.</p>
       <KeepsRow label="Still on" apps={others} />
@@ -129,6 +130,7 @@ export function SharedPolicyFork({
   asPopup,
   inline = false,
   only,
+  split = false,
 }: {
   open: boolean
   /** The policy the Edit was for. */
@@ -147,8 +149,13 @@ export function SharedPolicyFork({
   /** One way only (`HEAD_THREE_BUTTONS`): the head's Edit policy or Duplicate policy opened this, so there is nothing to
       choose and no list to scroll. A card, as the Remove dialog is, whatever `FORK_IN_POPUP` says. */
   only?: Way
+  /** The head is the split (`HEAD_SPLIT_EDIT`): the copy card's words follow the row that opened it. Its title says
+      Edit for the application and its verb is Copy and edit. Absent: the 26 Oct wording (Duplicate). */
+  split?: boolean
 }) {
   const { apps } = useBrand()
+  const editVerb = 'Edit for all'
+  const copyVerb = split ? 'Copy and edit' : 'Duplicate'
   const single = !!only
   const popup = single || (asPopup ?? FORK_IN_POPUP)
   const [q, setQ] = useState('')
@@ -212,7 +219,7 @@ export function SharedPolicyFork({
         Cancel
       </Button>
       <Button variant="brand" icon={way === 'edit' ? Pencil : Copy} onClick={go}>
-        {way === 'edit' ? 'Edit for all' : 'Duplicate'}
+        {way === 'edit' ? editVerb : copyVerb}
       </Button>
     </>
   )
@@ -221,7 +228,7 @@ export function SharedPolicyFork({
   if (single && only) {
     const others = on.filter((a) => a.id !== app.id)
     /* A short title naming the job, as Remove's names the application with a question mark. */
-    const title = only === 'edit' ? 'Edit shared policy?' : `Duplicate for ${app.name}?`
+    const title = only === 'edit' ? 'Edit shared policy?' : split ? `Edit for ${app.name} only?` : `Duplicate for ${app.name}?`
     const card = <ForkCard way={only} policy={policy} app={app} others={others} />
     if (inline) {
       return open ? (
@@ -241,7 +248,7 @@ export function SharedPolicyFork({
         tone={only === 'edit' ? 'warning' : 'info'}
         shape="hero"
         title={title}
-        confirmLabel={only === 'edit' ? 'Edit for all' : 'Duplicate'}
+        confirmLabel={only === 'edit' ? editVerb : copyVerb}
         confirmIcon={only === 'edit' ? Pencil : Copy}
         destructive={false}
         onConfirm={go}

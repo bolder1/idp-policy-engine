@@ -7,11 +7,12 @@ import {
   type LucideIcon,
   Network,
   Tag,
+  Trash2,
   Users,
   Webhook,
 } from 'lucide-react'
 
-import { Badge, Button, DecisionChip, Modal } from '../kit'
+import { Badge, Button, DecisionChip, Modal, RowMenu } from '../kit'
 import { conditionType, type AccessDecision, type Rule, type Scenario } from '../data'
 import { leaves } from '../predicate'
 import { narrowToAudience, withoutMissing, type TemplateLibrary, type TemplateNeed } from '../screens/board/apply-template'
@@ -221,6 +222,7 @@ export function TemplateCard({
   m,
   onUse,
   onPreview,
+  onDelete,
   useLabel = 'Use',
   fallback = '1fa',
 }: {
@@ -228,6 +230,8 @@ export function TemplateCard({
   /** Omitted where the template cannot be used yet: the card shows no control. */
   onUse?: () => void
   onPreview: () => void
+  /** Only on this tenant's own templates, which it may take away; a template Xecurify ships has no menu. */
+  onDelete?: () => void
   useLabel?: string
   /** What the policy's own default decides. The template does not change it. */
   fallback?: AccessDecision
@@ -359,6 +363,15 @@ export function TemplateCard({
             <button type="button" className="bgcard__cta" onClick={onUse} aria-label={`${useLabel} ${m.name}`}>
               {useLabel}
             </button>
+          )}
+          {/* The template's own door to being taken away (owner, 27 Oct 2026: the template audit). A tenant could save
+              one and never remove it. Only its own; the confirm is the shared one. */}
+          {onDelete && (
+            <RowMenu
+              label={`More for ${m.name}`}
+              items={[{ id: 'delete', label: 'Delete template', icon: Trash2, danger: true }]}
+              onSelect={() => onDelete()}
+            />
           )}
         </div>
         <p className="bgcard__sub">{m.description}</p>

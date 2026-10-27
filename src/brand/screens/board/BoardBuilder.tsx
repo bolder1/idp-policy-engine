@@ -22,7 +22,8 @@ import { arrivalKey, firstArrival, landFix, type ArriveFix } from './arrive-fix'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { afterPaint, guardOpens, isStale, overridePatch, patchSignIns, tryRunGuard, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from '../guard'
 import { GuardDrawer } from '../guard-page'
-import { offersMonitorAfterSave, portalRoot, statusToast, monitorOffered } from '../status-options'
+import { canSaveAsTemplate, offersMonitorAfterSave, portalRoot, statusToast, monitorOffered } from '../status-options'
+import { useSaveAsTemplate } from '../save-template'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, revertTo, undo, type History } from '../history'
 import { useSimEnv } from '../sim-env'
 import { boardPagesAllowed } from '../testing/board-views'
@@ -32,7 +33,7 @@ import { DOCK_TAB_LABEL } from '../testing/test-dock'
 import { ACCESS_CHECK } from '../sign-in-tests/names'
 import type { SignInFacts } from '../sign-in-facts'
 import { Board } from './Board'
-import { BAR_DEMO, BAR_TOUR, RULE_ON_OFF } from './bar-tools'
+import { BAR_DEMO, BAR_TEMPLATE, BAR_TOUR, RULE_ON_OFF } from './bar-tools'
 import { useShows } from './builder-version'
 import { PolicyNotice } from './PolicyNotice'
 import { DescribePanel } from './DescribePanel'
@@ -375,6 +376,8 @@ export function BoardBuilder({
      it goes through `commitDraft` like every other one, undo puts it back, and
      nothing is saved until you publish. */
   const [picking, setPicking] = useState(false)
+  /* The other direction: this policy saved as a template (the bar's ⋯). */
+  const saveTemplate = useSaveAsTemplate()
   /* The guided demo — see src/brand/tour/board-tour.ts. */
   const [tour, setTour] = useState(false)
   /* And the recording, which is NOT inside the tour.
@@ -557,6 +560,11 @@ export function BoardBuilder({
      sign-in to read, so Check access, Past sign-ins, Describe it, the
      template chooser and the checks before saving stay off for it. */
   const post = isPostSignIn(draft)
+  /* Save as template, from the bar's ⋯ (owner, 27 Oct 2026). The template is what the canvas holds, so the policy it is
+     made from carries the rules on screen — edits not yet saved included — and no saved draft under them. Offered for a
+     sign-in policy with a rule on the canvas (`canSaveAsTemplate`). */
+  const onCanvas: Policy = { ...draft, pendingDraft: undefined }
+  const templateFromCanvas = BAR_TEMPLATE && canSaveAsTemplate(onCanvas)
   /* A save or a Turn on refused for a rule or the last row with no action:
      the reason stands under that card's Then until it is answered, and moves
      to the next one left (post-board.ts `issueTarget`). */
@@ -2239,6 +2247,7 @@ export function BoardBuilder({
             checking={checking}
             post={post}
             onSave={saveNow}
+            onSaveTemplate={templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
           />
         }
       />
@@ -2696,6 +2705,7 @@ export function BoardBuilder({
         onChoose={applyTemplate}
         fallback={(draft.fallback ?? fallbackRule()).decision}
       />
+      {saveTemplate.dialog}
 
       {/* The guided demo.
 

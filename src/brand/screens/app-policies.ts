@@ -343,6 +343,33 @@ export const REPLACE_IN_POPUP: boolean = true
    Off: the head with two buttons and the popup that carries both ways (`FORK_IN_POPUP`), kept for comparison. */
 export const HEAD_THREE_BUTTONS: boolean = true
 
+/* ONE SPLIT BUTTON IN THE HEAD (owner, 27 Oct 2026: "instead of three buttons, we need two, so the replace policy
+   option will be on hold … add a split button by default. Show an Edit option for this application … and a single
+   Edit All button that starts editing all policies"; then, of the Edit all button: "move this button as well inside
+   the split button").
+
+   The head is a split button and the ⋯. On a policy more than one application shares:
+
+   - the split's action is Edit for this app (orange): it opens the one popup that says what the copy is and who keeps
+     the original (the old Duplicate policy);
+   - its chevron holds two rows: Edit all, which opens the one popup that says who an edit reaches (the old Edit
+     policy), and Replace policy (below).
+
+   On a policy this application has to itself there is nothing to be "all" of, and a copy would only be a draft
+   twin, so the action is Edit policy straight to the builder and the menu holds Replace policy alone.
+
+   While the page's save bar is up the head stands down to secondary, as it always has: the bar holds the one orange
+   button. Off: the three buttons of `HEAD_THREE_BUTTONS`, untouched. */
+export const HEAD_SPLIT_EDIT: boolean = true
+
+/* REPLACE POLICY IS ON HOLD IN THE SPLIT (owner, 27 Oct 2026: "the replace policy option will be on hold … indicate
+   that it's On hold (add pill) inside the split button").
+
+   The row stays in the split's menu so nobody wonders where it went, drawn disabled with an "On hold" pill. Nothing
+   is deleted: `onReplace`, the Replace popup (`REPLACE_IN_POPUP`) and the live swap behind it are all still wired, and
+   turning this off makes the row open the popup again. Read only where `HEAD_SPLIT_EDIT` draws the head. */
+export const HEAD_REPLACE_ON_HOLD: boolean = true
+
 /* REMOVE RUNS THE CHECKS (owner, 23 Oct 2026: "take the Before saving page off Remove as well, so the two
    paths are consistent").
 

@@ -1,4 +1,5 @@
-import { monitorOffered } from './status-options'
+import { canSaveAsTemplate, monitorOffered } from './status-options'
+import { useSaveAsTemplate } from './save-template'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import {
@@ -11,6 +12,8 @@ import {
   Copy,
   CornerDownRight,
   Eye,
+  Layers,
+  LayoutTemplate,
   ListChecks,
   ListPlus,
   Pencil,
@@ -27,13 +30,13 @@ import {
 import { appsOf, enforces, memberGroupIds, ruleExpired, type App, type Policy } from '../data'
 import { DecisionBadge } from '../decision-badge'
 import { Face, FaceStack, type FaceItem } from '../faces'
-import { Badge, Button, Chip, Drawer, Note, RowMenu, StatusPill } from '../kit'
+import { Badge, Button, Chip, Drawer, Note, RowMenu, SplitButton, StatusPill, type MenuItem } from '../kit'
 import { linkedTo } from '../post-sign-in'
 import { normaliseWho } from '../rule-who'
 import { useBrand, useNameLookup, type AppTab } from '../store'
 import { AppPolicyFocusOverride } from './app-policy-focus'
 import { AppActivity, AppBreakIn, GlanceActivity } from './app-activity'
-import { HEAD_THREE_BUTTONS, rulesLabel } from './app-policies'
+import { HEAD_REPLACE_ON_HOLD, HEAD_SPLIT_EDIT, HEAD_THREE_BUTTONS, rulesLabel } from './app-policies'
 import {
   GLANCE_ROWS,
   appCheckForm,
@@ -1216,7 +1219,14 @@ export function AppPolicyView({
     setForkWay(way)
     setForkOpen(true)
   }
+  /* More than this application is on it: the only case with an "all" to edit and a copy to make. */
+  const shared = row.policy.appIds.length > 1
+  /* The split's Edit all row says who the change reaches, since the popup that follows is a confirm, not an
+     explanation (owner, 27 Oct 2026: "the label should say it changes every application attached to this policy"). */
+  const editAllLabel = row.policy.appIds.length === 2 ? 'Edit for both apps on this policy' : `Edit for all ${row.policy.appIds.length} apps on this policy`
   const [scopeOpen, setScopeOpen] = useState(false)
+  /* Save as template, from the ⋯ (owner, 27 Oct 2026: every place a policy is managed offers it). */
+  const saveTemplate = useSaveAsTemplate()
   const check = useAppCheck(app)
   const FOCUS = (useContext(AppPolicyFocusOverride) ?? FOCUS_ON) && GLANCE
   const { policies, apps, users, groups, features } = store
@@ -1239,6 +1249,14 @@ export function AppPolicyView({
   const notice = tabNotice(row, others, diff, plan)
   const coverage = useMemo(() => coverageOf(app.id, policy, policies, users, groups), [app.id, policy, policies, users, groups])
   const menu = statusMenu(policy, app, apps, { monitor: monitorOffered(features), deletable })
+  /* Save as template, between the switches and Remove, so the red one stays last (owner, 27 Oct 2026). The policy as
+     stored: what a builder would open, a saved draft if there is one (template-from-policy.ts). */
+  const withTemplateRow = (items: MenuItem[]): MenuItem[] => {
+    if (!canSaveAsTemplate(policy)) return items
+    const at = items.findIndex((i) => i.id === 'remove' || i.id === 'delete')
+    const row: MenuItem = { id: 'template', label: 'Save as template', icon: LayoutTemplate, ...(at !== 0 ? { divide: true } : null) }
+    return at === -1 ? [...items, row] : [...items.slice(0, at), row, ...items.slice(at)]
+  }
 
   const toBoard = (policyId: string) => store.go({ name: 'board', policyId, from: { appId: app.id } })
 
@@ -1276,30 +1294,58 @@ export function AppPolicyView({
               the policy is on this application, Replace, is the secondary; the status switches, the two reads
               and Remove are in the ⋯. The page's save bar holds the view's one orange button while it is up,
               so the head stands down then. */}
-          <Button
-            variant={saving ? 'secondary' : 'brand'}
-            icon={Pencil}
-            onClick={() => (policy.appIds.length > 1 ? openFork(HEAD_THREE_BUTTONS ? 'edit' : undefined) : toBoard(policy.id))}
-          >
-            Edit policy
-          </Button>
-          {/* Three buttons, one popup each (`HEAD_THREE_BUTTONS`, owner, 26 Oct 2026): the choice between editing
-              for everyone and a copy for this application is made here, in the head, and not in a popup. */}
-          {HEAD_THREE_BUTTONS && (
-            <Button variant="secondary" icon={Copy} onClick={() => openFork('duplicate')}>
-              Duplicate policy
-            </Button>
+          {HEAD_SPLIT_EDIT ? (
+            <>
+              {/* One split button (`HEAD_SPLIT_EDIT`, owner, 27 Oct 2026; Edit all moved into it the same day: "move this
+                  button inside the split button"). Its action is the one that touches this application alone — Edit
+                  for this app, a copy opened in the builder — and its chevron holds the rest: Edit all, which reaches
+                  every application the policy is on, and Replace policy, on hold for now (`HEAD_REPLACE_ON_HOLD`):
+                  disabled, with a pill that says so. A policy this application has to itself has no "all" and no copy
+                  to make: Edit all is not on the menu, and the action is Edit policy straight to the builder. */}
+              <SplitButton
+                label={shared ? 'Edit for this app' : 'Edit policy'}
+                icon={Pencil}
+                variant={saving ? 'secondary' : 'brand'}
+                onPress={() => (shared ? openFork('duplicate') : toBoard(policy.id))}
+                menuLabel="More ways to change this policy"
+                items={[
+                  ...(shared ? [{ id: 'edit-all', label: editAllLabel, icon: Layers }] : []),
+                  { id: 'replace', label: 'Replace policy', icon: Replace, ...(HEAD_REPLACE_ON_HOLD ? { pill: 'On hold', disabled: true } : null) },
+                ]}
+                onSelect={(id) => {
+                  if (id === 'edit-all') openFork('edit')
+                  else if (id === 'replace') onReplace()
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                variant={saving ? 'secondary' : 'brand'}
+                icon={Pencil}
+                onClick={() => (shared ? openFork(HEAD_THREE_BUTTONS ? 'edit' : undefined) : toBoard(policy.id))}
+              >
+                Edit policy
+              </Button>
+              {/* Three buttons, one popup each (`HEAD_THREE_BUTTONS`, owner, 26 Oct 2026): the choice between editing
+                  for everyone and a copy for this application is made here, in the head, and not in a popup. */}
+              {HEAD_THREE_BUTTONS && (
+                <Button variant="secondary" icon={Copy} onClick={() => openFork('duplicate')}>
+                  Duplicate policy
+                </Button>
+              )}
+              <Button variant="secondary" icon={Replace} onClick={onReplace}>
+                Replace policy
+              </Button>
+            </>
           )}
-          <Button variant="secondary" icon={Replace} onClick={onReplace}>
-            Replace policy
-          </Button>
           <RowMenu
             label="More for this policy"
             size="md"
             /* Only what can be done, with no sentence under any row (owner, 23 Oct 2026: "remove this sub heading … show only
                Inactive … make the Remove red"): the coming-soon rows and the hints are gone, Remove is red, and on a shared
                policy Inactive asks its scope in a dialog instead of two rows. */
-            items={[
+            items={withTemplateRow([
               ...menu
                 .filter((i) => !i.disabled)
                 .map(({ hint: _hint, ...i }) => ({
@@ -1316,9 +1362,10 @@ export function AppPolicyView({
                     { id: 'check', label: ACCESS_CHECK, icon: ListChecks, hint: SOON },
                   ]
                 : []),
-            ]}
+            ])}
             onSelect={(id) => {
-              if (id === 'check') check()
+              if (id === 'template') saveTemplate.open(policy)
+              else if (id === 'check') check()
               else if (id === 'activity') setActivityOpen(true)
               else if (policy.appIds.length > 1 && id === 'inactive') setScopeOpen(true)
               else onMenu(id as StatusMenuId)
@@ -1426,8 +1473,10 @@ export function AppPolicyView({
         onClose={() => setForkOpen(false)}
         onEdit={() => toBoard(policy.id)}
         onDuplicate={onDuplicate}
-        only={HEAD_THREE_BUTTONS ? forkWay : undefined}
+        only={HEAD_THREE_BUTTONS || HEAD_SPLIT_EDIT ? forkWay : undefined}
+        split={HEAD_SPLIT_EDIT}
       />
+      {saveTemplate.dialog}
     </div>
   )
 }

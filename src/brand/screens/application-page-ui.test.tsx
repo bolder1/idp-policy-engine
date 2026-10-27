@@ -17,12 +17,20 @@ import { appStanding } from './app-standing'
 import { replaceFacts } from './applications-model'
 import { ReplaceCard } from './replace-dialog'
 import { policyOption } from './policy-option'
+import { PolicyFact, PolicyFacts } from './app-facts'
+import { HEAD_REPLACE_ON_HOLD, HEAD_SPLIT_EDIT } from './app-policies'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
 import type { Policy } from '../data'
+import kitSrc from '../kit.tsx?raw'
+import kitCss from '../kit.css?raw'
+import toneMarkSrc from '../tone-mark.tsx?raw'
 import activitySrc from './app-activity.tsx?raw'
 import viewSrc from './app-policy-view.tsx?raw'
 import appPageSrc from './ApplicationPage.tsx?raw'
 import addExistingSrc from './AddExistingPolicy.tsx?raw'
+
+/* Every screen's source, to read which popups name a policy and how. */
+const screenSrc = import.meta.glob('./*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
 /* -----------------------------------------------------------------------------
    An application's page and its Add existing policy drawer, drawn once as
@@ -43,7 +51,9 @@ const renderIn = (focus: boolean, node: ReactNode) =>
     </BrandProvider>,
   )
 const render = (node: ReactNode) => renderIn(false, node)
-const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+/* The word Policy in a policy tag (app-facts.tsx `PolicyFact`) is the marker, not part of the sentence round it, so a
+   sentence is read without it; the marker itself is asserted where it is drawn. */
+const text = (html: string) => html.replace(/<span class="bx-confirm__kind">.*?<\/span>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 const count = (html: string, needle: string) => html.split(needle).length - 1
 /* The view's orange CONTROLS, which is what "one orange button per view" counts. A split button (kit `SplitButton`)
    is one object drawn in two halves — the action, and the chevron holding the rest of what can be done to it — and
@@ -112,13 +122,15 @@ describe('the Policies tab', () => {
   const acts = (html: string) => html.slice(html.indexOf('apol__acts'), html.indexOf('</div>', html.indexOf('apol__acts')))
   const buttonsIn = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
 
-  it('heads the policy with a primary, a secondary and a ⋯ trail, and nothing else orange in the view', () => {
+  it('heads a policy this application has to itself with the split alone and a ⋯ trail, and nothing else orange in the view', () => {
     expect(box).toMatch(/<h2[^>]*>Box access<\/h2>/)
-    /* Edit policy is the one orange button, Replace policy the secondary, and the ⋯ holds the rest, which static
-       markup never opens (owner, 23 Oct 2026: "a primary, a secondary and a 3 dot button trail"). */
-    /* Three buttons since 26 Oct 2026 (HEAD_THREE_BUTTONS): Duplicate policy joined them, each opening its own popup. */
-    expect(buttonsIn(acts(box))).toEqual(['Edit policy', 'Duplicate policy', 'Replace policy', ''])
+    /* Since 27 Oct 2026 (HEAD_SPLIT_EDIT) the head is a split button — Edit policy and its chevron, which holds Replace
+       policy, on hold — and the ⋯, which static markup never opens. Box's policy is on Box alone, so there is no
+       "all" to edit and no Edit all (the shared case is below). */
+    expect(buttonsIn(acts(box))).toEqual(['Edit policy', '', ''])
+    expect(acts(box)).toContain('aria-label="More ways to change this policy"')
     expect(acts(box)).toContain('aria-label="More for this policy"')
+    expect(acts(box)).not.toContain('Edit all')
     expect(orange(box)).toBe(1)
     expect(orange(acts(box))).toBe(1)
   })
@@ -663,8 +675,8 @@ describe('Replace policy', () => {
 
     it('lists the other policies and never offers the one being replaced back', () => {
       expect(out).toContain('<b>Slack access</b>')
-      /* Box access is named once, in the line that says what is replaced, and is not a row in the list. */
-      expect(count(out, '<b>Box access</b>')).toBe(1)
+      /* Box access is named once, as a policy tag in the line that says what is replaced, and is not a row in the list. */
+      expect(count(out, 'bx-confirm__factname">Box access<')).toBe(1)
       expect(out).not.toContain('bapp__picktext"><b>Box access</b>')
       expect(out).toContain('placeholder="Search policies"')
     })
@@ -737,13 +749,16 @@ describe('Replace policy', () => {
     const said = (html: string) => text(html).replace(/\s+([.,:])/g, '$1').trim()
     const others = (p: Policy) => t.policies.filter((x) => x.id !== p.id)
 
-    it('reads from the policy coming off to the one going on, each named once in bold, the applications with their logos', () => {
+    it('reads from the policy coming off to the one going on, each named once as a policy tag, the applications with their logos', () => {
       const html = card(boxAccess, slackAccess)
       expect(said(html)).toBe('Box access comes off Box and becomes a draft. Slack access takes its place. Slack keeps it unchanged.')
-      expect(count(html, '<b>Box access</b>')).toBe(1)
-      expect(count(html, '<b>Slack access</b>')).toBe(1)
-      expect(html.indexOf('<b>Box access</b>')).toBeLessThan(html.indexOf('<b>Slack access</b>'))
-      expect(count(html, 'bx-confirm__fact')).toBe(2)
+      expect(count(html, 'bx-confirm__factname">Box access<')).toBe(1)
+      expect(count(html, 'bx-confirm__factname">Slack access<')).toBe(1)
+      expect(html.indexOf('bx-confirm__factname">Box access<')).toBeLessThan(html.indexOf('bx-confirm__factname">Slack access<'))
+      /* Two applications with their logos, two policies with the shield and the word. */
+      expect(count(html, 'class="bx-confirm__fact"')).toBe(2)
+      expect(count(html, 'bx-confirm__fact--policy')).toBe(2)
+      expect(count(html, '<span class="bx-confirm__kind">')).toBe(2)
     })
 
     it('says the old policy stays on its other applications, by their logos', () => {
@@ -777,7 +792,7 @@ describe('Replace policy', () => {
       expect(said(html)).toBe(
         'Box access comes off Box and becomes a draft. AWS access takes its place. AWS Console keeps it unchanged. Everyone else here goes to Global Default Policy.',
       )
-      expect(count(html, '<b>Global Default Policy</b>')).toBe(1)
+      expect(count(html, 'bx-confirm__factname">Global Default Policy<')).toBe(1)
       /* Not when the new one takes everybody: Slack access is for everyone. */
       expect(said(card(boxAccess, slackAccess))).not.toContain('Everyone else')
     })
@@ -837,10 +852,10 @@ describe('Replace policy', () => {
 describe('the Policies tab on the policy alone', () => {
   const box = renderIn(true, <ApplicationPage appId="box" />)
 
-  it('heads the policy with Edit policy, Replace policy and a ⋯ holding the rest, still the view’s one orange control', () => {
+  it('heads the policy with the split (Edit policy and its chevron) and a ⋯ holding the rest, still the view’s one orange control', () => {
     const acts = box.slice(box.indexOf('apol__acts'), box.indexOf('</div>', box.indexOf('apol__acts')))
-    /* Sign-in activity and Check access are inside the ⋯ menu; Replace policy is the secondary beside Edit. */
-    expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', 'Duplicate policy', 'Replace policy', ''])
+    /* Sign-in activity and Check access are inside the ⋯ menu; Replace policy, on hold, is inside the split's chevron. */
+    expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', '', ''])
     expect(acts).toContain('aria-label="More for this policy"')
     expect(orange(box)).toBe(1)
   })
@@ -910,11 +925,11 @@ describe('the head\'s Edit and Duplicate popups', () => {
   const buttons = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
   const logosIn = (html: string) => count(html.slice(html.indexOf('bapr__keeps')), 'class="applogo ')
 
-  it('draws three buttons in the head, in the page source, behind one flag', () => {
+  it('keeps the three buttons in the head, in the page source, behind their flag (the split has taken the default)', () => {
     const code = viewSrc.replace(/\/\*[\s\S]*?\*\//g, '')
     expect(code).toContain('HEAD_THREE_BUTTONS')
     expect(code).toMatch(/Duplicate policy/)
-    expect(code).toMatch(/only=\{HEAD_THREE_BUTTONS \? forkWay : undefined\}/)
+    expect(code).toMatch(/only=\{HEAD_THREE_BUTTONS \|\| HEAD_SPLIT_EDIT \? forkWay : undefined\}/)
   })
 
   it('Edit policy: the Remove dialog\'s card, one sentence of reach and the others as logos', () => {
@@ -958,5 +973,158 @@ describe('the head\'s Edit and Duplicate popups', () => {
       expect(out).not.toContain('Search applications')
     }
     expect(text(draw('edit', everywhere, dropbox))).toContain('reach all ' + t.apps.length + ' applications.')
+  })
+})
+
+/* ONE SPLIT BUTTON (HEAD_SPLIT_EDIT, owner, 27 Oct 2026: "instead of three buttons, we need two, so the replace policy
+   option will be on hold", then "move this button as well inside the split button"). The head is the split (Edit for
+   this app, orange) and the ⋯; its chevron holds Edit all, on a policy more than one application shares, and Replace
+   policy, on hold. A policy this application has to itself reads Edit policy and has no Edit all. The static markup never
+   opens a menu or a popup, so the rows and the pill are read from the page source and the kit, and the popups' words
+   from the card drawn in place. */
+describe('the head\'s split button', () => {
+  const shared = render(<ApplicationPage appId="dropbox" />)
+  const acts = (html: string) => html.slice(html.indexOf('apol__acts'), html.indexOf('</div>', html.indexOf('apol__acts')))
+  const buttonsIn = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
+  const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '')
+
+  it('is on by default, with Replace on hold', () => {
+    expect(HEAD_SPLIT_EDIT).toBe(true)
+    expect(HEAD_REPLACE_ON_HOLD).toBe(true)
+  })
+
+  it('on a shared policy draws the split and the ⋯ and nothing else: Edit all is in the split\'s menu, not beside it', () => {
+    expect(shared).toMatch(/<h2[^>]*>Device compliance for Outlook and Dropbox<\/h2>/)
+    expect(buttonsIn(acts(shared))).toEqual(['Edit for this app', '', ''])
+    expect(acts(shared)).toContain('class="bx-split"')
+    expect(acts(shared)).toContain('aria-label="More ways to change this policy"')
+    for (const gone of ['Edit all', 'Duplicate policy', 'Replace policy']) expect(text(acts(shared))).not.toContain(gone)
+  })
+
+  it('puts the one orange control on the split', () => {
+    expect(orange(shared)).toBe(1)
+    expect(orange(acts(shared))).toBe(1)
+    const tags = [...acts(shared).matchAll(/<button([^>]*)>(.*?)<\/button>/g)].map((m) => ({ attrs: m[1], label: text(m[2]).trim() }))
+    expect(tags.find((b) => b.label === 'Edit for this app')!.attrs).toContain('bx-btn--brand')
+    expect(tags.filter((b) => b.attrs.includes('bx-btn--brand'))).toHaveLength(2) // the action and its chevron: one control
+  })
+
+  it('lists the edit-for-all row above Replace policy in the split menu, on a shared policy only', () => {
+    const view = code(viewSrc)
+    expect(view).toMatch(/\.\.\.\(shared \? \[\{ id: 'edit-all', label: editAllLabel, icon: Layers \}\] : \[\]\)/)
+    expect(view.indexOf("id: 'edit-all'")).toBeLessThan(view.indexOf("id: 'replace'"))
+    expect(view).toMatch(/if \(id === 'edit-all'\) openFork\('edit'\)/)
+  })
+
+  it('says in the row itself who the change reaches: every application on the policy, counted', () => {
+    const view = code(viewSrc)
+    /* Two applications read "both"; more read the count. The popup after it is a confirm, so the row has to say it. */
+    expect(view).toMatch(/row\.policy\.appIds\.length === 2 \? 'Edit for both apps on this policy' : `Edit for all \$\{row\.policy\.appIds\.length\} apps on this policy`/)
+    /* One line, so the menu widens to the label rather than breaking it at the menu's minimum width. */
+    expect(kitCss).toMatch(/\.bx-split \.bx-menu__item strong\s*\{\s*white-space:\s*nowrap;\s*\}/)
+  })
+
+  it('keeps Replace policy in the split menu, disabled and marked On hold, with the Replace popup still wired', () => {
+    const view = code(viewSrc)
+    expect(view).toMatch(/label: 'Replace policy', icon: Replace/)
+    expect(view).toMatch(/HEAD_REPLACE_ON_HOLD \? \{ pill: 'On hold', disabled: true \}/)
+    expect(view).toMatch(/else if \(id === 'replace'\) onReplace\(\)/)
+  })
+
+  it('draws a menu item\'s pill after its label, full strength on a disabled row', () => {
+    expect(code(kitSrc)).toMatch(/item\.pill && <Badge className="bx-menu__pill">\{item\.pill\}<\/Badge>/)
+    expect(code(kitSrc)).toContain("item.pill ? ' has-pill' : ''")
+    expect(kitCss).toMatch(/\.bx-menu__item\.has-pill:disabled\s*\{\s*opacity:\s*1;\s*\}/)
+    expect(kitCss).toMatch(/\.bx-menu__item\s*>\s*\.bx-menu__pill/)
+  })
+
+  describe('a policy named in a popup (owner, 27 Oct 2026: "add a policy word and an icon … for all the popups")', () => {
+    /* The popups that say a policy's name in a sentence, each drawing it through the one tag. */
+    const POPUPS = ['shared-policy-fork', 'replace-dialog', 'AppProtection', 'AppPostSignIn', 'status-scope-dialog', 'use-status-change', 'AddExistingPolicy', 'Policies', 'confirm-delete']
+
+    it('draws every one of them with the tag, none with a bold name', () => {
+      for (const f of POPUPS) {
+        const src = code(screenSrc[`./${f}.tsx`] ?? '')
+        expect(src.length, f).toBeGreaterThan(0)
+        expect(src, f).toMatch(/<PolicyFacts? /)
+      }
+      for (const f of ['shared-policy-fork', 'replace-dialog', 'AppProtection', 'AppPostSignIn', 'status-scope-dialog', 'use-status-change', 'confirm-delete']) {
+        expect(code(screenSrc[`./${f}.tsx`]), f).not.toMatch(/<b>\{(?:[a-zA-Z.]*policy\.name|from\.name|to\.name|name|replacing\.name|targets[^}]*)\}<\/b>/)
+      }
+    })
+
+    it('is the shield, the word Policy, then the name, with the full name as its title', () => {
+      const out = renderToStaticMarkup(<PolicyFact name="Access the app through corporate devices only" />)
+      expect(out).toMatch(/^<span class="bx-confirm__fact bx-confirm__fact--tag bx-confirm__fact--policy" title="Access the app through corporate devices only">/)
+      expect(out).toMatch(/<span class="bx-confirm__kind"><svg[^>]*lucide-shield-check[^>]*>[\s\S]*?<\/svg>Policy<\/span>/)
+      expect(out).toContain('<span class="bx-confirm__factname">Access the app through corporate devices only</span>')
+    })
+
+    it('says several policies as a list, each a tag: A, B and C', () => {
+      const out = renderToStaticMarkup(<PolicyFacts names={['A', 'B', 'C']} />)
+      expect(count(out, 'bx-confirm__fact--policy')).toBe(3)
+      expect(text(out).trim()).toBe('A , B and C')
+    })
+
+    it('cuts a long name on one line, in a tag with a width of its own, and keeps the whole name as the title', () => {
+      /* Owner, 27 Oct 2026: a two-line name stretched the tag into a bar the width of the card. The tag is capped (and
+         never wider than the card), and its name is one line ending in an ellipsis. */
+      expect(kitCss).toMatch(/\.bx-confirm__fact\.bx-confirm__fact--tag\s*\{[^}]*max-width:\s*min\(100%,\s*var\(--fact-max,\s*22rem\)\)/)
+      expect(kitCss).toMatch(/\.bx-confirm__factname\s*\{[^}]*overflow:\s*hidden;\s*text-overflow:\s*ellipsis;\s*white-space:\s*nowrap/)
+      expect(kitCss).not.toMatch(/\.bx-confirm__factname\s*\{[^}]*overflow-wrap/)
+      const long = 'Access the app through corporate devices only, for contractors and agency staff on managed laptops'
+      const out = renderToStaticMarkup(<PolicyFact name={long} />)
+      expect(out).toContain(`title="${long}"`)
+      expect(out).toContain(`<span class="bx-confirm__factname">${long}</span>`)
+    })
+  })
+
+  describe('the popup header mark', () => {
+    it('draws the ring whole: turned a quarter back with a plain transform, never offset along its dash', () => {
+      const src = code(toneMarkSrc)
+      expect(src).not.toContain('pathOffset')
+      expect(src).toContain('<g transform="rotate(-90 12 12)">')
+    })
+  })
+
+  describe('its popups', () => {
+    const t = showcaseTenant()
+    const policy = t.policies.find((p) => p.name === 'Device compliance for Outlook and Dropbox')!
+    const dropbox = t.apps.find((a) => a.id === 'dropbox')!
+    const draw = (way: 'edit' | 'duplicate') =>
+      render(<SharedPolicyFork open policy={policy} app={dropbox} onClose={() => {}} onEdit={() => {}} onDuplicate={() => {}} only={way} split inline />)
+    const foot = (html: string) => html.slice(html.indexOf('bx-modal__foot'), html.indexOf('</footer>', html.indexOf('bx-modal__foot')))
+
+    it('Edit for this app: says it is for the application alone, and its verb is Copy and edit', () => {
+      const out = draw('duplicate')
+      expect(text(out)).toContain('Edit for Dropbox only?')
+      expect(text(out)).toContain('A copy of Device compliance for Outlook and Dropbox for Dropbox only.')
+      expect(text(out)).toContain('The others keep the original.')
+      expect(buttonsIn(foot(out))).toEqual(['Cancel', 'Copy and edit'])
+      expect(count(foot(out), 'bx-btn--brand')).toBe(1)
+    })
+
+    it('Edit for all: keeps the reach sentence, and its verb is Edit for all', () => {
+      const out = draw('edit')
+      expect(text(out)).toContain('Edit shared policy?')
+      expect(text(out)).toContain('reach both applications.')
+      expect(buttonsIn(foot(out))).toEqual(['Cancel', 'Edit for all'])
+    })
+
+    it('names the policy as a tag: the shield, the word Policy, then its name', () => {
+      for (const way of ['edit', 'duplicate'] as const) {
+        const out = draw(way)
+        expect(count(out, 'bx-confirm__fact--policy')).toBe(1)
+        expect(out).toMatch(/<span class="bx-confirm__kind"><svg[^>]*lucide-shield-check[^>]*>[\s\S]*?<\/svg>Policy<\/span>/)
+        expect(out).toContain('bx-confirm__factname">Device compliance for Outlook and Dropbox<')
+        expect(out).not.toContain('<b>Device compliance for Outlook and Dropbox</b>')
+      }
+    })
+
+    it('leaves the 26 Oct words alone when the split is not the head', () => {
+      const out = render(<SharedPolicyFork open policy={policy} app={dropbox} onClose={() => {}} onEdit={() => {}} onDuplicate={() => {}} only="duplicate" inline />)
+      expect(text(out)).toContain('Duplicate for Dropbox?')
+      expect(buttonsIn(foot(out))).toEqual(['Cancel', 'Duplicate'])
+    })
   })
 })

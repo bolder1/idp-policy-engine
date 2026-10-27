@@ -8,6 +8,7 @@ import { AUTH_METHODS, withRuleOptions } from '../../methods'
 import { methodStrength, ruleFactor } from '../factor-strength'
 import { METHOD_PREFIX, firstFactorPatch } from './first-factor'
 import { WhatEditor } from './WhatEditor'
+import kitCss from '../../kit.css?raw'
 
 /* -----------------------------------------------------------------------------
    The Then section's own options (owner, 26 Oct 2026): miniOrange Push's two
@@ -17,6 +18,7 @@ import { WhatEditor } from './WhatEditor'
    -------------------------------------------------------------------------- */
 
 const noop = () => {}
+const count = (html: string, needle: string) => html.split(needle).length - 1
 const draw = (r: ReturnType<typeof rule>) =>
   renderToStaticMarkup(
     <BrandProvider>
@@ -53,7 +55,7 @@ describe('miniOrange Push options on the rule', () => {
     const html = draw(
       rule({ name: 'Both', decision: '2fa', firstFactor: 'Specific', firstFactorMethod: 'miniOrange Push', secondFactor: 'specific', secondFactorMethods: ['miniOrange Push'] }),
     )
-    for (const o of PUSH_OPTIONS) expect(html.split(`aria-label="${o}"`).length - 1, o).toBe(1)
+    for (const o of PUSH_OPTIONS) expect(html.split(`bx-checkrow__label">${o}<`).length - 1, o).toBe(1)
     expect(html.indexOf('Number matching')).toBeLessThan(html.indexOf('Second factor'))
   })
 
@@ -121,6 +123,52 @@ describe('Magic link as a first factor', () => {
   })
 })
 
+/* Every option in the rule panel's Then section is a check with its sentence under it, as the device profile's enrolment
+   rows are (owner, 27 Oct 2026: "add check and subheading as well, did for device profile, same for all the other
+   options inside policy builder"): the tick, a bold label, one line. Not a switch with an info dot. */
+describe('the options as checks with a sentence', () => {
+  const everything = rule({
+    name: 'Everything',
+    decision: '2fa',
+    firstFactor: 'Specific',
+    firstFactorMethod: 'Magic link',
+    secondFactor: 'specific',
+    secondFactorMethods: ['miniOrange Push'],
+    rememberMfa: true,
+    rememberDays: 30,
+  })
+  const html = draw(everything)
+  const ALL = [...PUSH_OPTIONS, ...MAGIC_OPTIONS, 'Remember MFA', 'Force MFA on each login', 'Allow end users to disable 2FA']
+
+  it('draws all seven as checkboxes, none as a switch', () => {
+    for (const o of ALL) expect(html, o).toContain(`bx-checkrow__label">${o}<`)
+    expect(count(html, 'role="checkbox"')).toBe(ALL.length)
+    expect(html).not.toContain('role="switch"')
+  })
+
+  it('says what each one does, in a line under its label, and keeps no info dot for it', () => {
+    expect(count(html, 'class="bx-checkrow__hint"')).toBe(ALL.length)
+    expect(html).toContain('The tap has to be confirmed with a fingerprint or face.')
+    expect(html).toContain('The user picks the number shown, so no push is approved by reflex.')
+    expect(html).toContain('When enabled, users can open the magic link from a different IP address than where it was requested.')
+    expect(html).toContain('Ask for the second factor at every sign-in, even on a device that is remembered.')
+    expect(html).not.toContain('bx-tipdot')
+  })
+
+  it('names each check by its label and describes it by its sentence, so the sentence is not part of the name', () => {
+    const one = html.match(/<button[^>]*role="checkbox"[^>]*>/)?.[0] ?? ''
+    expect(one).toMatch(/aria-labelledby="([^"]+)-label"/)
+    expect(one).toMatch(/aria-describedby="([^"]+)-hint"/)
+    expect(one.match(/aria-labelledby="([^"]+)-label"/)?.[1]).toBe(one.match(/aria-describedby="([^"]+)-hint"/)?.[1])
+  })
+
+  it('is lit when on, and the tick keeps its own column so the labels line up', () => {
+    expect(html).toMatch(/class="bx-checkrow is-on"/)
+    expect(kitCss).toMatch(/\.bx-checkrow\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\)/)
+    expect(kitCss).toMatch(/\.bx-checkrow__hint\s*\{\s*grid-column:\s*1 \/ -1/)
+  })
+})
+
 describe('Remember MFA and Force MFA', () => {
   const two = (over: Partial<Parameters<typeof rule>[0]> = {}) => rule({ name: 'Two', decision: '2fa', secondFactor: 'any', ...over })
 
@@ -130,10 +178,14 @@ describe('Remember MFA and Force MFA', () => {
 
   it('draw Force MFA at the level of Remember MFA, not indented beneath it', () => {
     const html = draw(two({ rememberMfa: true, rememberDays: 30 }))
-    const classOf = (label: string) => html.match(new RegExp(`<div class="(bb__prop[^"]*)"><span>${label}</span>`))?.[1]
-    expect(classOf('Force MFA on each login')).toBeDefined()
-    expect(classOf('Force MFA on each login')).not.toContain('is-indent')
-    expect(classOf('Remember MFA')).not.toContain('is-indent')
+    /* Both are checks in the same column. The one indented row is the days field, and it holds nothing else. */
+    expect(html).toContain('bx-checkrow__label">Remember MFA<')
+    expect(html).toContain('bx-checkrow__label">Force MFA on each login<')
+    const indented = html.match(/<div class="bb__prop[^"]*is-indent[^"]*">[\s\S]*?<\/span><\/div>/)?.[0] ?? ''
+    expect(indented).toContain('Days to remember')
+    expect(indented).not.toContain('Force MFA')
+    expect(html.indexOf('Remember MFA')).toBeLessThan(html.indexOf('Days to remember'))
+    expect(html.indexOf('Days to remember')).toBeLessThan(html.indexOf('Force MFA on each login'))
   })
 
   it('keep the days field under Remember MFA only', () => {

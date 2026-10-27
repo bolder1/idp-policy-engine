@@ -215,6 +215,9 @@ export interface MenuItem {
   kbd?: string
   danger?: boolean
   disabled?: boolean
+  /** A pill after the label, in the kit's one badge family: why a row cannot be used ("On hold"). It stays at full
+      strength on a disabled row, so the reason is the part that still reads. */
+  pill?: string
   /** Draws a rule above this item. Groups related actions without a heading. */
   divide?: boolean
 }
@@ -419,7 +422,7 @@ function MenuItems({ items, onPick }: { items: MenuItem[]; onPick: (item: MenuIt
           role="menuitem"
           tabIndex={-1}
           disabled={item.disabled}
-          className={`bx-menu__item ${item.danger ? 'is-danger' : ''} ${item.divide ? 'is-divided' : ''}`}
+          className={`bx-menu__item ${item.danger ? 'is-danger' : ''} ${item.divide ? 'is-divided' : ''}${item.pill ? ' has-pill' : ''}`}
           /* Hover moves focus, so the pointer and the keys share one highlight
              rather than painting two. */
           onMouseEnter={(e) => {
@@ -435,6 +438,7 @@ function MenuItems({ items, onPick }: { items: MenuItem[]; onPick: (item: MenuIt
             <strong>{item.label}</strong>
             {item.hint && <em>{item.hint}</em>}
           </span>
+          {item.pill && <Badge className="bx-menu__pill">{item.pill}</Badge>}
           {item.kbd && <kbd>{item.kbd}</kbd>}
         </button>
       ))}
@@ -892,6 +896,58 @@ export function Toggle({
         animate={{ x: checked ? TOGGLE_TRAVEL[size] : 0 }}
         transition={{ type: 'spring', stiffness: 700, damping: 42 }}
       />
+    </button>
+  )
+}
+
+/* A check with its sentence under it: the tick, a bold label, and one line saying what ticking it does.
+
+   The device profile's two enrolment rows (device-profile-parts.tsx `EnrolCheck`) were the first to be drawn this way,
+   the console's own shape for a yes-or-no setting, with the sentence VISIBLE instead of behind an info dot. The policy
+   builder's option rows are the same kind of question — a rule's Push options, Magic link's two, Remember MFA, Force MFA,
+   Allow end users to disable 2FA — and were drawn as a label on the left and a switch on the right with the sentence
+   hidden (owner, 27 Oct 2026: "add check and subheading as well, did for device profile, same for all the other options
+   inside the policy builder"). So this is that row, in the kit, for any form that asks one.
+
+   `role="checkbox"` on a button, not a native input, for the reason `EnrolCheck` gives: `.bx-tick` is the console's one
+   tick mark and a native box draws whatever the operating system draws. The label names it and the sentence describes
+   it, so a screen reader reads both without the sentence being part of the name. The whole row is the hit target. The
+   sentence is not optional: a check with no explanation is the switch this replaces, minus its mark. */
+export function CheckRow({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string
+  /** What ticking it does, in a sentence. */
+  hint: string
+  checked: boolean
+  onChange: (next: boolean) => void
+  disabled?: boolean
+}) {
+  const id = useId()
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-labelledby={`${id}-label`}
+      aria-describedby={`${id}-hint`}
+      disabled={disabled}
+      className={`bx-checkrow${checked ? ' is-on' : ''}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="bx-tick" aria-hidden>
+        <Check size={11} strokeWidth={3.2} />
+      </span>
+      <b id={`${id}-label`} className="bx-checkrow__label">
+        {label}
+      </b>
+      <span id={`${id}-hint`} className="bx-checkrow__hint">
+        {hint}
+      </span>
     </button>
   )
 }

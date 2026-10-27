@@ -41,7 +41,7 @@ import { SaveTemplateDialog } from './builder-dialogs'
 import { ConfirmDelete } from './confirm-delete'
 import { AppTransfer } from './app-transfer'
 import { decidesFor, deleteFacts, ownerOf } from './app-policies'
-import { AppFacts, DeleteFactsLine } from './app-facts'
+import { AppFacts, DeleteFactsLine, PolicyFact } from './app-facts'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
 import { rowMenu, statusOptions, type RowMenuId, monitorOffered } from './status-options'
@@ -1168,7 +1168,9 @@ function AssignAppsDialog({
       }
     >
       <div className="bassign">
-        <p className="bassign__lede">{policy.name}</p>
+        <p className="bassign__lede">
+          <PolicyFact name={policy.name} />
+        </p>
         {noApps ? (
           <EmptyState
             compact

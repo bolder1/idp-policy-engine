@@ -111,6 +111,13 @@ export function watchAfter(watch: MonitoringWatch | null, watching: boolean): Mo
    links and leave an application's event with two policies. */
 export type RowMenuId = 'edit' | 'test' | StatusTarget | 'monitoring' | 'trail' | 'text' | 'template' | 'duplicate' | 'delete'
 
+/* Whether a policy can be saved as a template, wherever it is offered — the Policies list, the board's bar, an
+   application's Policies tab. A sign-in policy with at least one rule: a post sign-in policy decides no sign-in, so
+   there is nothing to reuse, and a template of a policy with no rules would apply nothing. */
+export function canSaveAsTemplate(policy: Policy): boolean {
+  return policy.type !== 'Session' && openForEditing(policy).rules.length > 0
+}
+
 export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean }): { id: RowMenuId; label: string }[] {
   const { monitor } = opts
   const signIn = policy.type !== 'Session'
@@ -122,8 +129,7 @@ export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boo
     ...(offersMonitoringView(policy, { monitor }) ? [{ id: 'monitoring' as const, label: 'View monitoring' }] : []),
     ...(opts.trail && signIn ? [{ id: 'trail' as const, label: 'Open in trail' }] : []),
     ...(signIn ? [{ id: 'text' as const, label: 'Read as text' }] : []),
-    /* A template of a policy with no rules would apply nothing. */
-    ...(signIn && openForEditing(policy).rules.length > 0 ? [{ id: 'template' as const, label: 'Save as template' }] : []),
+    ...(canSaveAsTemplate(policy) ? [{ id: 'template' as const, label: 'Save as template' }] : []),
     ...(policy.isSystem
       ? []
       : [...(signIn ? [{ id: 'duplicate' as const, label: 'Duplicate' }] : []), { id: 'delete' as const, label: 'Delete policy' }]),

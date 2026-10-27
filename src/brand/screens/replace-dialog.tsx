@@ -1,8 +1,7 @@
 import { Confirm } from '../kit'
 import { useBrand } from '../store'
 import type { App, Policy } from '../data'
-import { listNames } from '../rule-who'
-import { AppFacts } from './app-facts'
+import { AppFacts, PolicyFact, PolicyFacts } from './app-facts'
 import { replaceFacts, replaceTitle, replaceTone, type ReplaceFacts } from './applications-model'
 
 /* -----------------------------------------------------------------------------
@@ -77,7 +76,7 @@ const WHY_NOT: Record<'draft' | 'inactive' | 'monitor', string> = {
 }
 
 function Until({ until }: { until: NonNullable<ReplaceFacts['until']> }) {
-  const next = <b>{until.next?.name ?? 'the tenant default'}</b>
+  const next = until.next ? <PolicyFact name={until.next.name} /> : <b>the tenant default</b>
   /* "Decides first" only of a policy that does stand in front of it (`ahead`). One naming nobody the directory has
      is shadowed by nothing, and the policy that decides is the fall-through — never "first". */
   if (until.state === 'never') return until.ahead ? <p>It never decides here: {next} decides first.</p> : <p>It never decides here, so {next} decides.</p>
@@ -96,7 +95,7 @@ export function ReplaceCard({ from, to, app, facts }: { from: Policy; to: Policy
   return (
     <div className="bapr__confirm is-card">
       <p>
-        <b>{from.name}</b> comes off <AppFacts apps={[app]} />
+        <PolicyFact name={from.name} /> comes off <AppFacts apps={[app]} />
         {off.kind === 'stays' ? (
           off.apps.length > 0 ? (
             <>
@@ -114,7 +113,7 @@ export function ReplaceCard({ from, to, app, facts }: { from: Policy; to: Policy
         )}
       </p>
       <p>
-        <b>{to.name}</b> takes its place.
+        <PolicyFact name={to.name} /> takes its place.
         {alsoOn.length > 0 && (
           <>
             {' '}
@@ -127,7 +126,8 @@ export function ReplaceCard({ from, to, app, facts }: { from: Policy; to: Policy
           once, by the policy they land on, as the Remove confirm says its "Its sign-ins go to". */}
       {rest.length > 0 && (
         <p>
-          Everyone else here goes to <b>{listNames(rest.map((p) => p.name), 2)}</b>.
+          Everyone else here goes to <PolicyFacts names={(rest.length > 2 ? rest.slice(0, 1) : rest).map((p) => p.name)} />
+          {rest.length > 2 && ` and ${rest.length - 1} more`}.
         </p>
       )}
     </div>

@@ -9,7 +9,7 @@ import { commitToast, lastSaved, monitorBlocker, published, sameRules, turnOnBlo
 import { useBrand, useNameLookup } from '../store'
 import { isPostSignIn, turnOnIssue } from '../post-sign-in'
 import { playCue } from '../sound'
-import { AppFacts } from './app-facts'
+import { AppFacts, PolicyFact } from './app-facts'
 import { diagnose } from './diagnostics'
 import { GuardDrawer, type GuardVersion } from './guard-page'
 import { editsTip, isStale, overridePatch, patchSignIns, tryRunGuard, guardOpens, type EditsFrom, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from './guard'
@@ -409,7 +409,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
         >
           <div className="bapr__confirm is-card">
             <p>
-              <b>{name}</b>
+              <PolicyFact name={name} />
             </p>
             <p>{blocker}</p>
           </div>
@@ -442,7 +442,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
         >
           <div className="bapr__confirm is-card">
             <p>
-              <b>{name}</b> {copy.lead.does}
+              <PolicyFact name={name} /> {copy.lead.does}
               {policy.isSystem ? (
                 ` ${copy.lead.where} every application`
               ) : named.length > 0 ? (

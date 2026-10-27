@@ -27,6 +27,13 @@ export const BAR_TOUR: boolean = false
 /** Read as text on the builder's bar. */
 export const BAR_READ: boolean = false
 
+/* Save as template, in the ⋯ at the end of the builder's bar (owner, 27 Oct 2026: "add an option for save as
+   template"). Not in the builder-version ladder: it is shown at every version, since it is the one way to keep what
+   was built here for the next policy. It is offered only for a sign-in policy with a rule on its canvas, and the
+   template is what the canvas holds, unsaved edits included (template-from-policy.ts). On, in every build; this is the
+   switch should it ever have to go. */
+export const BAR_TEMPLATE: boolean = true
+
 /* The rule on/off switch, hidden (owner, 23 Oct 2026: "Hide the toggle and
    remove this active inactive rule function as of now"). It sat on the rule
    card and in the panel's rule head. Hidden, not deleted: the card still reads

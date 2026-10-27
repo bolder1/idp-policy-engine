@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react'
 import { Confirm, type ConfirmRow } from '../kit'
 import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
+import { PolicyFact, TemplateFact } from './app-facts'
 import { DELETE_WORD, asksForDeleteTick, asksForDeleteWord, type DeleteImpact, type PolicyUse } from './usage'
 
 /* One delete confirmation for everything the Policies area can delete: a policy,
@@ -148,9 +149,11 @@ export function ConfirmDelete({
      on gets the four names. */
   const bare = live.length === 0 && later.length === 0 && stuck.length === 0
   /* A policy's name is the admin's own and often long ("Developer tools — office and device checks"), so its title is
-     short and the name is said once, in bold, at the top of the body (owner, 23 Oct 2026: short titles, never a long
-     policy name inside the title; the Remove dialog is the model). A zone's or a profile's name stays in the title. */
-  const policyNoun = noun === 'policy'
+     short and the name is said once, as a tag, at the top of the body (owner, 23 Oct 2026: short titles, never a long
+     policy name inside the title; the Remove dialog is the model; 27 Oct: the name is the Policy tag, in every popup).
+     A template's name is the admin's own too, up to 50 characters, and is said the same way, as the Template tag. A
+     zone's or a profile's name stays in the title. */
+  const policyNoun = noun === 'policy' || noun === 'template'
 
   return (
     <Confirm
@@ -158,7 +161,7 @@ export function ConfirmDelete({
       onClose={onCancel}
       tone="removed"
       shape={bare ? 'hero' : 'rows'}
-      title={policyNoun ? 'Delete this policy?' : `Delete ${name}?`}
+      title={policyNoun ? `Delete this ${noun}?` : `Delete ${name}?`}
       /* NO STANDING CALLOUT (owner, 22 Oct 2026, choosing C2). It restated the
          title — "Delete X?" then "This permanently deletes the X" — and its
          second clause is true of every delete in this console, so it was a
@@ -215,9 +218,7 @@ export function ConfirmDelete({
     >
       {policyNoun ? (
         <div className="bapr__confirm is-card">
-          <p>
-            <b>{name}</b>
-          </p>
+          <p>{noun === 'template' ? <TemplateFact name={name} /> : <PolicyFact name={name} />}</p>
           {detail && <p>{detail}</p>}
         </div>
       ) : (

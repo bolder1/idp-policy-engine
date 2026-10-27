@@ -11,6 +11,7 @@ import { freeName } from '../policy-name'
 import { listNames } from '../rule-who'
 import { playCue } from '../sound'
 import { AppLogo } from '../logos/AppLogo'
+import { PolicyFact } from './app-facts'
 import { denyNotice, eventGroups, eventNames, linkChoices, linkIssue, unlinkEvents } from './app-page-model'
 import { PageBar } from './page-bar'
 
@@ -229,7 +230,7 @@ export function AppPostSignInTab({
         {unlinking && (
           <div className="bapr__confirm is-card">
             <p>
-              <b>{unlinking.policy.name}</b> stops deciding {unlinkEvents(app.id, linkOf(unlinking.policy, app.id)?.eventIds ?? [])} on{' '}
+              <PolicyFact name={unlinking.policy.name} /> stops deciding {unlinkEvents(app.id, linkOf(unlinking.policy, app.id)?.eventIds ?? [])} on{' '}
               <span className="bx-confirm__fact">
                 <AppLogo appId={app.id} name="" size={16} />
                 {app.name}

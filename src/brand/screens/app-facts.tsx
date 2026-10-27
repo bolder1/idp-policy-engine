@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { LayoutTemplate, ShieldCheck, type LucideIcon } from 'lucide-react'
 
 import { AppLogo } from '../logos/AppLogo'
 import type { DeleteFacts } from './app-policies'
@@ -32,6 +33,50 @@ export function AppFacts({ apps, max = 3 }: { apps: readonly { id: string; name:
         </Fragment>
       ))}
       {over && ` and ${apps.length - shown.length} more`}
+    </>
+  )
+}
+
+/* A policy named inside a confirm's sentence, marked as one (owner, 27 Oct 2026, of a popup whose bold policy name
+   ran to two lines and read as part of the sentence: "add a policy word and an icon so they can distinguish easily
+   that this is a policy, like we did for application … this type of use case should be managed for all popups").
+
+   The application is a logo and its name; the policy is the shield the Policies section wears and the word Policy,
+   then its name, drawn as one tag with a width of its own, so a long name is cut with an ellipsis on one line and
+   never stretches the tag across the card or breaks into the sentence round it (kit.css, `--fact-max`). Every popup
+   that names a policy draws it here, so the word and the icon are the same wherever it is said. The word is real text
+   (a reader and a copy both get it), and the full name is the tag's title, so a cut name is one hover away. */
+function KindFact({ kind, icon: Icon, name }: { kind: 'policy' | 'template'; icon: LucideIcon; name: string }) {
+  return (
+    <span className={`bx-confirm__fact bx-confirm__fact--tag bx-confirm__fact--${kind}`} title={name}>
+      <span className="bx-confirm__kind">
+        <Icon size={14} strokeWidth={1.9} aria-hidden />
+        {kind === 'policy' ? 'Policy' : 'Template'}
+      </span>
+      <span className="bx-confirm__factname">{name}</span>
+    </span>
+  )
+}
+
+export function PolicyFact({ name }: { name: string }) {
+  return <KindFact kind="policy" icon={ShieldCheck} name={name} />
+}
+
+/* A template named in a popup, the same tag with the template's own icon and word (the delete-template confirm). */
+export function TemplateFact({ name }: { name: string }) {
+  return <KindFact kind="template" icon={LayoutTemplate} name={name} />
+}
+
+/* Several policies, said as `AppFacts` says applications: "A, B and C". */
+export function PolicyFacts({ names }: { names: readonly string[] }) {
+  return (
+    <>
+      {names.map((n, i) => (
+        <Fragment key={`${i}-${n}`}>
+          {i > 0 && (i === names.length - 1 ? ' and ' : ', ')}
+          <PolicyFact name={n} />
+        </Fragment>
+      ))}
     </>
   )
 }

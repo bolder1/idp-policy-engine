@@ -1,5 +1,5 @@
 import { DEFAULT_DENY_MESSAGE, FALLBACK_NAME, type AccessDecision, type Policy, type Rule, type User } from '../../data'
-import { DEFAULT_METHOD_ID, methodBlocker, type AuthMethod } from '../../methods'
+import { DEFAULT_METHOD_ID, methodBlocker, withRuleOptions, type AuthMethod } from '../../methods'
 import { enrolShapeFor, type EnrolKind } from '../../user-methods'
 import type { TenantResolution } from '../tenant-resolver'
 
@@ -78,7 +78,11 @@ const offerable = (m: AuthMethod) => m.use === 'second' && methodBlocker(m) === 
    A rule naming only methods nobody can be offered gets a page saying so,
    under the first name it gave. */
 function secondMethod(rule: Partial<Rule>, ctx: ScreensContext): { method: AuthMethod | null; name: string } {
-  const named = (n: string | undefined) => (n ? ctx.methods.find((m) => m.name === n) : undefined)
+  /* A method the rule names is read as the rule sets it (miniOrange Push's two options are the rule's, 26 Oct 2026). */
+  const named = (n: string | undefined) => {
+    const m = n ? ctx.methods.find((x) => x.name === n) : undefined
+    return m ? withRuleOptions(m, rule) : undefined
+  }
   const anyMethod = () => {
     const def = ctx.methods.find((m) => m.id === (ctx.defaultMethodId ?? DEFAULT_METHOD_ID))
     const m = def && offerable(def) ? def : (ctx.methods.find(offerable) ?? null)

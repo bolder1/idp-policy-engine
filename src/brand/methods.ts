@@ -515,6 +515,16 @@ export const DEFAULT_METHOD_ID = 'otp-email'
 export const methodById = (id: string) => AUTH_METHODS.find((m) => m.id === id)
 export const methodByName = (n: string) => AUTH_METHODS.find((m) => m.name === n)
 
+/* A method as one RULE sees it (owner, 26 Oct 2026). miniOrange Push's two options, Require biometric to approve and
+   Number matching, moved from the tenant's Settings tab onto the rule, so what the rule says wins over the catalogue's
+   default for that method alone. Every other method, and a rule that says nothing, is the method untouched (the same
+   object), so a caller that never heard of this changes nothing. */
+export function withRuleOptions(m: AuthMethod, rule: { pushBiometric?: boolean; pushNumberMatching?: boolean }): AuthMethod {
+  if (m.id !== 'mo-push' || (rule.pushBiometric === undefined && rule.pushNumberMatching === undefined)) return m
+  const over: Record<string, boolean | undefined> = { biometric: rule.pushBiometric, 'number-match': rule.pushNumberMatching }
+  return { ...m, settings: m.settings?.map((s) => (s.kind === 'toggle' && over[s.id] !== undefined ? { ...s, value: over[s.id] as boolean } : s)) }
+}
+
 /* Why a method is not available to users, in the order the admin has to fix
    it. Configuration comes first because activating an unconfigured method
    silently does nothing. */

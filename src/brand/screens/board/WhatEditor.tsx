@@ -7,6 +7,7 @@ import {
   HelpCircle,
   KeyRound,
   Layers,
+  Link2,
   ListChecks,
   Lock,
   type LucideIcon,
@@ -21,12 +22,14 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { Toggle } from '../../kit'
+import { TipDot, Toggle } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import { Picker } from '../../picker'
 import { DENIAL_REASONS } from '../sign-in-tests/phase'
 import { DENY_ACTION_SUGGESTION, denyReasonOfRule } from '../testing/deny-reason'
 import { DEFAULT_DENY_MESSAGE, DENY_EXTRA_MAX, DENY_MESSAGE_MAX, type AccessDecision, type Rule } from '../../data'
+import { methodById } from '../../methods'
+import { PUSH_OPTIONS_IN_POLICY } from '../../mfa-settings'
 import { METHODS } from '../rule-form'
 import { METHOD_PREFIX, firstFactorPatch, firstFactorValue } from './first-factor'
 import { isPristine } from './parts'
@@ -136,6 +139,11 @@ const METHOD_ICON: Record<string, LucideIcon> = {
   'Yubikey Token': Usb,
   'Security Questions': HelpCircle,
 }
+/* Magic link starts a session in place of the password, so it is offered as a FIRST factor only, and the second-factor
+   lists do not carry it (owner, 26 Oct 2026, with its two options below). Named as the catalogue names it. */
+const MAGIC_LINK = methodById('magic-link')?.name ?? 'Magic link'
+const PUSH = 'miniOrange Push'
+METHOD_ICON[MAGIC_LINK] = Link2
 const methodOption = (m: string) => ({ value: m, label: m, icon: METHOD_ICON[m] ?? KeyRound })
 
 export function WhatEditor({
@@ -161,6 +169,12 @@ export function WhatEditor({
   const walksFactors = rule.decision !== 'deny'
   const twoStep = rule.decision === '2fa'
 
+  /* Push can also be the FIRST factor (a rule signing people in with a tap alone). The rule holds one pair of Push
+     options, so they are drawn once: under the First factor when it is Push, otherwise with the second factor that
+     names it. Whatever clears them with the second step must leave them while the first factor still needs them. */
+  const pushFirst = rule.firstFactor === 'Specific' && rule.firstFactorMethod === PUSH
+  const dropPush = pushFirst ? {} : { pushBiometric: undefined, pushNumberMatching: undefined }
+
   /* Deny normalises everything that belongs to Allow, and so does removing the
      second step. Without it a rule keeps a remembered-device window and a
      method list that nothing on screen shows and nothing on the rule uses —
@@ -174,6 +188,7 @@ export function WhatEditor({
     rememberDays: undefined,
     forceMfaEachLogin: undefined,
     allowDisable2fa: false,
+    ...dropPush,
   }
 
   /* One tile, one value, and the tile IS the field.
@@ -225,6 +240,8 @@ export function WhatEditor({
           rememberDays: rule.rememberDays,
           forceMfaEachLogin: rule.forceMfaEachLogin,
           allowDisable2fa: rule.allowDisable2fa,
+          pushBiometric: rule.pushBiometric,
+          pushNumberMatching: rule.pushNumberMatching,
         }
       }
       return onPatch({ decision: 'deny', ...noSecondStep })
@@ -239,6 +256,34 @@ export function WhatEditor({
   }
 
   const unsatisfiable = twoStep && rule.secondFactor === 'specific' && methods.length === 0
+  /* miniOrange Push's two options show while the rule NAMES it (owner, 26 Oct 2026: "when the user selects miniOrange
+     Push this should be visible"): picked in Specific methods, or the step of a chain a rule arrived holding. Not under
+     "Any enabled method", which names nobody. */
+  const pushSecond = twoStep && ((rule.secondFactor === 'specific' && methods.includes(PUSH)) || (rule.secondFactor === 'chain' && (rule.methodChain ?? []).includes(PUSH)))
+  const pushOptions = (
+    <div className="bb__opts">
+      <Prop
+        label={
+          <>
+            Require biometric to approve
+            <TipDot text="The tap has to be confirmed with a fingerprint or face." label="About Require biometric to approve" />
+          </>
+        }
+      >
+        <Toggle checked={rule.pushBiometric ?? true} onChange={(pushBiometric) => onPatch({ pushBiometric })} label="Require biometric to approve" size="sm" />
+      </Prop>
+      <Prop
+        label={
+          <>
+            Number matching
+            <TipDot text="The user picks the number shown, so no push is approved by reflex." label="About Number matching" />
+          </>
+        }
+      >
+        <Toggle checked={rule.pushNumberMatching ?? true} onChange={(pushNumberMatching) => onPatch({ pushNumberMatching })} label="Number matching" size="sm" />
+      </Prop>
+    </div>
+  )
 
   /* `2fa` IS an Allow, so it lights Allow. The dropdown answers "does this
      sign-in get through"; the card below answers "how many times do they
@@ -355,10 +400,42 @@ export function WhatEditor({
               options={[
                 { value: 'Password', label: 'Password', icon: Lock },
                 { value: 'Any', label: 'Any enabled method', icon: Layers },
-                ...METHODS.map((m) => ({ ...methodOption(m), value: METHOD_PREFIX + m, group: 'A specific method' })),
+                ...[...METHODS, MAGIC_LINK].map((m) => ({ ...methodOption(m), value: METHOD_PREFIX + m, group: 'A specific method' })),
               ]}
-              onChange={(v) => onPatch(firstFactorPatch(v))}
+              /* Choosing what is already chosen writes nothing, so Magic link's two options are not reset by it. Leaving
+                 Push as the first factor takes its options along unless the second factor still names it. */
+              onChange={(v) =>
+                v !== firstFactorValue(rule) &&
+                onPatch({ ...firstFactorPatch(v), ...(pushFirst && !pushSecond ? { pushBiometric: undefined, pushNumberMatching: undefined } : {}) })
+              }
             />
+            {PUSH_OPTIONS_IN_POLICY && pushFirst && pushOptions}
+            {rule.firstFactor === 'Specific' && rule.firstFactorMethod === MAGIC_LINK && (
+              <div className="bb__opts">
+                {/* The live console's two options for this first factor, in its words (owner, 26 Oct 2026). Off until ticked, as
+                    its boxes are. */}
+                <Prop
+                  label={
+                    <>
+                      Enable sign-in from other IPs
+                      <TipDot text="When enabled, users can open the magic link from a different IP address than where it was requested." label="About sign-in from other IPs" />
+                    </>
+                  }
+                >
+                  <Toggle checked={rule.magicLinkOtherIps ?? false} onChange={(magicLinkOtherIps) => onPatch({ magicLinkOtherIps })} label="Enable sign-in from other IPs" size="sm" />
+                </Prop>
+                <Prop
+                  label={
+                    <>
+                      Enable sign-in from other devices
+                      <TipDot text="When enabled, users can open the magic link from a different device than where it was requested." label="About sign-in from other devices" />
+                    </>
+                  }
+                >
+                  <Toggle checked={rule.magicLinkOtherDevices ?? false} onChange={(magicLinkOtherDevices) => onPatch({ magicLinkOtherDevices })} label="Enable sign-in from other devices" size="sm" />
+                </Prop>
+              </div>
+            )}
             {/* Only reachable by a rule saved before the merge: no choice in the
                 picker above can leave Specific without a method. */}
             {!SHOWCASE && rule.firstFactor === 'Specific' && !rule.firstFactorMethod && (
@@ -388,7 +465,7 @@ export function WhatEditor({
               onChange={(v) =>
                 v === 'none'
                   ? onPatch({ decision: '1fa', ...noSecondStep })
-                  : onPatch({ decision: '2fa', secondFactor: v as Rule['secondFactor'] })
+                  : onPatch({ decision: '2fa', secondFactor: v as Rule['secondFactor'], ...(v === 'specific' ? {} : dropPush) })
               }
             />
 
@@ -411,6 +488,8 @@ export function WhatEditor({
                 onChange={(m) =>
                   onPatch({
                     secondFactorMethods: methods.includes(m) ? methods.filter((x) => x !== m) : [...methods, m],
+                    /* Taking Push off the list takes its options with it: nothing on screen would show them. */
+                    ...(m === PUSH && methods.includes(PUSH) ? dropPush : {}),
                   })
                 }
               />
@@ -423,6 +502,14 @@ export function WhatEditor({
                   </span>
                 </p>
               )}
+            </div>
+          )}
+
+          {/* miniOrange Push's two options, on the rule (owner, 26 Oct 2026). They were the tenant's Settings tab. */}
+          {PUSH_OPTIONS_IN_POLICY && pushSecond && !pushFirst && (
+            <div className="bb__thenfield">
+              <span className="bb__thenlabel">{PUSH}</span>
+              {pushOptions}
             </div>
           )}
 
@@ -511,11 +598,15 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
               <span>Enter 1 to 365 days.</span>
             </p>
           )}
-          <Prop label="Force MFA on each login" indent>
-            <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Force MFA on each login" size="sm" />
-          </Prop>
         </>
       )}
+      {/* Its own switch, at the same level as Remember MFA and not inside it (owner, 26 Oct 2026: "make Remember MFA and
+          Force MFA independent, not inside one"). It was the second row under Remember MFA, so it could only be reached
+          by turning that on, and read as a sub-setting of it. The two are separate answers: whether a device is
+          remembered, and whether MFA is asked at every sign-in regardless. */}
+      <Prop label="Force MFA on each login">
+        <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Force MFA on each login" size="sm" />
+      </Prop>
       <Prop label="Allow end users to disable 2FA">
         <Toggle checked={rule.allowDisable2fa} onChange={(allowDisable2fa) => onPatch({ allowDisable2fa })} label="Allow end users to disable 2FA" size="sm" />
       </Prop>

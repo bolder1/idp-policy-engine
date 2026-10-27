@@ -760,6 +760,20 @@ export interface Rule {
   /** Prompt for MFA every login even on a remembered device. */
   forceMfaEachLogin?: boolean
   allowDisable2fa: boolean
+  /* miniOrange Push, on THIS rule (owner, 26 Oct 2026: "remove this options form here, it will be managed in the
+     policy, in the Then section, when the user selects miniOrange Push"). They were the two toggles on Authentication
+     methods > Settings; there they were a tenant setting and nothing read them (the Check access player and the factor
+     ranking read the catalogue's own, methods.ts `mo-push.settings`). On the rule they are the rule's. ABSENT means
+     what the tenant setting was, on, so no stored rule changes. Only meaningful while the rule names miniOrange Push
+     as a second factor; `noSecondStep` clears them with the rest of the second step. */
+  pushBiometric?: boolean
+  pushNumberMatching?: boolean
+  /* Magic link as this rule's FIRST factor, the live console's two options (owner, 26 Oct 2026, over its Edit Login
+     Policy form): "Enable sign-in from other IPs" and "Enable sign-in from other devices". ABSENT means off, as the
+     console's unticked boxes are. Only meaningful while `firstFactorMethod` is Magic link; picking any other first
+     factor clears them (board/first-factor.ts). */
+  magicLinkOtherIps?: boolean
+  magicLinkOtherDevices?: boolean
   /* What the user is told when this rule denies them (owner, 21 Sep 2026 — the
      console's "Deny message"). ABSENT means the default, DEFAULT_DENY_MESSAGE;
      an empty string is never stored. Kept while the rule is an Allow, so

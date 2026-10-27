@@ -1,5 +1,5 @@
 import type { Rule } from '../data'
-import { methodBlocker, type AuthMethod, type MethodTier } from '../methods'
+import { methodBlocker, withRuleOptions, type AuthMethod, type MethodTier } from '../methods'
 
 /* -----------------------------------------------------------------------------
    How strong a second factor is — as an attacker would rank it.
@@ -118,10 +118,15 @@ const available = (methods: readonly AuthMethod[]) => methods.filter((m) => m.us
 
    With nothing available at all the rank is below-weak: a second factor that
    cannot be delivered is not protecting anything. */
-export function ruleFactor(rule: Pick<Rule, 'decision' | 'secondFactor' | 'secondFactorMethods' | 'methodChain' | 'preferredFallback'>, methods: readonly AuthMethod[]): FactorStrength | null {
+export function ruleFactor(rule: Pick<Rule, 'decision' | 'secondFactor' | 'secondFactorMethods' | 'methodChain' | 'preferredFallback' | 'pushBiometric' | 'pushNumberMatching'>, methods: readonly AuthMethod[]): FactorStrength | null {
   if (rule.decision !== '2fa') return null
+  /* A method the rule NAMES is read as the rule sets it: miniOrange Push's number matching is the rule's (owner, 26 Oct
+     2026), so a rule that turns it off ranks as the one-tap push it is. "Any" is still the tenant's own default. */
   const named = (names: readonly string[] | undefined) =>
-    (names ?? []).map((n) => methods.find((m) => m.name === n)).filter((m): m is AuthMethod => m !== undefined)
+    (names ?? [])
+      .map((n) => methods.find((m) => m.name === n))
+      .filter((m): m is AuthMethod => m !== undefined)
+      .map((m) => withRuleOptions(m, rule))
   const anyOf = () => {
     const on = available(methods)
     return on.length === 0 ? 'below-weak' : weakest(on.map(methodStrength))

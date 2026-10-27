@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FAMILIES, allSettings, type MfaSetting } from './mfa-settings'
+import { FAMILIES, PUSH_OPTIONS_IN_POLICY, allSettings, type MfaSetting } from './mfa-settings'
 
 /* The field descriptors are data, and data of this shape fails quietly: a preset
    outside its own range draws a chip that cannot be selected, a pattern with no
@@ -189,10 +189,19 @@ describe('the catalogue as a whole', () => {
         'grid-length', 'grid-size',
         'kba-change', 'kba-limit', 'kba-verify',
         'otp-length', 'otp-length', 'otp-validity', 'otp-validity',
-        'push-biometric', 'push-number',
         'token-assign',
       ].sort(),
     )
+  })
+
+  /* miniOrange Push's two options are the RULE's (owner, 26 Oct 2026: "remove this options form here, it will be
+     managed in the policy, in the Then section"). While PUSH_OPTIONS_IN_POLICY is on the registry holds neither, so the
+     miniOrange Authenticator family has nothing to configure and no Settings tab; off, the two come back as they were. */
+  it('keeps miniOrange Push\'s two options on the rule, so the registry holds none of them', () => {
+    expect(PUSH_OPTIONS_IN_POLICY).toBe(true)
+    const push = FAMILIES.flatMap((f) => f.methods).find((m) => m.id === 'mo-push')
+    expect(push?.settings ?? []).toEqual([])
+    expect(settings().some((s) => s.id === 'push-biometric' || s.id === 'push-number')).toBe(false)
   })
 })
 

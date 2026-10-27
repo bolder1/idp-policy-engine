@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Check, Minus } from 'lucide-react'
 
 import { Button } from '../kit'
@@ -22,9 +22,13 @@ export function SliderActions({
   another,
 }: {
   onCancel: () => void
-  primary: { label: string; run: () => void; disabled?: boolean } | null
+  /* `blocked`: not pressable yet, for this reason — the button stays in the tab order with the reason announced (the
+     kit Button's `blocked`), never skipped as a natively disabled one is. `quiet`: a confirm over the slider holds the
+     view's one orange button, so this one steps down to secondary while it is up. */
+  primary: { label: string; run: () => void; disabled?: boolean; blocked?: string; quiet?: boolean; danger?: boolean } | null
   another: { label: string; run: () => void } | null
 }) {
+  const whyId = useId()
   return (
     <>
       {!another && (
@@ -38,9 +42,20 @@ export function SliderActions({
         </Button>
       )}
       {primary && (
-        <Button variant="brand" disabled={primary.disabled} onClick={primary.run}>
+        <Button
+          variant={primary.quiet ? 'secondary' : primary.danger ? 'danger' : 'brand'}
+          disabled={primary.disabled}
+          blocked={primary.blocked}
+          describedBy={primary.blocked ? whyId : undefined}
+          onClick={primary.run}
+        >
           {primary.label}
         </Button>
+      )}
+      {primary?.blocked && (
+        <span id={whyId} className="u-sr-only">
+          {primary.blocked}
+        </span>
       )}
     </>
   )

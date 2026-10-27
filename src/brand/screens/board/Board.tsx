@@ -187,6 +187,8 @@ export function Board({
   cardHead,
   foldOnPress,
   run,
+  still = false,
+  idPrefix = '',
 }: {
   policy: Policy
   /* Where a sign-in is arriving, in words — the application this policy
@@ -272,6 +274,14 @@ export function Board({
   foldOnPress?: boolean
   /** Check access v3: the chain read by a run (`BoardRunView`). Absent, the builder's canvas. */
   run?: BoardRunView
+  /* A read-only canvas with nothing beside it to open (ReadOnlyCanvas `still`: Add existing policy's preview, 24 Oct
+     2026): the start pill is its sentence alone, not a button with a chevron that says it opens a pane — there is no
+     pane. The builder never passes it. */
+  still?: boolean
+  /* Before every id the chain draws — the start pill's and each card's (RuleCard `idPrefix`) — for a canvas drawn
+     while another is in the page, so `#bb-start` and `#bb-terminal-title` name one element each. The run has its
+     own (`BoardRunView.idPrefix`). */
+  idPrefix?: string
 }) {
   const showHistory = useShows('history')
   const showZoom = useShows('zoom')
@@ -1008,11 +1018,11 @@ export function Board({
             {/* A button now: it opens the Applications pane, the one place on the
                 board the policy's applications are edited. The count of the
                 rest lives here too — the bar above no longer carries a mark. */}
-            <button
-              type="button"
-              id="bb-start"
+            <StartPill
+              still={still}
+              id={`${idPrefix}bb-start`}
               className={`bb__start ${selection.kind === 'apps' ? 'is-on' : ''}`}
-              aria-label={
+              label={
                 test
                   ? `${test.person?.name ?? 'Nobody chosen'} signs in to ${test.appId ? test.appName : 'no application'}. Edit applications`
                   : post
@@ -1023,9 +1033,8 @@ export function Board({
                   ? 'No applications. Choose applications'
                   : `Edit who and applications: ${fromWords}${destination}${destinationMore > 0 ? ` and ${destinationMore} more` : ''}`
               }
-              aria-controls="bb-insp-body"
-              aria-expanded={selection.kind === 'apps'}
-              onClick={() => onSelect({ kind: 'apps' })}
+              expanded={selection.kind === 'apps'}
+              onPress={() => onSelect({ kind: 'apps' })}
             >
               {/* The application's own mark, where a pulsing orange dot used to
                   be.
@@ -1100,8 +1109,7 @@ export function Board({
                   )}
                 </>
               )}
-              <ChevronRight size={14} strokeWidth={2} className="bb__start__go" aria-hidden />
-            </button>
+            </StartPill>
 
             {/* Which policy decides, on the spine, before any rule. This one:
                 a tiny pill, because the chain under it is the proof. Another
@@ -1210,6 +1218,7 @@ export function Board({
                       highlight={highlight}
                       head={cardHead?.(r.id)}
                       foldOnPress={foldOnPress}
+                      idPrefix={idPrefix}
                       onHover={(on) => onHover(on ? ri : null)}
                       cardRef={(el) => {
                         if (el) cards.current.set(r.id, el)
@@ -1251,6 +1260,7 @@ export function Board({
               highlight={highlight}
               head={cardHead?.('fallback')}
               foldOnPress={foldOnPress}
+              idPrefix={idPrefix}
               onHover={onHoverLast}
               cardRef={(el) => {
                 terminalCard.current = el
@@ -1371,6 +1381,41 @@ export function Board({
         </div>
       </div>
     </div>
+  )
+}
+
+/* The start pill: the way into the Applications pane on the builder, and on a still canvas (`still`) the sentence
+   alone — the same pill, with no chevron and nothing to press, because there is no pane to open. A button that
+   opened nothing was a dead stop in the tab order with `aria-expanded` promising a panel. */
+function StartPill({
+  still,
+  id,
+  className,
+  label,
+  expanded,
+  onPress,
+  children,
+}: {
+  still: boolean
+  id: string
+  className: string
+  label: string
+  expanded: boolean
+  onPress: () => void
+  children: ReactNode
+}) {
+  if (still) {
+    return (
+      <div id={id} className={className}>
+        {children}
+      </div>
+    )
+  }
+  return (
+    <button type="button" id={id} className={className} aria-label={label} aria-controls="bb-insp-body" aria-expanded={expanded} onClick={onPress}>
+      {children}
+      <ChevronRight size={14} strokeWidth={2} className="bb__start__go" aria-hidden />
+    </button>
   )
 }
 

@@ -6,6 +6,7 @@ import { BrandProvider } from '../store'
 import { apps } from '../data'
 import { showcaseTenant } from '../fixtures'
 import { AddExistingPolicy } from './AddExistingPolicy'
+import { SharedPolicyFork } from './shared-policy-fork'
 import { ApplicationPage, NewApplicationPage } from './ApplicationPage'
 import { TestingSessionProvider } from './testing/session'
 import { AppActivity } from './app-activity'
@@ -13,8 +14,15 @@ import { GLANCE_ROWS } from './app-policy-model'
 import { AppPolicyFocusOverride } from './app-policy-focus'
 import { APP_POLICY_GLANCE, PolicyChain } from './app-policy-view'
 import { appStanding } from './app-standing'
+import { replaceFacts } from './applications-model'
+import { ReplaceCard } from './replace-dialog'
+import { policyOption } from './policy-option'
+import { PolicyPage } from './sign-in-tests/InspectPanel'
+import type { Policy } from '../data'
 import activitySrc from './app-activity.tsx?raw'
 import viewSrc from './app-policy-view.tsx?raw'
+import appPageSrc from './ApplicationPage.tsx?raw'
+import addExistingSrc from './AddExistingPolicy.tsx?raw'
 
 /* -----------------------------------------------------------------------------
    An application's page and its Add existing policy drawer, drawn once as
@@ -108,7 +116,8 @@ describe('the Policies tab', () => {
     expect(box).toMatch(/<h2[^>]*>Box access<\/h2>/)
     /* Edit policy is the one orange button, Replace policy the secondary, and the ⋯ holds the rest, which static
        markup never opens (owner, 23 Oct 2026: "a primary, a secondary and a 3 dot button trail"). */
-    expect(buttonsIn(acts(box))).toEqual(['Edit policy', 'Replace policy', ''])
+    /* Three buttons since 26 Oct 2026 (HEAD_THREE_BUTTONS): Duplicate policy joined them, each opening its own popup. */
+    expect(buttonsIn(acts(box))).toEqual(['Edit policy', 'Duplicate policy', 'Replace policy', ''])
     expect(acts(box)).toContain('aria-label="More for this policy"')
     expect(orange(box)).toBe(1)
     expect(orange(acts(box))).toBe(1)
@@ -568,9 +577,258 @@ describe('Add existing policy', () => {
     const t = text(out)
     expect(t).toContain('Add existing policy')
     expect(t).toContain('On other applications')
-    expect(out).toMatch(/<button[^>]*disabled=""[^>]*>Add this policy<\/button>/)
+    /* Waiting for a pick is a reason, so Add stays in the tab order with it announced (Button `blocked`), never
+       natively disabled (review, 24 Oct 2026). */
+    const add = out.match(/<button[^>]*>Add this policy<\/button>/)?.[0] ?? ''
+    expect(add).toContain('aria-disabled="true"')
+    expect(add).not.toContain('disabled=""')
+    const why = add.match(/aria-describedby="([^"]+)"/)?.[1]
+    expect(out).toContain(`id="${why}" class="u-sr-only">Pick a policy</span>`)
     expect(t).not.toContain('Add a copy')
     expect(out).not.toContain('bapr__stack')
+  })
+})
+
+/* Replace policy, option A (owner, 24 Oct 2026: "pick a policy in a slider, one confirm that swaps it live on this app,
+   with Undo. No copy, no draft"). The slider is static markup here; the confirm renders nothing without a document,
+   so its card is drawn on its own, from the same facts the dialog reads. Pressing through is the browser check's. */
+describe('Replace policy', () => {
+  const t = showcaseTenant()
+  const byName = (name: string) => t.policies.find((p) => p.name === name)!
+  const box = t.apps.find((a) => a.id === 'box')!
+  const boxAccess = byName('Box access')
+  const slackAccess = byName('Slack access')
+
+  describe('the slider', () => {
+    const out = render(<AddExistingPolicy open app={box} onClose={() => {}} onAdd={() => 'confirming'} onCopy={() => true} replacing={boxAccess} asPopup={false} />)
+    const foot = out.slice(out.indexOf('bx-drawer__foot'), out.indexOf('</footer>', out.indexOf('bx-drawer__foot')))
+
+    it('is named for the replace and footed with two buttons, Cancel and Replace, Replace waiting for a pick', () => {
+      expect(text(out)).toContain('Replace policy')
+      expect([...foot.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Cancel', 'Replace'])
+      /* Blocked, not disabled: in the tab order, with the reason announced (review, 24 Oct 2026). */
+      const replace = foot.match(/<button[^>]*>Replace<\/button>/)?.[0] ?? ''
+      expect(replace).toContain('aria-disabled="true"')
+      expect(replace).not.toContain('disabled=""')
+      expect(foot).toContain(`id="${replace.match(/aria-describedby="([^"]+)"/)?.[1]}" class="u-sr-only">Pick a policy</span>`)
+      expect(count(foot, 'bx-btn--brand')).toBe(1)
+      /* No draft copy, and no second way forward. */
+      expect(text(out)).not.toContain('Add as a draft')
+      expect(text(out)).not.toContain('Duplicate and add')
+      expect(text(out)).not.toContain('Takes over from')
+    })
+
+    it('names the policy it replaces in its head, once', () => {
+      const head = out.slice(out.indexOf('bx-drawer__head'), out.indexOf('</header>', out.indexOf('bx-drawer__head')))
+      expect(text(head)).toContain('On Box, in place of Box access')
+      expect(count(text(out), 'Box access')).toBe(1)
+    })
+
+    it('never offers the policy being replaced back', () => {
+      expect(out).toContain('<b>Slack access</b>')
+      expect(out).not.toContain('<b>Box access</b>')
+    })
+
+    it('steps its Replace down while the confirm is up over it, so the confirm holds the one orange button', () => {
+      const under = render(
+        <AddExistingPolicy open app={box} onClose={() => {}} onAdd={() => 'confirming'} onCopy={() => true} replacing={boxAccess} confirming asPopup={false} />,
+      )
+      const f = under.slice(under.indexOf('bx-drawer__foot'), under.indexOf('</footer>', under.indexOf('bx-drawer__foot')))
+      expect(count(f, 'bx-btn--brand')).toBe(0)
+      /* `secondary` is drawn in the kit's neutral role (kit.tsx `ROLE`). */
+      expect(f).toMatch(/<button[^>]*bx-btn--neutral[^>]*>Replace<\/button>/)
+    })
+  })
+
+
+  /* REPLACE AS ONE POPUP (REPLACE_IN_POPUP, owner, 26 Oct 2026): the list and, once one is picked, its context in the
+     same place; Cancel and Replace are the whole footer, and no second confirm is drawn over it. Drawn in place
+     (inline): a Modal renders nothing without a document. */
+  describe('the popup', () => {
+    const out = render(<AddExistingPolicy open app={box} onClose={() => {}} onAdd={() => true} onCopy={() => true} replacing={boxAccess} asPopup inline />)
+    const foot = out.slice(out.indexOf('bx-modal__foot'), out.indexOf('</footer>', out.indexOf('bx-modal__foot')))
+
+    it('is on by default, and the slider and its confirm stay behind the flag', () => {
+      expect(addExistingSrc).toMatch(/\(asPopup \?\? REPLACE_IN_POPUP\)/)
+      expect(appPageSrc).toMatch(/if \(REPLACE_IN_POPUP\) return REPLACE_RUNS_CHECKS \? checkThenPutOn\(live\) : putOn\(policyId\)/)
+      expect(appPageSrc).toContain('<ReplaceDialog')
+    })
+
+    it('is named for the replace and says what it replaces, once, before the list', () => {
+      expect(out).toContain('role="dialog"')
+      expect(text(out)).toContain('Replace policy')
+      expect(text(out)).toContain('in place of Box access')
+      expect(count(text(out), 'Box access')).toBe(1)
+    })
+
+    it('lists the other policies and never offers the one being replaced back', () => {
+      expect(out).toContain('<b>Slack access</b>')
+      /* Box access is named once, in the line that says what is replaced, and is not a row in the list. */
+      expect(count(out, '<b>Box access</b>')).toBe(1)
+      expect(out).not.toContain('bapp__picktext"><b>Box access</b>')
+      expect(out).toContain('placeholder="Search policies"')
+    })
+
+    it('is footed with two buttons, Cancel and Replace, Replace waiting for a pick, and nothing else', () => {
+      expect([...foot.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Cancel', 'Replace'])
+      const replace = foot.match(/<button[^>]*>Replace<\/button>/)?.[0] ?? ''
+      expect(replace).toContain('aria-disabled="true"')
+      expect(foot).toContain('Pick a policy</span>')
+      expect(count(foot, 'bx-btn--brand')).toBe(1)
+      expect(text(out)).not.toContain('Add as a draft')
+      expect(text(out)).not.toContain('Duplicate and add')
+      expect(text(out)).not.toContain('Takes over from')
+    })
+
+    it('writes straight from its own button: the page skips the second confirm while the popup is the confirm', () => {
+      const code = appPageSrc.replace(/\/\*[\s\S]*?\*\//g, '')
+      expect(code).toMatch(/if \(REPLACE_IN_POPUP\) return/)
+    })
+  })
+
+  /* The card the popup shows as its context says what the second confirm used to say, on its own: what comes off, and what takes its place. */
+  it('says, in the popup context card, what the second confirm used to say', () => {
+    const from = byName('Box access')
+    const to = byName('Slack access')
+    const facts = replaceFacts(from, to, box, { policies: t.policies, apps: t.apps, users: t.directory.people, groups: t.groups })
+    const card = text(render(<ReplaceCard from={from} to={to} app={box} facts={facts} />))
+    expect(card).toContain('Box access comes off')
+    expect(card).toContain('Slack access takes its place')
+  })
+
+  /* A draft Duplicate for {app} parked on the application can be the pick: it is how an edited copy is put in charge. */
+  it('lets a replace pick a draft already on the application, and nothing else already there', () => {
+    const tenant = { apps: t.apps, groups: t.groups, users: t.directory.people }
+    const parked: Policy = { ...slackAccess, id: 'parked', status: 'draft', appIds: ['box'] }
+    const here = policyOption(parked, box, tenant, { here: true })
+    expect(here).toMatchObject({ disabled: false, group: 'On Box' })
+    expect(here.meta).not.toBe('Already on this application')
+    expect(policyOption(parked, box, tenant)).toMatchObject({ disabled: true, meta: 'Already on this application' })
+    /* The slider offers `here` only while replacing, and only for a draft. */
+    const code = addExistingSrc.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(code).toMatch(/here: !!replacing && p\.status === 'draft' && kind === 'already-here'/)
+  })
+
+  it('opens its one confirm before any write, and runs no checks while REPLACE_RUNS_CHECKS is off', () => {
+    const code = appPageSrc.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(code).toMatch(/if \(replacing\) \{[^}]*setSwapping\(\{ from: from\.id, to: policyId \}\)\s+return 'confirming'/)
+    expect(code).toMatch(/if \(!REPLACE_RUNS_CHECKS\) \{\s+if \(putOn\(s\.to\)\) setAdding\(false\)/)
+    expect(code).toContain('<ReplaceDialog')
+  })
+
+  /* A press the static render cannot make: the closing confirm's footer stays clickable through its exit. */
+  it('presses once per confirm, clearing it before anything is written, and re-reads the policy on the application', () => {
+    const code = appPageSrc.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(code).toMatch(/const s = swapping\s+if \(!s \|\| spent\.current === s\) return\s+spent\.current = s\s+setSwapping\(null\)\s+if \(!replacing \|\| replacing\.id !== s\.from\) return/)
+    /* What it replaces is read from the tab on every render, never held from the press that opened it. */
+    expect(code).toMatch(/const replacing = replaceOpen \? \(shown\?\.policy \?\? null\) : null/)
+    expect(code).not.toContain('setReplacing(')
+  })
+
+  it('runs the checks, when they are on, if either policy decides here — the one coming off as much as the one going on', () => {
+    const code = appPageSrc.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(code).toMatch(/if \(!appsGuard\.guards\(live\) && !\(off && !off\.isSystem && appsGuard\.guards\(off\)\)\) return putOn\(live\.id\)/)
+  })
+
+  describe('the confirm card', () => {
+    const tenant = { policies: t.policies, apps: t.apps, users: t.directory.people, groups: t.groups }
+    const card = (from: Policy, to: Policy, policies: readonly Policy[] = t.policies) =>
+      renderToStaticMarkup(<ReplaceCard from={from} to={to} app={box} facts={replaceFacts(from, to, box, { ...tenant, policies })} />)
+    const said = (html: string) => text(html).replace(/\s+([.,:])/g, '$1').trim()
+    const others = (p: Policy) => t.policies.filter((x) => x.id !== p.id)
+
+    it('reads from the policy coming off to the one going on, each named once in bold, the applications with their logos', () => {
+      const html = card(boxAccess, slackAccess)
+      expect(said(html)).toBe('Box access comes off Box and becomes a draft. Slack access takes its place. Slack keeps it unchanged.')
+      expect(count(html, '<b>Box access</b>')).toBe(1)
+      expect(count(html, '<b>Slack access</b>')).toBe(1)
+      expect(html.indexOf('<b>Box access</b>')).toBeLessThan(html.indexOf('<b>Slack access</b>'))
+      expect(count(html, 'bx-confirm__fact')).toBe(2)
+    })
+
+    it('says the old policy stays on its other applications, by their logos', () => {
+      const shared = { ...boxAccess, appIds: ['box', 'slack'] }
+      const html = card(shared, byName('AWS access'), [...others(shared), shared])
+      expect(said(html)).toMatch(/^Box access comes off Box\. It stays on Slack\. AWS access takes its place\./)
+    })
+
+    it('says plainly when the old policy’s saved draft will replace its published rules', () => {
+      const pending: Policy = { ...boxAccess, pendingDraft: { rules: [], savedAt: 'now', savedBy: 'You' } }
+      expect(said(card(pending, slackAccess, [...others(pending), pending]))).toContain(
+        'Box access comes off Box and becomes a draft. Its saved draft replaces the published rules.',
+      )
+    })
+
+    it('says, on its own line, where sign-ins go while the new one decides nothing', () => {
+      const html = card(boxAccess, byName('HRMS access from corporate offices'))
+      expect(said(html)).toBe(
+        'Box access comes off Box and becomes a draft. HRMS access from corporate offices takes its place. HRMS keeps it unchanged. It is inactive, so Global Default Policy decides here until it is turned on.',
+      )
+      expect(count(html, '<p>')).toBe(3)
+      const draft = { ...slackAccess, status: 'draft' as const, appIds: [] }
+      expect(said(card(boxAccess, draft, [...others(draft), draft]))).toBe(
+        'Box access comes off Box and becomes a draft. Slack access takes its place. It is a draft, so Global Default Policy decides here until it is turned on.',
+      )
+    })
+
+    /* Review, 24 Oct 2026: the new policy decides for some of the people the old one did, and the rest fall through. */
+    it('says where everybody else goes when the new policy names fewer people than the old one', () => {
+      const html = card(boxAccess, byName('AWS access'))
+      expect(said(html)).toBe(
+        'Box access comes off Box and becomes a draft. AWS access takes its place. AWS Console keeps it unchanged. Everyone else here goes to Global Default Policy.',
+      )
+      expect(count(html, '<b>Global Default Policy</b>')).toBe(1)
+      /* Not when the new one takes everybody: Slack access is for everyone. */
+      expect(said(card(boxAccess, slackAccess))).not.toContain('Everyone else')
+    })
+
+    it('never says the Global Default "decides first"', () => {
+      const nobody = { ...slackAccess, audience: { everyone: false, groupIds: [], userIds: [] } }
+      const s = said(card(boxAccess, nobody, [...others(nobody), nobody]))
+      expect(s).toContain('It never decides here, so Global Default Policy decides.')
+      expect(s).not.toContain('decides first')
+    })
+
+    it('reads right for a draft parked on the application being put in charge', () => {
+      const parked: Policy = { ...slackAccess, id: 'parked', name: 'Box access (copy)', status: 'draft', appIds: ['box'] }
+      const html = card(boxAccess, parked, [...t.policies, parked])
+      /* On this application alone, so no other application keeps it; a draft, so the Global Default decides meanwhile. */
+      expect(said(html)).toBe(
+        'Box access comes off Box and becomes a draft. Box access (copy) takes its place. It is a draft, so Global Default Policy decides here until it is turned on.',
+      )
+      expect(replaceFacts(boxAccess, parked, box, { ...tenant, policies: [...t.policies, parked] })).toMatchObject({ alsoOn: [], drops: true })
+    })
+  })
+
+  /* The pick's preview (review, 24 Oct 2026): nothing on it edits, and its ids are not the page canvas's. */
+  describe('the preview of the pick', () => {
+    const page = (preview: boolean) =>
+      render(<PolicyPage policyId={boxAccess.id} focus={undefined} plan={null} onOpenOne={() => {}} canvas {...(preview ? { preview } : { onEdit: () => {} })} />)
+    const out = page(true)
+
+    it('draws the start node as its sentence, not a button to a pane that is not there', () => {
+      expect(out).toMatch(/<div id="preview-bb-start" class="bb__start ?">/)
+      expect(out).not.toContain('bb__start__go')
+      expect(out).not.toContain('aria-controls="bb-insp-body"')
+    })
+
+    it('has ids of its own, so the page canvas under the drawer keeps its', () => {
+      expect(out).toContain('id="preview-bb-terminal-title"')
+      expect(out).toContain('id="preview-bb-terminal-body"')
+      for (const id of ['bb-start', 'bb-terminal-title', 'bb-terminal-body']) expect(out).not.toContain(`id="${id}"`)
+    })
+
+    it('folds a card on its title, the one thing a press does here', () => {
+      const titles = [...out.matchAll(/<button[^>]*class="bb__titlebtn"[^>]*>/g)].map((m) => m[0])
+      expect(titles.length).toBeGreaterThan(1)
+      for (const b of titles) expect(b).toMatch(/aria-controls="preview-bb-(rule-[^"]+|terminal)-body"/)
+    })
+
+    it('leaves the details slider as it was: the start node a button, the ids unprefixed', () => {
+      const own = page(false)
+      expect(own).toMatch(/<button type="button" id="bb-start"/)
+      expect(own).toContain('id="bb-terminal-title"')
+    })
   })
 })
 
@@ -582,7 +840,7 @@ describe('the Policies tab on the policy alone', () => {
   it('heads the policy with Edit policy, Replace policy and a ⋯ holding the rest, still the view’s one orange control', () => {
     const acts = box.slice(box.indexOf('apol__acts'), box.indexOf('</div>', box.indexOf('apol__acts')))
     /* Sign-in activity and Check access are inside the ⋯ menu; Replace policy is the secondary beside Edit. */
-    expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', 'Replace policy', ''])
+    expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', 'Duplicate policy', 'Replace policy', ''])
     expect(acts).toContain('aria-label="More for this policy"')
     expect(orange(box)).toBe(1)
   })
@@ -592,5 +850,113 @@ describe('the Policies tab on the policy alone', () => {
     expect(box).not.toContain('insp__hero')
     expect(box).not.toContain('aria-label="Find a person in Box sign')
     expect(box).not.toContain('apol__pair')
+  })
+})
+
+/* EDITING A SHARED POLICY, AS A POPUP (FORK_IN_POPUP, owner, 26 Oct 2026): two ways, one picked, and the heading over
+   the list says what the pick does to it. The slider stays behind the flag. Drawn in place (inline). */
+describe('the shared-policy popup', () => {
+  const t = showcaseTenant()
+  const shared = t.policies.find((p) => p.name === 'Device compliance for Outlook and Dropbox')!
+  const dropbox = t.apps.find((a) => a.id === 'dropbox')!
+  const popup = render(<SharedPolicyFork open policy={shared} app={dropbox} onClose={() => {}} onEdit={() => {}} onDuplicate={() => {}} asPopup inline />)
+  const slider = render(<SharedPolicyFork open policy={shared} app={dropbox} onClose={() => {}} onEdit={() => {}} onDuplicate={() => {}} asPopup={false} />)
+
+  it('is on by default, the slider kept behind the flag', () => {
+    expect(viewSrc).toContain('<SharedPolicyFork')
+    expect(slider).toContain('bx-drawer')
+  })
+
+  it('names the policy, offers Edit for all and Duplicate for this application, and starts on Edit for all', () => {
+    expect(text(popup)).toContain('Edit shared policy')
+    expect(text(popup)).toContain('Device compliance for Outlook and Dropbox')
+    expect(text(popup)).toContain('Edit for all')
+    expect(text(popup)).toContain('Duplicate for')
+    expect(popup).toMatch(/role="radio" aria-checked="true"[^>]*>[\s\S]*?Edit for all/)
+  })
+
+  it('says what the pick does to the applications under it: these change, each marked Changes', () => {
+    expect(text(popup)).toContain('These change')
+    expect(text(popup)).not.toContain('Who gets the copy')
+    expect(count(text(popup), 'Changes')).toBeGreaterThanOrEqual(2)
+    expect(text(popup)).toContain('Microsoft Outlook')
+  })
+
+  it('is footed with two buttons, Cancel and the pick verb', () => {
+    const foot = popup.slice(popup.indexOf('bx-modal__foot'), popup.indexOf('</footer>', popup.indexOf('bx-modal__foot')))
+    expect([...foot.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Cancel', 'Edit for all'])
+    expect(count(foot, 'bx-btn--brand')).toBe(1)
+  })
+
+  it('has no side slider in it', () => {
+    expect(popup).not.toContain('bx-drawer')
+  })
+})
+
+/* THREE BUTTONS, ONE CARD EACH (HEAD_THREE_BUTTONS, owner, 26 Oct 2026): the choice is made in the head, so a popup has
+   nothing to choose between; and it is the Remove dialog's card, a sentence and a row of logos with a count, because a
+   row per application does not scale to a policy on 100 applications. */
+describe('the head\'s Edit and Duplicate popups', () => {
+  const t = showcaseTenant()
+  const shared = t.policies.find((p) => p.name === 'Device compliance for Outlook and Dropbox')!
+  const dropbox = t.apps.find((a) => a.id === 'dropbox')!
+  const alone = t.policies.find((p) => p.name === 'Box access')!
+  const box = t.apps.find((a) => a.id === 'box')!
+  /* The same policy on every application the tenant has: the most a showcase can do toward "100+". */
+  const everywhere = { ...shared, appIds: t.apps.map((a) => a.id) }
+  const draw = (way: 'edit' | 'duplicate', policy = shared, app = dropbox) =>
+    render(<SharedPolicyFork open policy={policy} app={app} onClose={() => {}} onEdit={() => {}} onDuplicate={() => {}} only={way} inline />)
+  const foot = (html: string) => html.slice(html.indexOf('bx-modal__foot'), html.indexOf('</footer>', html.indexOf('bx-modal__foot')))
+  const buttons = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
+  const logosIn = (html: string) => count(html.slice(html.indexOf('bapr__keeps')), 'class="applogo ')
+
+  it('draws three buttons in the head, in the page source, behind one flag', () => {
+    const code = viewSrc.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(code).toContain('HEAD_THREE_BUTTONS')
+    expect(code).toMatch(/Duplicate policy/)
+    expect(code).toMatch(/only=\{HEAD_THREE_BUTTONS \? forkWay : undefined\}/)
+  })
+
+  it('Edit policy: the Remove dialog\'s card, one sentence of reach and the others as logos', () => {
+    const out = draw('edit')
+    expect(text(out)).toContain('Edit shared policy?')
+    expect(text(out)).toContain('Changes to Device compliance for Outlook and Dropbox reach both applications.')
+    expect(out).toContain('bapr__confirm is-card')
+    expect(text(out)).toContain('Also on')
+    expect(logosIn(out)).toBe(1)
+    expect(out).not.toContain('role="radiogroup"')
+    expect(out).not.toContain('bfork__list')
+    expect(buttons(foot(out))).toEqual(['Cancel', 'Edit for all'])
+    expect(count(foot(out), 'bx-btn--brand')).toBe(1)
+  })
+
+  it('Duplicate policy: names the application, says the others keep the original, and shows them as logos', () => {
+    const out = draw('duplicate')
+    expect(text(out)).toContain('Duplicate for Dropbox?')
+    expect(text(out)).toContain('A copy of Device compliance for Outlook and Dropbox for Dropbox only.')
+    expect(text(out)).toContain('The others keep the original.')
+    expect(text(out)).toContain('Still on')
+    expect(out).not.toContain('bfork__list')
+    expect(buttons(foot(out))).toEqual(['Cancel', 'Duplicate'])
+  })
+
+  it('Duplicate policy on a policy this application has to itself says what the draft is and shows nobody', () => {
+    const out = draw('duplicate', alone, box)
+    expect(text(out)).toMatch(/A draft copy of Box access for Box ?./)
+    expect(text(out)).toContain('It decides nothing until you replace this policy with it.')
+    expect(out).not.toContain('bapr__keeps')
+    expect(buttons(foot(out))).toEqual(['Cancel', 'Duplicate'])
+  })
+
+  it('scales: on every application the tenant has, the card stays one sentence and five logos with a count', () => {
+    for (const way of ['edit', 'duplicate'] as const) {
+      const out = draw(way, everywhere, dropbox)
+      const n = t.apps.length
+      expect(logosIn(out)).toBe(5)
+      expect(text(out)).toContain('+' + (n - 1 - 5))
+      expect(out).not.toContain('bfork__list')
+      expect(out).not.toContain('Search applications')
+    }
+    expect(text(draw('edit', everywhere, dropbox))).toContain('reach all ' + t.apps.length + ' applications.')
   })
 })

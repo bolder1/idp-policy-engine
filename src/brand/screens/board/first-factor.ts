@@ -19,7 +19,7 @@ import type { Rule } from '../../data'
    plain answers, whatever a method comes to be called. */
 export const METHOD_PREFIX = 'method:'
 
-type FirstFactor = Pick<Rule, 'firstFactor' | 'firstFactorMethod'>
+type FirstFactor = Pick<Rule, 'firstFactor' | 'firstFactorMethod' | 'magicLinkOtherIps' | 'magicLinkOtherDevices'>
 
 /** The picker's value for a rule's first factor. `''` for a specific method not
     yet chosen — which only a rule saved before this change can hold — so the
@@ -33,7 +33,9 @@ export function firstFactorValue(r: FirstFactor): string {
     from a specific one, so the rule never carries a method it is not using. */
 export function firstFactorPatch(value: string): FirstFactor {
   if (value.startsWith(METHOD_PREFIX)) {
-    return { firstFactor: 'Specific', firstFactorMethod: value.slice(METHOD_PREFIX.length) }
+    /* Magic link's two options belong to Magic link, so any CHANGE of first factor starts them blank (a choice of what is
+       already chosen is not written at all: WhatEditor). */
+    return { firstFactor: 'Specific', firstFactorMethod: value.slice(METHOD_PREFIX.length), magicLinkOtherIps: undefined, magicLinkOtherDevices: undefined }
   }
-  return { firstFactor: value === 'Any' ? 'Any' : 'Password', firstFactorMethod: undefined }
+  return { firstFactor: value === 'Any' ? 'Any' : 'Password', firstFactorMethod: undefined, magicLinkOtherIps: undefined, magicLinkOtherDevices: undefined }
 }

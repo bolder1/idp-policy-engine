@@ -82,6 +82,7 @@ import appPolicyViewSrc from './screens/app-policy-view.tsx?raw'
 import appActivitySrc from './screens/app-activity.tsx?raw'
 import activityRowSrc from './screens/sign-in-tests/activity-row.tsx?raw'
 import addExistingPolicySrc from './screens/AddExistingPolicy.tsx?raw'
+import replaceDialogSrc from './screens/replace-dialog.tsx?raw'
 import appPeopleTabsSrc from './screens/app-people-tabs.tsx?raw'
 import userDrawerSrc from './screens/UserDrawer.tsx?raw'
 import usersPageSrc from './screens/UsersPage.tsx?raw'
@@ -419,6 +420,8 @@ describe('sign-in, not login', () => {
       'app-activity.tsx': appActivitySrc,
       'activity-row.tsx': activityRowSrc,
       'AddExistingPolicy.tsx': addExistingPolicySrc,
+      /* Replace policy's one confirm (24 Oct 2026), opened over that drawer. */
+      'replace-dialog.tsx': replaceDialogSrc,
       'app-people-tabs.tsx': appPeopleTabsSrc,
       'UserDrawer.tsx': userDrawerSrc,
       'UsersPage.tsx': usersPageSrc,

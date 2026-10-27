@@ -170,7 +170,7 @@ export function AppsPane({
     onApplyFix: applyFix,
   })
 
-  /* Under the chips, once the last one is gone (`becomesDraft` is an empty list on a policy that is not a draft):
+  /* Under the field, once the last chip is gone (`becomesDraft` is an empty list on a policy that is not a draft):
      "stops deciding sign-ins" only where it was deciding them. */
   const emptyNote =
     dirty && diff.becomesDraft ? (
@@ -190,7 +190,8 @@ export function AppsPane({
           No heading of its own: the panel's bar already says Applications (23 Oct 2026). */}
       <section className="bb__sec bb__apps__sec" aria-label="Applications">
         <div className="bb__sec__body bb__apps__body">
-          {/* The chips (app-transfer.tsx): a search, the ones in this policy, then the ones that can be added. */}
+          {/* One field (app-transfer.tsx, 24 Oct 2026): the ones in this policy as chips with the search after them, and
+              the ones that can be added listed under it. The empty-list note sits right under the field. */}
           <AppTransfer
             apps={store.apps}
             picked={picked}

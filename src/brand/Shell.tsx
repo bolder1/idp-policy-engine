@@ -662,8 +662,18 @@ const TOAST_ICON = TONE_ICON
    mounts was heard where it began. */
 export function Toast() {
   const toast = useToast()
-  const { dismissToast } = useBrand()
+  const { dismissToast, holdToast } = useBrand()
   const heard = useRef(toast?.id)
+  /* The toast the pointer is over or focus is inside: its clock is stopped (store.tsx `holdToast`) and its bar with
+     it, so Undo cannot run out under somebody on their way to it (review, 24 Oct 2026). By id: a card still sliding
+     out never holds or releases the one that replaced it. */
+  const [held, setHeld] = useState<number | null>(null)
+  const hold = (id: number, on: boolean) => {
+    holdToast(id, on)
+    setHeld((h) => (on ? id : h === id ? null : h))
+  }
+  const stillIn = (card: HTMLElement, next?: EventTarget | null) =>
+    card.matches(':hover') || (next instanceof Node ? card.contains(next) : card.contains(document.activeElement))
   /* The toast whose action last ran: each runs once (toast-action.ts). */
   const ran = useRef<number | null>(null)
   useEffect(() => {
@@ -685,12 +695,16 @@ export function Toast() {
         {toast && (
           <motion.div
             key={toast.id}
-            className={`bshell__toast is-${toast.tone}`}
+            className={`bshell__toast is-${toast.tone}${held === toast.id ? ' is-held' : ''}`}
             style={{ '--toast-ms': `${toast.duration}ms` } as CSSProperties}
             initial={{ opacity: 0, y: -10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.99 }}
             transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+            onPointerEnter={() => hold(toast.id, true)}
+            onPointerLeave={(e) => hold(toast.id, e.currentTarget.contains(document.activeElement))}
+            onFocus={() => hold(toast.id, true)}
+            onBlur={(e) => hold(toast.id, stillIn(e.currentTarget, e.relatedTarget))}
           >
             <span className="bshell__toastico" aria-hidden>
               {(() => {

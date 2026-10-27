@@ -553,6 +553,8 @@ export interface BrandStore {
   showToast: (m: string, action?: ToastAction, opts?: { tone?: ToastTone }) => void
   /** Close the toast now — its × button. */
   dismissToast: () => void
+  /** Stop the toast's clock while the pointer or focus is on it (`held`), and run it on with the time it had left. By its id, so a newer toast is never held for an older one. */
+  holdToast: (id: number, held: boolean) => void
 }
 
 const Ctx = createContext<BrandStore | null>(null)
@@ -867,15 +869,55 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   )
 
   /* With an action the toast stays six seconds rather than about three: long
-     enough to read "Condition removed", decide, and reach Undo. */
-  const showToast = useCallback((m: string, action?: ToastAction, opts?: { tone?: ToastTone }) => {
-    toastSeq.current += 1
-    const id = toastSeq.current
-    const duration = toastDuration(!!action)
-    setToast({ id, text: m, action, tone: opts?.tone ?? toastTone(m), duration })
-    window.setTimeout(() => setToast((t) => (t?.id === id ? null : t)), duration)
+     enough to read "Condition removed", decide, and reach Undo.
+
+     And it waits while somebody is at it (review, 24 Oct 2026): the clock stops
+     while the pointer is over the toast or focus is inside it, and runs on with
+     the time it had left when they leave (`holdToast`, from Shell.tsx `Toast`).
+     A plain timeout let a keyboard user tab towards Undo and lose it on the way —
+     after a live swap the Undo is the only way back — and a toast that expired
+     with focus on its button dropped focus to <body>. */
+  const toastClock = useRef<{ id: number; timer: number | null; left: number; since: number } | null>(null)
+  const stopToastClock = useCallback(() => {
+    const c = toastClock.current
+    if (c?.timer != null) window.clearTimeout(c.timer)
+    toastClock.current = null
   }, [])
-  const dismissToast = useCallback(() => setToast(null), [])
+  const runToastClock = useCallback((id: number, ms: number) => {
+    const timer = window.setTimeout(() => {
+      toastClock.current = null
+      setToast((t) => (t?.id === id ? null : t))
+    }, ms)
+    toastClock.current = { id, timer, left: ms, since: Date.now() }
+  }, [])
+  const showToast = useCallback(
+    (m: string, action?: ToastAction, opts?: { tone?: ToastTone }) => {
+      toastSeq.current += 1
+      const id = toastSeq.current
+      const duration = toastDuration(!!action)
+      setToast({ id, text: m, action, tone: opts?.tone ?? toastTone(m), duration })
+      stopToastClock()
+      runToastClock(id, duration)
+    },
+    [stopToastClock, runToastClock],
+  )
+  const holdToast = useCallback(
+    (id: number, held: boolean) => {
+      const c = toastClock.current
+      if (!c || c.id !== id) return
+      if (held && c.timer !== null) {
+        window.clearTimeout(c.timer)
+        toastClock.current = { ...c, timer: null, left: Math.max(0, c.left - (Date.now() - c.since)) }
+      } else if (!held && c.timer === null) {
+        runToastClock(id, c.left)
+      }
+    },
+    [runToastClock],
+  )
+  const dismissToast = useCallback(() => {
+    stopToastClock()
+    setToast(null)
+  }, [stopToastClock])
 
   const value = useMemo<BrandStore>(
     () => ({
@@ -1212,6 +1254,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
       showToast,
       dismissToast,
+      holdToast,
     }),
     /* `pendingNav` belongs here and its absence was a silent dead end: `go`
        held the navigation via the guard ref, but the memoised store kept
@@ -1225,7 +1268,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     [
       policies, scenarios, zones, fingerprints, riskProfiles, activeRiskProfileId, scale, hooks, apps, groups, directory, edition,
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
-      registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast,
+      registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast, holdToast,
       gauntletOverrides, breakInAccepted, changeLog, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
       setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setDirectory, setApps,
       policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef, appsRef,

@@ -1141,6 +1141,33 @@ button.apol__gdstrip:hover { background: var(--int-ghost-bg-hover); }
 .bfork__keeps { font-size: var(--fs-sm); color: var(--text-tertiary); }
 @media (prefers-reduced-motion: reduce) { .bfork__way, .bfork__list li { transition: none; } }
 
+/* The shared-policy popup (FORK_IN_POPUP) and the Replace popup (REPLACE_IN_POPUP), 26 Oct 2026: the same cards and
+   rows as the sliders, in a centred popup. The list scrolls inside it, so the footer's two buttons never move. */
+.bfork:not(.is-popup) .bfork__context { display: contents; }
+.bfork__context { display: flex; flex-direction: column; gap: var(--space-2); }
+.bfork__policy { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); overflow-wrap: anywhere; }
+.bfork.is-popup .bfork__list { max-height: calc(var(--space-12) * 5); overflow-y: auto; }
+.bfork.is-popup .bfork__search { position: static; padding-bottom: 0; }
+.bapp__add.is-popup { gap: var(--space-5); }
+.bapp__for { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); overflow-wrap: anywhere; }
+.bapp__for b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* What the pick does here: the facts the second confirm used to say, left-aligned in a sunken card. */
+.bapp__ctx { padding: var(--space-5); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-sunken); font-size: var(--fs-md); }
+.bapp__ctx .bapr__confirm.is-card { align-items: flex-start; gap: var(--space-3); text-align: left; }
+.bapp__ctx .bapr__confirm.is-card p { margin: 0; }
+.bapp__when { margin: var(--space-3) 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bapp__pickedname { font-weight: var(--fw-semibold); color: var(--text-primary); overflow-wrap: anywhere; }
+/* The single-purpose Edit and Duplicate popups (shared-policy-fork.tsx `only`) are the Remove dialog's card:
+   `.bapr__confirm.is-card` and `.bapr__keeps`, nothing new. */
+.bapp__pickedhead.is-named { align-items: baseline; gap: var(--space-4); }
+.bapp__pickedhead.is-named > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
+.bapp__rules { display: flex; flex-direction: column; gap: var(--space-3); }
+.bapp__rulestoggle { appearance: none; align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-2); background: none; border: 0; padding: var(--space-2) 0; font: inherit; font-weight: var(--fw-medium); color: var(--text-link); cursor: pointer; }
+.bapp__rulestoggle:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); border-radius: var(--radius-sm); }
+.bapp__rulestoggle svg { transition: transform 180ms var(--ease-standard); }
+.bapp__rulestoggle svg.is-open { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .bapp__rulestoggle svg { transition: none; } }
+
 /* The scope dialog's illustration (status-scope-dialog.tsx): the applications as logos, this one ringed. */
 .bscope { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); padding: var(--space-4) 0; text-align: center; }
 .bscope__logos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-5); }

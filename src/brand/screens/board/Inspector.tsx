@@ -134,8 +134,8 @@ export function Inspector({
   const editingRule = !!(rule && part)
 
   return (
-    /* `is-apps`: the Applications panel is as tall as its form, not the canvas (owner, 23 Oct 2026: "make the form
-       smaller, no need to stretch for no reason"); board.css. */
+    /* `is-apps`: the Applications panel is full height like the rule panel (owner, 24 Oct 2026), with its form at its
+       own height inside and its foot at the floor (owner, 23 Oct 2026: "no need to stretch for no reason"); board.css. */
     <aside className={`bb__insp ${leaving ? 'is-leaving' : ''} ${swap ? 'is-swap' : ''}${selection.kind === 'apps' ? ' is-apps' : ''}`} aria-label="Inspector">
       <div className={`bb__inspbar${editingRule ? ' is-rule' : ''}`}>
         {editingRule && rule ? (

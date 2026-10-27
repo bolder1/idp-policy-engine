@@ -26,12 +26,16 @@ export function policyOption(
   p: Policy,
   app: Pick<App, 'id' | 'name'>,
   tenant: { apps: App[]; groups: readonly Group[]; users: readonly User[] },
+  /* `here`: already on this application and pickable all the same — Replace policy's draft parked here
+     (AddExistingPolicy.tsx), which a replace puts in charge. It reads as any other pick, under the application. */
+  opts: { here?: boolean } = {},
 ): PickerOption {
   const kind = attachKind(p, app.id)
   const first = appsOf(p, tenant.apps)[0] ?? null
   const group = kind === 'fresh' ? 'No applications yet' : kind === 'already-here' ? `On ${app.name}` : 'On other applications'
+  const blockedHere = kind === 'already-here' && !opts.here
   const meta =
-    kind === 'already-here'
+    blockedHere
       ? 'Already on this application'
       : p.type !== 'App Access'
         ? 'Not an app access policy'
@@ -42,6 +46,6 @@ export function policyOption(
     meta,
     art: first ? <AppLogo appId={first.id} name={first.name} size={16} /> : undefined,
     group,
-    disabled: kind === 'already-here' || kind === 'system' || p.type !== 'App Access',
+    disabled: blockedHere || kind === 'system' || p.type !== 'App Access',
   }
 }

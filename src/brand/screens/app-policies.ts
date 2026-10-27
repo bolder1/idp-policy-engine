@@ -277,14 +277,78 @@ export function attachableTo(appId: string, policies: Policy[]): Policy[] {
    check belongs at THAT moment, where "Before turning on" already lives.
 
    Off: the live swap, which is still what `replaceOnApp` and the guard's `alsoAfter` wiring are for. Kept,
-   not deleted. */
-export const REPLACE_MAKES_DRAFT: boolean = true
+   not deleted.
+
+   OFF SINCE 24 OCT 2026, the owner's choice (option A): "pick a policy in a slider, one confirm that swaps it
+   live on this app, with Undo. No copy, no draft." He had found the draft copy "not smooth" and its "Draft
+   waiting" note "not useful" (23 Oct). So a replace is the live swap again, but not the 22 Oct one: the risk the
+   draft took out of the press is said BEFORE it instead, in one confirm (replace-dialog.tsx `ReplaceDialog`)
+   that names what comes off, what goes on, what becomes of the old policy and where sign-ins go if the new one
+   decides nothing yet; then `replaceOnApp` writes both halves with one Undo. The pre-flight page stays off as
+   well (`REPLACE_RUNS_CHECKS`). `draftCopy` and everything else behind this flag is kept: on, the 22 Oct draft
+   copy comes back exactly as it was. */
+export const REPLACE_MAKES_DRAFT: boolean = false
+
+/* REPLACE RUNS THE CHECKS (owner, 24 Oct 2026, option A: "one confirm that swaps it live on this app").
+
+   The same answer as Remove's (`REMOVE_RUNS_CHECKS`, below), for the same reason and by the same choice: the
+   owner wants one confirm and no "Before saving: applications" page, the page he called "too complicated" on
+   22 Oct because it opened over the slider, never said "replace" and never named the policy coming off.
+
+   Unlike the draft copy this replaced, the swap DOES move sign-ins the moment it writes, so the confirm is
+   what the press rests on: it names the policy coming off and the one going on, what becomes of the old one
+   (still on other applications, or a draft — and whether its saved draft then replaces its published rules),
+   the applications the new one is on already, and where sign-ins go while the new one decides nothing. What is
+   given up is what the page alone could say: the saved sign-ins that would newly fail, the modelled totals,
+   the break-in test.
+
+   On: the confirm's Replace runs the checks first when the swap moves somebody — when EITHER policy decides
+   here, the one coming off as much as the one going on (a deciding policy replaced by a draft drops everybody it
+   decided for to the Global Default; ApplicationPage.tsx `checkThenPutOn`) — reading the tenant with BOTH halves
+   applied (`alsoOff`, guard.ts `alsoAfter`), and the page's primary reads "Replace on {app}". That wiring is
+   kept, not deleted. */
+export const REPLACE_RUNS_CHECKS: boolean = false
+
+/* REPLACE AND EDIT-A-SHARED-POLICY AS POPUPS (owner, 26 Oct 2026, over the head's two buttons: "I want 3 buttons inside
+   of 2 … so don't need the side nav, we can directly showcase them something like a popup, and based on select
+   showcase them the context").
+
+   Two buttons stay in the head, Edit policy and Replace policy, and three things sit behind them: Edit for all and
+   Duplicate for this application (Edit policy, on a policy more than one application shares), and Replace. None of
+   them opens a side slider any more. Each is one popup that shows what the pick does, here, before the press:
+
+   - `FORK_IN_POPUP`: Edit policy on a shared policy (shared-policy-fork.tsx). Two ways, one picked at a time, and the
+     sentence and the list under them change with the pick. Off: the 23 Oct slider.
+   - `REPLACE_IN_POPUP`: Replace policy (AddExistingPolicy.tsx). The list, then the pick's context in the same popup:
+     the facts the confirm used to say in a second dialog (replace-dialog.tsx `ReplaceCard`), and the one button is
+     Replace, which writes. The second confirm is not drawn, since the popup IS the confirm. Off: the 24 Oct slider
+     and its confirm, exactly as they were.
+
+   Both kept, not deleted: a flag is how the owner compares the two. Add existing policy, on an application with no
+   policy, stays a slider; nothing here changes it. */
+export const FORK_IN_POPUP: boolean = true
+export const REPLACE_IN_POPUP: boolean = true
+
+/* THREE BUTTONS IN THE HEAD, ONE POPUP EACH (owner, 26 Oct 2026, of the popup that offered Edit for all and Duplicate as
+   two cards: "give me 3 buttons there, not inside the popup, so based on the button selected we show a different popup,
+   with context. As minimal as we can").
+
+   The choice moves out of the popup and into the head. Edit policy (the orange one), Duplicate policy and Replace
+   policy are three buttons, and each opens the one popup that is about it: Edit policy, on a policy more than one
+   application shares, says who it reaches; Duplicate policy says what the copy is and who keeps the original;
+   Replace policy is the list, then what the pick does. A popup has no cards to choose between, so its footer is
+   Cancel and its one verb. Edit policy on a policy used by this application alone goes straight to the builder, as it
+   always did.
+
+   Off: the head with two buttons and the popup that carries both ways (`FORK_IN_POPUP`), kept for comparison. */
+export const HEAD_THREE_BUTTONS: boolean = true
 
 /* REMOVE RUNS THE CHECKS (owner, 23 Oct 2026: "take the Before saving page off Remove as well, so the two
    paths are consistent").
 
-   Replace stopped running "Before saving: applications" because a replace now lands as a draft copy and
-   moves nobody (`REPLACE_MAKES_DRAFT`). Remove is NOT that: taking a deciding policy off an application
+   Replace stopped running "Before saving: applications" because a replace then landed as a draft copy and
+   moved nobody (`REPLACE_MAKES_DRAFT`; since 24 Oct a replace is a live swap again, and it skips the page by
+   the owner's choice too, `REPLACE_RUNS_CHECKS` above). Remove is NOT that: taking a deciding policy off an application
    changes who gets in at the next sign-in, and there is no draft to defer it behind. The owner weighed that
    and chose consistency, which is his call to make; this comment records what the press now rests on, so
    nobody has to reconstruct it.

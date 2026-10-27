@@ -258,13 +258,18 @@ export type TabNotice =
    line ("If turned on: …"), kept for a monitoring policy only.
 
    WAITING OUTRANKS ALSO because the two look identical to `appStanding` and
-   mean opposite things. Since Replace makes a draft copy (app-policies.ts
-   `REPLACE_MAKES_DRAFT`), a second policy on the application is the normal
+   mean opposite things. While Replace made a draft copy (app-policies.ts
+   `REPLACE_MAKES_DRAFT`), a second policy on the application was the normal
    end of a replace, not stray data: it is the admin's own next step, sitting
    where they left it. Read as "Also on {app}" it came with Remove as its one
    labelled exit — housekeeping for a mistake — which is the opposite of what
    it is. The match is deliberately narrow: the one other policy, and a draft.
-   Anything else is still a stray and still reads as one. */
+   Anything else is still a stray and still reads as one.
+
+   Since 24 Oct 2026 a replace is the live swap (`replaceOnApp`) and leaves no
+   draft behind, so a replace no longer ends here. A draft copy made for this
+   application alone still does — Duplicate for {app} in the shared-policy
+   slider — and reads the same, because it means the same. */
 export function tabNotice(
   row: StandRow,
   others: readonly StandRow[],

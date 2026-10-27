@@ -1,4 +1,5 @@
 import { methodById } from './methods'
+import { PUSH_OPTIONS_IN_POLICY } from './mfa-settings'
 
 /* -----------------------------------------------------------------------------
    What "configured" actually means, per method.
@@ -115,13 +116,17 @@ const hardwareToken = (label: string, live: boolean): MethodConfig => ({
   ],
 })
 
+/* Number matching is the RULE's now (owner, 26 Oct 2026, with Require biometric to approve: "it will be managed in the
+   policy, in the Then section"), so this form no longer carries it while `PUSH_OPTIONS_IN_POLICY` is on. */
+const NUMBER_MATCHING: ConfigField = {
+  kind: 'toggle', id: 'matching', label: 'Number matching', value: true,
+  help: 'The user types a number shown on the sign-in screen. Without it, a push prompt can be approved by reflex — which is the whole of MFA fatigue as an attack.',
+}
+
 const miniOrangeApp = (_live: boolean): MethodConfig => ({
   blurb: 'The miniOrange app is already bound to this tenant. These settings change what the prompt looks like and how long it stands.',
   fields: [
-    {
-      kind: 'toggle', id: 'matching', label: 'Number matching', value: true,
-      help: 'The user types a number shown on the sign-in screen. Without it, a push prompt can be approved by reflex — which is the whole of MFA fatigue as an attack.',
-    },
+    ...(PUSH_OPTIONS_IN_POLICY ? [] : [NUMBER_MATCHING]),
     { kind: 'number', id: 'timeout', label: 'Prompt expires after', min: 15, max: 300, unit: 'seconds', value: 60 },
     { kind: 'number', id: 'retries', label: 'Prompts per sign-in', min: 1, max: 5, unit: 'attempts', value: 3, help: 'A high number is what makes fatigue attacks practical.' },
     { kind: 'text', id: 'brand', label: 'Name shown in the app', value: 'Acme Corp' },

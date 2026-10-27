@@ -8,6 +8,7 @@ import {
   ChevronUp,
   ChevronsDownUp,
   ChevronsUpDown,
+  Copy,
   CornerDownRight,
   Eye,
   ListChecks,
@@ -32,7 +33,7 @@ import { normaliseWho } from '../rule-who'
 import { useBrand, useNameLookup, type AppTab } from '../store'
 import { AppPolicyFocusOverride } from './app-policy-focus'
 import { AppActivity, AppBreakIn, GlanceActivity } from './app-activity'
-import { rulesLabel } from './app-policies'
+import { HEAD_THREE_BUTTONS, rulesLabel } from './app-policies'
 import {
   GLANCE_ROWS,
   appCheckForm,
@@ -271,8 +272,9 @@ function StateLine({
       </ul>
     )
   } else if (notice.kind === 'waiting') {
-    /* A draft parked on this application, which is where a replace now ends (app-policies.ts
-       `REPLACE_MAKES_DRAFT`). The heading is the state and the body is the consequence, so the admin reads what
+    /* A draft parked on this application, which is where a replace ended while it made a draft copy (app-policies.ts
+       `REPLACE_MAKES_DRAFT`, off since 24 Oct 2026: a replace is the live swap now and parks nothing); a draft copy
+       for this application alone still lands here. The heading is the state and the body is the consequence, so the admin reads what
        will happen rather than what is. No Turn on link here: a draft goes live from the builder, where its
        rules are in front of you and Before turning on runs — the one press that moves sign-ins should not be a
        link in a note on a page that is not showing you the rules. */
@@ -1207,6 +1209,13 @@ export function AppPolicyView({
   const [activityOpen, setActivityOpen] = useState(false)
   /* Edit stops to ask only where the policy is on more than this application (shared-policy-fork.tsx). */
   const [forkOpen, setForkOpen] = useState(false)
+  /* Which button opened it (`HEAD_THREE_BUTTONS`): kept after it closes, so the popup does not change shape while it
+     animates out. Absent while the head has two buttons and the popup carries both ways. */
+  const [forkWay, setForkWay] = useState<'edit' | 'duplicate' | undefined>(undefined)
+  const openFork = (way?: 'edit' | 'duplicate') => {
+    setForkWay(way)
+    setForkOpen(true)
+  }
   const [scopeOpen, setScopeOpen] = useState(false)
   const check = useAppCheck(app)
   const FOCUS = (useContext(AppPolicyFocusOverride) ?? FOCUS_ON) && GLANCE
@@ -1270,10 +1279,17 @@ export function AppPolicyView({
           <Button
             variant={saving ? 'secondary' : 'brand'}
             icon={Pencil}
-            onClick={() => (policy.appIds.length > 1 ? setForkOpen(true) : toBoard(policy.id))}
+            onClick={() => (policy.appIds.length > 1 ? openFork(HEAD_THREE_BUTTONS ? 'edit' : undefined) : toBoard(policy.id))}
           >
             Edit policy
           </Button>
+          {/* Three buttons, one popup each (`HEAD_THREE_BUTTONS`, owner, 26 Oct 2026): the choice between editing
+              for everyone and a copy for this application is made here, in the head, and not in a popup. */}
+          {HEAD_THREE_BUTTONS && (
+            <Button variant="secondary" icon={Copy} onClick={() => openFork('duplicate')}>
+              Duplicate policy
+            </Button>
+          )}
           <Button variant="secondary" icon={Replace} onClick={onReplace}>
             Replace policy
           </Button>
@@ -1410,6 +1426,7 @@ export function AppPolicyView({
         onClose={() => setForkOpen(false)}
         onEdit={() => toBoard(policy.id)}
         onDuplicate={onDuplicate}
+        only={HEAD_THREE_BUTTONS ? forkWay : undefined}
       />
     </div>
   )

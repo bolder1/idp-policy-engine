@@ -52,7 +52,7 @@ import {
   type NewDraft,
 } from './app-page-model'
 import { AppGroupsTab, AppUsersTab } from './app-people-tabs'
-import { REMOVE_RUNS_CHECKS, REPLACE_MAKES_DRAFT, attachTo, attachableTo, deleteFacts, detachFrom } from './app-policies'
+import { REMOVE_RUNS_CHECKS, REPLACE_IN_POPUP, REPLACE_MAKES_DRAFT, REPLACE_RUNS_CHECKS, attachTo, attachableTo, deleteFacts, detachFrom } from './app-policies'
 import { DeleteFactsLine } from './app-facts'
 import { SetupTabBody, type SetupPatch } from './app-setup-forms'
 import { appStanding, type StandRow } from './app-standing'
@@ -61,6 +61,7 @@ import { useAppsGuard } from './board/apps-guard'
 import { SENT_TO_BOARD, arriveFromBoard, sendToBoard } from './board-return'
 import { ConfirmDelete } from './confirm-delete'
 import { GuardDrawer } from './guard-page'
+import { ReplaceDialog } from './replace-dialog'
 import { WidthSwitch } from './page-bar'
 import { SHOWCASE } from '../showcase'
 import { portalRoot } from './status-options'
@@ -541,7 +542,8 @@ function PoliciesTab({
      the first on it. Any other is data the ruling bars, said on the view's
      state line with the way to clean it up. */
   /* A draft never leads. `duplicatePolicy` prepends its copy to the tenant's list (store.tsx), so once a
-     replace parks a draft here, `rows[0]` is that draft whenever nothing decides — an inactive or monitoring
+     draft copy is parked here (Duplicate for this application; a replace did it too while it made a draft copy,
+     `REPLACE_MAKES_DRAFT`), `rows[0]` is that draft whenever nothing decides — an inactive or monitoring
      policy would drop into `others` and be read as the stray. The decider leads; failing that, the policy
      that could be one. */
   const shown = rows.find((r) => r.state === 'decides') ?? rows.find((r) => r.policy.status !== 'draft') ?? rows[0]
@@ -551,8 +553,22 @@ function PoliciesTab({
   const attachable = attachableTo(app.id, policies).filter((p) => p.type === 'App Access')
 
   const [adding, setAdding] = useState(false)
-  /* Replace policy: the one the application has now, which the pick takes the place of. */
-  const [replacing, setReplacing] = useState<Policy | null>(null)
+  /* Replace policy is open. What it replaces is the policy the application has NOW, read from the tab's own reading
+     on every render rather than held from the press that opened it (review, 24 Oct 2026): an Undo from an earlier
+     toast can change which policy that is while the slider is up, and a copy held from the opening press then named —
+     and took off — a policy that was no longer here, leaving two on the application. */
+  const [replaceOpen, setReplaceOpen] = useState(false)
+  const replacing = replaceOpen ? (shown?.policy ?? null) : null
+  /* Replace policy's one confirm, open over the slider (replace-dialog.tsx): the policy it was opened to take off, and
+     the pick. It stands only while `from` is still the application's policy, so what it says stays true; once it is
+     not, the confirm goes and the slider, which reads the application afresh, is left with the pick. */
+  const [swapping, setSwapping] = useState<{ from: string; to: string } | null>(null)
+  if (swapping && swapping.from !== replacing?.id) setSwapping(null)
+  /* The confirm whose Replace has been pressed. AnimatePresence keeps a closing confirm's footer mounted and clickable
+     through its exit, holding the closure of the render before it closed, so a second press ran the swap again and
+     its toast replaced the first one's Undo. That press finds its own confirm here and does nothing; `replaceOnApp`
+     refuses it as well, because the policy it names is no longer on the application. */
+  const spent = useRef<{ from: string; to: string } | null>(null)
   const [removing, setRemoving] = useState<Policy | null>(null)
   const [deleting, setDeleting] = useState<{ policy: Policy; open: boolean } | null>(null)
   const statusChange = useStatusChange()
@@ -607,20 +623,29 @@ function PoliciesTab({
   const putOn = (policyId: string): boolean => {
     const live = store.policyById(policyId)
     if (!live || live.isSystem) return false
-    const after = store.policies.map((p) => (p.id === live.id ? attachTo(live, app.id, store.apps) : p))
+    /* A replace is read with both halves applied, as its confirm was: with the old policy still on, the one going on
+       can look shadowed by it. */
+    const off = replacing ? store.policyById(replacing.id) : undefined
+    const after = store.policies.map((p) =>
+      p.id === live.id ? attachTo(live, app.id, store.apps) : off && p.id === off.id && !p.isSystem ? detachFrom(p, app.id) : p,
+    )
     const decidesNow = appStanding(app.id, after, store.users).rows.some((r) => r.policy.id === live.id && r.state === 'decides')
     const had = hasDecider()
     /* Replace policy: the one it had comes off as the new one goes on, so it never holds two — one write, one toast,
-       one Undo that puts both back (applications-model.ts `replaceOnApp`). */
-    const wrote = replacing ? replaceOnApp(store, replacing.id, policyId, app, store.apps) : addToApp(store, policyId, app, store.apps)
+       one Undo that puts both back and then hands focus to the restored policy's heading (applications-model.ts
+       `replaceOnApp`, which refuses a swap whose old policy is no longer here). */
+    const wrote = replacing
+      ? replaceOnApp(store, replacing.id, policyId, app, store.apps, { decides: decidesNow, afterUndo: focusHead })
+      : addToApp(store, policyId, app, store.apps)
     if (!wrote) return false
-    if (replacing) setReplacing(null)
+    if (replacing) setReplaceOpen(false)
     /* Before the toast, which then stays quiet under it (sound.ts). */
     playCue(!had && decidesNow ? 'celebrate' : 'attach')
     focusRow(policyId)
     return true
   }
-  /* Replace policy, the draft-copy way (app-policies.ts `REPLACE_MAKES_DRAFT`): the pick is copied onto this
+  /* Replace policy, the draft-copy way (app-policies.ts `REPLACE_MAKES_DRAFT`, off since the owner chose the live swap
+     on 24 Oct 2026; kept for the flag's other half): the pick is copied onto this
      application alone, as a draft. The application keeps the policy it has and keeps being decided by it, so
      not one sign-in moves — the copy is the admin's to read, change and turn on when they are ready.
 
@@ -666,24 +691,74 @@ function PoliciesTab({
     const live = store.policyById(replacing.id)
     return live && !live.isSystem ? [detachFrom(live, app.id)] : undefined
   }
-  const attach = (policyId: string): boolean | 'checking' => {
+  const attach = (policyId: string): boolean | 'checking' | 'confirming' => {
     const live = store.policyById(policyId)
     if (!live || live.isSystem) return false
     /* A replace makes a draft copy and writes nothing live, so there is nothing to check first. The guard below
        still runs for a plain add, which does put a live policy on this application. */
     if (replacing && REPLACE_MAKES_DRAFT) return draftCopy(policyId)
-    if (!appsGuard.guards(live)) return putOn(policyId)
+    /* Replace policy, the live swap (owner, 24 Oct 2026: "pick a policy in a slider, one confirm that swaps it live on
+       this app, with Undo. No copy, no draft"): the confirm first, over the slider, which keeps the pick if it is
+       cancelled. Its Replace is `swap`. */
+    if (replacing) {
+      /* Re-read as the confirm opens: what it names as coming off is the policy on this application now. */
+      const from = store.policyById(replacing.id)
+      if (!from || !from.appIds.includes(app.id) || from.id === policyId) return false
+      /* As one popup (`REPLACE_IN_POPUP`, owner, 26 Oct 2026) the popup has said all of it already — what comes off,
+         what takes its place, who decides meanwhile — so its Replace writes, here, with no second dialog. The checks
+         still run first when `REPLACE_RUNS_CHECKS` is on, as the confirm's Replace ran them. */
+      if (REPLACE_IN_POPUP) return REPLACE_RUNS_CHECKS ? checkThenPutOn(live) : putOn(policyId)
+      setSwapping({ from: from.id, to: policyId })
+      return 'confirming'
+    }
+    return checkThenPutOn(live)
+  }
+  /* The checks, when the change moves somebody (board/apps-guard.ts), and then the write. A plain add moves somebody
+     when the policy going on decides sign-ins. A replace does when EITHER policy does: a deciding policy replaced by a
+     draft, an inactive or a monitoring one drops every sign-in it decided to the Global Default, which is the swap the
+     checks most need to see, though the policy going on decides nothing. A replace reads the tenant with the old
+     policy off as well (`alsoOff`). */
+  const checkThenPutOn = (live: Policy): boolean | 'checking' => {
+    const off = replacing ? store.policyById(replacing.id) : undefined
+    if (!appsGuard.guards(live) && !(off && !off.isSystem && appsGuard.guards(off))) return putOn(live.id)
     appsGuard.check(
       live,
       attachTo(live, app.id, store.apps).appIds,
       () => {
-        if (putOn(policyId)) setAdding(false)
+        if (putOn(live.id)) setAdding(false)
       },
       undefined,
       alsoOff(),
     )
     return 'checking'
   }
+  /* The replace confirm's Replace. The confirm is the whole of it (app-policies.ts `REPLACE_RUNS_CHECKS`, off, as
+     Remove's is): it has named both policies, what becomes of the old one and where sign-ins go, so the press
+     writes — `putOn`, so the swap is `replaceOnApp`'s one write with its one Undo, the cue and the focus on the new
+     policy's heading. On, a swap that moves somebody — either policy deciding here — opens Before saving:
+     applications first (`checkThenPutOn`).
+
+     Once per confirm (`spent`), and the state cleared before anything is written. The truth again at the press: the
+     policy the confirm named must still be the application's, and `replaceOnApp` re-reads both by id and refuses
+     otherwise. */
+  const swap = () => {
+    const s = swapping
+    if (!s || spent.current === s) return
+    spent.current = s
+    setSwapping(null)
+    if (!replacing || replacing.id !== s.from) return
+    const live = store.policyById(s.to)
+    if (!live || live.isSystem) return
+    if (!REPLACE_RUNS_CHECKS) {
+      if (putOn(s.to)) setAdding(false)
+      return
+    }
+    if (checkThenPutOn(live) === true) setAdding(false)
+  }
+  /* The confirm's two policies: the one it was opened to take off while it is still the application's, and the pick,
+     both re-read by id. */
+  const swapFrom = swapping && replacing && swapping.from === replacing.id ? replacing : null
+  const swapTo = swapping ? (store.policyById(swapping.to) ?? null) : null
   const takeOff = (policyId: string) => {
     if (removeFromApp(store, policyId, app)) focusHead()
   }
@@ -781,7 +856,7 @@ function PoliciesTab({
               flash={flash}
               deletable={deletable(shown.policy)}
               onReplace={() => {
-                setReplacing(shown.policy)
+                setReplaceOpen(true)
                 setAdding(true)
               }}
               onDuplicate={() => addCopy(shown.policy.id)}
@@ -810,12 +885,17 @@ function PoliciesTab({
         checking={appsGuard.checking}
         onClose={() => {
           setAdding(false)
-          setReplacing(null)
+          setReplaceOpen(false)
+          setSwapping(null)
         }}
         onAdd={attach}
         onCopy={addCopy}
         replacing={replacing}
+        confirming={!!(swapFrom && swapTo)}
       />
+      {/* Over the slider, after it, so it joins the dialog stack last: Escape and Cancel close it alone and hand
+          focus back to the slider's Replace, with the pick still picked. */}
+      <ReplaceDialog from={swapFrom} to={swapTo} app={app} onCancel={() => setSwapping(null)} onConfirm={swap} />
       <RemoveDialog
         policy={removing}
         app={app}

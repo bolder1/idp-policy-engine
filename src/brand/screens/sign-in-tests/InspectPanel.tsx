@@ -291,15 +291,21 @@ export function PolicyPage({
   onOpenOne,
   canvas = false,
   onPreview,
+  preview = false,
 }: {
   policyId: string
   focus: string | null | undefined
   plan: EngineRun | null
-  onEdit: (t: InspectTarget) => void
+  /** Absent: nothing here edits, so its applications are listed with no Edit. */
+  onEdit?: (t: InspectTarget) => void
   onOpenOne: (id: string | null | undefined) => void
   canvas?: boolean
   /** What they see for this sign-in, from the strip of the policy that decided it (20 Oct 2026); absent, no Preview. */
   onPreview?: () => void
+  /* A policy read inside another form — Add existing policy's pick (review, 24 Oct 2026). The canvas is drawn still
+     (ReadOnlyCanvas `still`): a sentence for the start node, cards that fold, and ids of its own, so they do not
+     repeat the canvas of the page under the drawer. */
+  preview?: boolean
 }) {
   const { policies, apps, groups, users } = useBrand()
   const policy = policies.find((p) => p.id === policyId)
@@ -344,7 +350,7 @@ export function PolicyPage({
     <AppsPeek
       apps={policy.appIds.flatMap((id) => apps.find((x) => x.id === id) ?? [])}
       policyName={policy.name}
-      onEdit={() => onEdit({ kind: 'policy', policyId: policy.id })}
+      onEdit={onEdit && !preview ? () => onEdit({ kind: 'policy', policyId: policy.id }) : undefined}
     />
   )
   const audienceNames = audienceLists.flatMap((l) => l.names)
@@ -398,7 +404,7 @@ export function PolicyPage({
       <Block title="Rules" aside="In order">
         {canvas ? (
           /* The builder's own canvas, read only (owner, 7 Oct 2026: "instead of this, the canvas itself"). */
-          <ReadOnlyCanvas policy={policy} traced={by ? [by.id ?? 'fallback'] : []} />
+          <ReadOnlyCanvas policy={policy} traced={by ? [by.id ?? 'fallback'] : []} {...(preview ? { still: true, idPrefix: 'preview-' } : null)} />
         ) : (
         <ul className="insp__accs">
           {list.map((r) => {
@@ -428,7 +434,7 @@ export function PolicyPage({
                 </button>
                 {isOpen && (
                   <div id={bodyId} className="insp__accbody">
-                    <RuleBody policy={policy} ruleId={r.id} plan={plan} shown={fate} list={list} onEdit={onEdit} />
+                    <RuleBody policy={policy} ruleId={r.id} plan={plan} shown={fate} list={list} onEdit={onEdit ?? noop} />
                   </div>
                 )}
               </li>
@@ -713,12 +719,20 @@ export function ReadOnlyCanvas({
   onOpen,
   cardHead,
   appFirst,
+  still = false,
+  idPrefix,
 }: {
   policy: Policy
   traced: readonly string[]
   /** The application whose page this is: the start pill names it first (21 Oct 2026), the others after it. */
   appFirst?: string
   framed?: boolean
+  /* Nothing on it edits (PolicyPage `preview`, review 24 Oct 2026). Unframed, a press on a card used to go to a no-op
+     select and the start pill was a button to a panel that is not there: here a press folds the card, as on a framed
+     canvas, and the start pill is the sentence alone (Board `still`). */
+  still?: boolean
+  /** Before every id the canvas draws, for a canvas drawn while another is in the page (Board `idPrefix`). */
+  idPrefix?: string
   /* Which cards are open, when the caller holds that itself. ONE id is the accordion the framed panel and the
      details slider want: the canvas closes whatever else was open. A SET is for a caller that lets several stand
      open at once — the app's Policies tab since 22 Oct, which has an Expand all — and such a caller is handed the
@@ -778,7 +792,7 @@ export function ReadOnlyCanvas({
         fitKey={policy.id}
         traced={traced}
         resolve={resolve}
-        onSelect={framed ? press : noop}
+        onSelect={framed || still ? press : noop}
         onInsert={noop}
         onMove={noop}
         onToggle={noop}
@@ -787,9 +801,11 @@ export function ReadOnlyCanvas({
         onHover={noop}
         expandedOf={held ? isHeldOpen : (id) => open.has(id)}
         onToggleExpand={toggle}
-        locked={framed}
-        foldOnPress={framed || undefined}
+        locked={framed || still}
+        foldOnPress={framed || still || undefined}
         cardHead={cardHead}
+        still={still}
+        idPrefix={idPrefix}
       />
     </div>
   )

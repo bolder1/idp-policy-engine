@@ -75,3 +75,121 @@
 .bxc__donemark { display: grid; place-items: center; width: var(--space-11); height: var(--space-11); border-radius: var(--radius-full); background: var(--surface-sunken); color: var(--text-tertiary); }
 .bxc__done b { font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .bxc__add { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-link); }
+
+/* --- One field: the chips and the search in one box (owner, 24 Oct 2026) -----------------------------------------------
+   The kit's search box (kit.css `.bx-search`: its ground, edge, radius, glass and focus ring), holding the applications
+   in this policy as the console's one pill — the Identity field's (sign-in-tests.css `.sit-ident__chip`), neutral, the
+   logo, the name, an × — and then the search as the box's own text. One line is the search box's height exactly; the
+   box grows a line at a time with its chips to three, then scrolls inside, so what is under it moves at most twice and
+   the dialog never grows. */
+.bxt {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  /* One line of 24 (a chip, the search) centred in the control's height, less the scroller's own 2px gutter. */
+  padding: calc((var(--ctl-height-md) - var(--space-8)) / 2 - var(--bw-thin) - var(--space-1)) calc(var(--space-5) - var(--bw-thin));
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border);
+  border-radius: var(--ctl-radius);
+  color: var(--text-muted);
+  cursor: text;
+}
+.bxt:hover { border-color: var(--ctl-border-hover); }
+.bxt:focus-within { border-color: var(--ctl-border-focus); box-shadow: 0 0 0 var(--space-2) var(--focus-halo); }
+.bxt__ico { flex: none; display: grid; place-items: center; height: var(--space-8); margin-top: var(--space-1); }
+/* The chips and the search, wrapping. A 2px gutter all round so a focused ×'s ring is not cut by the scroller. */
+.bxt__wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  max-height: calc(var(--space-8) * 3 + var(--space-2) * 2 + var(--space-1) * 2);
+  padding: var(--space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.bxt__chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pill-gap);
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--pill-py) var(--space-1) var(--pill-py) var(--space-2);
+  background: var(--fb-neutral-bg);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  border-radius: var(--pill-radius);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+  color: var(--fb-neutral-fg);
+  cursor: default;
+}
+.bxt__chip .applogo { flex: none; }
+.bxt__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The chip Backspace picked out (its × has the focus): the control's focus edge, grey, never the brand. */
+.bxt__chip:focus-within { border-color: var(--ctl-border-focus); }
+.bxt__x {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.bxt__x:hover { background: var(--state-hover-bg); color: var(--text-primary); }
+.bxt__x:focus-visible { outline: none; background: var(--state-hover-bg); box-shadow: 0 0 0 var(--bw-thick) var(--ctl-border-focus); color: var(--text-primary); }
+/* The search is the box's own text after the chips: none of a field's own edge, ground or ring (kit.css `:where(input)`
+   sets them at one class; two here). It is as wide as its words, so it drops to a line of its own rather than
+   cutting them, and takes whatever the line has left. */
+.bxt .bxt__input,
+.bxt .bxt__input:hover,
+.bxt .bxt__input:focus-visible {
+  flex: 1 0 auto;
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  height: var(--space-8);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+}
+/* What Enter adds while words are typed: the row's hover ground, so the key is never a guess. */
+.bxc__list .bxl__row.is-next { background: var(--surface-sunken); }
+/* The applications another policy holds: under their own quiet line, greyed, the policy named at the row's end. */
+.bxl__list > li.bxt__sep {
+  /* In line with the rows' logos. */
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  border-bottom: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+/* The same line as a button that opens them (FOLD_IN_USE, owner 26 Oct 2026): it keeps the line's padding and type, and a
+   chevron after the words says it opens. */
+.bxl__list > li.bxt__sep.is-fold { padding: 0; }
+.bxt__fold { display: flex; align-items: center; gap: var(--space-1); width: 100%; padding: var(--space-4) var(--space-4) var(--space-2); border: 0; background: none; font: inherit; font-size: var(--fs-xs); text-align: left; color: var(--text-tertiary); cursor: pointer; }
+.bxt__fold:hover { color: var(--text-secondary); }
+.bxt__fold:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--bw-thick) var(--focus-ring); }
+.bxt__chev { display: inline-flex; }
+.bxc__list .bxl__row.is-used { cursor: not-allowed; color: var(--text-tertiary); }
+.bxc__list .bxl__row.is-used:hover { background: none; }
+.bxc__list .bxl__row.is-used em { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bxl__list > li.bxt__miss { border-bottom: 0; }

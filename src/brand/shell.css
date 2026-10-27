@@ -311,6 +311,8 @@
   animation: bshell-toast-time var(--toast-ms, 3200ms) linear forwards;
 }
 @keyframes bshell-toast-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* Held while the pointer is over it or focus is inside (Shell.tsx `Toast`): the clock stops, so the bar does too. */
+.bshell__toast.is-held .bshell__toastbar { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .bshell__toastbar { animation: none; }
 }

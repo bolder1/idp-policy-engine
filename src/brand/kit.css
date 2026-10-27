@@ -86,12 +86,17 @@ html[data-theme='dark'] {
 /* Focus is never suppressed. A hairline that traces the control, and a soft
    halo that finds it from across the page — see the note on `--focus-ring` in
    console-theme.css for why it stopped being 2px of near-black. */
-.brand-root :focus-visible {
+.brand-root :focus-visible:not(:where([role='dialog'][tabindex='-1'], [role='alertdialog'][tabindex='-1'])) {
   outline: var(--bw-thin) solid var(--focus-ring);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--focus-halo);
   border-radius: var(--radius-sm);
 }
+/* A dialog or drawer takes focus itself only so focus has somewhere to land on open (dialog-chrome.ts), as a heading
+   does below. It is not a control, so it draws no ring: on the hero confirm the ring read as a blue border round the
+   whole card. Excluded above through `:where`, so the rule's weight is unchanged and the panel keeps its own shadow
+   and corners; the browser's own ring is taken off here. The controls inside keep theirs. */
+.brand-root :where([role='dialog'], [role='alertdialog'])[tabindex='-1']:focus-visible { outline: none; }
 
 /* Sentence case, 12px or more. The uppercase, letter-spaced micro-label is gone
    from the console (owner, 14 Sep 2026). */
@@ -2002,7 +2007,9 @@ html[data-theme='dark'] {
 .bx-confirm--hero { padding: 0 var(--space-10) var(--space-9); text-align: center; }
 .bx-confirm--hero .bx-confirm__text { max-width: 46ch; margin-inline: auto; }
 .bx-confirm--hero .bx-confirm__title { margin-bottom: var(--space-5); }
-.bx-confirm--hero .bx-confirm__body { line-height: 1.65; }
+/* Balanced lines: centred, a sentence that wrapped by width alone left one word on its last line ("…and becomes a /
+   draft."), which reads as a stray rather than as the end of the sentence. */
+.bx-confirm--hero .bx-confirm__body { line-height: 1.65; text-wrap: balance; }
 
 /* The template band's own treatment (owner, 22 Oct 2026: "remember we did
    something for the templates, that gradient"), lifted from create.css

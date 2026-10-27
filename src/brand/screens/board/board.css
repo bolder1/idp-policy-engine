@@ -1642,6 +1642,10 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
 }
 .bb__prop > span { font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.35; }
 .bb__prop > span em { display: block; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+/* A first factor's or a second factor's own options (WhatEditor: Magic link's two, miniOrange Push's two), a column of
+   property rows under the control they belong to. */
+.bb__opts { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); }
+.bb__opts .bx-tipdot { margin-left: var(--space-2); vertical-align: middle; }
 .bb__prop.is-indent { padding-left: var(--space-5); border-left: 2px solid var(--border-subtle); margin-left: 4px; }
 .bb__prop.is-stack { grid-template-columns: 1fr; }
 
@@ -3355,10 +3359,16 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__apps__sec .bb__apps__body { padding: 0; }
 .bb__apps__sec .bb__apps__lede { padding: 0; }
 
-/* The panel itself, as tall as its form (Inspector.tsx `is-apps`): it starts at the canvas's top inset and ends under
-   its buttons, and only a list longer than the window makes it full height and scroll. */
-.bb__insp.is-apps { align-self: start; max-height: calc(100% - 2 * var(--space-5)); }
-.bb__insp.is-apps .bb__inspbody { flex: 0 1 auto; padding-bottom: 0; }
+/* The panel itself is full height, as the rule panel is (owner, 24 Oct 2026: "use the full height as we did for the
+   other slider"); what stays small is the form inside it — chips and list at their own height, nothing stretched —
+   and the foot sits at the panel's floor, as the rule panel's Save rule does. It was as tall as its form for a day.
+   The body loses its bottom padding so the sticky foot meets the panel's edge. */
+.bb__insp.is-apps .bb__inspbody { display: flex; flex-direction: column; padding-bottom: 0; }
+/* The body's one child is the pane's motion wrapper (Inspector.tsx); it and the pane grow to the body's height, so a
+   percentage height is not needed through an auto-height box. */
+.bb__insp.is-apps .bb__inspbody > div { flex: 1 0 auto; display: flex; flex-direction: column; }
+.bb__insp.is-apps .bb__apps { flex: 1 0 auto; }
+.bb__insp.is-apps .bb__apps__foot { margin-top: auto; }
 /* The chips' own height, not the dialog's fixed one (app-transfer.css, 22 Oct 2026, which is about the popup): the
    chips take the rows they fill, and the list takes its rows. One step smaller than the popup's rows, because this
    is a panel form rather than a dialog to scan. */

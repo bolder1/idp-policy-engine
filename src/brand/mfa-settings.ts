@@ -184,6 +184,32 @@ const otpSettings = (): MfaSetting[] => [
   },
 ]
 
+/* miniOrange Push's two options live on the RULE (owner, 26 Oct 2026: "remove this options form here, it will be managed
+   in the policy, in the Then section, when the user selects miniOrange Push"). Were this tab's two toggles, labelled
+   "Was in Advanced Options"; the board's Then section draws them while a rule names miniOrange Push as a second factor
+   (screens/board/WhatEditor.tsx), and the rule's own values are what the Check access player and the factor ranking
+   read (methods.ts `withRuleOptions`). On, the miniOrange Authenticator family has nothing to configure here and so no
+   Settings tab. Off: the two toggles come back on the tab, kept rather than deleted; the rule's options are then hidden
+   too, so there is never one place that says it and another that disagrees. */
+export const PUSH_OPTIONS_IN_POLICY: boolean = true
+
+const PUSH_SETTINGS: MfaSetting[] = [
+  {
+    id: 'push-biometric',
+    label: 'Require biometric to approve',
+    help: 'The tap has to be confirmed with a fingerprint or face.',
+    source: 'advanced',
+    field: { kind: 'toggle', value: true },
+  },
+  {
+    id: 'push-number',
+    label: 'Number matching',
+    help: 'The user picks the number shown, so no push is approved by reflex.',
+    source: 'advanced',
+    field: { kind: 'toggle', value: true },
+  },
+]
+
 export const FAMILIES: MfaFamily[] = [
   {
     id: 'sms',
@@ -241,23 +267,9 @@ export const FAMILIES: MfaFamily[] = [
         blurb: 'Push notification to the app, accepted or denied in one tap.',
         tier: 'App-based',
         enrolled: 1203,
-        /* Genuinely method-level: neither applies to OTP or QR Verify. */
-        settings: [
-          {
-            id: 'push-biometric',
-            label: 'Require biometric to approve',
-            help: 'The tap has to be confirmed with a fingerprint or face.',
-            source: 'advanced',
-            field: { kind: 'toggle', value: true },
-          },
-          {
-            id: 'push-number',
-            label: 'Number matching',
-            help: 'The user picks the number shown, so no push is approved by reflex.',
-            source: 'advanced',
-            field: { kind: 'toggle', value: true },
-          },
-        ],
+        /* Genuinely method-level: neither applies to OTP or QR Verify. On the rule since 26 Oct 2026
+           (`PUSH_OPTIONS_IN_POLICY`), so the family has no Settings tab. */
+        settings: PUSH_OPTIONS_IN_POLICY ? [] : PUSH_SETTINGS,
       },
       { id: 'mo-qr', name: 'miniOrange QR Verify', blurb: 'Scan a barcode on screen with the app.', tier: 'App-based' },
     ],

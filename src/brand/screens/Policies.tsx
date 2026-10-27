@@ -1188,19 +1188,18 @@ function AssignAppsDialog({
             }
           />
         ) : (
-          <>
-            {/* All applications on the left, the ones in this policy on the right (app-transfer.tsx). */}
-            <AppTransfer
-              apps={store.apps}
-              picked={picked}
-              onChange={setPicked}
-              takenBy={(id) => (picked.includes(id) ? undefined : ownerOf(id, store.policies, policy.id)?.name)}
-            />
-
-            {picked.length === 0 && policy.status !== 'draft' && (
-              <p className="bassign__foot">With no applications, this policy becomes a draft.</p>
-            )}
-          </>
+          /* One field (app-transfer.tsx, 24 Oct 2026): the ones in this policy as chips with the search after them, and
+             the ones that can be added listed under it. What an empty list does is said right under the field, and
+             only while it is empty, as the builder's Applications panel says it. */
+          <AppTransfer
+            apps={store.apps}
+            picked={picked}
+            onChange={setPicked}
+            takenBy={(id) => (picked.includes(id) ? undefined : ownerOf(id, store.policies, policy.id)?.name)}
+            emptyNote={
+              policy.status !== 'draft' ? <p className="bassign__foot">With no applications, this policy becomes a draft.</p> : undefined
+            }
+          />
         )}
       </div>
     </Modal>

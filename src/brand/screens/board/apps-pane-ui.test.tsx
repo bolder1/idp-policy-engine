@@ -26,9 +26,31 @@ describe('the start node pane', () => {
     const out = pane('sc-device-compliance')
     expect(out).toContain('Applications')
     expect(out).not.toContain('Who')
-    /* The chips (21 Oct 2026: the picker the owner kept): a search, then the chips, then what can be added. */
     expect(out).toContain('Save applications')
     expect(out).toContain('Microsoft Outlook')
+  })
+
+  it('holds the policy’s applications as chips inside the one field, with the search after them', () => {
+    /* One field (24 Oct 2026; it was a search, then the chips under it, then the list). */
+    const html = renderToStaticMarkup(
+      <BrandProvider>
+        <AppsPane policyId="sc-device-compliance" />
+      </BrandProvider>,
+    )
+    const field = html.indexOf('class="bxt"')
+    const input = html.indexOf('class="bxt__input"')
+    expect(field).toBeGreaterThan(-1)
+    for (const name of ['Microsoft Outlook', 'Dropbox']) {
+      const x = html.indexOf(`aria-label="Remove ${name}"`)
+      expect(x).toBeGreaterThan(field)
+      expect(x).toBeLessThan(input)
+    }
+    expect(html).toMatch(/<input[^>]*placeholder="Search to add more"/)
+    expect(html).not.toContain('bxc__chosen')
+    expect(text(html).split('In this policy').length - 1).toBe(1)
+    expect(text(html)).toContain('Applications to add')
+    /* The panel's foot is untouched: Cancel and its grey save. */
+    expect(html.indexOf('>Cancel<')).toBeGreaterThan(html.indexOf('Applications to add'))
   })
 
   it('leaves the system policy as it was: every application, everyone', () => {

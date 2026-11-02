@@ -119,7 +119,8 @@ describe('the doors', () => {
   })
 
   it('is not offered on a post sign-in policy', () => {
-    expect(boardBuilderSrc).toContain('const copyOffered = COPY_RULES && !post && copySources(store.policies, draft).length > 0')
+    /* Not while the Global Default is the only policy to copy from (2 Nov 2026). */
+    expect(boardBuilderSrc).toContain('const copyOffered = COPY_RULES && !post && copySources(store.policies, draft).some((p) => !p.isSystem)')
   })
 
   it('is a slider with two buttons', () => {

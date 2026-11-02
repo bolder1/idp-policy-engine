@@ -385,8 +385,9 @@
   margin: calc(-1 * var(--space-6)) 0 var(--space-7);
 }
 .bb__empty__now p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); }
-/* The line under a new policy's heading, as close to it as the default's line above. */
-.bb__empty__sub { margin: calc(-1 * var(--space-6)) 0 var(--space-8); font-size: var(--fs-md); color: var(--text-secondary); text-align: center; }
+/* The line under a new policy's heading, close to it, and a wider gap before the cards (owner, 2 Nov 2026: "add space
+   between the heading and the cards"). */
+.bb__empty__sub { margin: calc(-1 * var(--space-6)) 0 var(--space-10); max-width: 560px; font-size: var(--fs-md); color: var(--text-secondary); text-align: center; }
 
 /* --- The two ways in ---------------------------------------------------------
 

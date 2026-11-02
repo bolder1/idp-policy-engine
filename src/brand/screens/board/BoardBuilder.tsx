@@ -600,7 +600,10 @@ export function BoardBuilder({
   const onCanvas: Policy = { ...draft, pendingDraft: undefined }
   const templateFromCanvas = BAR_TEMPLATE && canSaveAsTemplate(onCanvas)
   /* Not for a post sign-in policy, like the template doors beside it. */
-  const copyOffered = COPY_RULES && !post && copySources(store.policies, draft).length > 0
+  /* Only once the tenant has a policy of its own to reuse (owner, 2 Nov 2026: "if no policy exists or only Global is
+     present, hide this … let the user add their first policy, then add this option"). The Global Default alone does not
+     count; it is still offered, last, once the card is there. */
+  const copyOffered = COPY_RULES && !post && copySources(store.policies, draft).some((p) => !p.isSystem)
   /* A save or a Turn on refused for a rule or the last row with no action:
      the reason stands under that card's Then until it is answered, and moves
      to the next one left (post-board.ts `issueTarget`). */
@@ -2427,6 +2430,7 @@ export function BoardBuilder({
           /* "No rules" once the policy is live or had rules; the first-run
              question only for a new draft nobody has written in yet. */
           fresh={saved.status === 'draft' && saved.rules.length === 0 && !canUndo(hist)}
+          name={draft.name}
           /* No line under the heading (owner, 19 Oct 2026: "remove all this, no need"): the default, Edit default and
              Undo are on the chain and the bar once there is a chain; BoardEmpty still draws them when given. */
           onUseTemplate={() => (TEMPLATE_PICKER || cardLook ? openPicker('template') : setPicking(true))}

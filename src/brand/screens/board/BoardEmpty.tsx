@@ -27,7 +27,6 @@ import { DECISION_NAME } from './model'
 
 export function BoardEmpty({
   fresh = true,
-  name,
   fallback,
   onEditDefault,
   onUndo,
@@ -39,8 +38,6 @@ export function BoardEmpty({
 }: {
   /** A new draft nobody has written in yet. Otherwise the policy lost its rules, or never had any while live. */
   fresh?: boolean
-  /** The policy's name, for the heading of a new one. */
-  name?: string
   /** What the policy's default decides. Every sign-in gets it while there are no rules. */
   fallback?: AccessDecision
   onEditDefault?: () => void
@@ -66,11 +63,14 @@ export function BoardEmpty({
   return (
     <div className="bb__empty">
       <div className={`bb__empty__inner${three ? ' has-three' : ''}`}>
-        {/* The screen every new policy opens on, so it names the policy and says what its rules are for (owner, 2 Nov
-            2026: "more contextual … this is the screen the user will see every time he wants to create a policy"). A
-            policy that has lost its rules keeps the plain "No rules". */}
-        <h2>{fresh ? (name ? `Build the rules for ${name}` : 'Build the rules for this policy') : 'No rules'}</h2>
-        {fresh && <p className="bb__empty__sub">Rules decide whether a sign-in is allowed, asked for MFA, or denied. Pick how to start.</p>}
+        {/* The screen every new policy opens on, so it says what a sign-in policy is for (owner, 2 Nov 2026: "more
+            contextual … this is the screen the user will see every time he wants to create a policy"). Not the policy's
+            name: a name can be anything, and the bar already shows it ("what is this … rethink"). A policy that has lost
+            its rules keeps the plain "No rules". */}
+        <h2>{fresh ? 'Decide who gets in, and how' : 'No rules'}</h2>
+        {fresh && (
+          <p className="bb__empty__sub">Each rule allows a sign-in, asks for a second factor, or stops it. Start with ready-made rules or your own.</p>
+        )}
 
         {/* What the policy does right now. The default card and the undo
             control live on the canvas, which is not drawn without rules, so

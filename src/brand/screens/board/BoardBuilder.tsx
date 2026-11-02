@@ -2430,7 +2430,6 @@ export function BoardBuilder({
           /* "No rules" once the policy is live or had rules; the first-run
              question only for a new draft nobody has written in yet. */
           fresh={saved.status === 'draft' && saved.rules.length === 0 && !canUndo(hist)}
-          name={draft.name}
           /* No line under the heading (owner, 19 Oct 2026: "remove all this, no need"): the default, Edit default and
              Undo are on the chain and the bar once there is a chain; BoardEmpty still draws them when given. */
           onUseTemplate={() => (TEMPLATE_PICKER || cardLook ? openPicker('template') : setPicking(true))}

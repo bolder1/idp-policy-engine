@@ -8,6 +8,8 @@ import { useBrand } from '../store'
 import type { App, Policy } from '../data'
 import { ARRIVAL_LABEL, blankPostSignInPolicy, eventsFor, linkApp, linkOf, linkedTo, takenEvents, unlinkApp } from '../post-sign-in'
 import { freeName } from '../policy-name'
+import { newPolicy } from '../policy-draft'
+import { useNewPolicy } from '../create/use-new-policy'
 import { listNames } from '../rule-who'
 import { playCue } from '../sound'
 import { AppLogo } from '../logos/AppLogo'
@@ -43,7 +45,7 @@ import { PageBar } from './page-bar'
 const PAGE_EASE: [number, number, number, number] = [0.2, 0, 0, 1]
 
 /** The name a new policy made from here takes: the Policies page's New policy's, freed. */
-const NEW_NAME = 'Untitled post sign-in policy'
+const NEW_NAME = 'New post sign-in policy'
 
 /* A linked row's menu: its events here, the policy itself, and the link off.
    No status items: a post sign-in policy is turned on in the board, with its
@@ -130,16 +132,18 @@ export function AppPostSignInTab({
     return true
   }
 
-  /* Create new policy: an Untitled draft already linked to the ticked events,
-     straight into the board with no dialog (Policies.tsx's New policy), where
-     its rules are written. Inside the leave guard, so Keep editing over an
-     unsaved Basic leaves no draft behind, and the slider stays open with its
-     ticks. */
+  /* Create new policy: a name first (Policies.tsx's New policy), then the board, already linked to the ticked events.
+     The leave guard asks after the answer, so Keep editing over an unsaved Basic leaves nothing behind, and the slider
+     stays open with its ticks. */
+  const newOne = useNewPolicy()
   const create = (ticked: string[]) =>
-    confirmLeave(() => {
-      setSlider((s) => ({ ...s, open: false }))
-      const name = freeName(NEW_NAME, store.policies.map((p) => p.name))
-      toBoard(store.addPolicy(blankPostSignInPolicy(name, [{ appId: app.id, eventIds: ticked }])))
+    newOne.ask({
+      seedName: freeName(`${app.name} post sign-in`, store.policies.map((p) => p.name)),
+      onCreate: (name) =>
+        confirmLeave(() => {
+          setSlider((s) => ({ ...s, open: false }))
+          toBoard(store.addPolicy(newPolicy(blankPostSignInPolicy(name, [{ appId: app.id, eventIds: ticked }]))))
+        }),
     })
 
   /* Unlink, asked first. The policy keeps its rules, its status and its other
@@ -240,6 +244,7 @@ export function AppPostSignInTab({
           </div>
         )}
       </Confirm>
+      {newOne.dialog}
     </>
   )
 }
@@ -357,7 +362,7 @@ export function LinkPolicyDrawer({
   /* The events page is headed by the policy it links: its name and status,
      the would-be name for a new one, which is a draft until it is turned on
      in the board. */
-  const headName = pick === 'new' ? freeName(NEW_NAME, policies.map((p) => p.name)) : (picked?.name ?? 'Link policy')
+  const headName = pick === 'new' ? NEW_NAME : (picked?.name ?? 'Link policy')
   const head =
     page.kind === 'events' ? (
       <motion.div key={`events-${pick}`} className="bapr__pushed" {...slide}>

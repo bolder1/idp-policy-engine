@@ -1,31 +1,37 @@
 import { useState } from 'react'
 import { useMemo } from 'react'
-import { LayoutTemplate } from 'lucide-react'
+import { LayoutTemplate, Store } from 'lucide-react'
 
 import { PageHead } from '../Shell'
-import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { TemplateCard, TemplatePreview, scenarioCard } from '../create/TemplateCard'
+import { TemplateStore } from '../create/TemplateStore'
 import { EmptyState, NoMatches } from '../empty'
 import { Button, SearchBox } from '../kit'
 import { Picker } from '../picker'
 import { freeName } from '../policy-name'
+import { newPolicy } from '../policy-draft'
+import { useNewPolicy } from '../create/use-new-policy'
 import { useBrand } from '../store'
-import type { Scenario } from '../data'
-import { buildTemplate, templateBlocker, type TemplateLibrary } from './board/apply-template'
+import { blankPolicy, type Scenario } from '../data'
+import { buildTemplate, templateBlocker, templateGaps, type TemplateLibrary } from './board/apply-template'
 import { ConfirmDelete } from './confirm-delete'
 
 /* -----------------------------------------------------------------------------
    Policy templates.
 
-   The same templates the board's gallery offers — `store.scenarios`, the shipped
-   ones and every template this tenant saved from a policy — under the same two
-   headings. The page used to read a separate static list that nothing could
-   add to, so a template saved from the Policies list never appeared here, and
-   "Your templates" showed three seeded cards in every tenant.
+   This tenant's own templates (owner, 30 Oct 2026: "only show your templates"):
+   the ones saved from a policy and the ones added from the Xecurify store. The
+   templates miniOrange ships are in the store (create/TemplateStore.tsx), a
+   popup the page's one orange button opens, as the Figma Community sits apart
+   from a person's drafts. All of them come from `store.scenarios`, the list the
+   board's gallery reads too, so a template saved or added anywhere is here.
 
-   Use template names the new policy and creates it with the template's rules,
-   then opens it on the board. A template whose rules apply to nobody, or that
-   has no rules, cannot be used, so it offers no Use.
+   Use makes a draft named after the template, with its rules, and opens it on
+   the board: a new policy is a new file, not a form (owner, 23 Sep 2026), and
+   from a template too (29 Oct 2026: one way in). The name is the template's,
+   numbered when a policy has it, and is renamed in the builder's bar like any
+   other. A template whose rules apply to nobody, or that has no rules, cannot be
+   used, so it offers no Use.
    -------------------------------------------------------------------------- */
 
 const CATS: Scenario['category'][] = ['Quick Protection', 'Device-based', 'Risk-based', 'Compliance', 'Uncategorized']
@@ -42,7 +48,6 @@ export function Templates() {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string>('All')
   const [preview, setPreview] = useState<Scenario | null>(null)
-  const [using, setUsing] = useState<Scenario | null>(null)
   /* The tenant's own template the admin is about to take away. */
   const [deleting, setDeleting] = useState<Scenario | null>(null)
 
@@ -55,14 +60,15 @@ export function Templates() {
   )
   const cardOf = (s: Scenario) => cards.get(s.id) ?? scenarioCard(s, users, library)
 
+  /* The tenant's own. The page is their shelf (owner, 30 Oct 2026); Xecurify's are in the store. */
+  const own = useMemo(() => scenarios.filter((s) => !s.provided), [scenarios])
   /* Only categories something is filed under, so no option leads to nothing. */
-  const cats = CATS.filter((c) => scenarios.some((s) => s.category === c))
+  const cats = CATS.filter((c) => own.some((s) => s.category === c))
   const active = cat !== 'All' && cats.some((c) => c === cat) ? cat : 'All'
   const query = q.trim()
-  const shown = scenarios.filter((s) => (active === 'All' || s.category === active) && matches(s, query))
-  const mine = shown.filter((s) => !s.provided)
-  const shipped = shown.filter((s) => s.provided)
-  const filtering = active !== 'All' || query.length > 0
+  const shown = own.filter((s) => (active === 'All' || s.category === active) && matches(s, query))
+  /* The Xecurify store, open over the page. */
+  const [shopping, setShopping] = useState(false)
 
   const clear = () => {
     setQ('')
@@ -70,15 +76,30 @@ export function Templates() {
   }
 
   const usable = (s: Scenario) => s.rules.length > 0
+  const newOne = useNewPolicy()
   const startUse = (s: Scenario) => {
     setPreview(null)
-    /* The board's check, so both places refuse the same templates in the same words. */
-    const blocked = templateBlocker(s, buildTemplate(s, users, library))
+    /* Zones and device profiles this tenant lacks are cleared from the rules,
+       as on the board, so a condition reads "Choose…" instead of naming
+       something that never existed here. The board's check, so both places
+       refuse the same templates in the same words. */
+    const build = buildTemplate(s, users, library)
+    const blocked = templateBlocker(s, build)
     if (blocked) {
       store.showToast(blocked)
       return
     }
-    setUsing(s)
+    /* A name first, like every new policy (2 Nov 2026), offered as the template's. Its rules arrive unsaved. */
+    newOne.ask({
+      seedName: freeName(s.name, store.policies.map((p) => p.name)),
+      onCreate: (name) => {
+        const id = store.addPolicy(newPolicy(blankPolicy(name, []), { rules: build.rules }))
+        /* No toast when nothing was left behind: it named a thing you are looking at, as New policy does. */
+        const gaps = templateGaps(build)
+        if (gaps) store.showToast(`${name} created.${gaps}`)
+        store.go({ name: 'board', policyId: id })
+      },
+    })
   }
 
   const toPolicies = () => store.go({ name: 'policies' })
@@ -93,19 +114,32 @@ export function Templates() {
     />
   )
 
+  /* The page's one orange button: the way into the store. */
+  const browse = (
+    <Button variant="brand" icon={Store} onClick={() => setShopping(true)}>
+      Browse Xecurify templates
+    </Button>
+  )
+
   return (
     <div className="bpage blib-templates">
       <PageHead title="Policy templates" caption="Start a policy from a set of rules." />
 
-      {scenarios.length === 0 ? (
+      {/* The tenant's own templates, and nothing else (owner, 30 Oct 2026). With none, the whole page says so and
+          offers the two ways to get one: add from the store, or save a policy as one (from its ⋯, on the Policies
+          page). With some, the toolbar ends in the way into the store. */}
+      {own.length === 0 ? (
         <EmptyState
           icon={LayoutTemplate}
           title="No templates yet"
-          blurb="Save a policy as a template from its ⋯ menu, on the Policies page, an application or the builder."
+          blurb="Add one from Xecurify templates, or save a policy as a template."
           action={
-            <Button variant="brand" onClick={toPolicies}>
-              Go to policies
-            </Button>
+            <>
+              {browse}
+              <Button variant="secondary" onClick={toPolicies}>
+                Go to policies
+              </Button>
+            </>
           }
         />
       ) : (
@@ -115,87 +149,45 @@ export function Templates() {
               <SearchBox value={q} onChange={setQ} placeholder="Search templates…" label="Search templates" />
             </div>
             <div className="btoolbar__right">
-              <div className="btoolbar__filters">
-                <span className={`btoolbar__filter ${active !== 'All' ? 'is-set' : ''}`}>
-                  <Picker
-                    label="Filter by category"
-                    value={active}
-                    width="fill"
-                    size="md"
-                    options={[{ value: 'All', label: 'All categories' }, ...cats.map((c) => ({ value: c, label: c }))]}
-                    onChange={setCat}
-                  />
-                </span>
-                {active !== 'All' && (
-                  <button type="button" className="btoolbar__clear" onClick={() => setCat('All')}>
-                    Clear filters
-                  </button>
-                )}
-              </div>
+              {/* The filter only where it has work to do: one category needs no taxonomy. */}
+              {cats.length > 1 && (
+                <div className="btoolbar__filters">
+                  <span className={`btoolbar__filter ${active !== 'All' ? 'is-set' : ''}`}>
+                    <Picker
+                      label="Filter by category"
+                      value={active}
+                      width="fill"
+                      size="md"
+                      options={[{ value: 'All', label: 'All categories' }, ...cats.map((c) => ({ value: c, label: c }))]}
+                      onChange={setCat}
+                    />
+                  </span>
+                  {active !== 'All' && (
+                    <button type="button" className="btoolbar__clear" onClick={() => setCat('All')}>
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              )}
+              {browse}
             </div>
           </div>
 
-          {mine.length + shipped.length === 0 ? (
+          {shown.length === 0 ? (
             <NoMatches noun="templates" query={query} filtered={active !== 'All'} onClear={clear} />
           ) : (
-            <>
-              {/* Your templates stays on screen while it is empty and nothing is
-                  filtered, to say where one comes from. Under a search or a
-                  filter an empty shelf is just left out. */}
-              {(mine.length > 0 || !filtering) && (
-                <>
-                  <h2 className="bgal__section">Your templates</h2>
-                  {mine.length > 0 ? (
-                    <div className="bgal__grid">{mine.map(card)}</div>
-                  ) : (
-                    <EmptyState
-                      compact
-                      icon={LayoutTemplate}
-                      title="No templates of your own"
-                      blurb="Save a policy as a template from its ⋯ menu, on the Policies page, an application or the builder."
-                      action={<Button onClick={toPolicies}>Go to policies</Button>}
-                    />
-                  )}
-                </>
-              )}
-
-              {shipped.length > 0 && (
-                <>
-                  <h2 className="bgal__section">Xecurify templates</h2>
-                  <div className="bgal__grid">{shipped.map(card)}</div>
-                </>
-              )}
-            </>
+            <div className="bgal__grid">{shown.map(card)}</div>
           )}
         </>
       )}
+
+      <TemplateStore open={shopping} onClose={() => setShopping(false)} />
+      {newOne.dialog}
 
       <TemplatePreview
         m={preview ? cardOf(preview) : null}
         onClose={() => setPreview(null)}
         onUse={preview && usable(preview) ? () => startUse(preview) : undefined}
-      />
-
-      {/* Named like any new policy. The name offered is the template's, numbered
-          when a policy already has it. */}
-      <NewPolicyDialog
-        open={using !== null}
-        onClose={() => setUsing(null)}
-        seedName={using ? freeName(using.name, store.policies.map((p) => p.name)) : ''}
-        onCreate={(policy) => {
-          if (!using) return
-          /* Zones and device profiles this tenant lacks are cleared from the
-             rules, as on the board, so a condition reads "Choose…" instead of
-             naming something that never existed here. */
-          const { rules, dropped, needs } = buildTemplate(using, users, library)
-          const id = store.addPolicy({ ...policy, rules })
-          const d = dropped.length
-          const left = d > 0 ? ` ${d === 1 ? '1 rule' : `${d} rules`} left out.` : ''
-          const missing = needs.length > 0 ? ' Choose the missing zone or device profile.' : ''
-          store.showToast(`${policy.name} created${left || missing ? '.' : ''}${left}${missing}`)
-          setUsing(null)
-          store.go({ name: 'board', policyId: id })
-        }}
       />
 
       {/* Taking one of this tenant's own templates away, through the one delete confirm every library object uses. A

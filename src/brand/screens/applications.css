@@ -108,7 +108,6 @@
 .bapr__back:hover { background: var(--state-hover-bg); color: var(--text-primary); }
 .bapr__back:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
 .bapr__back svg { flex: none; }
-.bapr__nameerror { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--fb-negative-fg); }
 
 .bapr__list { margin-top: var(--space-6); }
 .bapr__listhead { margin-bottom: var(--space-4); }

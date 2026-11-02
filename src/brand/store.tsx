@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -31,7 +32,7 @@ import {
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
 import { logChange, seedChangeLog, type ChangeEntry } from './change-log'
-import { asStored, changedBeyondStamp, lastSaved, openForEditing, withSavedDraft } from './policy-draft'
+import { asStored, changedBeyondStamp, keptOrNew, lastSaved, openForEditing, withSavedDraft } from './policy-draft'
 import { isRevisit } from './revisit'
 import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
 import type { SavedSignIn } from './saved-sign-ins'
@@ -686,6 +687,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     run()
   }, [])
 
+  /* A new policy nobody saved goes as its board does, whichever way out was taken and before the next screen paints, so
+     no list draws it and no application's one slot is held by it (policy-draft.ts `newPolicy`). */
+  useLayoutEffect(() => {
+    const open = screen.name === 'board' ? screen.policyId : null
+    setPolicies((all) => (all.some((p) => p.provisional && p.id !== open) ? all.filter((p) => !p.provisional || p.id === open) : all))
+  }, [screen, setPolicies])
+
   const [visit, setVisit] = useState(0)
   const go = useCallback(
     (s: BrandScreen) =>
@@ -1150,12 +1158,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
          an action, though never for having no application (`settled`). */
       savePolicy: (p) => {
         const before = policiesRef.current.find((x) => x.id === p.id)
-        const after = settled(asStored(keepsCopyMark(p, before)))
+        const after = keptOrNew(settled(asStored(keepsCopyMark(p, before))), before)
         if (before && changedBeyondStamp(before, after)) setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), groups, directory.people, appsRef.current))
         setPolicies((all) =>
           all.map((x) => {
             if (x.id !== p.id) return x
-            const next = settled(asStored(keepsCopyMark(p, x)))
+            const next = keptOrNew(settled(asStored(keepsCopyMark(p, x))), x)
             return changedBeyondStamp(x, next) ? { ...next, lastModified: 'Just now', modifiedBy: 'You' } : x
           }),
         )
@@ -1177,7 +1185,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       },
 
       saveDraft: (policyId, d) =>
-        setPolicies((all) => all.map((x) => (x.id === policyId ? withSavedDraft(x, d) : x))),
+        setPolicies((all) => all.map((x) => (x.id === policyId ? keptOrNew(withSavedDraft(x, d), x) : x))),
 
       discardDraft: (policyId) =>
         setPolicies((all) => all.map((x) => (x.id === policyId ? { ...x, pendingDraft: undefined } : x))),

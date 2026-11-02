@@ -33,6 +33,8 @@ import { useBrand, type AppTab } from '../store'
 import { blankPolicy, nameTaken, type App, type Policy } from '../data'
 import { APP_NAME_MAX, basicIssues, cleanSetup, randomHex, type AppSetup } from '../app-setup'
 import { freeName } from '../policy-name'
+import { newPolicy } from '../policy-draft'
+import { useNewPolicy } from '../create/use-new-policy'
 import { playCue } from '../sound'
 import { AddExistingPolicy } from './AddExistingPolicy'
 import { AppPostSignInTab } from './AppPostSignIn'
@@ -602,15 +604,20 @@ function PoliciesTab({
 
   const hasDecider = () => rows.some((r) => r.state === 'decides')
 
-  /* New policy: an Untitled draft on this application, straight into the
-     board with no dialog and no toast (Policies.tsx `startDraft`). Inside the
-     leave guard, so Keep editing over an unsaved Basic leaves no draft behind. */
-  const newPolicy = () =>
-    confirmLeave(() => {
-      const had = hasDecider()
-      const id = store.addPolicy(blankPolicy(freeName('Untitled policy', store.policies.map((p) => p.name)), [app.id]))
-      sendToBoard(SENT_TO_BOARD, id, had)
-      store.go({ name: 'board', policyId: id, from: { appId: app.id } })
+  /* New policy on this application: a name and how to start (Policies.tsx `startDraft`), the name offered from the
+     application. The leave guard asks after the answer, so Keep editing over an unsaved Basic leaves nothing behind. */
+  const newOne = useNewPolicy()
+  const startNew = () =>
+    newOne.ask({
+      ways: true,
+      seedName: freeName(`${app.name} access`, store.policies.map((p) => p.name)),
+      onCreate: (name, start) =>
+        confirmLeave(() => {
+          const had = hasDecider()
+          const id = store.addPolicy(newPolicy(blankPolicy(name, [app.id]), start))
+          sendToBoard(SENT_TO_BOARD, id, had)
+          store.go({ name: 'board', policyId: id, from: { appId: app.id } })
+        }),
     })
 
   /* The one place a policy goes onto this application, and the one place one
@@ -871,7 +878,7 @@ function PoliciesTab({
               app={app}
               globalDefault={fallback}
               saving={saving}
-              onNew={newPolicy}
+              onNew={startNew}
               onAdd={attachable.length > 0 ? () => setAdding(true) : undefined}
               onTab={onTab}
             />
@@ -924,6 +931,7 @@ function PoliciesTab({
       {statusChange.dialog}
       {/* Portalled, so it opens over the add drawer as well as over the page. */}
       {guardPage && createPortal(<GuardDrawer {...guardPage} />, portalRoot())}
+      {newOne.dialog}
     </>
   )
 }
@@ -1053,16 +1061,27 @@ function NewAppPage({ entry }: { entry: CatalogApp }) {
     if (appId) store.go({ name: 'application', appId, tab: 'policies' })
   }
 
-  /* New policy: the stored page's own — an Untitled draft for everyone,
-     straight into the board (23 Sep 2026) — once the application exists. It
-     had no deciding policy a moment ago, so a first one is celebrated on the
+  /* New policy: the stored page's own popup, and the application is stored only once it is answered. Basic incomplete, it
+     says so as Save does and asks nothing. It had no deciding policy a moment ago, so a first one is celebrated on the
      board's way back. */
-  const newPolicy = () => {
-    const appId = create()
-    if (!appId) return
-    const pid = store.addPolicy(blankPolicy(freeName('Untitled policy', store.policies.map((p) => p.name)), [appId]))
-    sendToBoard(SENT_TO_BOARD, pid, false)
-    store.go({ name: 'board', policyId: pid, from: { appId } })
+  const newOne = useNewPolicy()
+  const startNew = () => {
+    if (problem) {
+      create()
+      return
+    }
+    const appName = draft.name.trim()
+    newOne.ask({
+      ways: true,
+      seedName: freeName(`${appName} access`, store.policies.map((p) => p.name)),
+      onCreate: (name, start) => {
+        const appId = create()
+        if (!appId) return
+        const pid = store.addPolicy(newPolicy(blankPolicy(name, [appId]), start))
+        sendToBoard(SENT_TO_BOARD, pid, false)
+        store.go({ name: 'board', policyId: pid, from: { appId } })
+      },
+    })
   }
 
   /* Add existing policy: the stored page's drawer, opened there, so the add
@@ -1159,7 +1178,7 @@ function NewAppPage({ entry }: { entry: CatalogApp }) {
 
       <div id="bapp-panel" role="tabpanel" aria-label={TAB_LABEL[tab]} className="bapp__panel" ref={panel}>
         {tab === 'policies' ? (
-          <NewAppPolicies appId={id} onNew={newPolicy} onExisting={addExisting} />
+          <NewAppPolicies appId={id} onNew={startNew} onExisting={addExisting} />
         ) : (
           <SetupTabBody
             tab={tab}
@@ -1175,6 +1194,7 @@ function NewAppPage({ entry }: { entry: CatalogApp }) {
       </div>
 
       {host ? createPortal(footer, host) : footer}
+      {newOne.dialog}
     </div>
   )
 }

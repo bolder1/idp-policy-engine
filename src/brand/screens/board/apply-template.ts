@@ -1,5 +1,7 @@
 import type { Audience, Rule, Scenario } from '../../data'
+import { freeName } from '../../policy-name'
 import { hasWho, intersectWho, normaliseWho, withWho, type WhoDirectory } from '../../rule-who'
+import { UNTITLED_NAME } from './describe-session'
 
 /* -----------------------------------------------------------------------------
    The rules a template puts on the board.
@@ -121,4 +123,24 @@ export function templateBlocker(t: Scenario, build: TemplateBuild): string | nul
   if (t.rules.length === 0) return `${t.name} has no rules.`
   if (build.rules.length === 0) return `${t.name} not applied. None of its rules apply to anyone.`
   return null
+}
+
+/** What a build left for the admin to do, as the end of a toast: "" when nothing. The board and the Templates page say it alike. */
+export function templateGaps(build: TemplateBuild): string {
+  const d = build.dropped.length
+  const left = d > 0 ? ` ${d === 1 ? '1 rule' : `${d} rules`} left out.` : ''
+  const needs = build.needs.length > 0 ? ' Choose the missing zone or device profile.' : ''
+  return left + needs
+}
+
+/** A name the product gave a policy rather than the admin: "Untitled policy", or one a template gave on this visit (`given`). */
+export function productNamed(name: string, given: ReadonlySet<string> = new Set()): boolean {
+  return UNTITLED_NAME.test(name) || given.has(name)
+}
+
+/* The name a policy takes from a template applied to it (owner, 29 Oct 2026: one way in). A name the product gave
+   becomes the template's, numbered when another policy has it, as the Templates page names the drafts it makes. A
+   name the admin typed is theirs and stays. */
+export function templateName(current: string, template: string, others: Iterable<string>, given: ReadonlySet<string> = new Set()): string {
+  return productNamed(current, given) ? freeName(template, others) : current
 }

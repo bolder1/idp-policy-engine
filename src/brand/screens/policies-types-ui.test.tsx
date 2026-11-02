@@ -212,13 +212,14 @@ describe('Policies: the Post sign-in tab', () => {
     expect([...filter.matchAll(/label: '([^']+)'/g)].map((m) => m[1])).toEqual(['All', 'Active', 'Draft', 'Inactive'])
   })
 
-  it('makes New policy an Untitled post sign-in draft and opens it in the board, with no dialog', () => {
+  /* A name first, and held until saved with a rule (2 Nov 2026; create/new-policy.test.ts). */
+  it('makes New policy ask for a name, then opens a held post sign-in policy in the board', () => {
     const start = policiesSrc.slice(policiesSrc.indexOf('function PostSignInPolicies'))
     const draft = start.slice(start.indexOf('const startDraft'), start.indexOf('const act'))
-    expect(draft).toContain("freeName('Untitled post sign-in policy', store.policies.map((p) => p.name))")
-    expect(draft).toContain('store.addPolicy(blankPostSignInPolicy(name))')
+    expect(draft).toContain('newOne.ask({')
+    expect(draft).toContain('store.addPolicy(newPolicy(blankPostSignInPolicy(name)))')
     expect(draft).toContain("store.go({ name: 'board', policyId: id })")
-    expect(draft).not.toMatch(/Modal|Dialog|setDeleting/)
+    expect(draft).not.toMatch(/Modal|setDeleting/)
   })
 
   it('opens Edit policy in the board too', () => {

@@ -44,6 +44,7 @@ These hide finished work for the current phase. Don't delete what they gate, and
 - `PEOPLE_AND_BREAK_IN` (`screens/board/test-mode.ts`)
 - `BAR_DEMO` / `BAR_TOUR` / `BAR_READ` (`screens/board/bar-tools.ts`)
 - `features` in `src/brand/store.tsx`
+- `TEMPLATES_MANAGED` / `CARD_PICTURES` (`src/brand/template-phase.ts`), and `COPY_RULES` / `BAR_COPY_RULES` / `TEMPLATE_PICKER` / `PICKER_LOOK` (`screens/board/bar-tools.ts`)
 
 New A/B or preview controls are gated on `SHOWCASE`. A later phase goes behind its own named flag.
 

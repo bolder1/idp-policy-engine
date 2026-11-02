@@ -27,9 +27,12 @@ export function StatusControl({
   onEditsFix,
   onRevealRule,
   onOpenBreakIn,
+  turnOnAsk,
 }: {
   policyId: string
   edits?: RuleSet
+  /** The board: counts up each time the toast after a first save is pressed on Turn on. It asks for the same switch the menu's row does. */
+  turnOnAsk?: number
   /** The board: Before turning on's ready fix lands on its draft, with Undo. */
   onEditsFix?: (next: RuleSet, toast: string) => void
   /** The board: a rule reference on Before turning on shows the rule on the chain. */
@@ -90,6 +93,18 @@ export function StatusControl({
       window.removeEventListener('scroll', onMove, true)
     }
   }, [open])
+
+  /* The toast after a first save, pressed on Turn on (29 Oct 2026): the pill's own switch, so the same confirm or the
+     same Before turning on page opens and the same refusals are said. Read at the render the count changed in, so it
+     sees the policy as saved and no edits; a count seen already is not asked again. */
+  const asked = useRef(turnOnAsk ?? 0)
+  useEffect(() => {
+    if (!turnOnAsk || turnOnAsk === asked.current) return
+    asked.current = turnOnAsk
+    const now = store.policyById(policyId)
+    if (now) request(now, 'active')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs on the count, not on every render of the policy
+  }, [turnOnAsk])
 
   if (!policy) return null
   if (options.length === 0) return <StatusPill status={policy.status} />

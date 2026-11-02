@@ -1,0 +1,60 @@
+/* --- Copy from a policy, Use a template (RulePicker.tsx) ---------------------------
+
+   The list on the left, the chosen one's rules on the right to read, filling the slider's height so that a policy with
+   two rules does not jump it. The chosen one is grey, as the Xecurify store's rail is; orange is only ever on the
+   slider's one button. The rules are not choices, so they are plain cards with no hover. */
+.bx-drawer__body:has(> .bcopy) { display: flex; padding: 0; overflow: hidden; }
+.bcopy { flex: 1; display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 0; }
+.bcopy__rail {
+  display: flex; flex-direction: column; gap: var(--space-4); min-height: 0;
+  padding: var(--space-6) var(--space-4) var(--space-6) var(--space-6);
+  border-right: 1px solid var(--border-subtle);
+}
+.bcopy__sources { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.bcopy__group { margin: var(--space-4) 0 var(--space-2); padding: 0 var(--space-4); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bcopy__group:first-child { margin-top: 0; }
+.bcopy__source {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0; border-radius: var(--radius-md); background: none;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.bcopy__source:hover { background: var(--surface-sunken); }
+.bcopy__source.is-on { background: var(--surface-inset); }
+.bcopy__source:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bcopy__sourcename { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+.bcopy__sourceapps { font-size: var(--fs-sm); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bcopy__rules { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; min-height: 0; padding: var(--space-6); }
+.bcopy__head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.bcopy__head h3 { margin: 0; min-width: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); overflow-wrap: anywhere; }
+.bcopy__list { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bcopy__rule {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-raised);
+}
+.bcopy__rulename { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+.bcopy__ruleline { font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.bcopy__ruleline.is-then { color: var(--text-tertiary); }
+.bcopy__note { display: flex; align-items: flex-start; gap: var(--space-2); margin-top: var(--space-2); font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+.bcopy__note svg { flex: none; margin-top: 2px; }
+@media (max-width: 700px) {
+  .bcopy { grid-template-columns: minmax(0, 1fr); grid-template-rows: 200px minmax(0, 1fr); }
+  .bcopy__rail { padding-right: var(--space-6); border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+}
+
+/* New policy's slider (create/NewPolicySlider.tsx): the step that pushes the picker names where Back goes. */
+.bnew__pushed h2 { font-size: var(--fs-lg); }
+.bcopy__detail { margin: calc(-1 * var(--space-2)) 0 0; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+
+/* The card look in a slider (create/TemplateSheet.tsx `slider`): the search, the shelves and the category over the grid,
+   which keeps the store's cards two to a row in the slider's width. */
+.bgslide { display: flex; flex-direction: column; gap: var(--space-6); }
+.bgslide__bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
+.bgslide__bar .bx-search { flex: 1 1 240px; }
+
+/* The store sheet with one shelf (create/TemplateSheet.tsx): no rail, so the cards take the whole width, three to a row
+   at the sheet's width, and the category dropdown over them holds any number of categories. */
+.bmarket__work.is-full { grid-template-columns: minmax(0, 1fr); }
+.bmarket__work.is-full .bmarket__body { grid-column: 1; }

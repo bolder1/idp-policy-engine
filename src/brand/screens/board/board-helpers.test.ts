@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { audienceOf, blankRule, card, cond, scenarios, when, type Rule, type Scenario } from '../../data'
 import { scenarioCard } from '../../create/TemplateCard'
-import { buildTemplate, templateBlocker, withoutMissing } from './apply-template'
+import { buildTemplate, productNamed, templateBlocker, templateGaps, templateName, withoutMissing } from './apply-template'
 import { journeyOf } from './model'
 import { copyName, isPristine, settledName } from './parts'
 import { patchRule } from './model'
@@ -133,6 +133,42 @@ describe('what stops a template from being applied', () => {
   it('lets a template with a kept rule through', () => {
     const t: Scenario = { ...base, rules: [{ name: 'All', ifText: 'x', decision: '2fa', build: () => blankRule('All') }] }
     expect(templateBlocker(t, buildTemplate(t))).toBeNull()
+  })
+})
+
+describe('what a template leaves to do, said alike on the board and the Templates page', () => {
+  it('says nothing when the build kept everything', () => {
+    expect(templateGaps({ rules: [], dropped: [], needs: [] })).toBe('')
+  })
+
+  it('counts the rules left out and asks for a missing zone or device profile once', () => {
+    expect(templateGaps({ rules: [], dropped: ['A'], needs: [] })).toBe(' 1 rule left out.')
+    expect(templateGaps({ rules: [], dropped: ['A', 'B'], needs: ['zone', 'fingerprint'] })).toBe(
+      ' 2 rules left out. Choose the missing zone or device profile.',
+    )
+  })
+})
+
+describe('the name a template gives the policy it is applied to (one way in, 29 Oct 2026)', () => {
+  it('replaces a name the product gave with the template’s', () => {
+    expect(templateName('Untitled policy', 'Block risky sign-ins', [])).toBe('Block risky sign-ins')
+    expect(templateName('Untitled policy 3', 'Block risky sign-ins', [])).toBe('Block risky sign-ins')
+  })
+
+  it('numbers it when another policy has that name, as the Templates page does', () => {
+    expect(templateName('Untitled policy', 'Block risky sign-ins', ['Block risky sign-ins'])).toBe('Block risky sign-ins 2')
+  })
+
+  it('replaces a name a template gave on this visit, so a second template renames again', () => {
+    const given = new Set(['Block risky sign-ins'])
+    expect(productNamed('Block risky sign-ins', given)).toBe(true)
+    expect(templateName('Block risky sign-ins', 'Managed devices only', [], given)).toBe('Managed devices only')
+  })
+
+  it('keeps a name the admin typed', () => {
+    expect(productNamed('Finance team')).toBe(false)
+    expect(templateName('Finance team', 'Block risky sign-ins', [])).toBe('Finance team')
+    expect(templateName('My untitled policy', 'Block risky sign-ins', [])).toBe('My untitled policy')
   })
 })
 

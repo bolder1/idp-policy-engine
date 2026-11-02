@@ -24,6 +24,50 @@
   --_blue-050: #eaf1fc;
   --_blue-500: #0b5fd6;
   --_blue-600: #0a4fb0;
+  /* The three ways to start a policy (board/BoardEmpty.tsx; owner, 2 Nov 2026: "give me some retro colours for this,
+     with our theme"). A seventies set built round the brand orange: terracotta (the orange, muted and deepened) for
+     miniOrange's templates, a faded teal for the tenant's own policies, a mustard ochre for a fresh start, each on a
+     warm cream wash rather than a cold tint. The ochre's strong shade is deep enough for words on white. Each has a
+     strong shade (the border, the icons, the lit part of the picture, the tab's words on hover), a wash (the stage) and
+     a deeper wash (its dots, the hover drift). Light mode only. */
+  --_terracotta-050: #fbefe7;
+  --_terracotta-100: #f1d2c1;
+  --_terracotta-600: #b4532c;
+  --_retro-teal-050: #e7f2f0;
+  --_retro-teal-100: #c4dfda;
+  --_retro-teal-600: #2d7471;
+  --_mustard-050: #fbf4e2;
+  --_mustard-100: #eedcaa;
+  --_mustard-700: #93690f;
+  --start-template: var(--_terracotta-600);
+  --start-template-wash: var(--_terracotta-050);
+  --start-template-wash-2: var(--_terracotta-100);
+  --start-reuse: var(--_retro-teal-600);
+  --start-reuse-wash: var(--_retro-teal-050);
+  --start-reuse-wash-2: var(--_retro-teal-100);
+  --start-scratch: var(--_mustard-700);
+  --start-scratch-wash: var(--_mustard-050);
+  --start-scratch-wash-2: var(--_mustard-100);
+  /* The template shelves, in the same family (create/TemplateCard.tsx; owner, same day: "change the template cards as
+     well … make it colourful, same retro colour family"): the shelf's colour washes the card's canvas and names it in
+     the corner tab. Terracotta for Quick protection, the faded teal for Device-based, the ochre for Risk-based, and a
+     plum, the family's fourth, for Compliance (it was magenta, Identity's hue). A tenant's own policy, shown as a card in
+     the reuse picker, takes the reuse teal from the set above. */
+  --_plum-050: #f6edf2;
+  --_plum-100: #e6cedc;
+  --_plum-600: #86476b;
+  --tpl-quick: var(--_terracotta-600);
+  --tpl-quick-wash: var(--_terracotta-050);
+  --tpl-quick-wash-2: var(--_terracotta-100);
+  --tpl-device: var(--_retro-teal-600);
+  --tpl-device-wash: var(--_retro-teal-050);
+  --tpl-device-wash-2: var(--_retro-teal-100);
+  --tpl-risk: var(--_mustard-700);
+  --tpl-risk-wash: var(--_mustard-050);
+  --tpl-risk-wash-2: var(--_mustard-100);
+  --tpl-compliance: var(--_plum-600);
+  --tpl-compliance-wash: var(--_plum-050);
+  --tpl-compliance-wash-2: var(--_plum-100);
   --_negative-050: #fbede9;
   --_negative-100: #f1c4b2;
   --_negative-500: #d33a2c;

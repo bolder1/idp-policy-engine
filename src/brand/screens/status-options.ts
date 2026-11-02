@@ -1,4 +1,5 @@
 import { enforces, type Policy, type PolicyStatus, type PolicyType } from '../data'
+import { TEMPLATES_MANAGED } from '../template-phase'
 import { monitorBlocker, openForEditing } from '../policy-draft'
 import { ACCESS_CHECK } from './sign-in-tests/names'
 
@@ -115,7 +116,8 @@ export type RowMenuId = 'edit' | 'test' | StatusTarget | 'monitoring' | 'trail' 
    application's Policies tab. A sign-in policy with at least one rule: a post sign-in policy decides no sign-in, so
    there is nothing to reuse, and a template of a policy with no rules would apply nothing. */
 export function canSaveAsTemplate(policy: Policy): boolean {
-  return policy.type !== 'Session' && openForEditing(policy).rules.length > 0
+  /* Not offered while the tenant cannot manage templates (template-phase.ts). */
+  return TEMPLATES_MANAGED && policy.type !== 'Session' && openForEditing(policy).rules.length > 0
 }
 
 export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean }): { id: RowMenuId; label: string }[] {
@@ -307,4 +309,15 @@ export function offersMonitorAfterSave(
   opts: { monitor?: boolean } = {},
 ): boolean {
   return before.status === 'draft' && after.status === 'inactive' && statusOptions(after, opts).some((o) => o.target === 'monitor')
+}
+
+/* Whether the toast after a save offers "Turn on" (29 Oct 2026: the way to live was long and quiet — Save policy, "It is
+   off.", then the status pill's menu, with nothing pointing at it). The same save as `offersMonitorAfterSave`, and only
+   where the pill's menu would offer Turn on, so the toast never offers what the pill would not. */
+export function offersTurnOnAfterSave(
+  before: Pick<Policy, 'status'>,
+  after: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType },
+  opts: { monitor?: boolean } = {},
+): boolean {
+  return before.status === 'draft' && after.status === 'inactive' && statusOptions(after, opts).some((o) => o.target === 'active')
 }

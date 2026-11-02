@@ -222,6 +222,7 @@ describe('the builder’s join', () => {
   })
 
   it('keeps the leave guard on the draft the fix leaves unsaved', () => {
-    expect(builderSrc).toContain("useLeaveGuard({ dirty: unsaved, save: saveDraft, saveLabel: 'Save as draft' })")
+    expect(builderSrc).toContain("useLeaveGuard({ dirty: toLose, save: saveDraft, saveLabel: 'Save as draft', blocked: stop })")
+    expect(builderSrc).toContain('const toLose = unsaved && !(saved?.provisional && noRules)')
   })
 })

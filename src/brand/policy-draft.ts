@@ -1,4 +1,4 @@
-import type { Policy, Rule } from './data'
+import type { NewPolicyStart, Policy, Rule } from './data'
 
 /* Draft mode for policies — the rules both builders share.
 
@@ -19,8 +19,46 @@ const ruleSet = (p: Pick<Policy, 'rules' | 'fallback'>): RuleSet => ({ rules: p.
 
 /** The policy as a builder should open it: the saved draft if there is one, otherwise the live rules. */
 export function openForEditing(p: Policy): Policy {
+  if (p.provisional) return { ...p, rules: p.provisional.rules }
   return p.pendingDraft ? { ...p, rules: p.pendingDraft.rules, fallback: p.pendingDraft.fallback } : p
 }
+
+/* --- A new policy, held until it has a rule ---------------------------------------
+
+   Owner, 2 Nov 2026, for the team: New policy made a draft at once, so pressing it and going back left an empty policy,
+   and an admin could pile them up. It takes a name first now (create/NewPolicyDialog.tsx), and a name alone does not
+   close the gap: Create, then Back, would still leave a named empty one. So nothing is kept until a save with a rule.
+
+   While the board is open the policy sits in the store marked `provisional`, because the board reads and renames its
+   policy there. No other screen can be drawn in that time. The store drops it on any way out, in the same paint
+   (`store.tsx`), so no list, picker or application's one slot ever sees it. The rules it started from stay on the mark
+   rather than in `rules`, so they read as unsaved: Save draft wakes up and leaving asks first, as any other edit does.
+   For the back end this is simply no create call until the first save. */
+
+/** A new policy, not kept until its first save with a rule. */
+export function newPolicy(p: Policy, start: NewPolicyStart = { rules: [] }): Policy {
+  return { ...p, provisional: start }
+}
+
+/** The mark comes off a policy as soon as a save gives it a rule, and only a policy holding the mark can keep it. */
+export function keptOrNew(p: Policy, before: Pick<Policy, 'provisional'> | undefined): Policy {
+  if (!p.provisional) return p
+  if (before?.provisional && p.rules.length === 0) return p
+  const { provisional: _gone, ...kept } = p
+  return kept
+}
+
+/** True when there is nothing to save yet: a policy needs a rule. The Global Default decides by its last row alone. */
+export const hasNoRules = (p: Pick<Policy, 'rules' | 'isSystem'>): boolean => p.rules.length === 0 && !p.isSystem
+
+/** What a refused save says. */
+export const NO_RULES_REASON = 'Add a rule first'
+
+/** A name the product gave, not the admin: "Untitled policy", "Untitled post sign-in policy 2". */
+export const isUntitled = (name: string): boolean => /^Untitled( post sign-in)? policy( \d+)?$/.test(name.trim())
+
+/** What a refused save says for a new policy still carrying the product's name. */
+export const UNNAMED_REASON = 'Name the policy first'
 
 /** What was last saved — the draft if there is one, otherwise the live rules. The "unsaved changes" baseline. */
 export function lastSaved(p: Policy): RuleSet {

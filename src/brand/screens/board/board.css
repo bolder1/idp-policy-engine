@@ -385,6 +385,8 @@
   margin: calc(-1 * var(--space-6)) 0 var(--space-7);
 }
 .bb__empty__now p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); }
+/* The line under a new policy's heading, as close to it as the default's line above. */
+.bb__empty__sub { margin: calc(-1 * var(--space-6)) 0 var(--space-8); font-size: var(--fs-md); color: var(--text-secondary); text-align: center; }
 
 /* --- The two ways in ---------------------------------------------------------
 
@@ -401,55 +403,160 @@
 /* Three on a new draft — template, Describe it, scratch — in a wider row, so
    each card keeps the room two had: about 277px at the builder's 1,056px
    content width, with the 180px picture inside the padding. */
-.bb__empty__inner.has-three { width: min(880px, 100%); }
+/* Wider for the gallery cards (owner, 2 Nov 2026: "make the card larger"). */
+.bb__empty__inner.has-three { width: min(1040px, 100%); }
 .bb__starts.has-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.bb__starts.has-three .bb__start2 { padding-left: var(--space-5); padding-right: var(--space-5); }
+.bb__starts.has-three .bb__start2 { padding: 0; }
+/* Unclipped, so the tab can sit over the card's own edge (the cut-out below); the stage rounds its own top corners. */
 .bb__start2 {
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
-  padding: var(--space-8) var(--space-7);
+  position: relative;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0;
+  padding: 0;
   border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
   background: var(--surface-raised);
   box-shadow: var(--el-low);
-  text-align: center; cursor: pointer;
+  text-align: left; cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard);
 }
-.bb__start2:hover { border-color: var(--brand); box-shadow: var(--el-mid); transform: translateY(-2px); }
+/* A colour per way to start (owner, 2 Nov 2026: "three different hover colours for three use cases"): the accent
+   violet for Xecurify's templates, the info blue of the Your organization pill for reusing a policy, the brand for a
+   fresh start (the owner swapped the first and the last; green was tried for scratch first). The border and the lit part of the picture take the strong shade; the stage behind the picture washes
+   between the two soft ones. A card with none keeps the brand. */
+/* The set made for these cards (tokens.css `--start-*`), retro: terracotta for the template, faded teal for reuse,
+   mustard ochre for a fresh start. A card with none takes the template's. */
+.bb__start2 { --start-hover: var(--start-template); --start-wash: var(--start-template-wash); --start-wash-2: var(--start-template-wash-2); }
+.bb__start2.is-reuse { --start-hover: var(--start-reuse); --start-wash: var(--start-reuse-wash); --start-wash-2: var(--start-reuse-wash-2); }
+.bb__start2.is-scratch { --start-hover: var(--start-scratch); --start-wash: var(--start-scratch-wash); --start-wash-2: var(--start-scratch-wash-2); }
+/* No lift and no coloured edge (owner, 2 Nov 2026: "subtle and silent"; "remove the hover border … the shadow can be there
+   to elevate"): the shadow raises the card, and the stage's wash says which. */
+.bb__start2:hover { box-shadow: var(--el-mid); }
+/* The stage: the picture's own panel at the top of the card, grey at rest. On hover only the stage takes the card's
+   colour, a soft wash that drifts between two shades (owner, 2 Nov 2026: "an animated colour background for each card,
+   not the full card but the part where we add the SVG"). The wash is a layer under the picture that fades in, then
+   drifts, so the colour arrives rather than snaps. Whose the rules are rides in its top-right corner as a pill:
+   Xecurify's grey, its logo is the colour; the tenant's own info blue. Both are tags, not choices. */
+/* The stage, flush with the card's top edge: the card's soft colour with a fine dot texture at rest, the picture centred
+   in it (owner, same day: "make the SVGs centre aligned"). */
+.bb__start2__stage {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: grid; place-items: center;
+  height: 208px;
+  background-color: var(--start-wash);
+  background-image: radial-gradient(circle, var(--start-wash-2) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius-xl) - 1px) calc(var(--radius-xl) - 1px) 0 0;
+}
+.bb__start2__stage::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(120deg, var(--start-wash) 0%, var(--start-wash-2) 50%, var(--start-wash) 100%);
+  background-size: 220% 220%;
+  opacity: 0;
+  transition: opacity 0.32s var(--ease-standard);
+}
+.bb__start2:hover .bb__start2__stage::before,
+.bb__start2:focus-visible .bb__start2__stage::before { opacity: 1; }
+/* The frame every picture is drawn in (owner, 2 Nov 2026: "an invisible section"): 264 by 176, the same box in all three
+   stages, and narrower with the card on a tight row rather than cropped. */
+.bb__start2__stage .bb__start2__art { width: min(264px, 100%); height: auto; aspect-ratio: 264 / 176; margin: 0; }
+/* Whose the rules are, as a tab cut out of the card's top-right corner (owner, 2 Nov 2026: "the same cut-out as the
+   template card … remove the white part and make it feel part of the canvas"). It sits 1px over the card's edge in the
+   board's own ground (`--bb-stage`), so the card's border stops where it begins and the card looks notched; two inverted
+   curves of the same ground join it to the edges it interrupts. The board's dots do not run through it: at this size
+   the plain ground reads as the same surface. Its words take the card's strong shade on hover; its icon always has. */
+.bb__start2__tab {
+  --tab-r: var(--radius-lg);
+  position: absolute; top: -1px; right: -1px; z-index: 2;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-5);
+  background: var(--bb-stage);
+  border-bottom-left-radius: var(--tab-r);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); line-height: 1.2; color: var(--text-secondary);
+  white-space: nowrap;
+  transition: color 0.24s var(--ease-standard);
+}
+.bb__start2__tab::before,
+.bb__start2__tab::after {
+  content: ''; position: absolute; width: var(--tab-r); height: var(--tab-r); pointer-events: none;
+  background: radial-gradient(circle at 0 100%, transparent calc(var(--tab-r) - 0.5px), var(--bb-stage) var(--tab-r));
+}
+.bb__start2__tab::before { top: 0; left: calc(-1 * var(--tab-r)); }
+.bb__start2__tab::after { right: 0; bottom: calc(-1 * var(--tab-r)); }
+.bb__start2__tab svg, .bb__start2__tab img { flex: none; }
+.bb__start2__tab svg { color: var(--start-hover); }
+.bb__start2:hover .bb__start2__tab,
+.bb__start2:focus-visible .bb__start2__tab { color: var(--start-hover); }
+/* Beneath the stage: the card's icon on a tile in its colour, then the heading and its line. */
+.bb__start2__foot { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-6); min-width: 0; }
+.bb__start2__icon {
+  flex: none; display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: var(--radius-lg);
+  background: var(--start-wash); color: var(--start-hover);
+  border: 1px solid var(--start-wash-2);
+}
+.bb__start2__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bb__start2__text strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Top right of the stage (owner, same day: "move the pills here"), clear of the picture's top-left panel. */
 .bb__start2:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__start2 strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
 /* One line each, and short enough to stay one at every width the two cards are
    drawn at. Both captions ran to two lines under a 30ch cap, which put four
    lines of grey under two pictures and made the pair read as documentation
    rather than as a choice. */
-.bb__start2 > span:last-child {
+.bb__start2__text > span {
   font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
-  white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* --- The illustrations, and their hover ---------------------------------------
 
-   See BoardEmpty.tsx for what the two panels draw. Here is only how they move,
-   and there is very little of it on purpose.
-
-   Five earlier passes had more: a deck fanning, a page ruling itself, a wave
-   travelling through a pixel grid in evaluation order, a sign-in falling down a
-   line and lighting the rule that caught it. The last was the most truthful
-   thing on the screen and the least useful — an animation somebody has to stop
-   and read, on the one screen where nobody should have to stop.
-
-   What is left is one lift, one small slide of the panel behind, and one
-   colour. Everything is grey until the pointer arrives; then the brand appears
-   on exactly the thing the card is offering — the first rule of the stack, or
-   the empty slot — and nothing else changes. */
+   See BoardEmpty.tsx for what each picture draws and how it plays; Motion moves them. Here is only the paint: white
+   sheets over a shadow in the card's wash, grey words, the card's colour on its mark, and on hover on the parts each
+   picture is about (the outcomes, the rules on the move, the empty place). The older rules after these are Describe
+   it's two panels. */
 .bb__start2__art {
   width: 180px; height: 120px;
   margin-bottom: var(--space-4);
   overflow: visible;
 }
 
+.bb__ill__sheet { fill: var(--surface-raised); stroke: var(--border-subtle); stroke-width: 1; }
+.bb__ill__shade { fill: var(--start-wash-2); }
+.bb__ill__rule { fill: none; stroke: var(--border-subtle); stroke-width: 1; }
+.bb__ill__text { fill: var(--border-strong); opacity: 0.4; }
+.bb__ill__text.is-lit { fill: var(--start-hover); opacity: 0.55; }
+.bb__ill__mark { fill: var(--start-hover); }
+.bb__ill__mark.is-muted { fill: var(--border-strong); opacity: 0.45; }
+.bb__ill__chip { fill: var(--border-strong); opacity: 0.16; }
+.bb__ill__chip.is-lit { fill: var(--start-hover); opacity: 1; }
+.bb__ill__row { fill: var(--surface-sunken); stroke: var(--border-subtle); stroke-width: 1; }
+.bb__ill__row.is-lit { fill: var(--start-wash); stroke: var(--start-hover); }
+/* The template: the sheet behind, a step lighter, and the template's own blocks in the card's soft colour; the header
+   block takes the strong one on hover. */
+.bb__ill__sheet.is-back { opacity: 0.7; }
+.bb__ill__block { fill: var(--start-wash); stroke: var(--start-wash-2); stroke-width: 1; }
+.bb__ill__block.is-lead { fill: var(--start-wash-2); }
+/* Scratch: the empty place fills with the card's soft colour on hover, and its plus turns solid. */
+.bb__ill__slot.is-place { fill: var(--surface-raised); }
+.bb__ill__disc { fill: var(--start-wash); stroke: var(--start-wash-2); stroke-width: 1; }
+.bb__ill__block,
+.bb__ill__slot.is-place,
+.bb__ill__disc { transition: fill 0.24s var(--ease-standard), stroke 0.24s var(--ease-standard); }
+.bb__start2:is(:hover, :focus-visible) .bb__ill__block.is-lead { fill: var(--start-hover); stroke: var(--start-hover); }
+.bb__start2:is(:hover, :focus-visible) .bb__ill__slot.is-place { fill: var(--start-wash); }
+.bb__start2:is(:hover, :focus-visible) .bb__ill__disc { fill: var(--start-hover); stroke: var(--start-hover); }
+.bb__start2:is(:hover, :focus-visible) .bb__ill__plus.is-on-disc { stroke: var(--surface-raised); }
+.bb__ill__badge { fill: var(--surface-raised); stroke: var(--start-wash-2); stroke-width: 1.25; }
+.bb__ill__arrow { fill: none; stroke: var(--start-hover); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.bb__ill__badge,
+.bb__ill__arrow { transition: fill 0.24s var(--ease-standard), stroke 0.24s var(--ease-standard); }
+.bb__start2:is(:hover, :focus-visible) .bb__ill__badge { fill: var(--start-hover); stroke: var(--start-hover); }
+.bb__start2:is(:hover, :focus-visible) .bb__ill__arrow { stroke: var(--surface-raised); }
+
+/* Describe it's two panels. */
 .bb__ill__panel { fill: var(--surface-raised); stroke: var(--border-subtle); stroke-width: 1.25; }
 .bb__ill__bar { stroke: var(--border-subtle); stroke-width: 1.25; fill: none; }
-.bb__ill__split { stroke: var(--border-subtle); stroke-width: 1.25; fill: none; }
 .bb__ill__line { fill: var(--border-strong); opacity: 0.3; transition: fill 0.22s var(--ease-standard), opacity 0.22s var(--ease-standard); }
 .bb__ill__line.is-lead { opacity: 0.45; }
 .bb__ill__line.is-small { opacity: 0.22; }
@@ -462,9 +569,9 @@
 /* `--brand`, the orange — not `--accent`, which is slate in the classic look and
    blue in the rebrand, so "hover brings the brand" rendered grey (owner, 21 Sep
    2026: "this should be orange, the hover state"). */
-.bb__start2:hover .bb__ill__line.is-lead { fill: var(--brand); opacity: 1; }
-.bb__start2:hover .bb__ill__slot,
-.bb__start2:hover .bb__ill__plus { stroke: var(--brand); opacity: 1; }
+.bb__start2:hover .bb__ill__line.is-lead { fill: var(--start-hover, var(--brand)); opacity: 1; }
+.bb__start2:is(:hover, :focus-visible) .bb__ill__slot,
+.bb__start2:is(:hover, :focus-visible) .bb__ill__plus { stroke: var(--start-hover, var(--brand)); opacity: 1; }
 
 /* One lift, and the panel behind slides a little further out from under it —
    the only movement in either picture, and the only one a deck has. */
@@ -489,6 +596,9 @@
    than one that says it without moving. */
 @media (prefers-reduced-motion: reduce) {
   .bb__ill__back, .bb__ill__front { transition: none; }
+  /* The wash still comes, without the drift. */
+  .bb__start2:hover .bb__start2__stage::before,
+  .bb__start2:focus-visible .bb__start2__stage::before { animation: none; }
   .bb__start2:hover .bb__ill__front,
   .bb__start2:hover .bb__ill__back { transform: none; }
 }

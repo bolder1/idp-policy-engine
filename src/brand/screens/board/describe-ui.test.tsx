@@ -58,7 +58,9 @@ const noop = () => {}
 const all = (out: string, re: RegExp) => [...out.matchAll(re)].map((m) => text(m[1]))
 
 /* The chooser's cards, by their titles, in the order drawn. */
-const starts = (out: string) => [...out.matchAll(/<button type="button" class="bb__start2"[\s\S]*?<strong>([^<]+)<\/strong>/g)].map((m) => m[1])
+/* Each card is a `bb__start2` button with a colour class of its own (is-template, is-reuse, is-scratch), its heading the
+   first <strong> inside it. */
+const starts = (out: string) => [...out.matchAll(/<button type="button" class="bb__start2[^"]*"[\s\S]*?<strong>([^<]+)<\/strong>/g)].map((m) => m[1])
 const chooser = (p: Policy, on = true) =>
   html(<BoardEmpty fallback="deny" onUseTemplate={noop} onDescribe={describeOffered(on, p) ? noop : undefined} onScratch={noop} />)
 
@@ -128,7 +130,7 @@ describe('the door', () => {
 
   it('is a third card, between the template and scratch, on a new draft', () => {
     const out = chooser(draft)
-    expect(starts(out)).toEqual(['Use a template', 'Describe it', 'Start from scratch'])
+    expect(starts(out)).toEqual(['Use a Xecurify template', 'Describe it', 'Start from scratch'])
     expect(text(out)).toContain('Describe it Type it or answer questions')
     expect(out).toContain('aria-label="A policy written from a sentence"')
     expect(out).toContain('bb__starts has-three')
@@ -136,11 +138,11 @@ describe('the door', () => {
 
   it('is not offered once the policy is live, nor on a system policy, nor with the flag off', () => {
     expect(live.status).not.toBe('draft')
-    expect(starts(chooser(live))).toEqual(['Use a template', 'Start from scratch'])
+    expect(starts(chooser(live))).toEqual(['Use a Xecurify template', 'Start from scratch'])
     expect(chooser(live)).not.toContain('has-three')
     expect(describeOffered(true, { ...draft, isSystem: true })).toBe(false)
     expect(describeOffered(true, { ...draft, type: 'Admin Access' as Policy['type'] })).toBe(false)
-    expect(starts(chooser(draft, false))).toEqual(['Use a template', 'Start from scratch'])
+    expect(starts(chooser(draft, false))).toEqual(['Use a Xecurify template', 'Start from scratch'])
   })
 })
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AppWindow, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { Button, IconButton, SearchBox } from '../kit'
@@ -62,12 +62,6 @@ export function Applications() {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'name', dir: 1 })
   /** Which application's protection panel is open. Null is closed. */
   const [panelFor, setPanelFor] = useState<string | null>(null)
-  /** The policy the panel just made, so the panel can mark its arrival. Cleared when the panel changes. */
-  const [added, setAdded] = useState<string | null>(null)
-
-  useEffect(() => {
-    setAdded(null)
-  }, [panelFor])
 
   /* With the directory, so a policy bound to named people is asked about them. */
   const summaries = useMemo(() => {
@@ -207,18 +201,7 @@ export function Applications() {
         </>
       )}
 
-      {/* Naming a new policy is a page inside the panel, not a dialog over it. */}
-      <AppProtection
-        appId={panelFor}
-        justAdded={added}
-        onClose={() => setPanelFor(null)}
-        onCreate={(policy) => {
-          const id = store.addPolicy(policy)
-          const app = store.apps.find((a) => a.id === policy.appIds[0])
-          store.showToast(app ? `${policy.name} created as a draft on ${app.name}.` : `${policy.name} created as a draft.`)
-          setAdded(id)
-        }}
-      />
+      <AppProtection appId={panelFor} onClose={() => setPanelFor(null)} />
     </div>
   )
 }

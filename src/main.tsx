@@ -68,6 +68,8 @@ import './brand/screens/applications.css'
 // Users, User roles and Groups, and the user cell an application's Users tab shares.
 import './brand/screens/directory.css'
 import './brand/create/create.css'
+// Copy rules from a policy: opened from the builder, and from New policy on any screen.
+import './brand/screens/board/copy-rules.css'
 import './brand/screens/board/describe.css'
 // Policy testing: the panel a sentence token, Save sign-in or What they see hangs open.
 import './brand/screens/testing/anchored-popover.css'

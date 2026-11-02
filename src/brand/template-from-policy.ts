@@ -34,6 +34,33 @@ const sentenceCase = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
    Monday said "You · Just now" for ever (it is the line under a tenant template's name, `scenarioCard`). */
 export const savedOn = (now: number): string => new Date(now).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
+/* A Xecurify template added to this tenant's own (30 Oct 2026: the store, treated like the Figma Community, where
+   "Open in Figma" puts a copy in your drafts). The copy is the tenant's: it can be deleted, and a later change to the
+   shipped one does not reach it. It keeps the rules, the audience, the words and the category, and drops what was
+   Xecurify's to say about it (the review stamp, the curation badge). The name is kept as it is, because a policy made
+   from it takes that name; where it came from is `addedFrom`. */
+export function scenarioFromStore(s: Scenario, now: number = Date.now()): Scenario {
+  seq += 1
+  return {
+    id: `s-own-${now.toString(36)}-${seq}`,
+    name: s.name,
+    description: s.description,
+    category: s.category,
+    tag: s.tag,
+    provided: undefined,
+    author: 'You',
+    when: savedOn(now),
+    addedFrom: s.id,
+    audience: { ...s.audience, groupIds: [...s.audience.groupIds], userIds: [...s.audience.userIds] },
+    rules: s.rules.map((r) => ({ ...r })),
+  }
+}
+
+/** The shipped templates this tenant has a copy of, by the shipped template's id. */
+export function addedFromStore(scenarios: readonly Scenario[]): Set<string> {
+  return new Set(scenarios.flatMap((s) => (!s.provided && s.addedFrom ? [s.addedFrom] : [])))
+}
+
 export function scenarioFromPolicy(
   policy: Policy,
   fields: TemplateFields,

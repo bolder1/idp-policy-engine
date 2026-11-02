@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Shell } from '../Shell'
 import { BrandProvider } from '../store'
+import { TEMPLATES_MANAGED } from '../template-phase'
 import { Policies } from './Policies'
 import { SignInTests } from './SignInTests'
 import { TestingSessionProvider } from './testing/session'
@@ -40,7 +41,7 @@ describe('Sign-in tests — out of the rail', () => {
   it('has no rail item, so the Policies submenu goes All Policies → Templates', () => {
     expect(shellSrc).not.toContain("label: 'Sign-in tests'")
     const all = shellSrc.indexOf("{ label: 'All Policies', screen: { name: 'policies' } }")
-    const templates = shellSrc.indexOf("{ label: 'Templates'")
+    const templates = shellSrc.indexOf("label: 'Templates'")
     expect(all).toBeGreaterThan(-1)
     expect(shellSrc.slice(all, templates)).not.toContain("name: 'sign-in-tests'")
   })
@@ -62,7 +63,9 @@ describe('Sign-in tests — out of the rail', () => {
     const sub = [...out.matchAll(/class="bshell__subitem[^"]*"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1]))
     expect(sub[0]).toBe('All Policies')
     expect(sub).not.toContain('Sign-in tests')
-    expect(sub).toContain('Templates')
+    /* Templates is on hold (template-phase.ts): in the rail only while the tenant manages templates. */
+    if (TEMPLATES_MANAGED) expect(sub).toContain('Templates')
+    else expect(sub).not.toContain('Templates')
   })
 })
 

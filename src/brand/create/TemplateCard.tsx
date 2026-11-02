@@ -1,6 +1,6 @@
 import {
+  Check,
   Clock,
-  Eye,
   Fingerprint,
   Globe,
   ListFilter,
@@ -11,6 +11,7 @@ import {
   Users,
   Webhook,
 } from 'lucide-react'
+import { useState } from 'react'
 
 import { Badge, Button, DecisionChip, Modal, RowMenu } from '../kit'
 import { conditionType, type AccessDecision, type Rule, type Scenario } from '../data'
@@ -19,6 +20,9 @@ import { narrowToAudience, withoutMissing, type TemplateLibrary, type TemplateNe
 import { whoSentence } from '../screens/predicate-prose'
 import { hasWho, type WhoDirectory } from '../rule-who'
 import { SHOWCASE } from '../showcase'
+import { CARD_PICTURES } from '../template-phase'
+import { CardPicture } from './CardPicture'
+import { AppLogo } from '../logos/AppLogo'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -34,9 +38,9 @@ import { SHOWCASE } from '../showcase'
    at a glance across a grid, which is exactly the case a Figma file thumbnail is
    built for.
 
-   Colour survives in one place only: the decision. Green, amber and red are
-   reserved for Allow, MFA and Deny across the whole product, and nothing on this
-   card competes with them any more.
+   Green and red stay reserved for the decisions, on the white rows. Since 2 Nov
+   2026 the canvas behind them takes the shelf's retro colour, the builder's start
+   cards' look (tokens.css `--tpl-*`), and the shelf names itself in a corner tab.
 
    The thumbnail is inert on purpose. It briefly had hoverable rows that read
    their condition into a strip below, which put a second interactive layer
@@ -72,11 +76,18 @@ export interface CardModel {
      caller at compile time for no gain. The hue map falls back to neutral for
      anything it does not recognise. */
   category?: string
+  /** The type of a card with no category, as a shelf's key: a tenant's own policy, in the reuse picker, takes the shelf its
+      rules are most like (TemplateSheet `policyKind`), and with it that shelf's colour and picture. */
+  tone?: string
   meta: string
+  /** The applications a tenant's own policy is on (the reuse picker), drawn as logos under its name. */
+  apps?: { id: string; name: string }[]
   /** Rules left out because they apply to nobody. Their rows are not in `rules`. */
   dropped?: string[]
   /** Library kinds the template names that this tenant does not have. */
   needs?: TemplateNeed[]
+  /** Where a tenant's own copy came from: "Xecurify templates", on one added from the store. */
+  from?: string
 }
 
 const NEED_LABEL: Record<TemplateNeed, string> = { zone: 'Needs a network zone', fingerprint: 'Needs a device profile' }
@@ -105,6 +116,30 @@ function CardNotes({ m }: { m: CardModel }) {
         </Badge>
       ))}
     </span>
+  )
+}
+
+/** A policy's applications: "Used by", then one logo with its name, or the logos alone (on the card and in its preview). */
+export function UsedBy({ apps }: { apps: { id: string; name: string }[] }) {
+  return (
+    <p className="bgcard__apps">
+      <span className="bgcard__appslabel">Used by</span>
+      {apps.length === 1 ? (
+        <span className="bgcard__app">
+          <AppLogo appId={apps[0].id} name={apps[0].name} size={18} />
+          <span>{apps[0].name}</span>
+        </span>
+      ) : (
+        <span className="bgcard__applogos">
+          {apps.slice(0, 6).map((a) => (
+            <span key={a.id} title={a.name}>
+              <AppLogo appId={a.id} name={a.name} size={18} />
+            </span>
+          ))}
+          {apps.length > 6 && <span className="bgcard__appsmore">+{apps.length - 6}</span>}
+        </span>
+      )}
+    </p>
   )
 }
 
@@ -186,7 +221,10 @@ const SIGNAL_TONE: Record<string, string> = {
    curation shelf has no condition group of its own to contradict.
 
    Anything unrecognised — the library's `'Uncategorized'` — falls to neutral
-   rather than picking a hue at random. */
+   rather than picking a hue at random.
+
+   2 Nov 2026: the four keys now name the retro set instead (owner: "same retro
+   colour family"): terracotta, faded teal, ochre and plum, in that order. */
 const CAT_KEY: Record<string, string> = {
   'Quick Protection': 'quick',
   'Device-based': 'device',
@@ -224,6 +262,7 @@ export function TemplateCard({
   onPreview,
   onDelete,
   useLabel = 'Use',
+  done,
   fallback = '1fa',
 }: {
   m: CardModel
@@ -233,18 +272,37 @@ export function TemplateCard({
   /** Only on this tenant's own templates, which it may take away; a template Xecurify ships has no menu. */
   onDelete?: () => void
   useLabel?: string
+  /** The store: what has been done with it already ("Added"), said where the button was. */
+  done?: string
   /** What the policy's own default decides. The template does not change it. */
   fallback?: AccessDecision
 }) {
   const shown = m.rules.slice(0, shownCount(m.rules.length))
   const rest = m.rules.length - shown.length
   const post = posture(m.rules)
+  /* One button where there were two (owner, 2 Nov 2026: "combine both … a single button for both, a big button in one
+     row"): the eye on the picture and Use beside the name were two doors to the same choice. It opens the preview, which
+     has the rules in full and the template's own Use. Once the store's card is added, it only previews. */
+  const offer = !done && !!onUse && m.rules.length > 0
+  const verb = offer ? `Preview and ${useLabel.toLowerCase()}` : 'Preview'
+  const hue = m.category ? catKey(m.category) : (m.tone ?? 'neutral')
+  /* The pointer or the keyboard on the card: its picture plays its use while it is. */
+  const [hot, setHot] = useState(false)
 
   return (
-    /* The category rides on the card as well as on the pill. No style reads it
-       since the sunrise went (22 Sep 2026): the hover is depth, not the pill's
-       hue. Kept so a card-level rule can take the hue without a markup change. */
-    <article className={`bgcard is-cat-${catKey(m.category ?? '')}`}>
+    /* The shelf's colour, on the whole card (owner, 2 Nov 2026: "make it colourful … same retro colour family"):
+       create.css reads it for the tab's words and the canvas's wash on hover ("simple as it used to be, and on hover add
+       this colour"). A card with no shelf takes its tone. */
+    <article
+      className={`bgcard is-cat-${hue}`}
+      onPointerEnter={() => setHot(true)}
+      onPointerLeave={() => setHot(false)}
+      onFocus={() => setHot(true)}
+      onBlur={() => setHot(false)}
+    >
+      {/* The shelf, cut out of the card's top-left corner (owner, 2 Nov 2026: "remove the border from this section so it
+          looks like a cut out"): on the card rather than in the canvas, so it can cover the card's own edge there. */}
+      {m.category && <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>}
       {/* The illustration is the live preview: the template's rules drawn as
           the builder would order them, plus the control that expands them.
 
@@ -256,32 +314,15 @@ export function TemplateCard({
           anybody is paying for. All it withheld was the ability to see what you
           were choosing, and it took the preview dialog with it, because the
           only control that opens the preview lives inside this block. */}
-      <div className="bgcard__canvas">
-        {/* The shelf this template is on, in the shelf's own colour.
-
-            Top-left of the thumbnail, mirroring the preview control top-right —
-            the canvas already reserves 32px there, and its comment has called
-            that "room for the badge" since before there was anything to put in
-            it.
-
-            NOT in `.bgcard__tags` with the other metadata: that row and
-            `.bgcard__signals` are both `display: none` on request, because
-            eight chips above a card's name made it lead with its taxonomy. One
-            chip, on the picture rather than over the name, is the version of
-            that idea somebody actually asked for. */}
-        {m.category && (
-          <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>
-        )}
-        <button
-          type="button"
-          className="bgcard__peek"
-          onClick={onPreview}
-          aria-label={`Preview the rules in ${m.name}`}
-          title="Preview rules"
-        >
-          <Eye size={13} strokeWidth={1.9} aria-hidden />
-        </button>
-
+      {/* The picture and the words, in a column, or side by side once the card is wide (create.css, a container query):
+          a card alone in its row (owner, 2 Nov 2026: "auto adaptable … single, double or max 3 in a row"). */}
+      <div className="bgcard__in">
+      <div className={`bgcard__canvas${CARD_PICTURES ? ' is-picture' : ''}`}>
+        {/* A generic picture of the shelf (template-phase.ts `CARD_PICTURES`); the template's rules are in the preview. */}
+        {CARD_PICTURES ? (
+          <CardPicture hue={hue} hot={hot} />
+        ) : (
+        <>
         {/* The thumbnail: the rule stack as the builder draws it, in order. */}
         <ol className="bgcard__stack">
           {shown.map((r, i) => (
@@ -330,6 +371,8 @@ export function TemplateCard({
           </span>
           <span className="bgcard__rtext">strictest outcome is {POSTURE_WORD[post]}</span>
         </p>
+        </>
+        )}
       </div>
 
       <div className="bgcard__body">
@@ -346,24 +389,11 @@ export function TemplateCard({
           </span>
         </span>
 
-        {/* The name, and the card's one action at the end of its line.
-
-            The footer strip that held this button went 21 Sep 2026 (owner: "I
-            don't like the position of the Use button"): a 54px row with its own
-            hairline, holding one button, left-aligned only because the review
-            line that once sat opposite it had been removed. The buttons still
-            line up across a grid row, because the thumbnail is a fixed 212px
-            and the name is one line. The name is truncated, so it keeps its
-            title; the button's name says which template it uses. */}
+        {/* The name, truncated, so it keeps its title. */}
         <div className="bgcard__head">
           <h3 className="bgcard__h" title={m.name}>
             {m.name}
           </h3>
-          {onUse && m.rules.length > 0 && (
-            <button type="button" className="bgcard__cta" onClick={onUse} aria-label={`${useLabel} ${m.name}`}>
-              {useLabel}
-            </button>
-          )}
           {/* The template's own door to being taken away (owner, 27 Oct 2026: the template audit). A tenant could save
               one and never remove it. Only its own; the confirm is the shared one. */}
           {onDelete && (
@@ -374,10 +404,26 @@ export function TemplateCard({
             />
           )}
         </div>
-        <p className="bgcard__sub">{m.description}</p>
+        {/* A policy's applications as their logos (owner, 2 Nov 2026: "showcase logos here … for a single one, logo with
+            name; more than one, logos only"), after "Used by", the console's word for what a thing is on. A policy on
+            none keeps its line of words. */}
+        {m.apps && m.apps.length > 0 ? <UsedBy apps={m.apps} /> : <p className="bgcard__sub">{m.description}</p>}
         <CardNotes m={m} />
+        {/* The card's one button, the width of the card, on the card's floor so a grid row's buttons line up. Its name
+            says which template it opens. */}
+        <div className="bgcard__go">
+          {done && (
+            <span className="bgcard__done">
+              <Check size={14} strokeWidth={2.2} aria-hidden />
+              {done}
+            </span>
+          )}
+          <button type="button" className={`bgcard__cta${offer ? '' : ' is-quiet'}`} onClick={onPreview} aria-label={`${verb} ${m.name}`}>
+            {verb}
+          </button>
+        </div>
       </div>
-
+      </div>
     </article>
   )
 }
@@ -443,6 +489,12 @@ export function TemplatePreview({
               <dt>Strictest outcome</dt>
               <dd>{POSTURE_WORD[posture(m.rules)]}</dd>
             </div>
+            {m.from && (
+              <div>
+                <dt>From</dt>
+                <dd>{m.from}</dd>
+              </div>
+            )}
           </dl>
 
           {(m.dropped?.length ?? 0) > 0 && (
@@ -584,5 +636,6 @@ export function scenarioCard(s: Scenario, directory?: WhoDirectory, library?: Te
     rules: kept.map(({ spec, rule }) => cardRule(spec, rule)),
     dropped,
     needs,
+    from: !s.provided && s.addedFrom ? 'Xecurify templates' : undefined,
   }
 }

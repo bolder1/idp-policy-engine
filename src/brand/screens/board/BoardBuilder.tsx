@@ -8,7 +8,7 @@ import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type 
 import { dictionaryOf, type AnswerKey, type DescribeTenant, type RuleIds } from '../../create/describe-model'
 import { checksView, withChecks, type CheckContext } from '../../create/describe-checks'
 import { guardSignIns } from '../../draft-checks'
-import { commitToast, committed, differsFromLive, hasUnsavedChanges, openForEditing, type CommitIntent, type RuleSet } from '../../policy-draft'
+import { NO_RULES_REASON, UNNAMED_REASON, commitToast, committed, differsFromLive, hasNoRules, hasUnsavedChanges, isUntitled, openForEditing, type CommitIntent, type RuleSet } from '../../policy-draft'
 import { useBrand, useNameLookup } from '../../store'
 import { playCue } from '../../sound'
 import { TemplateSheet } from '../../create/TemplateSheet'
@@ -17,12 +17,13 @@ import { CommandBar, type Cmd } from '../command-bar'
 import { BoardBar, BoardBarActions } from './BoardBar'
 import { SHOWCASE } from '../../showcase'
 import { BoardEmpty } from './BoardEmpty'
-import { buildTemplate, templateBlocker } from './apply-template'
+import { buildTemplate, productNamed, templateBlocker, templateGaps, templateName } from './apply-template'
 import { arrivalKey, firstArrival, landFix, type ArriveFix } from './arrive-fix'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { afterPaint, guardOpens, isStale, overridePatch, patchSignIns, tryRunGuard, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from '../guard'
 import { GuardDrawer } from '../guard-page'
-import { canSaveAsTemplate, offersMonitorAfterSave, portalRoot, statusToast, monitorOffered } from '../status-options'
+import { canSaveAsTemplate, offersMonitorAfterSave, offersTurnOnAfterSave, portalRoot, statusToast, monitorOffered } from '../status-options'
+import { toastDuration } from '../../toast-tone'
 import { useSaveAsTemplate } from '../save-template'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, revertTo, undo, type History } from '../history'
 import { useSimEnv } from '../sim-env'
@@ -33,7 +34,10 @@ import { DOCK_TAB_LABEL } from '../testing/test-dock'
 import { ACCESS_CHECK } from '../sign-in-tests/names'
 import type { SignInFacts } from '../sign-in-facts'
 import { Board } from './Board'
-import { BAR_DEMO, BAR_TEMPLATE, BAR_TOUR, RULE_ON_OFF } from './bar-tools'
+import { BAR_COPY_RULES, BAR_DEMO, BAR_TEMPLATE, BAR_TOUR, COPY_RULES, PICKER_LOOK, RULE_ON_OFF, TEMPLATE_PICKER } from './bar-tools'
+import { copiedRules, copyableRules, copySources, rulesSaid } from './copy-rules'
+import { RulePickerSlider } from './RulePicker'
+import type { PickFrom } from './use-rule-picker'
 import { useShows } from './builder-version'
 import { PolicyNotice } from './PolicyNotice'
 import { DescribePanel } from './DescribePanel'
@@ -222,7 +226,9 @@ export function BoardBuilder({
 
      Sticky for the visit, so deleting or undoing back to no rules keeps the
      canvas rather than throwing the chooser back up mid-edit. */
-  const [scratch, setScratch] = useState(false)
+  /* A new policy has answered this already, in the New policy slider, so it starts on the canvas. One opened with no
+     form (`choose`) asks here instead, on the three cards: Use template, Use existing policy, Start from scratch. */
+  const [scratch, setScratch] = useState(() => !!saved?.provisional && !saved.provisional.choose)
   /* Describe it (describe spec, §3): the panel is open in the inspector's
      slot. What it holds — the box, the reading, the answers and the choices —
      lives here for the visit, so the Describe it card reopens on them after
@@ -249,6 +255,11 @@ export function BoardBuilder({
     describedName.current = null
     return n && current === n.to ? n.from : current
   }
+  /* The same for a template (29 Oct 2026): the names templates gave on this visit, and the name each history entry
+     either side of an apply stands for, so Undo past a template gives "Untitled policy" back and Redo the template's
+     again — only while the policy still carries a name the product gave (`productNamed`), so one typed since stays. */
+  const templateGiven = useRef(new Set<string>())
+  const templateNames = useRef(new WeakMap<Policy, string>())
   /* Every card id a reading has written on this visit (`describedDraft`). A
      rule not in it was added by hand, and a panel write never takes it away. */
   const describeWritten = useRef(new Set<string>())
@@ -378,6 +389,29 @@ export function BoardBuilder({
   const [picking, setPicking] = useState(false)
   /* The other direction: this policy saved as a template (the bar's ⋯). */
   const saveTemplate = useSaveAsTemplate()
+  /* Copy from a policy or Use a template, open as a slider (RulePicker.tsx). It writes through `commitDraft` too. */
+  const [pickFrom, setPickFrom] = useState<PickFrom | null>(null)
+  /* The store's cards, centred or in a slider, or the list (bar-tools.ts `PICKER_LOOK`). */
+  const cardLook = PICKER_LOOK !== 'list'
+  /* The gallery's own door: open as Use existing policy, or as templates. */
+  const [galleryPolicies, setGalleryPolicies] = useState(false)
+  const openPicker = (from: PickFrom) => {
+    if (!cardLook) return setPickFrom(from)
+    setGalleryPolicies(from === 'policy')
+    setPicking(true)
+  }
+  /* Turn on, on the toast after a first save (29 Oct 2026): pressed, it counts up and the status pill asks for the
+     switch (`turnOnAsk` to StatusControl). `turnOnOffered` is when that toast went up; leaving the board inside its life
+     takes the toast with it, because its button asks through the pill and the pill is gone with the board. */
+  const [turnOnAsk, setTurnOnAsk] = useState(0)
+  const turnOnOffered = useRef(0)
+  const dismissToast = store.dismissToast
+  useEffect(
+    () => () => {
+      if (Date.now() - turnOnOffered.current < toastDuration(true)) dismissToast()
+    },
+    [dismissToast],
+  )
   /* The guided demo — see src/brand/tour/board-tour.ts. */
   const [tour, setTour] = useState(false)
   /* And the recording, which is NOT inside the tour.
@@ -565,6 +599,8 @@ export function BoardBuilder({
      sign-in policy with a rule on the canvas (`canSaveAsTemplate`). */
   const onCanvas: Policy = { ...draft, pendingDraft: undefined }
   const templateFromCanvas = BAR_TEMPLATE && canSaveAsTemplate(onCanvas)
+  /* Not for a post sign-in policy, like the template doors beside it. */
+  const copyOffered = COPY_RULES && !post && copySources(store.policies, draft).length > 0
   /* A save or a Turn on refused for a rule or the last row with no action:
      the reason stands under that card's Then until it is answered, and moves
      to the next one left (post-board.ts `issueTarget`). */
@@ -622,7 +658,7 @@ export function BoardBuilder({
      the toolbar Undo used to sit disabled and the template catalogue was gone
      for the rest of the visit. The old scratch inserted a rule, and one Undo
      brought the chooser back; this keeps that way home. */
-  const backToChooser = scratch && present.rules.length === 0 && !canUndo(hist)
+  const backToChooser = scratch && !saved?.provisional && present.rules.length === 0 && !canUndo(hist)
   /* Through `moveHistory` (below), which brings Describe it's thread along. */
   const undoStep = () => (backToChooser ? setScratch(false) : moveHistory(undo(histNow.current)))
   const redoStep = () => moveHistory(redo(histNow.current))
@@ -740,6 +776,13 @@ export function BoardBuilder({
      the publish gate. */
   /* Applications Guided setup chose and nothing has saved yet count as an edit, as its rules do. */
   const unsaved = !!saved && (hasUnsavedChanges(saved, draft) || !!pending)
+  /* A policy needs a rule to be saved at all (owner, 2 Nov 2026: no empty policies), and a new one opened with no form
+     needs a name of its own too. The reason is on the buttons and in the leave dialog. */
+  const noRules = hasNoRules(draft)
+  const unnamed = !!saved?.provisional && isUntitled((store.policyById(saved.id) ?? saved).name)
+  const stop = noRules ? NO_RULES_REASON : unnamed ? UNNAMED_REASON : null
+  /* A new policy with no rule has nothing to lose: going back just drops it, with nothing asked. */
+  const toLose = unsaved && !(saved?.provisional && noRules)
   const live = !!saved && (differsFromLive(saved, draft) || !!pending)
   const toPublish = live || saved?.status === 'draft'
   const hasDraft = !!saved?.pendingDraft
@@ -755,6 +798,10 @@ export function BoardBuilder({
      saved before Done kept the rules and lost who they are for. */
   const saveDraft = () => {
     if (!saved) return false
+    if (stop) {
+      store.showToast(stop)
+      return false
+    }
     const latest = store.policyById(saved.id) ?? saved
     const facts = saveFacts(latest)
     /* Applications Guided setup chose are a standing fact, not a rule: a saved draft holds rules only, so they are
@@ -821,7 +868,7 @@ export function BoardBuilder({
   /* The draft lives in this component, so leaving the board would destroy it.
      Every way out asks first, and Save as draft keeps the work without
      publishing it. */
-  useLeaveGuard({ dirty: unsaved, save: saveDraft, saveLabel: 'Save as draft' })
+  useLeaveGuard({ dirty: toLose, save: saveDraft, saveLabel: 'Save as draft', blocked: stop })
 
   /* The rehearsal that was re-walked here on every draft is Check access's
      run now, which reads the draft directly (TryJourney `policy`). */
@@ -1088,6 +1135,7 @@ export function BoardBuilder({
      `keep-off` because turning a draft on was the dialog's other button, and
      that lives on the status pill beside the name. */
   const saveNow = () => {
+    if (stop) return store.showToast(stop)
     if (!toPublish || saveBlocked) return
     /* A live post sign-in policy is never saved back to draft for a rule left
        without an action: the save is refused and the reason said under it
@@ -1516,6 +1564,17 @@ export function BoardBuilder({
   const duplicate = (i: number) =>
     insert(reidRule({ ...draft.rules[i], name: copyName(draft.rules[i].name, draft.rules.map((r) => r.name)) }), i + 1)
 
+  /* Rules from another policy, under the ones here, as one edit: Undo takes them all back, and nothing is saved until
+     Save policy. The panel lands on the first of them, as a template's does. */
+  const copyRules = (source: Policy, picked: Rule[]) => {
+    const copies = copiedRules(picked, draft.rules)
+    if (copies.length === 0) return
+    commitDraft({ ...draft, rules: [...draft.rules, ...copies] })
+    select(ruleAt(copies[0].id))
+    offerUndo(`${rulesSaid(copies.length)} copied from ${source.name}. Not saved yet.`)
+    focusSoon(byId(`bb-rule-${copies[0].id}-title`))
+  }
+
   /* A template, applied to a policy that already exists.
 
      One `commitDraft`, which is the whole point of routing it through here:
@@ -1544,6 +1603,9 @@ export function BoardBuilder({
      built rules (`buildTemplate`), so the condition reads "Choose…" and the
      blank-value check names it, rather than pointing at an id that never
      existed. A template with nothing to apply is refused, whatever the reason. */
+  /* A policy the product named takes the template's name, saved straight to the policy as the bar's rename is
+     (`templateName`; owner, 29 Oct 2026: one way in, so New policy → Use a template ends where the Templates page's
+     Use does). The entries either side of the apply keep the two names for Undo and Redo (`templateNames`). */
   const applyTemplate = (t: Scenario) => {
     const build = buildTemplate(t, store.users, { zones: store.zones, fingerprints: store.fingerprints })
     const blocked = templateBlocker(t, build)
@@ -1551,13 +1613,21 @@ export function BoardBuilder({
       store.showToast(blocked)
       return
     }
-    const { rules: built, dropped } = build
-    commitDraft({ ...draft, rules: built })
+    const built = build.rules
+    const before = histNow.current.present
+    const next = { ...draft, rules: built }
+    commitDraft(next)
+    const stored = store.policyById(saved.id) ?? saved
+    const others = store.policies.filter((p) => p.id !== stored.id).map((p) => p.name)
+    const name = templateName(stored.name, t.name, others, templateGiven.current)
+    if (name !== stored.name) {
+      store.savePolicy({ ...stored, name })
+      templateGiven.current.add(name)
+      templateNames.current.set(before, stored.name)
+      templateNames.current.set(next, name)
+    }
     select(ruleAt(built[0].id))
-    const d = dropped.length
-    const left = d > 0 ? ` ${d === 1 ? '1 rule' : `${d} rules`} left out.` : ''
-    const needs = build.needs.length > 0 ? ' Choose the missing zone or device profile.' : ''
-    store.showToast(`${t.name} applied. Not saved yet.${left}${needs}`)
+    store.showToast(`${t.name} applied. Not saved yet.${templateGaps(build)}`)
     focusSoon(byId(`bb-rule-${built[0].id}-title`))
   }
 
@@ -1986,6 +2056,10 @@ export function BoardBuilder({
     if (next === histNow.current) return
     histNow.current = next
     setHist(next)
+    /* Either side of a template's apply, the name that entry stands for (`templateNames`). */
+    const named = templateNames.current.get(next.present)
+    const stored = store.policyById(policyId)
+    if (named && stored && stored.name !== named && productNamed(stored.name, templateGiven.current)) store.savePolicy({ ...stored, name: named })
     const land = threadMarks.current.get(next.present)
     if (!land || land.thread === describeNow.current) return
     const p = store.policyById(policyId)
@@ -2079,6 +2153,10 @@ export function BoardBuilder({
        on screen. The first save leaves it off, and the toast offers the one
        step on. */
     const canMonitor = offersMonitorAfterSave(saved, next, { monitor: monitorOffered(store.features) })
+    /* Turn on takes the toast's one button where Monitor is not offered (29 Oct 2026: "Save policy" then the pill was a
+       long, quiet way to live). It opens the pill's own confirm, never a second one, and never writes the status itself. */
+    const canTurnOn = !canMonitor && offersTurnOnAfterSave(saved, next, { monitor: monitorOffered(store.features) })
+    turnOnOffered.current = canTurnOn ? Date.now() : 0
     store.showToast(
       commitToast(saved, next),
       canMonitor
@@ -2090,7 +2168,15 @@ export function BoardBuilder({
               store.showToast(text, undo ? { label: 'Undo', run: () => store.setPolicyStatus(next.id, undo) } : undefined)
             },
           }
-        : undefined,
+        : canTurnOn
+          ? {
+              label: 'Turn on',
+              run: () => {
+                turnOnOffered.current = 0
+                setTurnOnAsk((n) => n + 1)
+              },
+            }
+          : undefined,
     )
   }
   /* Before saving's actions. A ready fix is an ordinary edit to the draft —
@@ -2223,6 +2309,7 @@ export function BoardBuilder({
         }}
         onRevealRule={post ? revealIssue : revealRule}
         onOpenBreakIn={openBreakInPage}
+        turnOnAsk={turnOnAsk}
         onLearn={() => setTour(true)}
         onWatchDemo={BAR_DEMO ? () => setDemo(true) : undefined}
         actions={
@@ -2244,10 +2331,12 @@ export function BoardBuilder({
             onSaveDraft={saveDraft}
             onDiscard={discard}
             saveBlocked={saveBlocked}
+            stop={stop}
             checking={checking}
             post={post}
             onSave={saveNow}
             onSaveTemplate={templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
+            onCopyRules={BAR_COPY_RULES && copyOffered ? () => openPicker('policy') : undefined}
           />
         }
       />
@@ -2340,11 +2429,12 @@ export function BoardBuilder({
           fresh={saved.status === 'draft' && saved.rules.length === 0 && !canUndo(hist)}
           /* No line under the heading (owner, 19 Oct 2026: "remove all this, no need"): the default, Edit default and
              Undo are on the chain and the bar once there is a chain; BoardEmpty still draws them when given. */
-          onUseTemplate={() => setPicking(true)}
+          onUseTemplate={() => (TEMPLATE_PICKER || cardLook ? openPicker('template') : setPicking(true))}
           /* Describe it on a new draft only: it saves the audience straight to
              the policy, and a direct write to one that decides sign-ins would
              skip the checks before saving (describe spec, §2). */
           onDescribe={DESCRIBE_CARD && describeOffered(features.describePolicy, saved) ? openDescribe : undefined}
+          onCopyRules={copyOffered ? () => openPicker('policy') : undefined}
           onScratch={() => {
             /* The chooser goes and the empty chain comes up; focus lands on
                the one control on it that adds a rule. */
@@ -2704,8 +2794,21 @@ export function BoardBuilder({
         onClose={() => setPicking(false)}
         onChoose={applyTemplate}
         fallback={(draft.fallback ?? fallbackRule()).decision}
+        target={draft}
+        slider={PICKER_LOOK === 'slider'}
+        policiesOnly={cardLook && galleryPolicies}
+        onChoosePolicy={(p) => copyRules(p, copyableRules(p))}
       />
       {saveTemplate.dialog}
+      {/* A policy's rules land under the ones here; a template goes through `applyTemplate`, as the gallery's pick does,
+          so it names a policy the product named and says what it left out. */}
+      <RulePickerSlider
+        open={pickFrom !== null}
+        from={pickFrom ?? 'policy'}
+        target={draft}
+        onClose={() => setPickFrom(null)}
+        onPick={(s) => (s.scenario ? applyTemplate(s.scenario) : s.policy && copyRules(s.policy, s.rules))}
+      />
 
       {/* The guided demo.
 

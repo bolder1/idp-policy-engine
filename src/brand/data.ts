@@ -889,6 +889,13 @@ export function memberGroupIds(u: { groupId: string; alsoGroupIds?: readonly str
   return out
 }
 
+/** What a new policy opens with: the rules it was started from, on the canvas and not yet saved. `choose` opens it on
+    the empty board's three ways to start (board/BoardEmpty.tsx), the name already asked (create/NewPolicyDialog.tsx). */
+export interface NewPolicyStart {
+  rules: Rule[]
+  choose?: true
+}
+
 export interface Policy {
   id: string
   name: string
@@ -896,6 +903,9 @@ export interface Policy {
       name and on the canvas (board/PolicyNotice.tsx). Set by duplicatePolicy, taken away for good by a rename
       (store.tsx `keepsCopyMark`); nothing else reads it. */
   copiedFrom?: string
+  /** New and not saved yet (owner, 2 Nov 2026: the team wants no empty policies). Held only while its board is open: the
+      store drops it on the way out, and its first save with a rule makes it a real policy (policy-draft.ts `newPolicy`). */
+  provisional?: NewPolicyStart
   type: PolicyType
   /* The applications this policy protects. Empty means nobody has assigned one.
 
@@ -3827,6 +3837,8 @@ export interface Scenario {
   /** Who wrote it, on the tenant's own templates. */
   author?: string
   when?: string
+  /** On a tenant's own template added from the Xecurify store: the shipped template it is a copy of (30 Oct 2026). */
+  addedFrom?: string
   /* Who the policy this template builds should govern.
 
      It used to be stamped on each built rule, which meant a two-rule template

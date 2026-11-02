@@ -1,12 +1,12 @@
 import { ArrowLeft } from 'lucide-react'
-import { AlignLeft, ChevronRight, GraduationCap, LayoutTemplate, LogIn, Pencil } from 'lucide-react'
-import { useRef, useState, type ReactNode, type Ref } from 'react'
+import { AlignLeft, ChevronRight, CopyPlus, GraduationCap, LayoutTemplate, LogIn, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { DemoButton } from '../../tour/DemoButton'
 import { Button, IconButton, NameField, RowMenu } from '../../kit'
 import type { Policy } from '../../data'
 import { ChangeState } from '../../leave-guard'
-import type { RuleSet } from '../../policy-draft'
+import { isUntitled, type RuleSet } from '../../policy-draft'
 import { POLICY_NAME_MAX, policyNameIssue } from '../../policy-name'
 import { isPostSignIn } from '../../post-sign-in'
 import { useBrand } from '../../store'
@@ -64,6 +64,7 @@ export function BoardBar({
   onEditsFix,
   onRevealRule,
   onOpenBreakIn,
+  turnOnAsk,
   actions,
   onLearn,
   onWatchDemo,
@@ -83,6 +84,8 @@ export function BoardBar({
   /* Version 3: a guard page's Break-in row opens the test in the board's own
      test panel, where that version keeps it. */
   onOpenBreakIn?: () => void
+  /* The toast after a first save, pressed on Turn on: the status control asks for that switch (status-control.tsx). */
+  turnOnAsk?: number
   /* The publishing verbs, which belong to the builder's draft rather than to
      the policy. Passed in rather than reached for: this component knows what a
      policy IS, and the host knows what is unsaved about it. */
@@ -107,7 +110,17 @@ export function BoardBar({
      a fact about the policy, not a rule edit, so it stays out of the rules'
      draft and undo stack (see PolicyDetails.tsx). The builder reads the name
      back from the store, so the heading and Review agree at once. */
-  const [renaming, setRenaming] = useState(false)
+  /* A new policy opened with no form still carries the product's name: the field is open on arrival, so naming it is the
+     first thing on offer (create/NewPolicyDialog.tsx names it first now; this stays for one that is still untitled). */
+  const [renaming, setRenaming] = useState(() => !!policy.provisional && isUntitled(policy.name))
+  /* Selected on arrival, so typing replaces "Untitled policy" rather than adding to it. */
+  const nameInput = useRef<HTMLInputElement | null>(null)
+  const namedOnArrival = useRef(renaming)
+  useEffect(() => {
+    if (!namedOnArrival.current) return
+    const id = requestAnimationFrame(() => nameInput.current?.select())
+    return () => cancelAnimationFrame(id)
+  }, [])
   /* Where focus goes when the rename ends. The field unmounts with the focus in
      it, and focus on <body> is where the board's single-key shortcuts act. Only
      rescued when it actually landed on <body> after a leave: a click or Tab to
@@ -184,6 +197,7 @@ export function BoardBar({
               value={name}
               max={POLICY_NAME_MAX}
               label="Policy name"
+              inputRef={nameInput}
               errorId={nameErr ? 'bbtop-name-err' : undefined}
               invalid={!!nameErr}
               onChange={(v) => {
@@ -243,7 +257,7 @@ export function BoardBar({
 
         {/* Read from the store, not this bar's copy: the status is switched
             here, and it is not part of the draft. */}
-        <StatusControl policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} />
+        <StatusControl policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} turnOnAsk={turnOnAsk} />
         <ChangeState unsaved={unsaved} draft={draftSaved} />
       </nav>
 
@@ -343,12 +357,14 @@ export function BoardBarActions({
   canDiscard,
   blockers,
   saveBlocked,
+  stop = null,
   checking = false,
   post = false,
   onSaveDraft,
   onDiscard,
   onSave,
   onSaveTemplate,
+  onCopyRules,
 }: {
   /** Read as text is open in the panel's slot. */
   reading: boolean
@@ -390,9 +406,13 @@ export function BoardBarActions({
   onSaveDraft: () => void
   onDiscard: () => void
   onSave: () => void
+  /* Why nothing can be saved yet, said on both saves: no rule, or a new policy still unnamed (owner, 2 Nov 2026). */
+  stop?: string | null
   /* Save this policy as a template (owner, 27 Oct 2026). Absent where it cannot be: a post sign-in policy, or one with
      no rule on its canvas, so the ⋯ is not drawn with nothing in it. */
   onSaveTemplate?: () => void
+  /* Copy rules from another policy (owner, 2 Nov 2026). Absent with no policy to copy from. */
+  onCopyRules?: () => void
 }) {
   const showTesting = useShows('testing')
   const discard = useShows('discard')
@@ -447,7 +467,7 @@ export function BoardBarActions({
       {discard && <Button variant="secondary" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
         Discard
       </Button>}
-      <Button variant="secondary" size="sm" disabled={!unsaved} title={unsaved ? undefined : 'No changes to save'} onClick={onSaveDraft}>
+      <Button variant="secondary" size="sm" disabled={!unsaved} blocked={stop && unsaved ? stop : undefined} title={!unsaved ? 'No changes to save' : (stop ?? undefined)} onClick={onSaveDraft}>
         Save draft
       </Button>
       {/* One word, and it does that word (owner, 23 Sep 2026: "make it save
@@ -478,10 +498,13 @@ export function BoardBarActions({
           variant={quietSave ? 'secondary' : 'brand'}
           size="sm"
           disabled={!toPublish || saveBlocked || checking}
+          blocked={stop && toPublish ? stop : undefined}
           busy={checking}
           title={
             !toPublish
               ? 'Nothing to save'
+              : stop
+                ? stop
               : saveBlocked
                 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first`
                 : undefined
@@ -505,12 +528,15 @@ export function BoardBarActions({
       {/* The policy's other doors, after the verbs that end a draft, the way an application's head ends in its ⋯: Save as
           template (owner, 27 Oct 2026: "add an option for save as template"). Not for a post sign-in policy, which
           decides no sign-in and so has nothing to reuse, and not with no rule on the canvas. */}
-      {onSaveTemplate && !post && (
+      {(onSaveTemplate || onCopyRules) && !post && (
         <RowMenu
           label="More for this policy"
           size="sm"
-          items={[{ id: 'template', label: 'Save as template', icon: LayoutTemplate }]}
-          onSelect={() => onSaveTemplate()}
+          items={[
+            ...(onCopyRules ? [{ id: 'copy', label: 'Copy rules from a policy', icon: CopyPlus }] : []),
+            ...(onSaveTemplate ? [{ id: 'template', label: 'Save as template', icon: LayoutTemplate }] : []),
+          ]}
+          onSelect={(id) => (id === 'copy' ? onCopyRules?.() : onSaveTemplate?.())}
         />
       )}
     </>

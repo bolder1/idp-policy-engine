@@ -1,18 +1,23 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { TEMPLATES_MANAGED } from '../template-phase'
 import { describe, expect, it } from 'vitest'
 
 import { scenarioCard, TemplateCard } from '../create/TemplateCard'
+import { TemplateStore } from '../create/TemplateStore'
 import { showcaseTenant } from '../fixtures'
 import { BrandProvider } from '../store'
-import { savedOn, scenarioFromPolicy } from '../template-from-policy'
+import { addedFromStore, savedOn, scenarioFromPolicy, scenarioFromStore } from '../template-from-policy'
 import { TemplateFact } from './app-facts'
 import { BoardBarActions } from './board/BoardBar'
+import { Templates } from './Library'
 import { canSaveAsTemplate, rowMenu } from './status-options'
 import barToolsSrc from './board/bar-tools.ts?raw'
 import boardBuilderSrc from './board/BoardBuilder.tsx?raw'
 import confirmDeleteSrc from './confirm-delete.tsx?raw'
 import libraryScreenSrc from './Library.tsx?raw'
 import storeSrc from '../store.tsx?raw'
+import templateCardSrc from '../create/TemplateCard.tsx?raw'
+import templateStoreSrc from '../create/TemplateStore.tsx?raw'
 import appViewSrc from './app-policy-view.tsx?raw'
 import type { Policy } from '../data'
 
@@ -76,9 +81,10 @@ describe('what a saved template keeps', () => {
 })
 
 describe('which policies can be saved as a template', () => {
-  it('a sign-in policy with a rule can, and the Policies list offers it', () => {
-    expect(canSaveAsTemplate(boxAccess)).toBe(true)
-    expect(rowMenu(boxAccess, { monitor: false, trySignIn: true, trail: false }).map((i) => i.id)).toContain('template')
+  /* While templates are managed (template-phase.ts); on hold, no policy is offered it anywhere. */
+  it('a sign-in policy with a rule can while templates are managed, and the Policies list offers it then', () => {
+    expect(canSaveAsTemplate(boxAccess)).toBe(TEMPLATES_MANAGED)
+    expect(rowMenu(boxAccess, { monitor: false, trySignIn: true, trail: false }).map((i) => i.id).includes('template')).toBe(TEMPLATES_MANAGED)
   })
 
   it('one with no rule cannot: a template of it would apply nothing', () => {
@@ -180,5 +186,147 @@ describe('taking one of the tenant’s own templates away', () => {
     expect(out).toContain('bx-confirm__fact--template')
     expect(out).toMatch(/<span class="bx-confirm__kind"><svg[^>]*lucide-layout-template[^>]*>[\s\S]*?<\/svg>Template<\/span>/)
     expect(count(out, 'title="Regulated data access"')).toBe(1)
+  })
+})
+
+/* The Xecurify store (owner, 30 Oct 2026: "move this Xecurify template to a dedicated popup … as a store … how Figma
+   Community works, treat it like that"). Static markup: Add, Undo and the page filling up are checked in the browser. */
+describe('the Xecurify store', () => {
+  const NOW = new Date(2026, 9, 30, 12).getTime()
+  const shipped = t.scenarios.filter((s) => s.provided)
+  const source = { ...shipped[0], badge: 'Recommended', reviewed: { by: 'miniOrange Security', on: '2026-01' } }
+  const copy = scenarioFromStore(source, NOW)
+  const saved = scenarioFromPolicy(boxAccess, { name: 'Box rules', description: '', category: 'Compliance' }, NOW)
+
+  describe('adding a template', () => {
+    it('makes the tenant’s own copy, dated, that remembers where it came from', () => {
+      expect(copy).toMatchObject({ author: 'You', when: '30 Oct 2026', addedFrom: source.id })
+      expect(copy.provided).toBeUndefined()
+      expect(copy.id).not.toBe(source.id)
+      expect(scenarioFromStore(source, NOW).id).not.toBe(copy.id)
+    })
+
+    it('keeps the name, so a policy made from it takes no suffix, and the words and category', () => {
+      expect(copy).toMatchObject({ name: source.name, description: source.description, category: source.category })
+    })
+
+    it('keeps the rules with their decisions, and builds fresh ones every time', () => {
+      expect(copy.rules.map((r) => [r.name, r.ifText, r.decision])).toEqual(source.rules.map((r) => [r.name, r.ifText, r.decision]))
+      expect(copy.rules[0].build().id).not.toBe(copy.rules[0].build().id)
+    })
+
+    it('shares nothing a later change could reach through', () => {
+      expect(copy.audience).toEqual(source.audience)
+      expect(copy.audience).not.toBe(source.audience)
+      expect(copy.audience.groupIds).not.toBe(source.audience.groupIds)
+      expect(copy.rules).not.toBe(source.rules)
+      expect(copy.rules[0]).not.toBe(source.rules[0])
+    })
+
+    it('drops what was Xecurify’s to say about it: the review stamp and the badge', () => {
+      expect(copy.reviewed).toBeUndefined()
+      expect(copy.badge).toBeUndefined()
+    })
+
+    it('is known as added only by the tenant’s own copy, not a shipped template or one saved from a policy', () => {
+      expect([...addedFromStore([...shipped, saved])]).toEqual([])
+      expect([...addedFromStore([...shipped, saved, copy])]).toEqual([source.id])
+    })
+
+    it('adds once, with Undo on the toast', () => {
+      const src = code(templateStoreSrc)
+      expect(src).toContain('if (added.has(s.id)) return')
+      expect(src).toContain('store.addScenario(scenarioFromStore(s))')
+      expect(src).toContain("{ label: 'Undo', run: () => store.removeScenario(id) }")
+    })
+  })
+
+  describe('the card', () => {
+    const card = (over: Partial<Parameters<typeof TemplateCard>[0]> = {}) =>
+      renderToStaticMarkup(<TemplateCard m={scenarioCard(source)} onPreview={() => {}} onUse={() => {}} useLabel="Add" {...over} />)
+
+    /* One button for the eye and the action (2 Nov 2026): it opens the preview, which has the template's own Add. */
+    it('offers Preview and add until the template is in Your templates', () => {
+      expect(card()).toContain('aria-label="Preview and add ')
+      expect(card()).not.toContain('bgcard__done')
+    })
+
+    it('then says Added beside the button, and only previews', () => {
+      const html = card({ done: 'Added' })
+      expect(html).toContain('bgcard__done')
+      expect(html).toContain('Added')
+      expect(html).not.toContain('Preview and add')
+      expect(html).toContain('aria-label="Preview ')
+    })
+
+    it('says where a copy came from in its preview, and only on a copy', () => {
+      expect(scenarioCard(copy).from).toBe('Xecurify templates')
+      expect(scenarioCard(source).from).toBeUndefined()
+      expect(scenarioCard(saved).from).toBeUndefined()
+      expect(code(templateCardSrc)).toContain('<dt>From</dt>')
+    })
+  })
+
+  describe('the popup', () => {
+    const open = () => renderToStaticMarkup(<BrandProvider><TemplateStore open onClose={() => {}} /></BrandProvider>)
+
+    it('draws nothing while closed', () => {
+      expect(renderToStaticMarkup(<BrandProvider><TemplateStore open={false} onClose={() => {}} /></BrandProvider>)).toBe('')
+    })
+
+    it('is a dialog named for the store, with who it is by, a search and a way out', () => {
+      const html = open()
+      expect(html).toContain('role="dialog"')
+      expect(html).toContain('aria-modal="true"')
+      expect(html).toContain('aria-label="Xecurify templates"')
+      expect(html).toContain('By miniOrange')
+      expect(html).toContain('aria-label="Search Xecurify templates"')
+      expect(html).toContain('aria-label="Close Xecurify templates"')
+    })
+
+    it('narrows by category down its rail, with no counts, and only categories something is filed under', () => {
+      const html = open()
+      const rail = [...html.matchAll(/class="bmarket__cat[^"]*"[^>]*><span>([^<]+)<\/span>/g)].map((m) => m[1])
+      const filed = new Set(shipped.map((s) => s.category))
+      expect(rail[0]).toBe('All templates')
+      expect(rail.slice(1).sort()).toEqual([...filed].sort())
+      expect(html).not.toContain('Uncategorized')
+    })
+
+    it('lists every shipped template with Preview and add, and never Use', () => {
+      const html = open()
+      expect(count(html, 'class="bgcard ')).toBe(shipped.length)
+      expect(count(html, 'aria-label="Preview and add ')).toBe(shipped.length)
+      expect(html).not.toContain('aria-label="Preview and use ')
+    })
+  })
+
+  describe('the Templates page', () => {
+    const page = () => renderToStaticMarkup(<BrandProvider><Templates /></BrandProvider>)
+
+    it('with none of the tenant’s own, is one empty state with two ways to get one, and no Xecurify cards', () => {
+      const html = page()
+      expect(html).toContain('No templates yet')
+      expect(html).toContain('Browse Xecurify templates')
+      expect(html).toContain('Go to policies')
+      expect(html).not.toContain('class="bgcard ')
+      expect(html).not.toContain('btoolbar')
+      expect(html).not.toContain('bgal__section')
+    })
+
+    it('has one orange button, the way into the store, before the other', () => {
+      const html = page()
+      expect(count(html, 'bx-btn--brand')).toBe(1)
+      expect(html.indexOf('bx-btn--brand')).toBeLessThan(html.indexOf('Browse Xecurify templates'))
+      expect(html.indexOf('Browse Xecurify templates')).toBeLessThan(html.indexOf('Go to policies'))
+    })
+
+    it('lists only the tenant’s own, and ends its toolbar in the way into the store', () => {
+      const src = code(libraryScreenSrc)
+      expect(src).toContain('scenarios.filter((s) => !s.provided)')
+      expect(src).toContain('const shown = own.filter(')
+      expect(src).toContain('<TemplateStore open={shopping}')
+      expect(src).not.toContain('bgal__none')
+    })
   })
 })

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useId, useRef } from 'react'
+import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Pencil, ShieldPlus, Unlink } from 'lucide-react'
+import { Pencil, ShieldPlus, Unlink } from 'lucide-react'
 
 import { Badge, Button, Callout, Confirm, Drawer, Note, RowMenu, StatusPill, TipDot, type MenuItem } from '../kit'
 import { EmptyState } from '../empty'
@@ -11,10 +11,12 @@ import { PolicyFact, PolicyFacts } from './app-facts'
 import { Face } from '../faces'
 import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
-import { appsOf, blankPolicy, nameTaken, type Policy } from '../data'
+import { appsOf, blankPolicy, type Policy } from '../data'
+import { useNewPolicy } from '../create/use-new-policy'
+import { newPolicy } from '../policy-draft'
+import { freeName } from '../policy-name'
 import { DECISION_WORDS } from '../decision-words'
 import { isPostSignIn } from '../post-sign-in'
-import { ApplicationFixed } from './scope-fields'
 import { REMOVE_RUNS_CHECKS, attachKind, attachTo, attachableTo, detachFrom, rulesLabel } from './app-policies'
 import { appStanding, deciderChanges, keyName, rowTip, visibleMoves, whoLabel, type Key, type StandRow } from './app-standing'
 import { addToApp, attachNote, existingHint, removeCopy, removeFromApp } from './applications-model'
@@ -47,21 +49,14 @@ import { portalRoot } from './status-options'
 
 export function AppProtection({
   appId,
-  justAdded,
   onClose,
-  onCreate,
 }: {
   appId: string | null
-  /* A policy the CALLER just created, so it lands with the same tint as one
-     attached from inside this panel. */
-  justAdded?: string | null
   onClose: () => void
-  /** Hands out the named policy. The caller stores it. */
-  onCreate: (p: Policy) => void
 }) {
   const store = useBrand()
-  const uid = useId()
   const appsGuard = useAppsGuard()
+  const newOne = useNewPolicy()
 
   const [choice, setChoice] = useState<'new' | 'existing' | null>(null)
   const [pickId, setPickId] = useState<string | null>(null)
@@ -71,11 +66,7 @@ export function AppProtection({
   /* The row an attach from this form just put on. An object, so attaching the
      same policy again after taking it off is a new flash and moves focus again. */
   const [flash, setFlash] = useState<{ id: string } | null>(null)
-  /** The pushed "Name your policy" page is showing. */
-  const [naming, setNaming] = useState(false)
-  const [newName, setNewName] = useState('')
   const newRadio = useRef<HTMLInputElement | null>(null)
-  const nameField = useRef<HTMLInputElement | null>(null)
   const body = useRef<HTMLDivElement | null>(null)
 
   /* Reset when the subject changes. One drawer serves every row, so a form
@@ -87,8 +78,6 @@ export function AppProtection({
     setTried(false)
     setGone(false)
     setFlash(null)
-    setNaming(false)
-    setNewName('')
     /* And the checks' page with it. Its state outlives the panel (this
        component stays mounted, closed), so a page left open would otherwise
        come up over the next application's panel. */
@@ -97,21 +86,7 @@ export function AppProtection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appId])
 
-  /* And after the caller created a policy from this form: the choice has been
-     acted on, so "Name and create" must not stay on offer for a second one.
-     Focus goes to the new row, which replaced the page that had it. */
-  useEffect(() => {
-    if (!justAdded) return
-    setChoice(null)
-    setPickId(null)
-    setTried(false)
-    const id = requestAnimationFrame(() =>
-      body.current?.querySelector<HTMLElement>(`[data-policy-id="${CSS.escape(justAdded)}"]`)?.focus(),
-    )
-    return () => cancelAnimationFrame(id)
-  }, [justAdded])
-
-  /* The same after an attach from this form, however it was written: at once,
+  /* After an attach from this form, however it was written: at once,
      on a clean check, or from the checks' page. The choice is spent by then
      (nothing is picked), so the button that asked has nothing left to do, and
      the checks' page hands focus back to it as it closes. A frame later, after
@@ -123,14 +98,6 @@ export function AppProtection({
     )
     return () => cancelAnimationFrame(id)
   }, [flash])
-
-  /* The name field takes focus when its page is pushed. After the drawer's own
-     focus, which lands on the panel when it opens. */
-  useEffect(() => {
-    if (!naming) return
-    const id = requestAnimationFrame(() => nameField.current?.focus())
-    return () => cancelAnimationFrame(id)
-  }, [naming])
 
   /* `apps.find`, never `store.appById` — that resolves an unknown id to a
      placeholder, so a stale id would render this panel for the wrong app. */
@@ -164,14 +131,24 @@ export function AppProtection({
     if (app) removeFromApp(store, policyId, app)
   }
 
+  /* Write a new policy: the one popup (create/NewPolicyDialog.tsx), then the board, carrying this application. It stood
+     as a name page here that made an empty draft and stayed put, which the team has ruled out (2 Nov 2026). */
+  const writeNew = () => {
+    if (!app) return
+    newOne.ask({
+      ways: true,
+      seedName: freeName(`${app.name} access`, store.policies.map((p) => p.name)),
+      onCreate: (name, start) => {
+        onClose()
+        toBoard(store.addPolicy(newPolicy(blankPolicy(name, [app.id]), start)))
+      },
+    })
+  }
+
   function submit() {
     if (!app) return
     setTried(true)
-    if (choice === 'new') {
-      setNewName('')
-      setNaming(true)
-      return
-    }
+    if (choice === 'new') return writeNew()
     if (!pickId || appsGuard.checking) return
 
     /* A policy that decides sign-ins runs the checks first, as the app page's
@@ -196,21 +173,6 @@ export function AppProtection({
   }
 
   if (!app) return null
-
-  const taken = nameTaken(newName, store.policies.map((p) => p.name))
-  const nameReady = newName.trim().length > 0 && !taken
-
-  /* Back to the list, with focus on the choice that pushed the page. */
-  const back = () => {
-    setNaming(false)
-    requestAnimationFrame(() => newRadio.current?.focus())
-  }
-
-  const create = () => {
-    if (!nameReady) return
-    onCreate(blankPolicy(newName.trim(), [app.id]))
-    setNaming(false)
-  }
 
   /* What the attach will do, under the picker it is about. It was the footer's sentence beside Close, with the two
      blocked reasons ("Choose new or existing to continue.", "Pick a policy to attach.") and "Nothing changes for users
@@ -268,20 +230,10 @@ export function AppProtection({
       <Drawer
         open={!!appId}
         onClose={onClose}
-        title={naming ? 'Name your policy' : `Protection for ${app.name}`}
+        title={`Protection for ${app.name}`}
         width={560}
         resizable
         head={
-          naming ? (
-            <div className="bapr__pushed">
-              {/* Named for where it goes. */}
-              <button type="button" className="bapr__back" onClick={back}>
-                <ArrowLeft size={14} strokeWidth={2} aria-hidden />
-                {app.name}
-              </button>
-              <h2>Name your policy</h2>
-            </div>
-          ) : (
             <div className="bapr__head">
               <AppLogo appId={app.id} name={app.name} size={28} />
               <div>
@@ -289,21 +241,8 @@ export function AppProtection({
                 <p>{app.type}</p>
               </div>
             </div>
-          )
         }
         actions={
-          naming ? (
-            <>
-              {/* Cancel goes where Back goes: closing the panel from here would
-                  throw away the list along with the name. */}
-              <Button variant="ghost" onClick={back}>
-                Cancel
-              </Button>
-              <Button variant="brand" disabled={!nameReady} onClick={create}>
-                Create policy
-              </Button>
-            </>
-          ) : (
             <>
               <Button variant="ghost" onClick={onClose}>
                 Close
@@ -319,47 +258,9 @@ export function AppProtection({
                 {appsGuard.checking ? 'Checking…' : primary}
               </Button>
             </>
-          )
         }
       >
         <div ref={body}>
-          {naming ? (
-            <div className="bnp bapr__naming">
-              <div className="bname2__field">
-                <span className="bname2__labelrow">
-                  <label htmlFor={`${uid}-name`} className="bname2__label">
-                    Policy name <i>*</i>
-                  </label>
-                  {newName.length > 39 && <span className="bname2__count">{50 - newName.length} left</span>}
-                </span>
-                <input
-                  id={`${uid}-name`}
-                  ref={nameField}
-                  type="text"
-                  value={newName}
-                  maxLength={50}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'Enter') return
-                    e.preventDefault()
-                    create()
-                  }}
-                  aria-invalid={taken || undefined}
-                  aria-describedby={taken ? `${uid}-name-error` : undefined}
-                  placeholder="Finance Team – High Security"
-                />
-                {taken && (
-                  <p id={`${uid}-name-error`} className="bapr__nameerror" role="alert">
-                    A policy with this name already exists.
-                  </p>
-                )}
-              </div>
-              <div className="bname2__field">
-                <span className="bname2__label">Application</span>
-                <ApplicationFixed appId={app.id} />
-              </div>
-            </div>
-          ) : (
             <>
               {/* Only the case the list can't show on its own: policies are attached
                   and none of them decides. */}
@@ -387,12 +288,7 @@ export function AppProtection({
                     action={
                       <Button
                         variant="secondary"
-                        onClick={() => {
-                          /* Straight to the name page: the choice is already made. */
-                          setChoice('new')
-                          setNewName('')
-                          setNaming(true)
-                        }}
+                        onClick={writeNew}
                       >
                         Write a new policy
                       </Button>
@@ -406,7 +302,7 @@ export function AppProtection({
                         row={row}
                         tip={rowTip(row, store.groups, store.users)}
                         who={whoLabel(row.policy, store.groups, store.users)}
-                        fresh={flash?.id === row.policy.id || justAdded === row.policy.id}
+                        fresh={flash?.id === row.policy.id}
                         onOpen={() => toBoard(row.policy.id)}
                         menu={menu}
                         onSelect={onMenu(row.policy)}
@@ -436,7 +332,7 @@ export function AppProtection({
                     }}
                   />
                   <span className="bapr__choicename">Write a new policy</span>
-                  <span className="bapr__choicehint">Created as a draft on {app.name}. You name it next.</span>
+                  <span className="bapr__choicehint">You name it next.</span>
                 </label>
 
                 <label className={`bapr__choice ${choice === 'existing' ? 'is-on' : ''} ${none ? 'is-disabled' : ''}`}>
@@ -501,7 +397,6 @@ export function AppProtection({
                 )}
               </fieldset>
             </>
-          )}
         </div>
       </Drawer>
 
@@ -519,6 +414,7 @@ export function AppProtection({
           close it alone, Tab stays inside it, and focus goes back to the button
           that asked for the change. */}
       {guardPage && createPortal(<GuardDrawer {...guardPage} />, portalRoot())}
+      {newOne.dialog}
     </>
   )
 }

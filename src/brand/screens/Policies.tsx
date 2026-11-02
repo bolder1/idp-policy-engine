@@ -34,8 +34,8 @@ import { appsOf, blankPolicy, enforces, type Policy } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { ChangeState } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
-import { openForEditing } from '../policy-draft'
-import { freeName } from '../policy-name'
+import { newPolicy, openForEditing } from '../policy-draft'
+import { useNewPolicy } from '../create/use-new-policy'
 import { scenarioFromPolicy } from '../template-from-policy'
 import { SaveTemplateDialog } from './builder-dialogs'
 import { ConfirmDelete } from './confirm-delete'
@@ -169,7 +169,11 @@ export function Policies() {
      only the sign-in check it said before 13 Oct 2026. */
   return (
     <div className="bpage">
-      <PageHead title="Policies" caption="Every sign-in, and the session after it, is checked against these policies." docs />
+      <PageHead
+        title="Policies"
+        caption="Every sign-in, and the session after it, is checked against these policies."
+        docs
+      />
       <Tabs<PolicyKind> className="bx-tabs--line bpol__types" name="Policy types" value={kind} onChange={show} options={POLICY_KINDS} />
       {/* Each tab brings its own bar and list; a fragment, so they stay rows of
           the page grid as they were before the tabs. */}
@@ -230,11 +234,17 @@ function SignInPolicies() {
      Describe it, which sits on the empty draft beside the templates (describe
      spec, §6.2). The naming form stays with the one caller that still needs a
      name first, the Applications screen's row. */
-  const startDraft = () => {
-    const name = freeName('Untitled policy', store.policies.map((p) => p.name))
-    const id = store.addPolicy(blankPolicy(name, []))
-    store.go({ name: 'board', policyId: id })
-  }
+  /* SUPERSEDED 2 Nov 2026 (the team: no empty policies): it asks for a name and how to start first
+     (create/NewPolicyDialog.tsx), and what it makes is kept only once saved with a rule (policy-draft.ts `newPolicy`). */
+  const newOne = useNewPolicy()
+  const startDraft = () =>
+    newOne.ask({
+      ways: true,
+      onCreate: (name, start) => {
+        const id = store.addPolicy(newPolicy(blankPolicy(name, []), start))
+        store.go({ name: 'board', policyId: id })
+      },
+    })
 
   const showExposure = store.features.exposure
 
@@ -613,6 +623,7 @@ function SignInPolicies() {
         <ReadAsTextDrawer key={current.id} open={dialogOpen} policy={current} onClose={closeDialog} />
       )}
       {statusChange.dialog}
+      {newOne.dialog}
       {details && store.policies.some((p) => p.id === details.id) && (
         <PolicyDetailsDrawer open={details.open} policyId={details.id} onClose={() => setDetails({ ...details, open: false })} />
       )}
@@ -706,14 +717,16 @@ function PostSignInPolicies() {
 
   const openBuilder = (p: Policy) => store.go({ name: 'board', policyId: p.id })
 
-  /* New policy makes an Untitled draft of this tab's type, linked to nothing,
-     and opens it in the board with nothing asked first — the Sign-in tab's
-     way (23 Sep 2026). */
-  const startDraft = () => {
-    const name = freeName('Untitled post sign-in policy', store.policies.map((p) => p.name))
-    const id = store.addPolicy(blankPostSignInPolicy(name))
-    store.go({ name: 'board', policyId: id })
-  }
+  /* New policy of this tab's type, linked to nothing: a name first, the Sign-in tab's way (2 Nov 2026). A post sign-in
+     policy has no other way to start yet, so the name is all it asks. */
+  const newOne = useNewPolicy()
+  const startDraft = () =>
+    newOne.ask({
+      onCreate: (name) => {
+        const id = store.addPolicy(newPolicy(blankPostSignInPolicy(name)))
+        store.go({ name: 'board', policyId: id })
+      },
+    })
 
   const act = (policy: Policy, action: PostRowAction) => {
     switch (action) {
@@ -863,6 +876,7 @@ function PostSignInPolicies() {
         />
       )}
       {statusChange.dialog}
+      {newOne.dialog}
     </>
   )
 }

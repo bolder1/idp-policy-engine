@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { TEMPLATES_MANAGED } from '../template-phase'
 
 import type { Policy, PolicyDraft } from '../data'
 import { showcaseTenant } from '../fixtures'
@@ -7,6 +8,7 @@ import {
   guardFor,
   offersMonitorAfterSave,
   offersMonitoringView,
+  offersTurnOnAfterSave,
   rowMenu,
   statusConfirmCopy,
   statusConfirmParts,
@@ -178,6 +180,28 @@ describe('offersMonitorAfterSave', () => {
   })
 })
 
+describe('offersTurnOnAfterSave', () => {
+  it('offers Turn on on the save that takes a draft out of draft and leaves it off', () => {
+    expect(offersTurnOnAfterSave({ status: 'draft' }, { status: 'inactive' })).toBe(true)
+    expect(offersTurnOnAfterSave({ status: 'draft' }, { status: 'inactive' }, { monitor: false })).toBe(true)
+  })
+
+  it('offers it for a post sign-in policy too, which has no Monitoring', () => {
+    expect(offersTurnOnAfterSave({ status: 'draft' }, { status: 'inactive', type: 'Session' })).toBe(true)
+  })
+
+  it('offers nothing when the save turned it on, kept it a draft, or it was already published', () => {
+    expect(offersTurnOnAfterSave({ status: 'draft' }, { status: 'active' })).toBe(false)
+    expect(offersTurnOnAfterSave({ status: 'draft' }, { status: 'draft' })).toBe(false)
+    expect(offersTurnOnAfterSave({ status: 'inactive' }, { status: 'inactive' })).toBe(false)
+    expect(offersTurnOnAfterSave({ status: 'active' }, { status: 'active' })).toBe(false)
+  })
+
+  it('offers nothing the status menu would not', () => {
+    expect(offersTurnOnAfterSave({ status: 'draft' }, { status: 'inactive', isSystem: true })).toBe(false)
+  })
+})
+
 describe('guardFor', () => {
   /* Checks that say yes, and count how often they were asked. */
   const checks = (turnsOn = true, newlyAllows = true) => {
@@ -279,33 +303,27 @@ describe('rowMenu', () => {
   const as = (status: Policy['status']): Policy => ({ ...hrms, status })
   const showcase = { monitor: true, trySignIn: true, trail: false }
   const labels = (p: Policy, opts = showcase) => rowMenu(p, opts).map((i) => i.label)
+  /* Save as template, while the tenant manages templates (template-phase.ts); on hold, it is not offered. */
+  const tpl = (xs: string[]) => (TEMPLATES_MANAGED ? xs : xs.filter((x) => x !== 'Save as template' && x !== 'template'))
 
   it('reads Edit policy, Check access, Monitor, Turn off, … for an active policy (check 3)', () => {
-    expect(labels(as('active'))).toEqual(['Edit policy', 'Check access', 'Monitoring', 'Inactive', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(labels(as('active'))).toEqual(tpl(['Edit policy', 'Check access', 'Monitoring', 'Inactive', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy']))
   })
 
   it('reads Turn on, Turn off, View monitoring for a monitoring policy (check 4)', () => {
-    expect(rowMenu(as('monitor'), showcase).map((i) => i.id)).toEqual(['edit', 'test', 'active', 'inactive', 'monitoring', 'text', 'template', 'duplicate', 'delete'])
-    expect(labels(as('monitor'))).toEqual(['Edit policy', 'Check access', 'Active', 'Inactive', 'View monitoring', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(rowMenu(as('monitor'), showcase).map((i) => i.id)).toEqual(tpl(['edit', 'test', 'active', 'inactive', 'monitoring', 'text', 'template', 'duplicate', 'delete']))
+    expect(labels(as('monitor'))).toEqual(tpl(['Edit policy', 'Check access', 'Active', 'Inactive', 'View monitoring', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy']))
   })
 
   it('offers View monitoring for no other status, and nowhere the edition has no Monitoring status', () => {
     for (const status of ['draft', 'active', 'inactive'] as const) expect(labels(as(status))).not.toContain('View monitoring')
-    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(['Edit policy', 'Check access', 'Active', 'Inactive', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(tpl(['Edit policy', 'Check access', 'Active', 'Inactive', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy']))
   })
 
   it('offers the trail builder outside the showcase, after the switches', () => {
-    expect(labels(as('inactive'), { ...showcase, trail: true })).toEqual([
-      'Edit policy',
-      'Check access',
-      'Active',
-      'Monitoring',
-      'Open in trail',
-      'Read as text',
-      'Save as template',
-      'Duplicate',
-      'Delete policy',
-    ])
+    expect(labels(as('inactive'), { ...showcase, trail: true })).toEqual(
+      tpl(['Edit policy', 'Check access', 'Active', 'Monitoring', 'Open in trail', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy']),
+    )
   })
 
   it('leaves out what a policy cannot do: Try without the edition, a template of no rules, Duplicate and Delete of the system policy', () => {

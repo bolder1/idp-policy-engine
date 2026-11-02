@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, animate, useReducedMotion } from 'motion/react'
+import { TEMPLATES_MANAGED } from './template-phase'
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import {
   Activity,
@@ -106,7 +107,8 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              than letting somebody find out by opening them. A quiet tag, not
              the brand-filled badge "New" gets: one is an announcement and the
              other is a caveat, and they must not read alike. */
-          { label: 'Templates', screen: { name: 'templates' }, tag: SHOWCASE ? undefined : 'In progress' },
+          /* On hold with the rest of template management (template-phase.ts): the tenant only picks Xecurify's. */
+          ...(TEMPLATES_MANAGED ? [{ label: 'Templates', screen: { name: 'templates' } as const, tag: SHOWCASE ? undefined : 'In progress' }] : []),
           { label: 'Zones', screen: { name: 'zones' } },
           /* The page calls itself "Device fingerprint"; so does the screen id
              and every sentence on it. The rail was the only place still saying

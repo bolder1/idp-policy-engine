@@ -6,23 +6,26 @@ import { DecisionChip } from '../kit'
 
 /* -----------------------------------------------------------------------------
    The template card's picture: a small piece of the product its shelf is about, in place of the template's live rules
-   (owner, 2 Nov 2026: "real-time showcase might be a problem"; "one generic per category … five of them"; then, 3 Nov,
-   "make the illustration a little towards a skeleton, with only a few words or none, based on need, but generic so we
-   can scale").
+   (owner, 2 Nov 2026: "real-time showcase might be a problem"; pointing at Profound's feature cards, "this kind of card
+   design"; "one generic per category … five of them"; and, after a pass of bare skeletons, "the last one serves a
+   purpose, revert to that concept").
 
-   One panel per shelf, the same for every template on it, so a new template needs nothing drawn. Each keeps its shape
-   and the one thing that says what it is about, and draws everything else as grey skeleton bars:
-   · Quick protection: a second factor's code screen (its MFA chip, six code boxes).
-   · Device-based: a device check (three rows, each ticked).
-   · Risk-based: a risk gauge (the arc filled to its score).
-   · Compliance: where a sign-in may come from (a place allowed, anywhere else denied).
-   · A tenant's own policy (the reuse picker), or anything without a shelf: a policy's rules and their outcomes.
-   Light mode, tokens only. On hover the panel lifts a little and plays its use, then holds: the code boxes fill, the
-   checks tick, the gauge fills, the rows reveal. Motion props move it; with reduced motion nothing does.
+   One panel per shelf, with real words and sample numbers, the same for every template on it, so a new template needs
+   nothing drawn:
+   · Quick protection: the second factor's code screen.
+   · Device-based: a device check.
+   · Risk-based: a risk score gauge.
+   · Compliance: where a sign-in may come from.
+   · A tenant's own policy (the reuse picker), or anything without a shelf: a sign-in policy's rules.
+   Light mode, tokens only, 12px at the smallest. On hover the panel lifts a little and plays its use, then holds (owner,
+   same day: "I like the whole hover animation as it used to be … it should give the user the overview of the use of
+   that policy"): the code's digits arrive, the device's checks tick, the gauge fills to its score, the places reveal.
+   Motion props move it; with reduced motion nothing does.
    -------------------------------------------------------------------------- */
 
 type Kind = 'quick' | 'device' | 'risk' | 'compliance' | 'policy'
 
+/** Which panel: a shelf's key (TemplateCard.tsx `catKey`), or the tone of a card that has none. */
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1]
 const lift: Variants = {
   rest: { y: 0, transition: { duration: 0.3, ease: EASE_OUT } },
@@ -38,22 +41,15 @@ const fill: Variants = {
   hot: { pathLength: [0.15, 0.72], transition: { duration: 0.8, ease: EASE_OUT } },
 }
 
-/** Which panel: a shelf's key (TemplateCard.tsx `catKey`), or the tone of a card that has none. */
 const kindOf = (hue: string): Kind => (hue === 'quick' || hue === 'device' || hue === 'risk' || hue === 'compliance' ? hue : 'policy')
 
-/** A skeleton line of words: `long`, `mid` or `short`. */
-function Bar({ w, faint }: { w: 'long' | 'mid' | 'short'; faint?: boolean }) {
-  return <span className={`bgviz__bar is-${w}${faint ? ' is-faint' : ''}`} aria-hidden />
-}
-
-/** The panel's head: its icon in the shelf's colour, a skeleton title, and what it ends on. */
-function Head({ icon: Icon, end }: { icon: LucideIcon; end?: ReactNode }) {
+function Head({ icon: Icon, title, end }: { icon: LucideIcon; title: string; end?: ReactNode }) {
   return (
     <span className="bgviz__head">
       <span className="bgviz__icon" aria-hidden>
         <Icon size={13} strokeWidth={2} />
       </span>
-      <Bar w="mid" />
+      <span className="bgviz__title">{title}</span>
       {end}
     </span>
   )
@@ -62,15 +58,15 @@ function Head({ icon: Icon, end }: { icon: LucideIcon; end?: ReactNode }) {
 function Quick() {
   return (
     <>
-      <Head icon={Smartphone} end={<DecisionChip decision="2fa" size="sm" />} />
+      <Head icon={Smartphone} title="Verify it's you" end={<DecisionChip decision="2fa" size="sm" />} />
       <span className="bgviz__code">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <span key={i} className="bgviz__box">
-            <motion.span className="bgviz__dot" variants={reveal} custom={0.08 + i * 0.07} />
-          </span>
+        {'482913'.split('').map((c, i) => (
+          <motion.span key={i} variants={reveal} custom={0.08 + i * 0.07}>
+            {c}
+          </motion.span>
         ))}
       </span>
-      <Bar w="mid" faint />
+      <span className="bgviz__note">Sent to ••• 4821</span>
     </>
   )
 }
@@ -78,10 +74,10 @@ function Quick() {
 function Device() {
   return (
     <>
-      <Head icon={Laptop} end={<span className="bgviz__pill is-blank" aria-hidden />} />
-      {(['long', 'mid', 'long'] as const).map((w, i) => (
-        <span key={i} className="bgviz__row">
-          <Bar w={w} />
+      <Head icon={Laptop} title="Device check" end={<span className="bgviz__pill">Compliant</span>} />
+      {['Registered device', 'OS up to date', 'Screen lock on'].map((label, i) => (
+        <span key={label} className="bgviz__row">
+          <span>{label}</span>
           <motion.span className="bgviz__tickbox" variants={reveal} custom={0.12 + i * 0.12}>
             <Check className="bgviz__tick" size={14} strokeWidth={2.4} aria-hidden />
           </motion.span>
@@ -97,10 +93,17 @@ function Risk() {
       <svg viewBox="0 0 200 124" aria-hidden>
         <path className="bgviz__track" d="M20 100 A80 80 0 0 1 180 100" />
         <motion.path className="bgviz__arc" d="M20 100 A80 80 0 0 1 180 100" variants={fill} />
+        <text className="bgviz__tickmark" x="20" y="122" textAnchor="middle">
+          0
+        </text>
+        <text className="bgviz__tickmark" x="180" y="122" textAnchor="middle">
+          100
+        </text>
       </svg>
       <span className="bgviz__score">
-        <Bar w="short" faint />
-        <span className="bgviz__scorebar" aria-hidden />
+        <span className="bgviz__note">Risk score</span>
+        <strong>72</strong>
+        <span className="bgviz__pill">High</span>
       </span>
     </span>
   )
@@ -109,21 +112,21 @@ function Risk() {
 function Compliance() {
   return (
     <>
-      <Head icon={MapPin} />
-      {(
-        [
-          ['mid', '1fa'],
-          ['long', 'deny'],
-        ] as const
-      ).map(([w, d], i) => (
-        <motion.span key={i} className="bgviz__row" variants={reveal} custom={0.1 + i * 0.12}>
-          <span className="bgviz__where">
-            <MapPin size={13} strokeWidth={2} aria-hidden />
-            <Bar w={w} />
-          </span>
-          <DecisionChip decision={d} size="sm" />
-        </motion.span>
-      ))}
+      <Head icon={MapPin} title="Sign-in location" />
+      <motion.span className="bgviz__row" variants={reveal} custom={0.1}>
+        <span className="bgviz__where">
+          <MapPin size={13} strokeWidth={2} aria-hidden />
+          Allowed region
+        </span>
+        <DecisionChip decision="1fa" size="sm" />
+      </motion.span>
+      <motion.span className="bgviz__row" variants={reveal} custom={0.22}>
+        <span className="bgviz__where">
+          <MapPin size={13} strokeWidth={2} aria-hidden />
+          Anywhere else
+        </span>
+        <DecisionChip decision="deny" size="sm" />
+      </motion.span>
     </>
   )
 }
@@ -131,16 +134,16 @@ function Compliance() {
 function Policy() {
   return (
     <>
-      <Head icon={ShieldCheck} />
+      <Head icon={ShieldCheck} title="Sign-in policy" />
       {(
         [
-          ['long', '1fa'],
-          ['mid', '2fa'],
-          ['long', 'deny'],
+          ['Office network', '1fa'],
+          ['New device', '2fa'],
+          ['Everyone else', 'deny'],
         ] as const
-      ).map(([w, d], i) => (
-        <motion.span key={i} className="bgviz__row" variants={reveal} custom={0.1 + i * 0.1}>
-          <Bar w={w} />
+      ).map(([label, d], i) => (
+        <motion.span key={label} className="bgviz__row" variants={reveal} custom={0.1 + i * 0.1}>
+          <span>{label}</span>
           <DecisionChip decision={d} size="sm" />
         </motion.span>
       ))}

@@ -1457,3 +1457,31 @@
 .bgcard.is-bare .bgcard__h { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; -webkit-box-orient: unset; }
 /* The preview's name starts where the grid view's icon does. */
 .bmarket__hero:has(.bdetail__head) { padding-left: var(--space-8); }
+
+/* Back as an arrow to the left of the preview's name, centred on the name and its line; the footer's note in italics
+   (owner, 3 Nov 2026: "move the back button to the top, beside the heading, and make the text italic"). */
+.bmarket__hero .bdetail__head { flex-direction: row; align-items: center; gap: var(--space-4); }
+.bmarket__hero .bdetail__head > .bx-iconbtn { flex: none; margin-left: calc(-1 * var(--space-3)); }
+.bdetail__footnote { font-style: italic; }
+
+/* The preview's header: the arrow, then the name beside it, from the left (an earlier rule spread them apart). The footer:
+   the note on the left now that Back has gone, the button on the right (owner: "move to the left, we have space now"). */
+.bmarket__hero .bdetail__head { justify-content: flex-start; }
+.bmarket__hero .bdetail__head .bdetail__words { margin: 0; text-align: left; }
+.bdetail__foot .bdetail__footnote { margin-left: 0; margin-right: auto; }
+
+/* The pictures as skeletons (owner, 3 Nov 2026: "towards a skeleton, with only a few words or none … generic so we can
+   scale"): grey bars where the words were; the shelf's colour, the decisions and the checks stay. */
+.bgviz__bar { display: block; height: 8px; border-radius: var(--radius-pill); background: var(--border-default); }
+.bgviz__bar.is-faint { background: var(--border-subtle); }
+.bgviz__bar.is-long { width: 120px; }
+.bgviz__bar.is-mid { width: 84px; }
+.bgviz__bar.is-short { width: 48px; }
+.bgviz__head .bgviz__bar { flex: 1; max-width: 96px; }
+.bgviz__row .bgviz__bar { flex: 0 1 auto; max-width: 60%; }
+.bgviz__where .bgviz__bar { max-width: 110px; }
+.bgviz__pill.is-blank { width: 52px; height: 20px; padding: 0; }
+.bgviz__box { display: grid; place-items: center; height: 30px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.bgviz__dot { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--tpl); }
+.bgviz__score .bgviz__bar.is-short { width: 40px; }
+.bgviz__scorebar { display: block; width: 44px; height: 14px; border-radius: var(--radius-pill); background: var(--tpl); opacity: 0.85; }

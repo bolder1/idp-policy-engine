@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, CopyPlus, LayoutTemplate, PenLine, Plus, Undo2 } from 'lucide-react'
+import { Building2, PenLine, Plus, Undo2 } from 'lucide-react'
 
 import { Button } from '../../kit'
 import { BrandMark } from '../../logos/BrandMark'
@@ -127,9 +127,6 @@ export function BoardEmpty({
                 <StartPicture kind="template" hot={hot === 'template'} />
               </span>
               <span className="bb__start2__foot">
-                <span className="bb__start2__icon" aria-hidden>
-                  <LayoutTemplate size={17} strokeWidth={1.9} />
-                </span>
                 <span className="bb__start2__text">
                   <strong>Use a Xecurify template</strong>
                   <span>Ready-made rules for common setups</span>
@@ -165,9 +162,6 @@ export function BoardEmpty({
                 <StartPicture kind="reuse" hot={hot === 'reuse'} />
               </span>
               <span className="bb__start2__foot">
-                <span className="bb__start2__icon" aria-hidden>
-                  <CopyPlus size={17} strokeWidth={1.9} />
-                </span>
                 <span className="bb__start2__text">
                   <strong>Inherit from an existing policy</strong>
                   <span>Take the rules of a policy you already run</span>
@@ -175,14 +169,15 @@ export function BoardEmpty({
               </span>
             </button>
           )}
-          <button type="button" className="bb__start2 is-scratch" onClick={onScratch} {...point('scratch')}>
+          {/* A blank card, as a document app draws its blank document (owner, 3 Nov 2026: "just a blank button with a big icon
+              that has a dotted outline, and a subheading; no illustration"): a plus in a dotted outline on a plain stage. */}
+          <button type="button" className="bb__start2 is-scratch is-blank" onClick={onScratch} {...point('scratch')}>
             <span className="bb__start2__stage">
-              <StartPicture kind="scratch" hot={hot === 'scratch'} />
+              <span className="bb__start2__plus" aria-hidden>
+                <Plus size={36} strokeWidth={1.6} />
+              </span>
             </span>
             <span className="bb__start2__foot">
-              <span className="bb__start2__icon" aria-hidden>
-                <Plus size={17} strokeWidth={1.9} />
-              </span>
               <span className="bb__start2__text">
                 <strong>Start from scratch</strong>
                 <span>Build your own rules, one by one</span>

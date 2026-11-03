@@ -4128,3 +4128,28 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__g__ghost { fill: var(--surface-raised); stroke: var(--start-hover); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.85; transition: fill 0.3s var(--ease-standard); }
 .bb__start2:is(:hover, :focus-visible) .bb__g__ghost { fill: color-mix(in srgb, var(--start-hover) 10%, var(--surface-raised)); }
 
+
+/* The card's icon on its picture (StartArt.tsx `Badge`): the card's colour, ringed in the paper's white. */
+.bb__g__badge { fill: var(--start-hover); stroke: var(--surface-raised); stroke-width: 3; }
+.bb__g__badgeicon { color: var(--surface-raised); }
+
+/* Start from scratch, blank (BoardEmpty.tsx): no picture and no tint, a plus in a dotted outline on the card's own white,
+   no rule under the stage. Hover darkens the outline and the plus; nothing moves. */
+.bb__start2.is-blank .bb__start2__stage { background: var(--surface-raised); border-bottom-color: transparent; }
+.bb__start2.is-blank .bb__start2__stage::before { display: none; }
+.bb__start2__plus {
+  display: grid; place-items: center; width: 96px; height: 96px;
+  border: 2px dashed var(--border-strong); border-radius: var(--radius-xl);
+  color: var(--text-tertiary);
+  transition: border-color 0.24s var(--ease-standard), color 0.24s var(--ease-standard);
+}
+.bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__plus { border-color: var(--text-secondary); color: var(--text-secondary); }
+
+/* The dotted outline is the card's own edge (owner, 3 Nov 2026: "add the stroke outside of the card, dotted, brighter on
+   hover"); the plus stands alone in the middle, bigger. */
+.bb__start2.is-blank { border: 2px dashed var(--border-strong); box-shadow: none; }
+.bb__start2.is-blank .bb__start2__plus { width: auto; height: auto; border: 0; }
+.bb__start2.is-blank .bb__start2__plus svg { width: 44px; height: 44px; }
+.bb__start2.is-blank { transition: border-color 0.24s var(--ease-standard), box-shadow 0.24s var(--ease-standard); }
+.bb__start2.is-blank:is(:hover, :focus-visible) { border-color: var(--text-secondary); box-shadow: var(--el-mid); }
+.bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__plus { color: var(--text-primary); }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { CopyPlus, LayoutTemplate, Plus, type LucideIcon } from 'lucide-react'
 import { motion, useReducedMotion, type Variants } from 'motion/react'
 
 /* -----------------------------------------------------------------------------
@@ -27,6 +28,23 @@ const run: Variants = {
 const emerge: Variants = {
   rest: { x: 0, transition: { duration: 0.3, ease: EASE } },
   hot: { x: 14, transition: { duration: 0.5, ease: EASE } },
+}
+
+/* The card's icon, on its picture (owner, 3 Nov 2026: "remove these icons … add the icons in the animations and SVG"): a
+   badge in the card's colour on the sheet's corner, ringed in white, that steps forward a little on hover. */
+const step: Variants = {
+  rest: { scale: 1, transition: { duration: 0.3, ease: EASE } },
+  hot: { scale: 1.1, transition: { duration: 0.4, ease: EASE } },
+}
+function Badge({ icon: Icon, x, y }: { icon: LucideIcon; x: number; y: number }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <motion.g variants={step}>
+        <circle className="bb__g__badge" r="15" />
+        <Icon className="bb__g__badgeicon" x={-8} y={-8} width={16} height={16} strokeWidth={2.2} aria-hidden />
+      </motion.g>
+    </g>
+  )
 }
 
 function ArtFrame({ hot, label, children }: { hot: boolean; label: string; children: ReactNode }) {
@@ -80,6 +98,7 @@ function TemplateArt({ hot }: { hot: boolean }) {
       <rect className="bb__ill__block" x="74" y="70" width="56" height="66" rx="4" />
       <rect className="bb__ill__block" x="138" y="70" width="52" height="29" rx="4" />
       <rect className="bb__ill__block" x="138" y="107" width="52" height="29" rx="4" />
+      <Badge icon={LayoutTemplate} x={198} y={144} />
     </ArtFrame>
   )
 }
@@ -99,6 +118,7 @@ function CopyArt({ hot }: { hot: boolean }) {
           [32, 32],
         ]}
       />
+      <Badge icon={CopyPlus} x={178} y={146} />
     </ArtFrame>
   )
 }
@@ -115,6 +135,7 @@ function ScratchArt({ hot }: { hot: boolean }) {
           [12, 40],
         ]}
       />
+      <Badge icon={Plus} x={178} y={146} />
     </ArtFrame>
   )
 }

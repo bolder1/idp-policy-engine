@@ -382,7 +382,7 @@ export function TemplateSheet({
                 <X size={18} strokeWidth={1.9} />
               </button>
               {detailOpen && detailModel ? (
-                <DetailHead m={detailModel} />
+                <DetailHead m={detailModel} backLabel={policiesOnly ? 'Back to your policies' : 'Back to Xecurify templates'} onBack={back} />
               ) : (
                 <>
                 <span className="bmarket__mark" aria-hidden>
@@ -443,8 +443,6 @@ export function TemplateSheet({
                     m={scenarioCard(preview, users, library)}
                     policy={previewPolicy}
                     useLabel="Use this template"
-                    backLabel="Back to Xecurify templates"
-                    onBack={back}
                     onUse={previewPolicy.rules.length > 0 ? () => take(preview) : undefined}
                   />
                 )}
@@ -453,8 +451,6 @@ export function TemplateSheet({
                     m={policyCard(policyPreview)}
                     policy={policyPreview}
                     useLabel="Inherit these rules"
-                    backLabel="Back to your policies"
-                    onBack={back}
                     onUse={() => takePolicy(policyPreview)}
                   />
                 )}

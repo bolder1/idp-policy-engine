@@ -39,15 +39,19 @@
   --_mustard-050: #fbf4e2;
   --_mustard-100: #eedcaa;
   --_mustard-700: #93690f;
-  --start-template: var(--_terracotta-600);
-  --start-template-wash: var(--_terracotta-050);
-  --start-template-wash-2: var(--_terracotta-100);
-  --start-reuse: var(--_retro-teal-600);
-  --start-reuse-wash: var(--_retro-teal-050);
-  --start-reuse-wash-2: var(--_retro-teal-100);
-  --start-scratch: var(--_mustard-700);
-  --start-scratch-wash: var(--_mustard-050);
-  --start-scratch-wash-2: var(--_mustard-100);
+  /* The template card in the brand's own orange (owner, 3 Nov 2026: "change the orange tone, it looks a little generic … our
+     brand colour with less brown"); it was terracotta. */
+  --start-template: var(--_orange-500);
+  --start-template-wash: var(--_orange-050);
+  --start-template-wash-2: var(--_orange-100);
+  /* 3 Nov 2026 (owner: "start from scratch can be greyed out … the inherit one can be blue"): inherit takes the denim
+     blue, scratch the console's own greys; the template card keeps its terracotta. */
+  --start-reuse: var(--_denim-600);
+  --start-reuse-wash: var(--_denim-050);
+  --start-reuse-wash-2: var(--_denim-100);
+  --start-scratch: var(--text-tertiary);
+  --start-scratch-wash: var(--surface-sunken);
+  --start-scratch-wash-2: var(--border-subtle);
   /* The template shelves, in the same family (create/TemplateCard.tsx; owner, same day: "change the template cards as
      well … make it colourful, same retro colour family"): the shelf's colour washes the card's canvas and names it in
      the corner tab. A denim blue for Quick protection, the faded teal for Device-based, the ochre for Risk-based, and a

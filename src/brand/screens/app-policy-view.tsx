@@ -1221,9 +1221,9 @@ export function AppPolicyView({
   }
   /* More than this application is on it: the only case with an "all" to edit and a copy to make. */
   const shared = row.policy.appIds.length > 1
-  /* The split's Edit all row says who the change reaches, since the popup that follows is a confirm, not an
-     explanation (owner, 27 Oct 2026: "the label should say it changes every application attached to this policy"). */
-  const editAllLabel = row.policy.appIds.length === 2 ? 'Edit for both apps on this policy' : `Edit for all ${row.policy.appIds.length} apps on this policy`
+  /* The split's Edit all row: an option, not a sentence (owner, 3 Nov 2026: "don't want to write a sentence, this is just
+     an option"), the pair of Edit for this app. The popup it opens says how many applications the change reaches. */
+  const editAllLabel = row.policy.appIds.length === 2 ? 'Edit for both apps' : 'Edit for all apps'
   const [scopeOpen, setScopeOpen] = useState(false)
   /* Save as template, from the ⋯ (owner, 27 Oct 2026: every place a policy is managed offers it). */
   const saveTemplate = useSaveAsTemplate()
@@ -1305,7 +1305,10 @@ export function AppPolicyView({
               <SplitButton
                 label={shared ? 'Edit for this app' : 'Edit policy'}
                 icon={Pencil}
-                variant={saving ? 'secondary' : 'brand'}
+                /* A secondary, not the orange (owner, 3 Nov 2026: "we might not want to promote this button so much"): this
+                   tab is for reading what protects the application, and an edit here changes live sign-ins (on a shared
+                   policy it makes a copy). The page's save bar, when one is up, keeps the orange. */
+                variant="secondary"
                 onPress={() => (shared ? openFork('duplicate') : toBoard(policy.id))}
                 menuLabel="More ways to change this policy"
                 items={[

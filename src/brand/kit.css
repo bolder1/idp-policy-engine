@@ -351,8 +351,8 @@ html[data-theme='dark'] {
 /* A pill after the label (MenuItem `pill`): the row's own reason, at the end of the line. It is a span, so the
    `> span` rule above would stretch it into a column; this one outweighs that and keeps it a pill. */
 .bx-menu__item > .bx-menu__pill { flex: none; flex-direction: row; align-self: center; }
-/* The split's menu is sized by what its rows say: a row that names who a change reaches ("Edit for all 3 apps on this
-   policy") stays on one line and widens the menu, instead of breaking at the 232px floor. */
+/* The split's menu is sized by what its rows say: a row stays on one line and widens the menu, instead of breaking at
+   the 232px floor. */
 .bx-split .bx-menu__item strong { white-space: nowrap; }
 /* A disabled row fades its icon and words, not its pill: "On hold" is what the row has to say. */
 .bx-menu__item.has-pill:disabled { opacity: 1; }

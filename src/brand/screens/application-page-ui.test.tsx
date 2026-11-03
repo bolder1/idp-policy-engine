@@ -98,8 +98,9 @@ describe('an application page', () => {
   })
 
   it('has no second policy to add once it has its one, and no explaining sentence over the list', () => {
-    /* One application has at most one sign-in policy: Edit policy is the view's one orange control, and nothing adds another. */
-    expect(orange(out)).toBe(1)
+    /* One application has at most one sign-in policy, and nothing adds another. Since 3 Nov 2026 Edit policy is a
+       secondary, so the tab has no orange until a save bar is up. */
+    expect(orange(out)).toBe(0)
     expect(text(out)).not.toContain('Create new policy')
     expect(text(out)).not.toContain('Add existing policy')
     expect(text(out)).not.toContain('Checked top to bottom')
@@ -122,7 +123,7 @@ describe('the Policies tab', () => {
   const acts = (html: string) => html.slice(html.indexOf('apol__acts'), html.indexOf('</div>', html.indexOf('apol__acts')))
   const buttonsIn = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())
 
-  it('heads a policy this application has to itself with the split alone and a ⋯ trail, and nothing else orange in the view', () => {
+  it('heads a policy this application has to itself with the split alone and a ⋯ trail, and nothing orange in the view', () => {
     expect(box).toMatch(/<h2[^>]*>Box access<\/h2>/)
     /* Since 27 Oct 2026 (HEAD_SPLIT_EDIT) the head is a split button — Edit policy and its chevron, which holds Replace
        policy, on hold — and the ⋯, which static markup never opens. Box's policy is on Box alone, so there is no
@@ -131,8 +132,8 @@ describe('the Policies tab', () => {
     expect(acts(box)).toContain('aria-label="More ways to change this policy"')
     expect(acts(box)).toContain('aria-label="More for this policy"')
     expect(acts(box)).not.toContain('Edit all')
-    expect(orange(box)).toBe(1)
-    expect(orange(acts(box))).toBe(1)
+    expect(orange(box)).toBe(0)
+    expect(orange(acts(box))).toBe(0)
   })
 
   it('says the status in a plain chip, with every switch in the head\'s one menu', () => {
@@ -852,12 +853,12 @@ describe('Replace policy', () => {
 describe('the Policies tab on the policy alone', () => {
   const box = renderIn(true, <ApplicationPage appId="box" />)
 
-  it('heads the policy with the split (Edit policy and its chevron) and a ⋯ holding the rest, still the view’s one orange control', () => {
+  it('heads the policy with the split (Edit policy and its chevron) and a ⋯ holding the rest, and no orange', () => {
     const acts = box.slice(box.indexOf('apol__acts'), box.indexOf('</div>', box.indexOf('apol__acts')))
     /* Sign-in activity and Check access are inside the ⋯ menu; Replace policy, on hold, is inside the split's chevron. */
     expect([...acts.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]).trim())).toEqual(['Edit policy', '', ''])
     expect(acts).toContain('aria-label="More for this policy"')
-    expect(orange(box)).toBe(1)
+    expect(orange(box)).toBe(0)
   })
 
   it('draws the rules wide straight under the policy name and buttons, and the activity table not at all until the button is pressed', () => {
@@ -1001,12 +1002,12 @@ describe('the head\'s split button', () => {
     for (const gone of ['Edit all', 'Duplicate policy', 'Replace policy']) expect(text(acts(shared))).not.toContain(gone)
   })
 
-  it('puts the one orange control on the split', () => {
-    expect(orange(shared)).toBe(1)
-    expect(orange(acts(shared))).toBe(1)
+  /* 3 Nov 2026 (owner: "we might not want to promote this button so much"): the split is a secondary, so no orange. */
+  it('keeps the split quiet: a secondary, and no orange in the view', () => {
+    expect(orange(shared)).toBe(0)
     const tags = [...acts(shared).matchAll(/<button([^>]*)>(.*?)<\/button>/g)].map((m) => ({ attrs: m[1], label: text(m[2]).trim() }))
-    expect(tags.find((b) => b.label === 'Edit for this app')!.attrs).toContain('bx-btn--brand')
-    expect(tags.filter((b) => b.attrs.includes('bx-btn--brand'))).toHaveLength(2) // the action and its chevron: one control
+    expect(tags.find((b) => b.label === 'Edit for this app')!.attrs).toContain('bx-btn--neutral')
+    expect(tags.filter((b) => b.attrs.includes('bx-btn--neutral'))).toHaveLength(2) // the action and its chevron: one control // the action and its chevron: one control
   })
 
   it('lists the edit-for-all row above Replace policy in the split menu, on a shared policy only', () => {
@@ -1016,10 +1017,11 @@ describe('the head\'s split button', () => {
     expect(view).toMatch(/if \(id === 'edit-all'\) openFork\('edit'\)/)
   })
 
-  it('says in the row itself who the change reaches: every application on the policy, counted', () => {
+  it('names the row as an option, the pair of Edit for this app: no count, no sentence', () => {
     const view = code(viewSrc)
-    /* Two applications read "both"; more read the count. The popup after it is a confirm, so the row has to say it. */
-    expect(view).toMatch(/row\.policy\.appIds\.length === 2 \? 'Edit for both apps on this policy' : `Edit for all \$\{row\.policy\.appIds\.length\} apps on this policy`/)
+    /* Two applications read "both", more read "all" (owner, 3 Nov 2026: "this is just an option"). The popup it opens
+       counts the applications the change reaches. */
+    expect(view).toMatch(/row\.policy\.appIds\.length === 2 \? 'Edit for both apps' : 'Edit for all apps'/)
     /* One line, so the menu widens to the label rather than breaking it at the menu's minimum width. */
     expect(kitCss).toMatch(/\.bx-split \.bx-menu__item strong\s*\{\s*white-space:\s*nowrap;\s*\}/)
   })

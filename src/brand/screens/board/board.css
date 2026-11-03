@@ -4153,3 +4153,18 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__start2.is-blank { transition: border-color 0.24s var(--ease-standard), box-shadow 0.24s var(--ease-standard); }
 .bb__start2.is-blank:is(:hover, :focus-visible) { border-color: var(--text-secondary); box-shadow: var(--el-mid); }
 .bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__plus { color: var(--text-primary); }
+
+/* The plus in a circle, so it does not float in an empty card, and a light grey over the whole card on hover, the circle
+   turning white against it (owner, 3 Nov 2026: "on hover add a basic background, and a circle around the icon; the icon
+   looks very empty"). */
+.bb__start2.is-blank .bb__start2__plus {
+  width: 76px; height: 76px; border-radius: 50%;
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+  transition: background-color 0.24s var(--ease-standard), border-color 0.24s var(--ease-standard), color 0.24s var(--ease-standard);
+}
+.bb__start2.is-blank .bb__start2__plus svg { width: 32px; height: 32px; }
+.bb__start2.is-blank,
+.bb__start2.is-blank .bb__start2__stage { transition: background-color 0.24s var(--ease-standard), border-color 0.24s var(--ease-standard), box-shadow 0.24s var(--ease-standard); }
+.bb__start2.is-blank:is(:hover, :focus-visible) { background: var(--surface-sunken); }
+.bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__stage { background: transparent; }
+.bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__plus { background: var(--surface-raised); border-color: var(--border-default); }

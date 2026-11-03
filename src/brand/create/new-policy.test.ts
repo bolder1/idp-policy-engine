@@ -166,17 +166,19 @@ describe('the popup asks for the name and nothing else', () => {
 describe('inside, three ways to start', () => {
   it('says where the rules come from, what happens and what is left: a Xecurify template, a copy of a policy, scratch', () => {
     const empty = code(boardEmptySrc)
-    expect(empty).toContain('By miniOrange')
-    expect(empty).toContain('Your organization')
+    /* No source pills on the cards (owner, 3 Nov 2026), and no note under them. */
+    expect(empty).not.toContain('bb__start2__tab')
+    expect(empty).not.toContain('<Note')
     expect(empty).toContain('<strong>Use a Xecurify template</strong>')
-    expect(empty).toContain('<strong>Reuse an existing policy</strong>')
+    expect(empty).toContain('<strong>Inherit from an existing policy</strong>')
     expect(empty).toContain('<span className="bb__start2__stage">')
     expect(empty).toContain('<strong>Start from scratch</strong>')
     expect(boardBuilderSrc).toContain('useState(() => !!saved?.provisional && !saved.provisional.choose)')
   })
 
-  /* 'Use the older popup here as well', then 'a filter-like dropdown … for scale' (owner, 2 Nov 2026). */
-  it('opens both pickers as the store’s centred popup of cards, taken whole, the categories a dropdown', () => {
+  /* 'Use the older popup here as well', then 'a filter-like dropdown … for scale' (owner, 2 Nov 2026), then 'replace the
+     category dropdown with chips' (3 Nov 2026). */
+  it('opens both pickers as the store’s centred popup of cards, taken whole, the categories as chips', () => {
     expect(PICKER_LOOK).toBe('sheet')
     expect(boardBuilderSrc).toContain("onUseTemplate={() => (TEMPLATE_PICKER || cardLook ? openPicker('template') : setPicking(true))}")
     expect(boardBuilderSrc).toContain("onCopyRules={copyOffered ? () => openPicker('policy') : undefined}")
@@ -186,9 +188,9 @@ describe('inside, three ways to start', () => {
     const g = code(sheetSrc)
     expect(g).toContain("{storeLook && <p className=\"bmarket__by\">By miniOrange</p>}")
     expect(g).toContain('const rail = railShelves.length > 1')
-    expect(g).toMatch(/\{shelf === 'xecurify' && \(\s*<Picker\s*label="Filter by category"\s*prefix="Category"/)
+    expect(g).toMatch(/\{TEMPLATE_CATEGORIES && shelf === 'xecurify' && \(\s*<div className="bmarket__chips" role="group" aria-label="Filter by category">/)
     expect(g).not.toMatch(/aria-label="Categories"/)
-    expect(g).toContain("const title = policiesOnly ? 'Reuse an existing policy' : 'Xecurify templates'")
+    expect(g).toContain("const title = policiesOnly ? 'Inherit from an existing policy' : 'Xecurify templates'")
     expect(g).not.toMatch(/role="checkbox"|SelectAll/)
   })
 

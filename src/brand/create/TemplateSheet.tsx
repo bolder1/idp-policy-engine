@@ -2,9 +2,9 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, BookmarkPlus, Building2, LayoutTemplate, Store, X } from 'lucide-react'
+import { ArrowLeft, BookmarkPlus, Building2, ChevronRight, LayoutGrid, LayoutTemplate, List, Store, X } from 'lucide-react'
 
-import { Button, Drawer, SearchBox } from '../kit'
+import { Button, Chip, Drawer, SearchBox } from '../kit'
 import { FilterTabs } from '../screens/page-bar'
 import { appRoot, useDialogChrome } from '../dialog-chrome'
 import { EmptyState, NoMatches } from '../empty'
@@ -17,8 +17,9 @@ import { scenarioFromPolicy } from '../template-from-policy'
 import { TEMPLATES_MANAGED } from '../template-phase'
 import { buildTemplate, type TemplateLibrary } from '../screens/board/apply-template'
 import type { WhoDirectory } from '../rule-who'
-import { TemplateCard, TemplatePreview, scenarioCard, type CardModel } from './TemplateCard'
-import { TemplateDetail } from './TemplateDetail'
+import { TEMPLATE_CATEGORIES } from '../template-phase'
+import { TemplateCard, TemplatePreview, UsedBy, scenarioCard, type CardModel } from './TemplateCard'
+import { DetailHead, TemplateDetail } from './TemplateDetail'
 
 /* -----------------------------------------------------------------------------
    The template picker.
@@ -119,6 +120,8 @@ export function TemplateSheet({
   const [shelf, setShelf] = useState<Shelf>('xecurify')
   const [cat, setCat] = useState<Cat | 'All'>('All')
   const [q, setQ] = useState('')
+  /* Inherit from an existing policy lists its policies as cards or as rows, a function of the popup (owner, 3 Nov 2026). */
+  const [view, setView] = useState<'cards' | 'list'>('cards')
   const [preview, setPreview] = useState<Scenario | null>(null)
   const [policyPreview, setPolicyPreview] = useState<Policy | null>(null)
   const sheet = useRef<HTMLDivElement>(null)
@@ -156,6 +159,7 @@ export function TemplateSheet({
 
   /* The preview in the popup (TemplateDetail): a template's, or a policy's in the reuse picker. Back closes it. */
   const detailOpen = !slider && (preview !== null || policyPreview !== null)
+  const detailModel = preview ? scenarioCard(preview, users, library) : policyPreview ? policyCard(policyPreview) : null
   const back = () => {
     setPreview(null)
     setPolicyPreview(null)
@@ -234,7 +238,7 @@ export function TemplateSheet({
       {shelf === 'policies' && policyList.length > 0 && (
         <div className="bgal__grid">
           {policyList.map((p) => (
-            <TemplateCard key={p.id} m={policyCard(p)} fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} useLabel="Use" />
+            <TemplateCard key={p.id} m={policyCard(p)} compact fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} useLabel="Inherit" />
           ))}
         </div>
       )}
@@ -276,7 +280,7 @@ export function TemplateSheet({
     </>
   )
 
-  const title = policiesOnly ? 'Reuse an existing policy' : 'Xecurify templates'
+  const title = policiesOnly ? 'Inherit from an existing policy' : 'Xecurify templates'
   /* Xecurify's alone (template-phase.ts): the sheet is the store's own popup (owner, 2 Nov 2026: "use the older popup
      here as well"), its name and by-line in the band. */
   const storeLook = !policiesOnly && railShelves.length === 1 && railShelves[0] === 'xecurify'
@@ -349,7 +353,7 @@ export function TemplateSheet({
              template. */
           role="dialog"
           aria-modal="true"
-          aria-label={policiesOnly ? 'Reuse an existing policy' : storeLook ? 'Xecurify templates' : 'Start from a template'}
+          aria-label={policiesOnly ? 'Inherit from an existing policy' : storeLook ? 'Xecurify templates' : 'Start from a template'}
         >
           <motion.div
             ref={sheet}
@@ -377,17 +381,23 @@ export function TemplateSheet({
                 search at the width a template name actually needs — and
                 nothing else in it. */}
             <header className="bmarket__hero">
-              {/* The shopfront, back and smaller. It was briefly a two-by-two
-                  of the four category hues — a legend for the filter — which
-                  was the last of six attempts to make this band say which
-                  category was selected. It said it accurately and it was still
-                  a second readout for something the dropdown states in words
-                  and the cards state in pills. */}
-              <span className="bmarket__mark" aria-hidden>
-                {policiesOnly ? <Building2 size={17} strokeWidth={1.8} /> : <Store size={17} strokeWidth={1.8} />}
-              </span>
-              <h2>{policiesOnly ? 'Reuse an existing policy' : storeLook ? 'Xecurify templates' : 'Start from a template'}</h2>
-              {storeLook && <p className="bmarket__by">By miniOrange</p>}
+              {detailOpen && detailModel ? (
+                <DetailHead m={detailModel} backLabel={policiesOnly ? 'Back to your policies' : 'Back to Xecurify templates'} onBack={back} />
+              ) : (
+                <>
+                <span className="bmarket__mark" aria-hidden>
+                  {policiesOnly ? <Building2 size={17} strokeWidth={1.8} /> : <Store size={17} strokeWidth={1.8} />}
+                </span>
+                {/* The shopfront, back and smaller. It was briefly a two-by-two
+                    of the four category hues — a legend for the filter — which
+                    was the last of six attempts to make this band say which
+                    category was selected. It said it accurately and it was still
+                    a second readout for something the dropdown states in words
+                    and the cards state in pills. */}
+                <h2>{policiesOnly ? 'Inherit from an existing policy' : storeLook ? 'Xecurify templates' : 'Start from a template'}</h2>
+                {storeLook && <p className="bmarket__by">By miniOrange</p>}
+                </>
+              )}
               <div className="bmarket__searchbox" hidden={detailOpen}>
                 <SearchBox
                   block
@@ -399,7 +409,7 @@ export function TemplateSheet({
               </div>
             </header>
 
-            <div className={`bmarket__work${rail ? '' : ' is-full'}`}>
+            <div className={`bmarket__work${rail ? '' : ' is-full'}${detailOpen ? ' is-detail' : ''}`}>
               {/* Two entries. Who wrote it, and nothing else — the four content
                   categories that used to share this rail are a dropdown over
                   the grid now, because "written by my team" and "about devices"
@@ -425,16 +435,14 @@ export function TemplateSheet({
               </aside>
               )}
 
-              <div className="bmarket__body">
+              <div className={`bmarket__body${detailOpen ? ' is-detail' : ''}`}>
                 {/* A card's preview takes the popup's place (owner, 2 Nov 2026: "change the whole popup, don't open one
                     after another"): it fades in where the grid was, and Back puts the grid back. */}
                 {preview && previewPolicy && (
                   <TemplateDetail
                     m={scenarioCard(preview, users, library)}
                     policy={previewPolicy}
-                    changeLabel="Change template"
                     useLabel="Use this template"
-                    onBack={back}
                     onUse={previewPolicy.rules.length > 0 ? () => take(preview) : undefined}
                   />
                 )}
@@ -442,42 +450,60 @@ export function TemplateSheet({
                   <TemplateDetail
                     m={policyCard(policyPreview)}
                     policy={policyPreview}
-                    changeLabel="Change policy"
-                    useLabel="Use this policy"
-                    onBack={back}
+                    useLabel="Inherit these rules"
                     onUse={() => takePolicy(policyPreview)}
                   />
                 )}
                 {!detailOpen && (
                 <>
+                {/* The heading over the cards is back, for now (owner, 3 Nov 2026: "add the heading as of now"). */}
                 <div className="bmarket__shelf">
-                  {/* No count beside the heading: the cards under it are the count. */}
                   <h3 className="bgal__section">
                     {storeLook ? (cat === 'All' ? 'All templates' : cat) : SHELF_NAME[shelf]}
-                    {!storeLook && <span>{shelf === 'mine' ? 'Built by your team' : shelf === 'xecurify' ? 'By miniOrange' : 'Taken whole, as a copy'}</span>}
+                    {!storeLook && shelf !== 'policies' && <span>{shelf === 'mine' ? 'Built by your team' : 'By miniOrange'}</span>}
                   </h3>
-
-                  {/* The filter, over the thing it filters, and only where it
-                      has work to do: two tenant templates do not need a
-                      taxonomy between them. No counts in the options: the
-                      cards are the count. */}
-                  {shelf === 'xecurify' && (
-                    <Picker
-                      label="Filter by category"
-                      prefix="Category"
-                      value={cat}
-                      size="md"
-                      summary={cat === 'All' ? 'All categories' : cat}
-                      options={[{ value: 'All', label: 'All categories' }, ...cats.map((c) => ({ value: c, label: c }))]}
-                      onChange={(v) => setCat(v as Cat | 'All')}
-                    />
+                  {shelf === 'policies' && (
+                    <div className="bmarket__tools">
+                      <div className="bseg bseg--icons" role="group" aria-label="View">
+                        <button type="button" aria-pressed={view === 'cards'} className={view === 'cards' ? 'is-on' : ''} aria-label="Cards" title="Cards" onClick={() => setView('cards')}>
+                          <LayoutGrid size={16} strokeWidth={1.9} aria-hidden />
+                        </button>
+                        <button type="button" aria-pressed={view === 'list'} className={view === 'list' ? 'is-on' : ''} aria-label="List" title="List" onClick={() => setView('list')}>
+                          <List size={16} strokeWidth={1.9} aria-hidden />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {shelf === 'policies' && policyList.length > 0 && (
+                {/* The categories as chips, one click each and all in view (owner, 3 Nov 2026: "replace the category
+                    dropdown with chips"). */}
+                {TEMPLATE_CATEGORIES && shelf === 'xecurify' && (
+                  <div className="bmarket__chips" role="group" aria-label="Filter by category">
+                    {(['All', ...cats] as (Cat | 'All')[]).map((c) => (
+                      <Chip key={c} active={cat === c} onClick={() => setCat(c)}>
+                        {c === 'All' ? 'All categories' : c}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+
+                {shelf === 'policies' && policyList.length > 0 && view === 'list' && (
+                  <ul className="bpl" aria-label="Your policies">
+                    <li className="bpl__head" aria-hidden>
+                      <span>Name</span>
+                      <span>Used by</span>
+                      <span />
+                    </li>
+                    {policyList.map((p) => (
+                      <PolicyRow key={p.id} m={policyCard(p)} onPreview={() => setPolicyPreview(p)} />
+                    ))}
+                  </ul>
+                )}
+                {shelf === 'policies' && policyList.length > 0 && view === 'cards' && (
                   <div className="bgal__grid">
                     {policyList.map((p) => (
-                      <TemplateCard key={p.id} m={policyCard(p)} fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} useLabel="Use" />
+                      <TemplateCard key={p.id} m={policyCard(p)} compact fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} useLabel="Inherit" />
                     ))}
                   </div>
                 )}
@@ -581,4 +607,24 @@ function Card({
 }) {
   const m = useMemo(() => scenarioCard(s, directory, library), [s, directory, library])
   return <TemplateCard m={m} fallback={fallback} onUse={onUse} onPreview={onPreview} useLabel="Use" />
+}
+
+
+/* A policy as a row of the list (owner, 3 Nov 2026: "give me a good list experience … the whole row on hover", then "simple and useful": a name, where it runs, and the action): the whole row is
+   the button, so it highlights and opens the preview from anywhere on it; the action says itself on hover and focus. */
+function PolicyRow({ m, onPreview }: { m: CardModel; onPreview: () => void }) {
+  return (
+    <li>
+      <button type="button" className="bpl__row" onClick={onPreview} aria-label={`Preview and inherit ${m.name}`}>
+        <span className="bpl__name" title={m.name}>
+          {m.name}
+        </span>
+        <span className="bpl__apps">{m.apps && m.apps.length > 0 ? <UsedBy apps={m.apps} /> : null}</span>
+        <span className="bpl__go">
+          Preview and inherit
+          <ChevronRight size={14} strokeWidth={2} aria-hidden />
+        </span>
+      </button>
+    </li>
+  )
 }

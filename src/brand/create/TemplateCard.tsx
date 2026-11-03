@@ -1,11 +1,16 @@
 import {
   Check,
+  ClipboardCheck,
   Clock,
+  CopyPlus,
   Fingerprint,
+  Gauge,
   Globe,
+  Laptop,
   ListFilter,
   type LucideIcon,
   Network,
+  ShieldCheck,
   Tag,
   Trash2,
   Users,
@@ -20,9 +25,10 @@ import { narrowToAudience, withoutMissing, type TemplateLibrary, type TemplateNe
 import { whoSentence } from '../screens/predicate-prose'
 import { hasWho, type WhoDirectory } from '../rule-who'
 import { SHOWCASE } from '../showcase'
-import { CARD_PICTURES } from '../template-phase'
+
 import { CardPicture } from './CardPicture'
 import { AppLogo } from '../logos/AppLogo'
+import { TEMPLATE_CATEGORIES } from '../template-phase'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -233,6 +239,17 @@ const CAT_KEY: Record<string, string> = {
 }
 export const catKey = (c: string) => CAT_KEY[c] ?? 'neutral'
 
+/* A card's icon when its picture is off (card-hero.ts): one per shelf, on a tile in the shelf's colour. A policy to
+   reuse takes the one its rules are most like, as its picture does. */
+const HUE_ICON: Record<string, LucideIcon> = {
+  quick: ShieldCheck,
+  device: Laptop,
+  risk: Gauge,
+  compliance: ClipboardCheck,
+  reuse: CopyPlus,
+  neutral: ShieldCheck,
+}
+
 function SignalRow({ signals }: { signals: string[] }) {
   return (
     <span className="bgcard__signals">
@@ -264,6 +281,7 @@ export function TemplateCard({
   useLabel = 'Use',
   done,
   fallback = '1fa',
+  compact = false,
 }: {
   m: CardModel
   /** Omitted where the template cannot be used yet: the card shows no control. */
@@ -276,6 +294,8 @@ export function TemplateCard({
   done?: string
   /** What the policy's own default decides. The template does not change it. */
   fallback?: AccessDecision
+  /** No picture: the card is its icon, its words and its button (the Copy a policy popup, with Pictures off). */
+  compact?: boolean
 }) {
   const shown = m.rules.slice(0, shownCount(m.rules.length))
   const rest = m.rules.length - shown.length
@@ -285,16 +305,19 @@ export function TemplateCard({
      has the rules in full and the template's own Use. Once the store's card is added, it only previews. */
   const offer = !done && !!onUse && m.rules.length > 0
   const verb = offer ? `Preview and ${useLabel.toLowerCase()}` : 'Preview'
-  const hue = m.category ? catKey(m.category) : (m.tone ?? 'neutral')
+  /* A policy of the tenant's own, in the reuse picker, has no colour (owner, 3 Nov 2026: "remove the colours from reuse"). */
+  const hue = m.category ? catKey(m.category) : 'neutral'
   /* The pointer or the keyboard on the card: its picture plays its use while it is. */
   const [hot, setHot] = useState(false)
+  /* Xecurify's own templates are drawn (CardPicture.tsx); a policy of the tenant's is shown by its rules. */
+  const pictured = !!m.category
 
   return (
     /* The shelf's colour, on the whole card (owner, 2 Nov 2026: "make it colourful … same retro colour family"):
        create.css reads it for the tab's words and the canvas's wash on hover ("simple as it used to be, and on hover add
        this colour"). A card with no shelf takes its tone. */
     <article
-      className={`bgcard is-cat-${hue}`}
+      className={`bgcard is-cat-${hue}${compact ? ' is-bare' : ''}`}
       onPointerEnter={() => setHot(true)}
       onPointerLeave={() => setHot(false)}
       onFocus={() => setHot(true)}
@@ -302,7 +325,7 @@ export function TemplateCard({
     >
       {/* The shelf, cut out of the card's top-left corner (owner, 2 Nov 2026: "remove the border from this section so it
           looks like a cut out"): on the card rather than in the canvas, so it can cover the card's own edge there. */}
-      {m.category && <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>}
+      {TEMPLATE_CATEGORIES && m.category && <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>}
       {/* The illustration is the live preview: the template's rules drawn as
           the builder would order them, plus the control that expands them.
 
@@ -317,9 +340,9 @@ export function TemplateCard({
       {/* The picture and the words, in a column, or side by side once the card is wide (create.css, a container query):
           a card alone in its row (owner, 2 Nov 2026: "auto adaptable … single, double or max 3 in a row"). */}
       <div className="bgcard__in">
-      <div className={`bgcard__canvas${CARD_PICTURES ? ' is-picture' : ''}`}>
-        {/* A generic picture of the shelf (template-phase.ts `CARD_PICTURES`); the template's rules are in the preview. */}
-        {CARD_PICTURES ? (
+      <div className={`bgcard__canvas${pictured ? ' is-picture' : ''}`}>
+        {/* A generic picture of the shelf (card-hero.ts, the Pictures version); the template's rules are in the preview. */}
+        {pictured ? (
           <CardPicture hue={hue} hot={hot} />
         ) : (
         <>
@@ -376,6 +399,17 @@ export function TemplateCard({
       </div>
 
       <div className="bgcard__body">
+        {/* Pictures off: the card's icon on a tile, in place of the picture above it. */}
+        {compact && (
+          <div className="bgcard__top">
+            <span className="bgcard__icon" aria-hidden>
+              {(() => {
+                const Ico = HUE_ICON[hue] ?? Tag
+                return <Ico size={18} strokeWidth={1.9} />
+              })()}
+            </span>
+          </div>
+        )}
         {/* Signals first, then the labels, then the words — Apollo's order, and
             it is the right one: the glyph row is read at a glance across the
             grid, the heading only once the glyphs have narrowed the field. */}
@@ -391,6 +425,12 @@ export function TemplateCard({
 
         {/* The name, truncated, so it keeps its title. */}
         <div className="bgcard__head">
+          <span className="bgcard__icon is-sm" aria-hidden>
+            {(() => {
+              const Ico = HUE_ICON[hue] ?? Tag
+              return <Ico size={16} strokeWidth={1.9} />
+            })()}
+          </span>
           <h3 className="bgcard__h" title={m.name}>
             {m.name}
           </h3>

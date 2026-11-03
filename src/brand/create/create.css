@@ -557,7 +557,7 @@
   isolation: isolate;
   overflow: hidden;
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  padding: 20px 24px 22px;
+  padding: 14px 24px 14px;
   /* Deepest at the top edge and flat well before the search field, so the input
      and the seam into the catalogue below both sit on plain surface. */
   background: linear-gradient(
@@ -571,14 +571,14 @@
 /* The band takes the colour of the card that opened it (owner, 2 Nov 2026: "change the gradient based on the card colour:
    for template orange, for the other one green"): the builder's start cards' terracotta and teal (tokens.css `--start-*`). */
 .bmarket__sheet.is-template { --hero-tint: var(--start-template); --hero-mark: var(--start-template); --hero-mark-border: var(--start-template-wash-2); }
-.bmarket__sheet.is-reuse { --hero-tint: var(--start-reuse); --hero-mark: var(--start-reuse); --hero-mark-border: var(--start-reuse-wash-2); }
+.bmarket__sheet.is-reuse { --hero-tint: var(--text-secondary); --hero-mark: var(--text-secondary); --hero-mark-border: var(--border-default); }
 
 /* The mark, back to the shopfront it was, and staying at the smaller size the
    shrunken band asked for. Brand-tinted rather than neutral now that the band
    under it is brand too — a grey badge in a warm band reads as an oversight. */
 .bmarket__mark {
   flex: none; width: 32px; height: 32px; border-radius: 10px;
-  display: grid; place-items: center; margin-bottom: 10px;
+  display: grid; place-items: center; margin-bottom: 6px;
   background: var(--surface-raised); color: var(--hero-mark, var(--accent-strong));
   border: 1px solid var(--hero-mark-border, var(--accent-soft-border));
   box-shadow: var(--el-low);
@@ -593,7 +593,9 @@
 /* The search, at the width a template name actually needs. The pill-shaped
    42px field this used to draw is gone — a fifth shape for the same object —
    and the wrapper now only says how wide the box is on this page. */
-.bmarket__searchbox { width: min(440px, 100%); margin-top: 12px; }
+.bmarket__searchbox { width: min(440px, 100%); margin-top: 8px; }
+/* The category chips, under the shelf's heading and over its cards. */
+.bmarket__chips { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: calc(-1 * var(--space-2)) 0 var(--space-6); }
 
 /* The close, over the band rather than in a row of its own. */
 .bmarket__x {
@@ -919,6 +921,29 @@
    words 12px at the smallest and its one colour the shelf's. On hover only its edge and shadow change ("subtle and
    silent"); nothing moves. */
 .bgcard__canvas.is-picture { display: grid; place-items: center; padding: 34px 20px 14px; }
+/* Pictures off (card-hero.tsx): no canvas, and the body leaves room under the shelf's tab. */
+.bgcard.is-bare .bgcard__canvas,
+.bgcard.is-bare .bgcard__cat { display: none; }
+.bgcard.is-bare .bgcard__body { gap: var(--space-3); padding-top: var(--space-6); }
+.bgcard__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-3); }
+.bgcard__icon {
+  flex: none; display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: var(--radius-lg);
+  background: var(--tpl-wash); color: var(--tpl);
+  border: 1px solid var(--tpl-wash-2);
+}
+.bgcard__icon.is-sm { flex: none; width: 32px; height: 32px; border-radius: var(--radius-md); }
+.bgcard__pill {
+  display: inline-flex; align-items: center; min-width: 0;
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  /* The shelf's colour, a shade darker: the plain colour on its own wash is 4.4:1 for two shelves, under the 4.5:1 a 12px
+     label needs. */
+  background: var(--tpl-wash); color: color-mix(in srgb, var(--tpl) 82%, black);
+  font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); white-space: nowrap;
+}
+/* The outcome and who it is for, on one line under the name. */
+.bmarket__tools { display: flex; align-items: center; gap: var(--space-6); }
+.cardhero-switch { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-secondary); }
 .bgviz {
   display: flex; flex-direction: column; gap: var(--space-3);
   width: min(264px, 100%);
@@ -1251,3 +1276,166 @@
     transition: opacity 240ms var(--ease-standard) 40ms;
   }
 }
+
+/* One face for every card, the rule stack (owner, 3 Nov 2026: "show the old rule view … a single scalable illustration,
+   drop the category-based part, keep the colours"). The shelf's colour rides on the numbers and the spine, so the cards
+   still tell their shelves apart without a drawing per shelf. */
+.bgcard .bgcard__mn {
+  background: var(--tpl-wash);
+  border-color: color-mix(in srgb, var(--tpl) 35%, var(--surface-raised));
+  color: color-mix(in srgb, var(--tpl) 82%, black);
+}
+.bgcard .bgcard__stack::before { background: color-mix(in srgb, var(--tpl) 40%, var(--surface-raised)); }
+.bgcard .bgcard__readout .bgcard__rlabel { color: color-mix(in srgb, var(--tpl) 82%, black); }
+
+
+/* A tenant's own policy (the reuse picker) has no colour and nothing moves inside its picture (owner, 3 Nov 2026: "I don't
+   like the hover inside the picture … that dark grey"): the numbers stay light, the stage stays grey, the rows stay put. */
+.bgcard.is-cat-neutral .bgcard__mn { background: var(--surface-inset); border-color: var(--border-subtle); color: var(--text-tertiary); }
+.bgcard.is-cat-neutral .bgcard__stack::before { background: var(--border-default); }
+.bgcard.is-cat-neutral .bgcard__readout .bgcard__rlabel { color: var(--text-secondary); }
+.bgcard.is-cat-neutral:is(:hover, :has(:focus-visible)) .bgcard__canvas::before { opacity: 0; }
+.bgcard.is-cat-neutral:is(:hover, :has(:focus-visible)) .bgcard__canvas::after { opacity: 1; }
+.bgcard.is-cat-neutral:is(:hover, :has(:focus-visible)) .bgcard__mrow:not(.bgcard__mrow--default) { border-color: var(--border-subtle); box-shadow: var(--el-low); }
+.bgcard.is-cat-neutral:is(:hover, :has(:focus-visible)) .bgcard__mrow:not(.bgcard__mrow--rest, .bgcard__mrow--default) .bgcard__mn { border-color: var(--border-subtle); color: var(--text-tertiary); }
+.bgcard.is-cat-neutral .bgcard__mrow { transition: none; transform: none; }
+
+/* The template's rules in the preview are drawn at the builder's own card width, centred, not the width of the dialog
+   (owner, 3 Nov 2026: "make the card less wide, it looks bad"). */
+.bdetail__canvas .bb.insp__canvas { --bb-card: 560px; }
+.bdetail__canvas .bb__chain { margin-inline: auto; }
+
+/* A card with no picture is a filled, rounded tile (owner, 3 Nov 2026: "add some background to the cards", with the Projects list
+   as the reference): a flat grey ground, so the cards stand off the popup's white. Its button stays white. */
+.bgcard.is-bare { background: var(--surface-sunken); border-color: transparent; }
+.bgcard.is-bare .bgcard__go .bx-btn, .bgcard.is-bare .bgcard__cta { background: var(--surface-raised); }
+
+/* The policy list (TemplateSheet.tsx PolicyRow): a header, then one row per policy. The whole row is the button; on hover it
+   darkens a step and its action comes in, as in a file list. */
+.bpl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bpl__head, .bpl__row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 150px; align-items: center; gap: var(--space-5); padding: 0 var(--space-6); }
+.bpl__head { height: 36px; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); border-bottom: 1px solid var(--border-subtle); }
+.bpl > li { border-bottom: 1px solid var(--border-subtle); }
+.bpl > li:last-child { border-bottom: 0; }
+.bpl__row { width: 100%; height: 56px; text-align: left; font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; transition: background 0.12s var(--ease-standard); }
+.bpl__row:hover, .bpl__row:focus-visible { background: var(--surface-sunken); }
+.bpl__row:focus-visible { outline: 2px solid var(--ctl-border-focus); outline-offset: -2px; }
+.bpl__name { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bpl__apps { min-width: 0; overflow: hidden; }
+.bpl__apps .bgcard__apps { margin: 0; }
+.bpl__rules { font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; }
+.bpl__row .bgcard__tag { justify-self: start; }
+.bpl__go { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--space-2); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; opacity: 0; transition: opacity 0.12s var(--ease-standard); }
+.bpl__row:hover .bpl__go, .bpl__row:focus-visible .bpl__go { opacity: 1; color: var(--text-primary); }
+@media (max-width: 720px) { .bpl__head { display: none; } .bpl__row { grid-template-columns: minmax(0, 1fr) auto; } .bpl__apps, .bpl__rules, .bpl__row .bgcard__tag { display: none; } .bpl__go { opacity: 1; } }
+.bpl__apps .bgcard__appslabel { display: none; }
+
+/* The popup's head, as the product's other popups draw theirs (owner, 3 Nov 2026: "revamp it … remove the gradient and the layout"):
+   the title on the left with who it is by, the search on the right, on the plain surface, a rule underneath. */
+.bmarket__hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-8); align-items: center; text-align: left;
+  padding: var(--space-6) 64px var(--space-6) var(--space-8);
+  background: var(--surface-raised);
+}
+.bmarket__hero h2 { grid-column: 1; font-size: var(--fs-lg); }
+.bmarket__hero .bmarket__by { grid-column: 1; margin-top: 0; }
+.bmarket__hero .bmarket__searchbox { grid-column: 2; grid-row: 1 / span 2; width: 320px; margin: 0; }
+.bmarket__x { top: var(--space-6); right: var(--space-6); }
+@media (max-width: 720px) { .bmarket__hero { grid-template-columns: 1fr; padding-right: 56px; } .bmarket__hero .bmarket__searchbox { grid-column: 1; grid-row: auto; width: 100%; margin-top: var(--space-4); } }
+
+/* The view switch as two icon buttons. */
+.bseg--icons button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; }
+
+/* The preview page: a back button, the name with its Preview chip, the rules, and a footer with the note and the one button. */
+.bdetail__head { align-items: flex-start; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-8) var(--space-6); }
+.bdetail__titlerow { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.bdetail__name { font-size: var(--fs-xl); }
+.bdetail__foot { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-5) var(--space-8); background: var(--surface-raised); border-top: 1px solid var(--border-subtle); }
+.bdetail__footnote { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+
+/* The popup's icon, on the left of its title again (owner, 3 Nov 2026: "add the icons here"), as a plain tile. */
+.bmarket__hero { grid-template-columns: auto minmax(0, 1fr) auto; column-gap: var(--space-5); }
+.bmarket__hero .bmarket__mark { grid-column: 1; grid-row: 1 / span 2; margin: 0; width: 36px; height: 36px; box-shadow: none; }
+.bmarket__hero h2, .bmarket__hero .bmarket__by { grid-column: 2; }
+.bmarket__hero .bmarket__searchbox { grid-column: 3; }
+@media (max-width: 720px) { .bmarket__hero { grid-template-columns: auto minmax(0, 1fr); } .bmarket__hero .bmarket__searchbox { grid-column: 1 / -1; } }
+
+/* The preview is a page of its own: the head and the footer stay, the rules scroll between them (owner, 3 Nov 2026). */
+.bmarket__body.is-detail { display: flex; flex-direction: column; overflow: hidden; }
+.bmarket__body.is-detail .bdetail { flex: 1; min-height: 0; }
+.bdetail__canvas { flex: 1; min-height: 0; overflow-y: auto; }
+.bdetail__foot { justify-content: flex-end; }
+.bdetail__note { display: flex; justify-content: center; padding-top: var(--space-6); }
+
+/* A card with no picture: the icon and the name share one row, and the name is big and may take two lines instead of one cut
+   short (owner, 3 Nov 2026: "icon and name in one row, big names, good spacing"). */
+.bgcard.is-bare .bgcard__top { display: none; }
+.bgcard.is-bare .bgcard__head { align-items: flex-start; gap: var(--space-4); }
+.bgcard.is-bare .bgcard__head .bgcard__icon { flex: none; width: 36px; height: 36px; }
+.bgcard.is-bare .bgcard__h { font-size: var(--fs-lg); line-height: 1.3; white-space: normal; overflow: visible; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bgcard.is-bare .bgcard__body { padding-top: var(--space-6); }
+
+/* The preview is three bands: the popup's header with the heading, the rules scrolling in the middle, and a footer that stays. */
+.bmarket__hero:has(.bdetail__head) { display: block; padding: var(--space-4) 64px var(--space-5) var(--space-6); }
+.bmarket__hero .bdetail__head { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); padding: 0; border: 0; }
+.bmarket__work.is-detail { overflow: hidden; padding: 0; gap: 0; display: block; }
+.bmarket__body.is-detail { height: 100%; }
+.bmarket__body.is-detail .bdetail { height: 100%; border: 0; border-radius: 0; }
+.bmarket__body.is-detail .bdetail__canvas { padding: var(--space-5) var(--space-6); }
+
+/* The note sits on the canvas's free left side when the popup is wide enough, and above the rules when it is not. */
+.bdetail__note { position: relative; z-index: 2; }
+.bdetail__note .bb__notice { position: static; right: auto; top: auto; height: auto; margin: 0; }
+@media (min-width: 1100px) {
+  .bdetail__canvas { position: relative; }
+  .bdetail__note { position: absolute; top: var(--space-6); left: var(--space-6); padding: 0; }
+}
+
+/* The preview's canvas is fixed between the header and the footer; the rules scroll inside it, centred as on the builder's canvas. */
+.bmarket__body.is-detail .bdetail__canvas { overflow: hidden; display: flex; flex-direction: column; padding: var(--space-5) var(--space-6); }
+.bdetail__canvas .bb.insp__canvas { flex: 1; min-height: 0; height: 100%; }
+.bdetail__canvas .bb.insp__canvas .bb__stage { height: 100%; overflow-y: auto; overflow-x: hidden; }
+
+/* The note leans against the first rule's left edge when the popup is wide, and sits above the rules when it is not. */
+@media (min-width: 1100px) {
+  .bdetail__note { top: calc(var(--space-5) + 84px); left: calc(50% - 280px - 236px); }
+}
+
+/* Back: a quiet link above the title, level with it. */
+.bdetail__head .bx-btn--ghost { margin-left: calc(-1 * var(--space-3)); color: var(--text-secondary); }
+.bdetail__head .bx-btn--ghost:hover { color: var(--text-primary); }
+
+/* A card with no picture is as tall as its words, not as a picture would have been. */
+.bgcard.is-bare, .bgcard.is-bare .bgcard__in { min-height: 0; }
+.bgcard.is-bare .bgcard__go { margin-top: var(--space-5); padding-top: 0; }
+
+/* The no-picture card: the icon and the name level with each other, and the name on one line, cut with an ellipsis. */
+.bgcard.is-bare .bgcard__head { align-items: center; }
+.bgcard.is-bare .bgcard__h { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; -webkit-box-orient: unset; }
+
+/* The Preview chip rides the canvas's top-left corner; the footer says what Use does in one line. */
+.bdetail__chip { position: absolute; top: var(--space-5); left: var(--space-5); z-index: 3; display: inline-flex; align-items: center; gap: var(--space-2); height: 26px; padding: 0 var(--space-4); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-pill); box-shadow: var(--el-low); }
+.bdetail__foot { justify-content: space-between; }
+
+/* The no-picture card is three rows and a button (owner, 3 Nov 2026: "one row for the icon, one for the heading, one for the rest,
+   and one CTA"): the icon tile, the name on one line, who it is on, then the button. */
+.bgcard.is-bare .bgcard__top { display: block; }
+.bgcard.is-bare .bgcard__head .bgcard__icon { display: none; }
+.bgcard.is-bare .bgcard__head { align-items: flex-start; }
+
+/* The Preview chip: amber, so it reads as a state and not a label; bolder; it settles in once when the preview opens (owner, 3 Nov 2026).
+   It sits inside the dotted canvas, a step in from its corner. */
+.bdetail__chip {
+  top: calc(var(--space-5) + var(--space-4)); left: calc(var(--space-6) + var(--space-4));
+  font-weight: var(--fw-semibold); letter-spacing: 0.01em;
+  color: var(--fb-notice-fg); background: var(--fb-notice-bg); border-color: color-mix(in srgb, var(--fb-notice-fg) 28%, var(--fb-notice-bg)); box-shadow: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bdetail__chip { animation: bdetail-chip-in 0.4s var(--ease-standard) both; }
+  .bdetail__chip svg { animation: bdetail-chip-eye 0.5s 0.25s var(--ease-standard) both; }
+}
+@keyframes bdetail-chip-in { from { opacity: 0; translate: -6px 0; } to { opacity: 1; translate: 0 0; } }
+@keyframes bdetail-chip-eye { 0% { scale: 1 1; } 40% { scale: 1 0.1; } 100% { scale: 1 1; } }
+
+/* The name may take a second line, never a third (owner, 3 Nov 2026). */
+.bgcard.is-bare .bgcard__h { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }

@@ -523,7 +523,9 @@
 }
 
 .bb__ill__sheet { fill: var(--surface-raised); stroke: var(--border-subtle); stroke-width: 1; }
-.bb__ill__shade { fill: var(--start-wash-2); }
+.bb__ill__shade { fill: color-mix(in srgb, var(--start-hover) 32%, var(--surface-raised)); }
+/* The tile edge runs along the bottom and right, like a Figma file tile (owner, 3 Nov 2026). */
+.bb__start2 .bb__ill__sheet:not(.is-back) { stroke: color-mix(in srgb, var(--start-hover) 40%, var(--surface-raised)); }
 .bb__ill__rule { fill: none; stroke: var(--border-subtle); stroke-width: 1; }
 .bb__ill__text { fill: var(--border-strong); opacity: 0.4; }
 .bb__ill__text.is-lit { fill: var(--start-hover); opacity: 0.55; }
@@ -4114,3 +4116,15 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__sticky__logos li { display: inline-flex; }
 .bb__sticky__more { font-size: var(--fs-sm); color: var(--text-secondary); }
 .bb__sticky__app { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--fw-medium); color: var(--text-primary); vertical-align: bottom; }
+
+
+/* The start cards' pictures (StartArt.tsx): paper in the card's own colour, no words. */
+.bb__g__solid { fill: var(--start-hover); }
+.bb__g__tint { fill: color-mix(in srgb, var(--start-hover) 16%, var(--surface-raised)); }
+.bb__g__tint2 { fill: color-mix(in srgb, var(--start-hover) 36%, var(--surface-raised)); }
+.bb__g__paper { fill: var(--surface-raised); stroke: color-mix(in srgb, var(--start-hover) 40%, var(--surface-raised)); stroke-width: 1.25; }
+.bb__g__shade { fill: color-mix(in srgb, var(--start-hover) 28%, var(--surface-raised)); }
+.bb__g__fold { fill: color-mix(in srgb, var(--start-hover) 16%, var(--surface-raised)); stroke: color-mix(in srgb, var(--start-hover) 40%, var(--surface-raised)); stroke-width: 1.25; stroke-linejoin: round; }
+.bb__g__ghost { fill: var(--surface-raised); stroke: var(--start-hover); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.85; transition: fill 0.3s var(--ease-standard); }
+.bb__start2:is(:hover, :focus-visible) .bb__g__ghost { fill: color-mix(in srgb, var(--start-hover) 10%, var(--surface-raised)); }
+

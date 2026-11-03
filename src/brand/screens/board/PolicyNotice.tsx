@@ -106,6 +106,15 @@ function Sticky({ id, title, logos, children }: { id: string; title: string; log
   )
 }
 
+/** The board's sticky note, for a page that is not the board: the template preview says what Use will do on one (owner, 3 Nov 2026). */
+export function StickyNote({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <Sticky id={id} title={title}>
+      {children}
+    </Sticky>
+  )
+}
+
 /** Who a save reaches, in a phrase: the groups and people the policy is narrowed to, or everyone. */
 const whoText = (audience: string[] | null | undefined) => (audience && audience.length > 0 ? appNames(audience) : 'everyone')
 

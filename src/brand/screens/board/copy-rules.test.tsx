@@ -103,10 +103,10 @@ describe('the doors', () => {
 
   it('adds a card on the empty board, sized as a third, only when there is a policy to copy from', () => {
     const on = chooser({ onCopyRules: () => {} })
-    expect(on).toContain('Reuse an existing policy')
+    expect(on).toContain('Inherit from an existing policy')
     expect(on).toContain('bb__starts has-three')
     const off = chooser()
-    expect(off).not.toContain('Reuse an existing policy')
+    expect(off).not.toContain('Inherit from an existing policy')
     expect(off).not.toContain('has-three')
   })
 

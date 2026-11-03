@@ -41,7 +41,7 @@ export const COPY_RULES: boolean = true
 
 /* Copy rules from a policy as a row in the bar's ⋯ (owner, 2 Nov 2026, later: "can hide this, no need"). Off, the row
    goes, and with Save as template on hold (template-phase.ts) the ⋯ has nothing left in it, so it goes too. The empty
-   board's Reuse an existing policy card is the way in. Hidden, not deleted. */
+   board's Inherit from an existing policy card is the way in. Hidden, not deleted. */
 export const BAR_COPY_RULES: boolean = false
 
 /* The empty board's Use a template opens the same picker as Copy from a policy (owner, 2 Nov 2026: "make the copy from

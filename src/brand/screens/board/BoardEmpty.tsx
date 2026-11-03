@@ -1,11 +1,10 @@
-import { useState, type ReactNode } from 'react'
-import { Building2, CopyPlus, LayoutTemplate, PenLine, Plus, Undo2 } from 'lucide-react'
-import { motion, useReducedMotion, type Variants } from 'motion/react'
+import { useState } from 'react'
+import { CopyPlus, LayoutTemplate, PenLine, Plus, Undo2 } from 'lucide-react'
 
 import { Button } from '../../kit'
-import { BrandMark } from '../../logos/BrandMark'
 import type { AccessDecision } from '../../data'
 import { DECISION_NAME } from './model'
+import { StartPicture } from './StartArt'
 
 /* -----------------------------------------------------------------------------
    The empty policy — a screen, not a canvas.
@@ -67,9 +66,9 @@ export function BoardEmpty({
             contextual … this is the screen the user will see every time he wants to create a policy"). Not the policy's
             name: a name can be anything, and the bar already shows it ("what is this … rethink"). A policy that has lost
             its rules keeps the plain "No rules". */}
-        <h2>{fresh ? 'Decide who gets in, and how' : 'No rules'}</h2>
+        <h2>{fresh ? 'How should this policy start?' : 'No rules'}</h2>
         {fresh && (
-          <p className="bb__empty__sub">Each rule allows a sign-in, asks for a second factor, or stops it. Start with ready-made rules or your own.</p>
+          <p className="bb__empty__sub">Each rule lets people in, asks for a second factor, or blocks them.</p>
         )}
 
         {/* What the policy does right now. The default card and the undo
@@ -116,12 +115,8 @@ export function BoardEmpty({
                   here, at the top edge"; then "the same cut-out as the template card, remove the white part, make it feel
                   part of the canvas"). Its words take the card's colour on hover. Start from scratch has none: its rules
                   come from nowhere ("By you … can remove"). */}
-              <span className="bb__start2__tab">
-                <BrandMark brand="miniorange" size={12} />
-                By miniOrange
-              </span>
               <span className="bb__start2__stage">
-                <TemplateArt hot={hot === 'template'} />
+                <StartPicture kind="template" hot={hot === 'template'} />
               </span>
               <span className="bb__start2__foot">
                 <span className="bb__start2__icon" aria-hidden>
@@ -129,7 +124,7 @@ export function BoardEmpty({
                 </span>
                 <span className="bb__start2__text">
                   <strong>Use a Xecurify template</strong>
-                  <span>Ready-made rules, yours to edit</span>
+                  <span>Ready-made rules for common setups</span>
                 </span>
               </span>
             </button>
@@ -152,27 +147,23 @@ export function BoardEmpty({
           )}
           {onCopyRules && (
             <button type="button" className="bb__start2 is-reuse" onClick={onCopyRules} {...point('reuse')}>
-              <span className="bb__start2__tab">
-                <Building2 size={12} strokeWidth={2} aria-hidden />
-                Your organization
-              </span>
               <span className="bb__start2__stage">
-                <CopyArt hot={hot === 'reuse'} />
+                <StartPicture kind="reuse" hot={hot === 'reuse'} />
               </span>
               <span className="bb__start2__foot">
                 <span className="bb__start2__icon" aria-hidden>
                   <CopyPlus size={17} strokeWidth={1.9} />
                 </span>
                 <span className="bb__start2__text">
-                  <strong>Reuse an existing policy</strong>
-                  <span>Copy its rules, then edit them</span>
+                  <strong>Inherit from an existing policy</strong>
+                  <span>Take the rules of a policy you already run</span>
                 </span>
               </span>
             </button>
           )}
           <button type="button" className="bb__start2 is-scratch" onClick={onScratch} {...point('scratch')}>
             <span className="bb__start2__stage">
-              <ScratchArt hot={hot === 'scratch'} />
+              <StartPicture kind="scratch" hot={hot === 'scratch'} />
             </span>
             <span className="bb__start2__foot">
               <span className="bb__start2__icon" aria-hidden>
@@ -180,7 +171,7 @@ export function BoardEmpty({
               </span>
               <span className="bb__start2__text">
                 <strong>Start from scratch</strong>
-                <span>Write the first rule yourself</span>
+                <span>Build your own rules, one by one</span>
               </span>
             </span>
           </button>
@@ -209,147 +200,6 @@ export function BoardEmpty({
 
 type Start = 'template' | 'reuse' | 'scratch'
 
-
-/** The frame: every picture's 264 by 176 box, playing while its card is hot. */
-function ArtFrame({ hot, label, children }: { hot: boolean; label: string; children: ReactNode }) {
-  const still = useReducedMotion()
-  return (
-    <motion.svg
-      className="bb__start2__art"
-      viewBox="0 0 264 176"
-      role="img"
-      aria-label={label}
-      initial={false}
-      animate={hot && !still ? 'hot' : 'rest'}
-    >
-      {children}
-    </motion.svg>
-  )
-}
-
-/** A sheet: its shadow in the card's wash, then the sheet. */
-function Sheet({ x, y, w, h, r = 10 }: { x: number; y: number; w: number; h: number; r?: number }) {
-  return (
-    <>
-      <rect className="bb__ill__shade" x={x} y={y + 4} width={w} height={h} rx={r} />
-      <rect className="bb__ill__sheet" x={x} y={y} width={w} height={h} rx={r} />
-    </>
-  )
-}
-
-/* The one move left (owner, same day: "the animation feels too much … make it subtle and silent, it shouldn't pull the
-   user's attention, we added so much colour anyway"): reuse's rules fade into the new policy's empty places, one after
-   another. Everything else on hover is colour, in board.css. `custom` is the delay in seconds. */
-const fadeIn: Variants = {
-  rest: { opacity: 0, transition: { duration: 0.15 } },
-  hot: (d: number) => ({ opacity: 1, transition: { delay: d, duration: 0.3, ease: 'easeOut' } }),
-}
-
-/** The new policy, on the right of every picture: its mark in the card's colour, a title, and its empty places. */
-function NewPolicy({ places }: { places: number }) {
-  return (
-    <>
-      <Sheet x={144} y={30} w={106} h={116} />
-      <circle className="bb__ill__mark" cx="158" cy="45" r="5" />
-      <rect className="bb__ill__text" x="168" y="42" width="42" height="6" rx="3" />
-      <path className="bb__ill__rule" d="M144 58 H250" />
-      {Array.from({ length: places }, (_, i) => (
-        <rect key={i} className="bb__ill__slot" x="154" y={68 + i * 22} width="86" height="16" rx="5" />
-      ))}
-    </>
-  )
-}
-
-/** The arrow between where the rules come from and the new policy. */
-function Arrow() {
-  return (
-    <g transform="translate(132 96)">
-      <circle className="bb__ill__badge" r="11" />
-      <path className="bb__ill__arrow" d="M-4.5 0 H4.5 M1 -3.5 L4.5 0 L1 3.5" />
-    </g>
-  )
-}
-
-/** The rules that arrive, in the new policy's places, sliding in on hover. One per width. */
-function Arrivals({ widths }: { widths: number[] }) {
-  return (
-    <>
-      {widths.map((w, i) => {
-        const y = 68 + i * 22
-        return (
-          <motion.g key={i} variants={fadeIn} custom={i * 0.08}>
-            <rect className="bb__ill__row is-lit" x="154" y={y} width="86" height="16" rx="5" />
-            <rect className="bb__ill__text is-lit" x="161" y={y + 5.5} width={w} height="5" rx="2.5" />
-            <rect className="bb__ill__chip is-lit" x="220" y={y + 4} width="14" height="8" rx="4" />
-          </motion.g>
-        )
-      })}
-    </>
-  )
-}
-
-/* The template: a template, drawn as its own icon draws one (a header, a wide block and two small ones), on a second
-   sheet behind it (owner, same day: "give me a simple template SVG"). On hover its header takes the card's colour;
-   nothing moves ("subtle and silent", which replaced the wipe-and-reveal he had asked for an hour before). */
-
-function TemplateArt({ hot }: { hot: boolean }) {
-  return (
-    <ArtFrame hot={hot} label="A ready-made template">
-      <rect className="bb__ill__sheet is-back" x="78" y="24" width="108" height="100" rx="10" />
-      <Sheet x={62} y={36} w={140} h={112} />
-      <rect className="bb__ill__block is-lead" x="74" y="48" width="116" height="14" rx="4" />
-      <rect className="bb__ill__block" x="74" y="70" width="56" height="66" rx="4" />
-      <rect className="bb__ill__block" x="138" y="70" width="52" height="29" rx="4" />
-      <rect className="bb__ill__block" x="138" y="107" width="52" height="29" rx="4" />
-    </ArtFrame>
-  )
-}
-
-/* Reuse: the tenant's policy on the left, the new one on the right with its places empty. The left one's rules slide
-   into them. */
-const SOURCE_ROWS = [38, 30, 34]
-
-function CopyArt({ hot }: { hot: boolean }) {
-  return (
-    <ArtFrame hot={hot} label="Rules copied from another policy">
-      <Sheet x={14} y={36} w={106} h={110} />
-      <circle className="bb__ill__mark is-muted" cx="28" cy="51" r="5" />
-      <rect className="bb__ill__text" x="38" y="48" width="42" height="6" rx="3" />
-      <path className="bb__ill__rule" d="M14 63 H120" />
-      {SOURCE_ROWS.map((w, i) => {
-        const y = 74 + i * 22
-        return (
-          <g key={i}>
-            <rect className="bb__ill__row" x="24" y={y} width="86" height="16" rx="5" />
-            <rect className="bb__ill__text" x="31" y={y + 5.5} width={w} height="5" rx="2.5" />
-            <rect className="bb__ill__chip" x="90" y={y + 4} width="14" height="8" rx="4" />
-          </g>
-        )
-      })}
-      <Arrow />
-      <NewPolicy places={3} />
-      <Arrivals widths={SOURCE_ROWS} />
-    </ArtFrame>
-  )
-}
-
-/* Scratch: an empty policy with a place for its first rule. On hover the place fills with the card's soft colour and its
-   plus turns solid; nothing moves (owner, same day: "the older one is better"; then "subtle and silent"). */
-
-function ScratchArt({ hot }: { hot: boolean }) {
-  return (
-    <ArtFrame hot={hot} label="An empty policy, with a place for the first rule">
-      <Sheet x={44} y={22} w={176} h={132} r={12} />
-      <rect className="bb__ill__text" x="60" y="35" width="48" height="7" rx="3.5" />
-      <path className="bb__ill__rule" d="M44 54 H220" />
-      <rect className="bb__ill__slot is-place" x="68" y="72" width="128" height="46" rx="10" />
-      <g transform="translate(132 95)">
-        <circle className="bb__ill__disc" r="12" />
-        <path className="bb__ill__plus is-on-disc" d="M0 -5 V5 M-5 0 H5" />
-      </g>
-    </ArtFrame>
-  )
-}
 
 /* --- Describe it's drawing --------------------------------------------------------
    The older two-panel picture, kept for the Describe it card: grey at rest, one lift and one small slide of the panel

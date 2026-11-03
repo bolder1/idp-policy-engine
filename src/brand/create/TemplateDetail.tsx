@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
 
+import { ArrowLeft, Eye } from 'lucide-react'
+
 import { Button, DecisionChip } from '../kit'
 import type { Policy } from '../data'
 import { ReadOnlyCanvas } from '../screens/sign-in-tests/InspectPanel'
@@ -17,21 +19,40 @@ import { UsedBy, catKey, type CardModel } from './TemplateCard'
    was. It fades in where the grid was; nothing on it moves after that.
    -------------------------------------------------------------------------- */
 
+/** The preview's heading, which sits in the popup's header (owner, 3 Nov 2026: "move the heading and subheading to the header,
+    a sticky footer, and the rules scrolling between"): Back, the name with a Preview chip, then what it is or where it runs. */
+export function DetailHead({ m, backLabel, onBack }: { m: CardModel; backLabel: string; onBack: () => void }) {
+  return (
+    <div className="bdetail__head">
+      <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={onBack}>
+        {backLabel}
+      </Button>
+      <div className="bdetail__words">
+        <div className="bdetail__titlerow">
+          <h3 className="bdetail__name">{m.name}</h3>
+        </div>
+        {m.apps && m.apps.length > 0 ? <UsedBy apps={m.apps} /> : <p className="bdetail__sub">{m.description}</p>}
+        {(m.dropped?.length ?? 0) > 0 && <p className="bprev__note">Not included: {m.dropped!.join(', ')}. These rules apply to nobody.</p>}
+        {(m.needs ?? []).map((n) => (
+          <p key={n} className="bprev__note">
+            {n === 'zone' ? 'Needs a network zone. Add one, then choose it in the rule.' : 'Needs a device profile. Add one, then choose it in the rule.'}
+          </p>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function TemplateDetail({
   m,
   policy,
-  changeLabel,
   useLabel,
-  onBack,
   onUse,
 }: {
   m: CardModel
   /** The rules as Use would write them, in a policy the canvas can draw. */
   policy: Policy
-  /** "Change template": back to the grid, beside Use. */
-  changeLabel: string
   useLabel: string
-  onBack: () => void
   /** Absent where it cannot be used: no rules apply. */
   onUse?: () => void
 }) {
@@ -61,32 +82,22 @@ export function TemplateDetail({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      <header className="bdetail__head">
-        <div className="bdetail__words">
-          {m.category && <span className="bdetail__cat">{m.category}</span>}
-          <h3 className="bdetail__name">{m.name}</h3>
-          {m.apps && m.apps.length > 0 ? <UsedBy apps={m.apps} /> : <p className="bdetail__sub">{m.description}</p>}
-          {(m.dropped?.length ?? 0) > 0 && <p className="bprev__note">Not included: {m.dropped!.join(', ')}. These rules apply to nobody.</p>}
-          {(m.needs ?? []).map((n) => (
-            <p key={n} className="bprev__note">
-              {n === 'zone' ? 'Needs a network zone. Add one, then choose it in the rule.' : 'Needs a device profile. Add one, then choose it in the rule.'}
-            </p>
-          ))}
-        </div>
-        {/* Change beside Use, where Back and the facts line were (owner, same day: "remove this, and add a Change
-            template button with Use this template, to save space"; the facts: "remove"). */}
-        <div className="bdetail__actions">
-          <Button onClick={onBack}>{changeLabel}</Button>
-          {onUse && (
-            <Button variant="brand" onClick={onUse}>
-              {useLabel}
-            </Button>
-          )}
-        </div>
-      </header>
       <div className="bdetail__canvas">
+        {/* A read-only preview, said on the canvas itself (owner, 3 Nov 2026: "move the preview inside the canvas, a good preview chip"). */}
+        <span className="bdetail__chip">
+          <Eye size={14} strokeWidth={2} aria-hidden />
+          Preview
+        </span>
         <ReadOnlyCanvas policy={policy} traced={[]} still idPrefix="tpl-" cardHead={head} open={open} onOpen={toggle} />
       </div>
+      <footer className="bdetail__foot">
+        <p className="bdetail__footnote">{m.category ? "Only the template's rules are brought in. The template is not changed." : 'Only the rules are brought in, not its applications. The original policy is not changed.'}</p>
+        {onUse && (
+          <Button variant="brand" onClick={onUse}>
+            {useLabel}
+          </Button>
+        )}
+      </footer>
     </motion.section>
   )
 }

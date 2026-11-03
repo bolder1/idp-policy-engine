@@ -19,3 +19,8 @@ export const TEMPLATES_MANAGED: boolean = false
    SVGs"): on, a picture of what the template is about (create/CardPicture.tsx); off, the live rule stack it drew
    before, its rules numbered with their outcomes. Kept for when the product can draw a template's rules on its card. */
 export const CARD_PICTURES: boolean = true
+
+/* Template categories on the cards and in the store (owner, 3 Nov 2026: "hide the filter and the tags as of now, we are not sure we are
+   providing categories or not"): off, the store has no category chips and no category tab on a card. Hidden, not deleted: on, both come
+   back as they were. */
+export const TEMPLATE_CATEGORIES: boolean = false

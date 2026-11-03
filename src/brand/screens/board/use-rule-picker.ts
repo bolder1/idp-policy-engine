@@ -7,7 +7,7 @@ import { copyNotes, policySources, templateSources, type PickSource } from './co
 /** What the picker lists: policies to copy from, or templates to start from. */
 export type PickFrom = 'policy' | 'template'
 
-export const PICK_TITLE: Record<PickFrom, string> = { policy: 'Reuse an existing policy', template: 'Xecurify templates' }
+export const PICK_TITLE: Record<PickFrom, string> = { policy: 'Inherit from an existing policy', template: 'Xecurify templates' }
 
 /** The two shelves of Use template, should Use existing policy ever sit inside it. */
 export type Shelf = 'templates' | 'policies'

@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { CopyPlus, LayoutTemplate, PenLine, Plus, Undo2 } from 'lucide-react'
+import { Building2, CopyPlus, LayoutTemplate, PenLine, Plus, Undo2 } from 'lucide-react'
 
 import { Button } from '../../kit'
+import { BrandMark } from '../../logos/BrandMark'
+import { LOCAL_PILLS } from '../../template-phase'
 import type { AccessDecision } from '../../data'
 import { DECISION_NAME } from './model'
 import { StartPicture } from './StartArt'
@@ -115,6 +117,12 @@ export function BoardEmpty({
                   here, at the top edge"; then "the same cut-out as the template card, remove the white part, make it feel
                   part of the canvas"). Its words take the card's colour on hover. Start from scratch has none: its rules
                   come from nowhere ("By you … can remove"). */}
+              {LOCAL_PILLS && (
+                <span className="bb__start2__tab">
+                  <BrandMark brand="miniorange" size={12} />
+                  By miniOrange
+                </span>
+              )}
               <span className="bb__start2__stage">
                 <StartPicture kind="template" hot={hot === 'template'} />
               </span>
@@ -147,6 +155,12 @@ export function BoardEmpty({
           )}
           {onCopyRules && (
             <button type="button" className="bb__start2 is-reuse" onClick={onCopyRules} {...point('reuse')}>
+              {LOCAL_PILLS && (
+                <span className="bb__start2__tab">
+                  <Building2 size={12} strokeWidth={2} aria-hidden />
+                  Your organization
+                </span>
+              )}
               <span className="bb__start2__stage">
                 <StartPicture kind="reuse" hot={hot === 'reuse'} />
               </span>

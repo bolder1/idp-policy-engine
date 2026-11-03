@@ -24,3 +24,8 @@ export const CARD_PICTURES: boolean = true
    providing categories or not"): off, the store has no category chips and no category tab on a card. Hidden, not deleted: on, both come
    back as they were. */
 export const TEMPLATE_CATEGORIES: boolean = false
+
+/* The pills (owner, 3 Nov 2026: "add these pills we used to have, as of now just in localhost only"): the start cards'
+   By miniOrange and Your organization tabs, and the template cards' category tab. Drawn on the dev server only: the
+   production build (the Vercel link) and the tests leave them out. */
+export const LOCAL_PILLS: boolean = import.meta.env.DEV && import.meta.env.MODE !== 'test'

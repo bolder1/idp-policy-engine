@@ -28,7 +28,7 @@ import { SHOWCASE } from '../showcase'
 
 import { CardPicture } from './CardPicture'
 import { AppLogo } from '../logos/AppLogo'
-import { TEMPLATE_CATEGORIES } from '../template-phase'
+import { LOCAL_PILLS, TEMPLATE_CATEGORIES } from '../template-phase'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -325,7 +325,7 @@ export function TemplateCard({
     >
       {/* The shelf, cut out of the card's top-left corner (owner, 2 Nov 2026: "remove the border from this section so it
           looks like a cut out"): on the card rather than in the canvas, so it can cover the card's own edge there. */}
-      {TEMPLATE_CATEGORIES && m.category && <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>}
+      {(TEMPLATE_CATEGORIES || LOCAL_PILLS) && m.category && <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>}
       {/* The illustration is the live preview: the template's rules drawn as
           the builder would order them, plus the control that expands them.
 

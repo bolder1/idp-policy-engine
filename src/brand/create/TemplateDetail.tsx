@@ -20,13 +20,11 @@ import { UsedBy, catKey, type CardModel } from './TemplateCard'
    -------------------------------------------------------------------------- */
 
 /** The preview's heading, which sits in the popup's header (owner, 3 Nov 2026: "move the heading and subheading to the header,
-    a sticky footer, and the rules scrolling between"): Back, the name with a Preview chip, then what it is or where it runs. */
-export function DetailHead({ m, backLabel, onBack }: { m: CardModel; backLabel: string; onBack: () => void }) {
+    a sticky footer, and the rules scrolling between"): the name, then what it is or where it runs. Back is in the footer
+    ("move this button to the footer"). */
+export function DetailHead({ m }: { m: CardModel }) {
   return (
     <div className="bdetail__head">
-      <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={onBack}>
-        {backLabel}
-      </Button>
       <div className="bdetail__words">
         <div className="bdetail__titlerow">
           <h3 className="bdetail__name">{m.name}</h3>
@@ -47,12 +45,17 @@ export function TemplateDetail({
   m,
   policy,
   useLabel,
+  backLabel,
+  onBack,
   onUse,
 }: {
   m: CardModel
   /** The rules as Use would write them, in a policy the canvas can draw. */
   policy: Policy
   useLabel: string
+  /** "Back to Xecurify templates": the footer's way back to the grid, opposite Use. */
+  backLabel: string
+  onBack: () => void
   /** Absent where it cannot be used: no rules apply. */
   onUse?: () => void
 }) {
@@ -91,6 +94,9 @@ export function TemplateDetail({
         <ReadOnlyCanvas policy={policy} traced={[]} still idPrefix="tpl-" cardHead={head} open={open} onOpen={toggle} />
       </div>
       <footer className="bdetail__foot">
+        <Button variant="ghost" icon={ArrowLeft} onClick={onBack}>
+          {backLabel}
+        </Button>
         <p className="bdetail__footnote">{m.category ? "Only the template's rules are brought in. The template is not changed." : 'Only the rules are brought in, not its applications. The original policy is not changed.'}</p>
         {onUse && (
           <Button variant="brand" onClick={onUse}>

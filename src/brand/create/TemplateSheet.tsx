@@ -366,10 +366,6 @@ export function TemplateSheet({
             exit={{ y: 16, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 380, damping: 34 }}
           >
-            <button type="button" className="bmarket__x" onClick={onClose} aria-label="Close the gallery">
-              <X size={18} strokeWidth={1.9} />
-            </button>
-
             {/* A band of its own for the question and the one control that
                 answers it fastest.
 
@@ -381,8 +377,12 @@ export function TemplateSheet({
                 search at the width a template name actually needs — and
                 nothing else in it. */}
             <header className="bmarket__hero">
+              {/* In the header, centred on it whatever it holds (owner, 3 Nov 2026: "fix the alignments"). */}
+              <button type="button" className="bmarket__x" onClick={onClose} aria-label="Close the gallery">
+                <X size={18} strokeWidth={1.9} />
+              </button>
               {detailOpen && detailModel ? (
-                <DetailHead m={detailModel} backLabel={policiesOnly ? 'Back to your policies' : 'Back to Xecurify templates'} onBack={back} />
+                <DetailHead m={detailModel} />
               ) : (
                 <>
                 <span className="bmarket__mark" aria-hidden>
@@ -443,6 +443,8 @@ export function TemplateSheet({
                     m={scenarioCard(preview, users, library)}
                     policy={previewPolicy}
                     useLabel="Use this template"
+                    backLabel="Back to Xecurify templates"
+                    onBack={back}
                     onUse={previewPolicy.rules.length > 0 ? () => take(preview) : undefined}
                   />
                 )}
@@ -451,6 +453,8 @@ export function TemplateSheet({
                     m={policyCard(policyPreview)}
                     policy={policyPreview}
                     useLabel="Inherit these rules"
+                    backLabel="Back to your policies"
+                    onBack={back}
                     onUse={() => takePolicy(policyPreview)}
                   />
                 )}

@@ -166,8 +166,10 @@ describe('the popup asks for the name and nothing else', () => {
 describe('inside, three ways to start', () => {
   it('says where the rules come from, what happens and what is left: a Xecurify template, a copy of a policy, scratch', () => {
     const empty = code(boardEmptySrc)
-    /* No source pills on the cards (owner, 3 Nov 2026), and no note under them. */
-    expect(empty).not.toContain('bb__start2__tab')
+    /* The source pills are on the dev server only (owner, 3 Nov 2026: "just in localhost only"), each behind LOCAL_PILLS, so
+       the live build has none; and no note under the cards. */
+    expect(empty.match(/\{LOCAL_PILLS && \(\s*<span className="bb__start2__tab">/g)?.length).toBe(2)
+    expect(empty.match(/bb__start2__tab/g)?.length).toBe(2)
     expect(empty).not.toContain('<Note')
     expect(empty).toContain('<strong>Use a Xecurify template</strong>')
     expect(empty).toContain('<strong>Inherit from an existing policy</strong>')

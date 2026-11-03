@@ -4168,3 +4168,18 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__start2.is-blank:is(:hover, :focus-visible) { background: var(--surface-sunken); }
 .bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__stage { background: transparent; }
 .bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__plus { background: var(--surface-raised); border-color: var(--border-default); }
+
+/* The blank card's stage is tinted and dotted like the other two (owner, 3 Nov 2026: "it should have a background like
+   the others by default"), in the scratch greys, with the line under it again; the plus's circle is white on it, as the
+   other cards' sheets are. Hover is the others' wash, and the circle's edge darkens. */
+.bb__start2.is-blank .bb__start2__stage {
+  background-color: var(--start-wash);
+  background-image: radial-gradient(circle, var(--start-wash-2) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+  border-bottom-color: var(--border-subtle);
+}
+.bb__start2.is-blank .bb__start2__stage::before { display: block; }
+.bb__start2.is-blank .bb__start2__plus { background: var(--surface-raised); border-color: var(--border-default); box-shadow: var(--el-low); }
+.bb__start2.is-blank:is(:hover, :focus-visible) { background: var(--surface-raised); }
+.bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__stage { background-color: var(--start-wash); }
+.bb__start2.is-blank:is(:hover, :focus-visible) .bb__start2__plus { border-color: var(--text-tertiary); }

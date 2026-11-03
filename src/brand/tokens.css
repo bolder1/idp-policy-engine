@@ -50,8 +50,8 @@
   --start-reuse-wash: var(--_denim-050);
   --start-reuse-wash-2: var(--_denim-100);
   --start-scratch: var(--text-tertiary);
-  --start-scratch-wash: var(--surface-sunken);
-  --start-scratch-wash-2: var(--border-subtle);
+  --start-scratch-wash: var(--surface-inset);
+  --start-scratch-wash-2: var(--border-default);
   /* The template shelves, in the same family (create/TemplateCard.tsx; owner, same day: "change the template cards as
      well … make it colourful, same retro colour family"): the shelf's colour washes the card's canvas and names it in
      the corner tab. A denim blue for Quick protection, the faded teal for Device-based, the ochre for Risk-based, and a

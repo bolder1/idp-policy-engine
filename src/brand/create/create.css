@@ -1460,8 +1460,14 @@
 
 /* Back as an arrow to the left of the preview's name, centred on the name and its line; the footer's note in italics
    (owner, 3 Nov 2026: "move the back button to the top, beside the heading, and make the text italic"). */
-.bmarket__hero .bdetail__head { flex-direction: row; align-items: center; gap: var(--space-4); }
-.bmarket__hero .bdetail__head > .bx-iconbtn { flex: none; margin-left: calc(-1 * var(--space-3)); }
+.bmarket__hero .bdetail__head { flex-direction: row; align-items: center; gap: var(--space-5); }
+/* Lined up (owner, 3 Nov 2026: "fix the alignment, the back button's position looks odd"). The arrow's glyph starts on the
+   sheet's content edge, where the Preview chip and the footer's note start, as the close X's glyph ends on the other one; its
+   button's padding overhangs on both sides, so the name follows the glyph by the grid view's own icon-to-title gap. The
+   button sits in a tooltip, so the rule is on that. Even padding above and below puts the arrow, the name with its line,
+   and the X on one centre line. */
+.bmarket__hero .bdetail__head > .bx-tip { flex: none; margin-inline: calc(-1 * var(--space-5)); }
+.bmarket__hero:has(.bdetail__head) { padding-block: var(--space-5); }
 .bdetail__footnote { font-style: italic; }
 
 /* The preview's header: the arrow, then the name beside it, from the left (an earlier rule spread them apart). The footer:

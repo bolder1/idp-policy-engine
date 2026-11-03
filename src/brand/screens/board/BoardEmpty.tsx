@@ -3,7 +3,7 @@ import { Building2, PenLine, Plus, Undo2 } from 'lucide-react'
 
 import { Button } from '../../kit'
 import { BrandMark } from '../../logos/BrandMark'
-import { LOCAL_PILLS } from '../../template-phase'
+import { usePills } from '../../source-pills'
 import type { AccessDecision } from '../../data'
 import { DECISION_NAME } from './model'
 import { StartPicture } from './StartArt'
@@ -55,6 +55,8 @@ export function BoardEmpty({
   const three = !!onUseTemplate && (!!onDescribe || !!onCopyRules)
   /* The card the pointer or the keyboard is on: its picture plays while it is. */
   const [hot, setHot] = useState<Start | null>(null)
+  /* The source pills: hidden until Alt+T (source-pills.ts). */
+  const pills = usePills()
   const point = (k: Start) => ({
     onPointerEnter: () => setHot(k),
     onPointerLeave: () => setHot((h) => (h === k ? null : h)),
@@ -117,7 +119,7 @@ export function BoardEmpty({
                   here, at the top edge"; then "the same cut-out as the template card, remove the white part, make it feel
                   part of the canvas"). Its words take the card's colour on hover. Start from scratch has none: its rules
                   come from nowhere ("By you … can remove"). */}
-              {LOCAL_PILLS && (
+              {pills && (
                 <span className="bb__start2__tab">
                   <BrandMark brand="miniorange" size={12} />
                   By miniOrange
@@ -152,7 +154,7 @@ export function BoardEmpty({
           )}
           {onCopyRules && (
             <button type="button" className="bb__start2 is-reuse" onClick={onCopyRules} {...point('reuse')}>
-              {LOCAL_PILLS && (
+              {pills && (
                 <span className="bb__start2__tab">
                   <Building2 size={12} strokeWidth={2} aria-hidden />
                   Your organization

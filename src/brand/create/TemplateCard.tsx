@@ -28,7 +28,8 @@ import { SHOWCASE } from '../showcase'
 
 import { CardPicture } from './CardPicture'
 import { AppLogo } from '../logos/AppLogo'
-import { LOCAL_PILLS, TEMPLATE_CATEGORIES } from '../template-phase'
+import { TEMPLATE_CATEGORIES } from '../template-phase'
+import { usePills } from '../source-pills'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -311,6 +312,8 @@ export function TemplateCard({
   const [hot, setHot] = useState(false)
   /* Xecurify's own templates are drawn (CardPicture.tsx); a policy of the tenant's is shown by its rules. */
   const pictured = !!m.category
+  /* The category tab: with the categories, or while Alt+T has the pills showing (source-pills.ts). */
+  const pills = usePills()
 
   return (
     /* The shelf's colour, on the whole card (owner, 2 Nov 2026: "make it colourful … same retro colour family"):
@@ -325,7 +328,7 @@ export function TemplateCard({
     >
       {/* The shelf, cut out of the card's top-left corner (owner, 2 Nov 2026: "remove the border from this section so it
           looks like a cut out"): on the card rather than in the canvas, so it can cover the card's own edge there. */}
-      {(TEMPLATE_CATEGORIES || LOCAL_PILLS) && m.category && <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>}
+      {(TEMPLATE_CATEGORIES || pills) && m.category && <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>}
       {/* The illustration is the live preview: the template's rules drawn as
           the builder would order them, plus the control that expands them.
 

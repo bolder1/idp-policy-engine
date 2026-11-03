@@ -932,7 +932,6 @@
   background: var(--tpl-wash); color: var(--tpl);
   border: 1px solid var(--tpl-wash-2);
 }
-.bgcard__icon.is-sm { flex: none; width: 32px; height: 32px; border-radius: var(--radius-md); }
 .bgcard__pill {
   display: inline-flex; align-items: center; min-width: 0;
   padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
@@ -1371,7 +1370,6 @@
    short (owner, 3 Nov 2026: "icon and name in one row, big names, good spacing"). */
 .bgcard.is-bare .bgcard__top { display: none; }
 .bgcard.is-bare .bgcard__head { align-items: flex-start; gap: var(--space-4); }
-.bgcard.is-bare .bgcard__head .bgcard__icon { flex: none; width: 36px; height: 36px; }
 .bgcard.is-bare .bgcard__h { font-size: var(--fs-lg); line-height: 1.3; white-space: normal; overflow: visible; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .bgcard.is-bare .bgcard__body { padding-top: var(--space-6); }
 
@@ -1420,7 +1418,6 @@
 /* The no-picture card is three rows and a button (owner, 3 Nov 2026: "one row for the icon, one for the heading, one for the rest,
    and one CTA"): the icon tile, the name on one line, who it is on, then the button. */
 .bgcard.is-bare .bgcard__top { display: block; }
-.bgcard.is-bare .bgcard__head .bgcard__icon { display: none; }
 .bgcard.is-bare .bgcard__head { align-items: flex-start; }
 
 /* The Preview chip: amber, so it reads as a state and not a label; bolder; it settles in once when the preview opens (owner, 3 Nov 2026).

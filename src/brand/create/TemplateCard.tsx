@@ -426,14 +426,9 @@ export function TemplateCard({
           </span>
         </span>
 
-        {/* The name, truncated, so it keeps its title. */}
+        {/* The name, truncated, so it keeps its title. No icon beside it (owner, 3 Nov 2026: "remove this icon from here"):
+            the picture above already says what the template is about. */}
         <div className="bgcard__head">
-          <span className="bgcard__icon is-sm" aria-hidden>
-            {(() => {
-              const Ico = HUE_ICON[hue] ?? Tag
-              return <Ico size={16} strokeWidth={1.9} />
-            })()}
-          </span>
           <h3 className="bgcard__h" title={m.name}>
             {m.name}
           </h3>

@@ -158,7 +158,9 @@ describe('the popup asks for the name and nothing else', () => {
   })
 
   it('is the only way in: the slider form and the comparison switches are gone', () => {
-    expect(code(policiesSrc)).not.toMatch(/NewPolicyFlowSwitch|useFlowSwitchShown|preview=/)
+    /* The page head's one switch since 4 Nov 2026 is the owner's Empty / With policies (migrate/), not a create flow. */
+    expect(code(policiesSrc)).not.toMatch(/NewPolicyFlowSwitch|useFlowSwitchShown/)
+    expect(code(policiesSrc).match(/preview=/g)?.length ?? 0).toBeLessThanOrEqual(1)
     expect(code(boardBuilderSrc)).not.toMatch(/useCopyPlacement|usePickerLook|copyInside/)
   })
 })

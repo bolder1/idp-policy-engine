@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, IconButton, Modal, NameField, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
+import { Badge, Button, IconButton, Modal, NameField, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
 import { PageHead } from '../Shell'
 import { Picker } from '../picker'
 import {
@@ -177,7 +177,9 @@ export function ZonesFinal() {
     const needle = q.trim().toLowerCase()
     /* A zone with both halves is in both filters: it IS a network zone, and a
        location zone. */
-    const byShape = shape === 'all' ? store.zones : store.zones.filter((z) => SHAPE_FILTER[shape].includes(shapeOf(z)))
+    /* A move's zones wait out of the list until a policy using them is approved; arrived, they lead it. */
+    const listed = [...store.zones.filter((z) => z.fromOld === 'added'), ...store.zones.filter((z) => !z.fromOld)]
+    const byShape = shape === 'all' ? listed : listed.filter((z) => SHAPE_FILTER[shape].includes(shapeOf(z)))
     if (!needle) return byShape
     const hit = (v: string | undefined) => !!v && v.toLowerCase().includes(needle)
     return byShape.filter(
@@ -507,7 +509,8 @@ function ZoneList({
       name: z.name,
       tile: <meta.icon size={18} strokeWidth={1.8} />,
       tileClass: `bz7__tile is-${meta.tint}`,
-      attrs: usesId === z.id ? { 'data-zone-id': z.id, 'data-docked': 'true' } : { 'data-zone-id': z.id },
+      badge: z.fromOld === 'added' ? <Badge tone="info">From old policy</Badge> : undefined,
+      attrs: { 'data-zone-id': z.id, ...(usesId === z.id ? { 'data-docked': 'true' } : {}), ...(z.fromOld === 'added' ? { 'data-from-old': 'true' } : {}) },
       onOpen: () => onOpen(z.id),
       facts: [
         {

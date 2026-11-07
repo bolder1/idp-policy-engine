@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -11,7 +12,10 @@ import {
   type SetStateAction,
 } from 'react'
 
+import { MIGRATION_FIRST } from './migrate/phase'
+import type { ActivityKind, ActivityLog } from './policy-activity'
 import {
+  addedToday,
   consoleStamp,
   memberGroupIds,
   newId,
@@ -44,6 +48,43 @@ import { normaliseHook, type Hook } from './hooks'
    before that, and a post sign-in one to Monitoring ever. */
 import { refusesStatus, settled, showcaseTenant, tenantAt, type Tenant } from './fixtures'
 import { SHOWCASE } from './showcase'
+import { EMPTY_LEGACY, MIGRATE_SCALE, showcaseLegacy, type DeadlineView, type LegacyEstate } from './migrate/legacy'
+import { scaleApps, scaleLegacy } from './migrate/scale-seed'
+
+const NO_APPS: App[] = []
+import type { MovePlan, MoveLine, RuleSource } from './migrate/plan'
+
+/** One move, while it runs and after. */
+export interface MoveJob {
+  total: number
+  done: number
+  /** The new policies' ids, in the order they were saved. */
+  ids: string[]
+  status: 'running' | 'done' | 'stopped'
+  /** Every policy the move makes, in order, with the old rows it takes: what the Moving screen draws still to come. */
+  queue: { key: string; name: string; appIds: string[]; sourceIds: string[]; joins: boolean }[]
+  /** Zones the move makes: the Move story counts them. */
+  zones: number
+}
+
+/** A moved policy's record of where it came from: Review's Before side, its Changes and Left out, its Approve. */
+export interface MovedInfo {
+  sourceIds: string[]
+  moves: MoveLine[]
+  changes: MoveLine[]
+  leftOut: MoveLine[]
+  ruleSource: Record<string, RuleSource>
+  approved: boolean
+  /** The admin approved it in the builder (owner, 6 Nov 2026): Draft, then Approved, then Active once published. */
+  reviewed?: true
+  /** The old rows joined a policy the application already had, rather than making a new one. */
+  joined?: true
+  /** A joined policy's new rules, held until Approve adds them. */
+  pending?: Rule[]
+}
+
+/** How long one policy takes to move: long enough to watch, short enough that a hundred is a coffee, not a lunch. */
+const MOVE_TICK_MS = 380
 import type { ConfigField } from './method-config'
 import type { MfaValues } from './mfa-join'
 import { SEED_ENROLMENT, type UserEnrolment } from './user-methods'
@@ -72,6 +113,8 @@ export type Role = 'admin' | 'user'
 
 export type BrandScreen =
   | { name: 'policies' }
+  /** The Dashboard: the Policy builder's What's new hub, then the move's next steps (migrate/HomeHub.tsx). */
+  | { name: 'home' }
   /* `open` lets a caller hand off INTO a surface rather than merely near it.
      The policy list can say "this one has four holes" and land you in the
      gauntlet for that policy, instead of in a builder where you still have to
@@ -129,6 +172,14 @@ export type BrandScreen =
          to the trail for callers that predate the board. */
       from?: PolicyDetailsFrom
     }
+  /* Move policies (migrate/): the old console's sign-in policies, selected, explained and reviewed on one page. */
+  /* `pick`: the old rows to start selected, when opened from one row or from an adaptive policy's users. */
+  | { name: 'move-policies'; pick?: string[] }
+  | { name: 'review-moved' }
+  /* The old console's Policies section (migrate/OldPolicies.tsx), one page per rail item, as the live console has them. */
+  | { name: 'old-login' }
+  | { name: 'old-password' }
+  | { name: 'old-adaptive' }
   | { name: 'templates' }
   | { name: 'zones' }
   | { name: 'fingerprint' }
@@ -541,6 +592,90 @@ export interface BrandStore {
   updateZone: (z: Zone) => void
   removeZone: (id: string) => void
   deletePolicy: (id: string) => void
+  /** The old console's sign-in policies, still enforcing until the policy each moved to is turned on. */
+  legacy: LegacyEstate
+  /** What last happened to each policy in this visit: added, edited or opened (policy-activity.ts). */
+  activity: ActivityLog
+  /** Old policy id → the id of the new policy it moved to. */
+  movedLegacy: Readonly<Record<string, string>>
+  /** How the new builder opens: empty (no sign-in policies of its own, where the move starts) or with the seeded ones.
+      A preview switch on All Policies sets it (owner, 3 Nov 2026). */
+  builderStart: 'empty' | 'seeded'
+  setBuilderStart: (s: 'empty' | 'seeded') => void
+  /** Which moment the move banner is drawn at (owner, 4 Nov 2026: "three different states for time left"): today, or
+      as if 45 or 7 days were left. A preview switch on the Old policy pages sets it. */
+  deadlineView: DeadlineView
+  setDeadlineView: (v: DeadlineView) => void
+  /** The Policy builder intro (migrate/IntroCarousel.tsx), a popup over any page: `learn` from a What's new note,
+      `migrate` from Start migration, where it ends in the move (owner, 4 Nov 2026: it plays every time). */
+  intro: { mode: 'learn' | 'migrate'; pick?: string[] } | null
+  openIntro: (mode: 'learn' | 'migrate', pick?: string[]) => void
+  closeIntro: () => void
+  /** The Start migration popup (migrate/MoveDialog.tsx; owner, 4 Nov 2026): a summary and the pick list, then the move
+      runs in the background. `pick` preselects old policies. */
+  moveDialog: { pick?: string[] } | null
+  /** Review as a popup (migrate/ReviewDialog.tsx; owner, 5 Nov 2026), over any page. */
+  reviewOpen: boolean
+  openReview: () => void
+  closeReview: () => void
+  openMoveDialog: (pick?: string[]) => void
+  /** Migrate has been pressed in the Migrate popup (migrate/phase.ts MIGRATION_FIRST): the rail opens the new Policies. */
+  migrationStarted: boolean
+  /** The Migrate popup's Migrate: the move starts, the rail swaps, and the console lands on New policies. */
+  beginMigration: (plan: MovePlan) => void
+  /** Approve in the builder, without publishing; false takes it back. */
+  reviewMoved: (policyId: string, reviewed: boolean) => void
+  closeMoveDialog: () => void
+  /** What moves have made, waiting or added: Review's Created panel lists them. */
+  movedProfiles: readonly FingerprintProfile[]
+  /** After a move: which of Done's next steps the admin has taken (migrate/done-stage.tsx), and the tour of where
+      everything landed (migrate/MoveTour.tsx), which crosses pages so it lives here. */
+  setupDone: readonly string[]
+  markSetup: (id: string) => void
+  moveTour: boolean
+  setMoveTour: (on: boolean) => void
+  /** The tenant's applications and the ones only old policies name: what every Move screen looks names up in. */
+  moveApps: readonly App[]
+  /** The move running, or the last one, or null (migrate/MovePolicies.tsx; the top bar's pill reads it). */
+  moveJob: MoveJob | null
+  /** What each moved policy came from and what changed on the way, by new policy id; Review reads and approves it. */
+  moved: Readonly<Record<string, MovedInfo>>
+  /** Policies that arrived in the last move, for the Policies list to show arriving. */
+  imported: readonly string[]
+  /** Saves a plan from Move policies in the background: its zones at once, then one policy at a time (as drafts), at
+      the top of the list, so the move runs while the admin works anywhere else. */
+  startMove: (plan: MovePlan) => void
+  /** Stops after the policy being saved: what has moved stays moved; the rest stays old. */
+  stopMove: () => void
+  /** Approve sends a moved policy to the list (a draft) or adds its rules to the policy it joined; false takes it back. */
+  approveMoved: (policyId: string, approved: boolean) => void
+  /** Moved policies waiting for review, outside the policy list. */
+  staged: readonly Policy[]
+  /** A moved policy, waiting or approved. */
+  migratedById: (id: string) => Policy | undefined
+  clearImported: () => void
+  /* The migration's finale (owner, 5 Nov 2026): approved policies wait off the list until Add to Policies lays them
+     in row by row; Make all active turns every moved draft active, one row at a time, and deletes the old policies
+     they came from; then a done state. */
+  /** Approved moved policies not yet laid into the list. */
+  held: readonly string[]
+  /** Rows lighting up right now (being added, or being made active). */
+  landing: readonly string[]
+  /** Lays the held policies into the list, one row at a time. */
+  revealHeld: () => void
+  /** True while Make all active runs. */
+  activating: boolean
+  /** Makes every moved draft active, one row at a time, then deletes the old policies they came from. */
+  activateMoved: () => void
+  /** The migration is finished: every moved policy active, the old ones deleted. Null until then. */
+  migrationDone: { active: number; deleted: number } | null
+  /** The move's full-page stage folded into a banner (owner, 5 Nov 2026): it keeps running either way. */
+  moveMinimized: boolean
+  setMoveMinimized: (v: boolean) => void
+  closeMigrationDone: () => void
+  /** Publishes moved drafts (owner, 6 Nov 2026): each becomes active, one row at a time, and the old policies it came from
+      are deleted. Returns how many were published. */
+  publishMoved: (ids: readonly string[]) => number
   /** Copies a policy as a draft with fresh rule ids, named "X (copy)", "X (copy 2)"… within 50 characters. Returns the copy's id; `policyById` finds it at once.
       `appIds` gives the copy those applications instead of the original's (an application page's "Add a copy"). */
   duplicatePolicy: (id: string, opts?: { appIds?: string[] }) => string | null
@@ -634,20 +769,77 @@ function leaveGroup(u: User, groupId: string): User {
   return others.length > 0 ? { ...rest, groupId: first, alsoGroupIds: others } : { ...rest, groupId: first }
 }
 
-export function BrandProvider({ children }: { children: ReactNode }) {
+/* A sign-in policy the empty new builder keeps: the tenant's system policy, and every post sign-in policy (another tab). */
+const keptWhenEmpty = (p: Policy) => !!p.isSystem || p.type === 'Session'
+
+export function BrandProvider({ children, fresh = false }: { children: ReactNode; fresh?: boolean }) {
   /* The tenant the console opens on. The showcase build loads the presentation
      tenant (showcase-seed.ts); every other build loads the Security IT
      Manager's, which is the default persona below. Chosen once, lazily, and
      read by every initialiser that follows. */
   const [seed] = useState<Tenant>(() => (SHOWCASE ? showcaseTenant() : tenantAt('medium')))
-  const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)
+  /* `fresh` (the app passes it, tests do not): the new builder as a tenant first meets it, with no sign-in policies
+     of its own yet, so the move from the old builder starts on an empty page (owner, 3 Nov 2026). */
+  const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => (fresh ? seed.policies.filter(keptWhenEmpty) : seed.policies))
+  const [builderStart, setBuilderStartState] = useState<'empty' | 'seeded'>(fresh ? 'empty' : 'seeded')
+  const [deadlineView, setDeadlineView] = useState<DeadlineView>('now')
+  const [intro, setIntro] = useState<{ mode: 'learn' | 'migrate'; pick?: string[] } | null>(null)
+  const [moveDialog, setMoveDialog] = useState<{ pick?: string[] } | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [setupDone, setSetupDone] = useState<string[]>([])
+  const [moveTour, setMoveTour] = useState(false)
+  const setBuilderStart = useCallback(
+    (s: 'empty' | 'seeded') => {
+      setBuilderStartState(s)
+      const seededIds = new Set(seed.policies.map((p) => p.id))
+      if (s === 'empty') setPolicies((all) => all.filter((p) => keptWhenEmpty(p) || !seededIds.has(p.id)))
+      /* Back with the seeded policies, but never a second policy on an application that has one by now (one app, one
+         policy): a seeded policy whose application already moved over stays out. */
+      else
+        setPolicies((all) => {
+          const taken = new Set(all.filter((p) => !keptWhenEmpty(p)).flatMap((p) => p.appIds))
+          return [...all, ...seed.policies.filter((p) => !all.some((x) => x.id === p.id) && !p.appIds.some((a) => taken.has(a)))]
+        })
+    },
+    [seed, setPolicies],
+  )
   const [changeLog, setChangeLog] = useState<ChangeEntry[]>(() => (SHOWCASE ? seedChangeLog(seed.policies, new Date()) : []))
   /* Zones are edited in place now that they carry two sections, so they need
      the same draft/commit treatment policies already had. */
   const [zones, setZones, zonesRef] = useCollection<Zone>(() => seed.zones)
   const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => seed.scenarios)
   const [savedSignIns, setSavedSignIns, savedSignInsRef] = useCollection<SavedSignIn>(() => seed.savedSignIns)
-  const [screen, setScreenState] = useState<BrandScreen>({ name: 'policies' })
+  const [legacy, setLegacy] = useState<LegacyEstate>(() => (SHOWCASE ? (MIGRATE_SCALE ? scaleLegacy : showcaseLegacy) : EMPTY_LEGACY))
+  const [movedLegacy, setMovedLegacy] = useState<Record<string, string>>({})
+  const movedLegacyRef = useRef(movedLegacy)
+  movedLegacyRef.current = movedLegacy
+  const [activity, setActivity] = useState<ActivityLog>({})
+  const [moveJob, setMoveJob] = useState<MoveJob | null>(null)
+  const [moved, setMoved] = useState<Record<string, MovedInfo>>({})
+  const movedRef = useRef(moved)
+  movedRef.current = moved
+  /* Policies a move made that have not been approved: kept out of `policies` (and so out of every list) until then. */
+  const [staged, setStaged] = useState<Policy[]>([])
+  const stagedRef = useRef<Policy[]>([])
+  const [imported, setImported] = useState<string[]>([])
+  const [held, setHeld] = useState<string[]>([])
+  const heldRef = useRef(held)
+  heldRef.current = held
+  const [landing, setLanding] = useState<string[]>([])
+  const [activating, setActivating] = useState(false)
+  const [moveMinimized, setMoveMinimized] = useState(false)
+  const [migrationDone, setMigrationDone] = useState<{ active: number; deleted: number } | null>(null)
+  const finaleTimers = useRef<number[]>([])
+  useEffect(() => () => finaleTimers.current.forEach((t) => window.clearTimeout(t)), [])
+  const moveRef = useRef<{ plan: MovePlan; at: number; ids: string[] } | null>(null)
+  /* The Migrate popup's press starts the move the same way Move policies does. */
+  const startMoveRef = useRef<(plan: MovePlan) => void>(() => {})
+  const touch = useCallback((ids: string[], kind: ActivityKind) => {
+    const at = Date.now()
+    setActivity((a) => ({ ...a, ...Object.fromEntries(ids.map((id) => [id, { kind, at }])) }))
+  }, [])
+  const [screen, setScreenState] = useState<BrandScreen>(MIGRATION_FIRST ? { name: 'old-login' } : { name: 'policies' })
+  const [migrationStarted, setMigrationStarted] = useState(!MIGRATION_FIRST)
   /* The screen as of the last navigation, for `go` to compare against without
      waiting for a render. */
   const screenRef = useRef(screen)
@@ -702,10 +894,11 @@ export function BrandProvider({ children }: { children: ReactNode }) {
            a tab, a testing view or the testing slider on the same screen does
            not (revisit.ts). */
         const again = isRevisit(screenRef.current, s)
+        if (s.name === 'board' || s.name === 'builder') touch([s.policyId], 'opened')
         setScreen(s)
         if (leaving.current || again) setVisit((v) => v + 1)
       }),
-    [requestLeave, setScreen],
+    [requestLeave, setScreen, touch],
   )
 
   const registerLeaveGuard = useCallback((g: LeaveGuard) => {
@@ -751,6 +944,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
      name them, so the linter and the simulator have to be able to resolve
      one without the Device Fingerprint page being mounted. */
   const [fingerprints, setFingerprints, fingerprintsRef] = useCollection<FingerprintProfile>(() => seed.fingerprints)
+  const visibleFingerprints = useMemo(() => fingerprints.filter((f) => f.fromOld !== 'waiting'), [fingerprints])
   const [riskProfiles, setRiskProfiles, riskProfilesRef] = useCollection<RiskProfile>(() => seed.riskProfiles)
   const [activeRiskProfileId, setActiveRiskProfileId] = useState(seed.activeRiskProfileId)
   /* The scale comes from the profile in use, and falls back to the shipped
@@ -789,6 +983,11 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [setupChoice, setSetupChoice] = useState<Record<string, string>>({})
   const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
   const [apps, setApps, appsRef] = useCollection<App>(() => seed.apps)
+  /* With the old console at scale, the applications only its rows name (migrate/scale-seed.ts). They are not in the
+     tenant's lists until a policy moves onto them: every other screen keeps the showcase's own thirteen. */
+  const legacyApps = SHOWCASE && MIGRATE_SCALE ? scaleApps : NO_APPS
+  const moveApps = useMemo(() => [...apps, ...legacyApps.filter((a) => !apps.some((x) => x.id === a.id))], [apps, legacyApps])
+  const legacyAppsRef = useRef(legacyApps)
   const [groups, setGroups] = useState<Group[]>(() => seed.groups)
   const [directory, setDirectoryState] = useState(() => seed.directory)
   /* The latest directory, ahead of the next render, as `tokensRef` above:
@@ -862,6 +1061,15 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           setGroups(t.groups)
           setDirectory(t.directory)
           setSavedSignIns(t.savedSignIns)
+          setLegacy(EMPTY_LEGACY)
+          setMovedLegacy({})
+          setActivity({})
+          moveRef.current = null
+          setMoveJob(null)
+          setMoved({})
+          setImported([])
+          stagedRef.current = []
+          setStaged([])
           setOverrides({})
           setBreakInAccepted({})
           setRecovery(RECOVERY_DEFAULTS)
@@ -937,7 +1145,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       users: directory.people,
       unlistedUsers: directory.unlisted,
       zones,
-      fingerprints,
+      /* A profile a move made is not listed until a policy using it is approved (fingerprintById still finds it). */
+      fingerprints: visibleFingerprints,
       hooks,
       edition,
       /* The showcase pin (showcase.ts): lite, plus the tenant-wide testing
@@ -1010,6 +1219,197 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       },
       removeScenario: (id: string) => setScenarios((all) => all.filter((s) => s.id !== id || s.provided)),
       policies,
+      legacy,
+      movedLegacy,
+      activity,
+      builderStart,
+      setBuilderStart,
+      deadlineView,
+      setDeadlineView,
+      intro,
+      openIntro: (mode, pick) => setIntro({ mode, pick }),
+      closeIntro: () => setIntro(null),
+      moveDialog,
+      reviewOpen,
+      /* Review is a page now (owner, 5 Nov 2026). */
+      openReview: () => go({ name: 'review-moved' }),
+      closeReview: () => setReviewOpen(false),
+      /* The move form is a page now (owner, 5 Nov 2026). */
+      /* With migration first, the intro ends in the Migrate popup; the rail only swaps on its Migrate (owner, 6 Nov 2026). */
+      openMoveDialog: (pick) => {
+        if (MIGRATION_FIRST && !migrationStarted) {
+          setMoveDialog({ pick })
+          return
+        }
+        go({ name: 'move-policies', pick })
+      },
+      migrationStarted,
+      closeMoveDialog: () => setMoveDialog(null),
+      movedProfiles: fingerprints.filter((f) => !!f.fromOld),
+      setupDone,
+      markSetup: (id) => setSetupDone((d) => (d.includes(id) ? d : [...d, id])),
+      moveTour,
+      setMoveTour,
+      moveApps,
+      moveJob,
+      moved,
+      imported,
+      /* Zones first and with their own ids: the plan's conditions already name them. */
+      startMove: (plan) => {
+        if (moveRef.current) return
+        setZones((all) => [...all, ...plan.zones.filter((z) => !all.some((x) => x.id === z.id))])
+        /* Device profiles the move made wait the same way, out of the Device profiles list until a policy using one is approved. */
+        if (plan.profiles?.length) setFingerprints((all) => [...all, ...plan.profiles.filter((p) => !all.some((x) => x.id === p.id))])
+        moveRef.current = { plan, at: 0, ids: [] }
+        setImported([])
+        const queue = plan.policies.map((p) => ({ key: p.key, name: p.policy.name, appIds: p.appIds, sourceIds: p.sourceIds, joins: !!p.into }))
+        setMoveJob({ total: plan.policies.length, done: 0, ids: [], status: plan.policies.length ? 'running' : 'done', queue, zones: plan.zones.length })
+      },
+      beginMigration: (plan) => {
+        setMoveDialog(null)
+        setMigrationStarted(true)
+        try {
+          localStorage.setItem('brand-policies-type', 'sign-in')
+        } catch {
+          /* the tab just isn't remembered */
+        }
+        go({ name: 'policies' })
+        startMoveRef.current(plan)
+      },
+      reviewMoved: (policyId, reviewed) =>
+        setMoved((m) => {
+          const info = m[policyId]
+          if (!info || !!info.reviewed === reviewed) return m
+          const next = { ...info }
+          if (reviewed) next.reviewed = true
+          else delete next.reviewed
+          return { ...m, [policyId]: next }
+        }),
+      stopMove: () => {
+        if (!moveRef.current) return
+        moveRef.current = null
+        setMoveJob((j) => (j ? { ...j, status: 'stopped' } : j))
+      },
+      /* Approve is the door into the policy list (owner, 4 Nov 2026). A new policy leaves `staged` and arrives as
+         a draft; a joined one gets its pending rules — straight into a policy still in draft or monitoring, into the
+         saved draft of one that decides sign-ins. Taking approval back undoes exactly that. */
+      approveMoved: (policyId, approved) => {
+        const info = movedRef.current[policyId]
+        if (!info || info.approved === approved) return
+        const stagedOne = stagedRef.current.find((p) => p.id === policyId)
+        if (approved) {
+          if (stagedOne) {
+            stagedRef.current = stagedRef.current.filter((p) => p.id !== policyId)
+            setStaged((all) => all.filter((p) => p.id !== policyId))
+            setPolicies((all) => [stagedOne, ...all])
+            setHeld((h) => (h.includes(policyId) ? h : [...h, policyId]))
+            const joining = legacyAppsRef.current.filter((a) => stagedOne.appIds.includes(a.id) && !appsRef.current.some((x) => x.id === a.id))
+            if (joining.length) setApps((all) => [...all, ...joining.filter((a) => !all.some((x) => x.id === a.id))])
+            touch([policyId], 'added')
+            setImported((i) => [...i.filter((x) => x !== policyId), policyId])
+          } else if (info.pending?.length) {
+            const add = info.pending
+            const join = (t: Policy): Policy =>
+              t.status === 'monitor' || t.status === 'draft'
+                ? { ...t, rules: [...t.rules, ...add], lastModified: 'Just now', modifiedBy: 'You' }
+                : withSavedDraft(t, { rules: [...(t.pendingDraft?.rules ?? t.rules), ...add], fallback: t.pendingDraft?.fallback ?? t.fallback })
+            setPolicies((all) => all.map((t) => (t.id === policyId ? join(t) : t)))
+            touch([policyId], 'edited')
+          }
+        } else {
+          const live = policiesRef.current.find((p) => p.id === policyId)
+          if (live && !info.joined) {
+            setPolicies((all) => all.filter((p) => p.id !== policyId))
+            setHeld((h) => h.filter((x) => x !== policyId))
+            stagedRef.current = [live, ...stagedRef.current]
+            setStaged((all) => [live, ...all])
+            setImported((i) => i.filter((x) => x !== policyId))
+          } else if (live && info.pending?.length) {
+            const drop = new Set(info.pending.map((r) => r.id))
+            const unjoin = (t: Policy): Policy =>
+              t.pendingDraft
+                ? { ...t, pendingDraft: { ...t.pendingDraft, rules: t.pendingDraft.rules.filter((r) => !drop.has(r.id)) } }
+                : { ...t, rules: t.rules.filter((r) => !drop.has(r.id)) }
+            setPolicies((all) => all.map((t) => (t.id === policyId ? unjoin(t) : t)))
+          }
+        }
+        /* The zones a move made wait with its policies, out of the Zones list; the first approved policy using one
+           brings it in. Taking that back leaves the zone: another approved policy may use it, and it is harmless. */
+        if (approved) {
+          const uses = JSON.stringify([stagedOne?.rules ?? [], info.pending ?? []])
+          setZones((all) => (all.some((z) => z.fromOld === 'waiting' && uses.includes(`"${z.id}"`)) ? all.map((z) => (z.fromOld === 'waiting' && uses.includes(`"${z.id}"`) ? { ...z, fromOld: 'added' } : z)) : all))
+          setFingerprints((all) => (all.some((f) => f.fromOld === 'waiting' && uses.includes(`"${f.id}"`)) ? all.map((f) => (f.fromOld === 'waiting' && uses.includes(`"${f.id}"`) ? { ...f, fromOld: 'added' } : f)) : all))
+        }
+        setMoved((m) => (m[policyId] ? { ...m, [policyId]: { ...m[policyId], approved } } : m))
+      },
+      staged,
+      migratedById: (id) => stagedRef.current.find((p) => p.id === id) ?? policiesRef.current.find((p) => p.id === id),
+      clearImported: () => setImported([]),
+      held,
+      landing,
+      revealHeld: () => {
+        const ids = [...heldRef.current]
+        if (!ids.length) return
+        setImported([])
+        ids.forEach((id, n) => {
+          finaleTimers.current.push(
+            window.setTimeout(() => {
+              setHeld((h) => h.filter((x) => x !== id))
+              setLanding((l) => [...l, id])
+            }, 160 * n),
+          )
+        })
+        finaleTimers.current.push(window.setTimeout(() => setLanding([]), 160 * ids.length + 2200))
+      },
+      activating,
+      activateMoved: () => {
+        const ids = policiesRef.current.filter((p) => p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0).map((p) => p.id)
+        if (!ids.length) return
+        setActivating(true)
+        setLanding([])
+        ids.forEach((id, n) => {
+          finaleTimers.current.push(
+            window.setTimeout(() => {
+              setPolicies((all) => all.map((x) => (x.id === id && x.status === 'draft' ? { ...x, status: 'active', lastModified: 'Just now', modifiedBy: 'You' } : x)))
+              setLanding((l) => [...l, id])
+            }, 140 * n),
+          )
+        })
+        finaleTimers.current.push(
+          window.setTimeout(() => {
+            /* The old policies stay (owner, 6 Nov 2026): they remain readable in the Old policies tab. */
+            touch(ids, 'edited')
+            setActivating(false)
+            setLanding([])
+            setMigrationDone({ active: ids.length, deleted: 0 })
+          }, 140 * ids.length + 900),
+        )
+      },
+      migrationDone,
+      moveMinimized,
+      setMoveMinimized,
+      closeMigrationDone: () => setMigrationDone(null),
+      publishMoved: (ids) => {
+        const list = policiesRef.current.filter((p) => ids.includes(p.id) && p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
+        if (!list.length) return 0
+        setLanding([])
+        list.forEach((p, n) => {
+          finaleTimers.current.push(
+            window.setTimeout(() => {
+              setPolicies((all) => all.map((x) => (x.id === p.id && x.status === 'draft' ? { ...x, status: 'active', lastModified: 'Just now', modifiedBy: 'You' } : x)))
+              setLanding((l) => [...l, p.id])
+            }, 120 * n),
+          )
+        })
+        finaleTimers.current.push(
+          window.setTimeout(() => {
+            /* The old policies stay (owner, 6 Nov 2026): they remain readable in the Old policies tab. */
+            touch(list.map((p) => p.id), 'edited')
+            setLanding([])
+          }, 120 * list.length + 1600),
+        )
+        return list.length
+      },
 
       screen,
       visit,
@@ -1159,7 +1559,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       savePolicy: (p) => {
         const before = policiesRef.current.find((x) => x.id === p.id)
         const after = keptOrNew(settled(asStored(keepsCopyMark(p, before))), before)
-        if (before && changedBeyondStamp(before, after)) setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), groups, directory.people, appsRef.current))
+        if (before && changedBeyondStamp(before, after)) {
+          setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), groups, directory.people, appsRef.current))
+          touch([p.id], 'edited')
+        }
         setPolicies((all) =>
           all.map((x) => {
             if (x.id !== p.id) return x
@@ -1174,6 +1577,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         if (before && before.status !== status && !before.isSystem && !refusesStatus(before, status)) {
           const after = settled(asStored({ ...before, status, lastModified: 'Just now', modifiedBy: 'You' }))
           setChangeLog((l) => logChange(l, before, after, ADMIN_ACCOUNT.name, new Date(), undefined, undefined, appsRef.current))
+          touch([id], 'edited')
         }
         setPolicies((all) =>
           all.map((x) => {
@@ -1184,15 +1588,18 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         )
       },
 
-      saveDraft: (policyId, d) =>
-        setPolicies((all) => all.map((x) => (x.id === policyId ? keptOrNew(withSavedDraft(x, d), x) : x))),
+      saveDraft: (policyId, d) => {
+        touch([policyId], 'edited')
+        setPolicies((all) => all.map((x) => (x.id === policyId ? keptOrNew(withSavedDraft(x, d), x) : x)))
+      },
 
       discardDraft: (policyId) =>
         setPolicies((all) => all.map((x) => (x.id === policyId ? { ...x, pendingDraft: undefined } : x))),
 
       addPolicy: (p) => {
         const id = freeId(policiesRef.current, p, 'p', p.name)
-        setPolicies((all) => [settled({ ...p, id }), ...all])
+        setPolicies((all) => [settled({ ...p, id, addedOn: p.addedOn ?? addedToday() }), ...all])
+        touch([id], 'added')
         return id
       },
 
@@ -1259,8 +1666,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           isSystem: false,
           lastModified: 'Just now',
           modifiedBy: 'You',
+          addedOn: addedToday(),
         }
         setPolicies([copy, ...all])
+        touch([copy.id], 'added')
         return copy.id
       },
 
@@ -1281,11 +1690,73 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       policies, scenarios, zones, fingerprints, riskProfiles, activeRiskProfileId, scale, hooks, apps, groups, directory, edition,
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
       registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast, holdToast,
-      gauntletOverrides, breakInAccepted, changeLog, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
+      gauntletOverrides, breakInAccepted, changeLog, legacy, movedLegacy, activity, touch, builderStart, setBuilderStart, deadlineView, intro, moveDialog, reviewOpen, setupDone, moveTour, moveApps, moveJob, moved, imported, migrationStarted, held, landing, activating, migrationDone, moveMinimized, staged, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
+      visibleFingerprints,
       setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setDirectory, setApps,
       policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef, appsRef,
     ],
   )
+  startMoveRef.current = value.startMove
+
+  /* The move's clock: one policy per tick, on a timer rather than animation frames, so it carries on while the pane is
+     hidden or the admin is on another page. The last tick says so with a toast that opens Review. */
+  useEffect(() => {
+    if (moveJob?.status !== 'running') return
+    const t = window.setInterval(() => {
+      const run = moveRef.current
+      if (!run) return
+      const pp = run.plan.policies[run.at]
+      if (!pp) return
+      /* One application, one policy: rows for an application that already has one join it as rules after its own —
+         straight into a policy still in draft or monitoring, into the saved draft of one that decides sign-ins. */
+      /* Nothing a move makes reaches the policy list before it is reviewed (owner, 4 Nov 2026): a new policy waits in
+         `staged`; rows joining a policy an application already has wait as `pending` rules on its record, and the
+         policy itself is untouched until Approve. */
+      const target = pp.into ? policiesRef.current.find((p) => p.id === pp.into?.id) : undefined
+      let id: string
+      if (target) {
+        id = target.id
+      } else {
+        id = freeId([...policiesRef.current, ...stagedRef.current], pp.policy, 'p', pp.policy.name)
+        const made = settled({ ...pp.policy, id, addedOn: addedToday() })
+        stagedRef.current = [made, ...stagedRef.current]
+        setStaged((all) => [made, ...all])
+        /* The applications the old console protected are the tenant's: they join its list as their policy is made,
+           so Review's canvas can name them. */
+        const joining = legacyAppsRef.current.filter((a) => made.appIds.includes(a.id) && !appsRef.current.some((x) => x.id === a.id))
+        if (joining.length) {
+          setApps((all) => [...all, ...joining.filter((a) => !all.some((x) => x.id === a.id))])
+        }
+      }
+      setMovedLegacy((m) => ({ ...m, ...Object.fromEntries(pp.sourceIds.map((s) => [s, id])) }))
+      setMoved((m) => {
+        const was = m[id]
+        return {
+          ...m,
+          [id]: {
+            sourceIds: [...(was?.sourceIds ?? []), ...pp.sourceIds],
+            moves: [...(was?.moves ?? []), ...pp.moves],
+            changes: [...(was?.changes ?? []), ...pp.changes],
+            leftOut: [...(was?.leftOut ?? []), ...pp.leftOut],
+            ruleSource: { ...(was?.ruleSource ?? {}), ...pp.ruleSource },
+            approved: false,
+            ...(target ? { joined: true as const, pending: [...(was?.pending ?? []), ...pp.policy.rules] } : null),
+          },
+        }
+      })
+      run.at += 1
+      if (!run.ids.includes(id)) run.ids.push(id)
+      const finished = run.at >= run.plan.policies.length
+      setMoveJob((j) => (j ? { ...j, done: run.at, ids: [...run.ids], status: finished ? 'done' : 'running' } : j))
+      if (finished) {
+        moveRef.current = null
+        const n = run.ids.length
+        /* No review step (owner, 6 Nov 2026): every moved policy goes straight into Policies as a draft (AutoAdd, finale.tsx). */
+        showToast(n === 1 ? '1 policy added to Policies as a draft' : `${n} policies added to Policies as drafts`, { label: 'View', run: () => go({ name: 'policies' }) })
+      }
+    }, MOVE_TICK_MS)
+    return () => window.clearInterval(t)
+  }, [moveJob?.status, policiesRef, appsRef, setApps, showToast, go])
 
   return (
     <Ctx.Provider value={value}>

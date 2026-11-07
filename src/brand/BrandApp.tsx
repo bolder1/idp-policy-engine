@@ -10,6 +10,10 @@ import { Policies } from './screens/Policies'
 import { TestingSessionProvider } from './screens/testing/session'
 import { UserApps } from './screens/UserApps'
 import { BrandProvider, useBrand, type BrandScreen } from './store'
+import { FRESH_BUILDER } from './migrate/legacy'
+import { IntroCarousel } from './migrate/IntroCarousel'
+import { MoveTour } from './migrate/MoveTour'
+import { HomeHub } from './migrate/HomeHub'
 import './theme-mode'
 
 /* -----------------------------------------------------------------------------
@@ -31,6 +35,13 @@ import './theme-mode'
    -------------------------------------------------------------------------- */
 
 const Templates = lazy(() => import('./screens/Library').then((m) => ({ default: m.Templates })))
+import { AutoAdd } from './migrate/finale'
+import { MigratePopup } from './migrate/MoveDialog'
+const ReviewMoved = lazy(() => import('./migrate/ReviewPage').then((m) => ({ default: m.ReviewPage })))
+const MovePolicies = lazy(() => import('./migrate/MovePolicies').then((m) => ({ default: m.MovePolicies })))
+const OldLoginPolicies = lazy(() => import('./migrate/OldPolicies').then((m) => ({ default: m.OldLoginPolicies })))
+const OldPasswordPolicy = lazy(() => import('./migrate/OldPolicies').then((m) => ({ default: m.OldPasswordPolicy })))
+const OldAdaptivePolicies = lazy(() => import('./migrate/OldPolicies').then((m) => ({ default: m.OldAdaptivePolicies })))
 const FingerprintPage = lazy(() => import('./screens/FingerprintPage').then((m) => ({ default: m.FingerprintPage })))
 const RiskSignals = lazy(() => import('./screens/RiskSignals').then((m) => ({ default: m.RiskSignals })))
 const Hooks = lazy(() => import('./screens/Hooks').then((m) => ({ default: m.Hooks })))
@@ -58,6 +69,9 @@ const SignInTests = lazy(() => import('./screens/SignInTests').then((m) => ({ de
    Every lazy() specifier has to be here; routes.test.ts checks. */
 const warm = () => {
   void import('./screens/Library')
+  void import('./migrate/MovePolicies')
+  void import('./migrate/ReviewPage')
+  void import('./migrate/OldPolicies')
   void import('./screens/FingerprintPage')
   void import('./screens/RiskSignals')
   void import('./screens/Hooks')
@@ -139,6 +153,8 @@ function ScreenBody() {
     }
     case 'apps':
       return <UserApps />
+    case 'home':
+      return <HomeHub />
     case 'policies':
       return <Policies />
     case 'builder':
@@ -150,6 +166,17 @@ function ScreenBody() {
       /* Cast to the screen's own prop type, so the route can offer a return
          target a moment before the screen handles it. */
       return <PolicyDetails policyId={screen.policyId} from={screen.from as ComponentProps<typeof PolicyDetails>['from']} />
+    /* Keyed on the pick, so Merge from another row starts the flow again with that row. */
+    case 'move-policies':
+      return <MovePolicies key={screen.pick?.join(',') ?? 'all'} pick={screen.pick} />
+    case 'review-moved':
+      return <ReviewMoved />
+    case 'old-login':
+      return <OldLoginPolicies />
+    case 'old-password':
+      return <OldPasswordPolicy />
+    case 'old-adaptive':
+      return <OldAdaptivePolicies />
     case 'templates':
       return <Templates />
     case 'zones':
@@ -214,6 +241,10 @@ function Chrome() {
       {role === 'user' ? <UserShell>{body}</UserShell> : <Shell>{body}</Shell>}
       <Toast />
       <LeaveDialog />
+      {role !== 'user' && <IntroCarousel />}
+      {role !== 'user' && <MoveTour />}
+      {role !== 'user' && <AutoAdd />}
+      {role !== 'user' && <MigratePopup />}
     </TestingSessionProvider>
   )
 }
@@ -224,7 +255,8 @@ export function BrandApp() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="brand-root">
-        <BrandProvider>
+        {/* The new builder opens empty, as a tenant first meets it after the release (migrate/legacy.ts). */}
+        <BrandProvider fresh={FRESH_BUILDER}>
           <Chrome />
         </BrandProvider>
       </div>

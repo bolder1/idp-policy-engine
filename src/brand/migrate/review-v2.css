@@ -1,0 +1,51 @@
+/* Review V2 (review-v2.tsx): one policy at a time, drawn like the template preview. */
+.brv { display: flex; flex-direction: column; gap: var(--space-5); }
+
+/* The bar: where you are in the list. */
+.brv__bar { display: flex; align-items: center; gap: var(--space-4); }
+.brv__nav { display: inline-flex; align-items: center; gap: var(--space-2); }
+.brv button.brv__arrow { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: var(--radius-md); border: var(--bw-thin) solid var(--border-default); background: var(--surface-raised); color: var(--text-primary); cursor: pointer; }
+.brv button.brv__arrow:disabled { opacity: 0.4; cursor: default; }
+.brv button.brv__arrow:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.brv__count { min-width: 52px; text-align: center; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.brv__dots { width: 140px; height: 4px; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.brv__dots > i { display: block; height: 100%; border-radius: inherit; background: var(--fb-positive-fg); }
+.brv__approvedn { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.brv__pill { padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); background: var(--surface-sunken); color: var(--text-secondary); }
+.brv__pill.is-done { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+
+/* The sheet: heading, canvas, footer — the template preview's three bands. */
+.bdetail.brv2 { display: flex; flex-direction: column; overflow: visible; border-radius: var(--radius-xl, 16px); border: var(--bw-thin) solid var(--border-default); background: var(--surface-raised); box-shadow: var(--el-low); }
+.brv2__head { position: relative; z-index: 4; display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-5) var(--space-6); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.brv2__logo { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.brv2__words { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-width: 0; }
+.brv2__titlerow { display: flex; align-items: center; gap: var(--space-3); }
+.brv2__titlerow h2 { margin: 0; font-size: var(--fs-lg, 18px); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.brv2__sub { font-size: var(--fs-sm); color: var(--text-secondary); }
+.brv2__flags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+.brv2__flag { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 var(--space-3); border-radius: var(--radius-full); background: var(--fb-notice-bg); color: var(--fb-notice-fg); font-size: 12px; font-weight: var(--fw-medium); cursor: default; }
+.brv2__flag:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* The old policies, one button away. */
+.brv2__oldwrap { position: relative; flex: none; }
+.brv2__old { position: absolute; top: calc(100% + 8px); right: 0; width: 360px; max-height: 420px; overflow: auto; padding: var(--space-3); border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-high); }
+.brv2__oldhead { display: block; padding: var(--space-2) var(--space-3) var(--space-3); font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.brv2__old ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.brv2__oldrow { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); cursor: default; transition: background-color 0.15s ease; }
+.brv2__oldrow:hover, .brv2__oldrow.is-on { background: var(--surface-sunken); }
+.brv2__oldrow > .applogo, .brv2__oldrow > span:first-child { margin-top: 2px; }
+.brv2__oldtext { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 12px; color: var(--text-tertiary); }
+.brv2__oldtext > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.brv2__oldrow > em { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.brv2__oldrow.is-left .brv2__oldtext > b { text-decoration: line-through; color: var(--text-tertiary); }
+
+/* The canvas: the builder's own cards on the dotted ground, centred at their own width. */
+.brv2__canvas { position: relative; min-height: 460px; max-height: calc(100vh - 340px); overflow-y: auto; padding: var(--space-5) var(--space-6); background-color: var(--surface-sunken); }
+.brv2__canvas .bb.insp__canvas { --bb-card: 560px; }
+.brv2__canvas .bb__chain { margin-inline: auto; }
+.brv2 .bdetail__foot { position: static; border-radius: 0 0 var(--radius-xl, 16px) var(--radius-xl, 16px); }
+.brv2__actions { display: inline-flex; align-items: center; gap: var(--space-3); }
+
+/* Review in its popup: the canvas leaves room for the head and the footer. */
+.brvd .brv2__canvas { min-height: 360px; max-height: calc(100vh - 430px); }
+.brvd .bdetail.brv2 { box-shadow: none; }

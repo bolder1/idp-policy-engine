@@ -1,0 +1,268 @@
+/* Move policies, the form (MoveDialog.tsx MovePick): a bento of four tiles, generic pieces, no data. The page fits
+   the screen: no page scroll, the footer under the tiles (owner, 5 Nov 2026). */
+.bmv:has(.bmpk) { flex: 1 1 0; min-height: 520px; padding-bottom: var(--space-4); display: flex; flex-direction: column; }
+.bmpk { display: flex; flex-direction: column; gap: var(--space-5); flex: 1; min-height: 0; }
+.bmpk__bento { display: grid; flex: 1; min-height: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(250px, 1.15fr) minmax(220px, 1fr); gap: var(--space-4); }
+.bmpk__tile { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; padding: var(--space-5); border-radius: var(--radius-xl, 16px); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); overflow: hidden; }
+.bmpk__tile.is-wide { grid-column: span 2; }
+.bmpk__tile.is-tall { grid-row: span 2; }
+.bmpk__words { display: flex; flex-direction: column; gap: var(--space-2); }
+.bmpk__tilehead { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-base); color: var(--text-primary); }
+.bmpk__tilehead > b { font-weight: var(--fw-semibold); }
+.bmpk__tileicon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--surface-sunken); border: var(--bw-thin) solid var(--border-subtle); color: var(--text-primary); }
+.bmpk__words > p { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+
+/* The picture: old pieces dashed on the left, new ones solid on the right, on the dotted ground. */
+.bmpk__pic { display: flex; flex: 1; min-height: 120px; align-items: center; justify-content: center; gap: var(--space-5); padding: var(--space-5); border-radius: var(--radius-lg); background-color: var(--surface-sunken); background-image: radial-gradient(var(--border-subtle) 1px, transparent 1px); background-size: 16px 16px; }
+.bmpk__stack { display: flex; flex-direction: column; gap: var(--space-2); }
+.bmpk__piece { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); white-space: nowrap; }
+.bmpk__piece > svg { color: var(--text-tertiary); }
+.bmpk__piece.is-old { box-shadow: none; border-style: dashed; border-color: var(--border-strong); font-weight: var(--fw-regular); color: var(--text-secondary); }
+.bmpk__piece.is-made { background: var(--fb-positive-bg); border-color: transparent; color: var(--fb-positive-fg); }
+.bmpk__piece.is-made > svg { color: inherit; }
+.bmpk__to { flex: none; color: var(--text-tertiary); }
+.bmpk__bar { display: block; flex: 1; height: 6px; border-radius: var(--radius-full); background: var(--border-subtle); }
+.bmpk__bar.is-short { flex: 0 0 28%; }
+
+/* Tile 1: two old pages, drawn as small windows, and the one policy. */
+.bmpk__page { display: flex; flex-direction: column; gap: 6px; width: 180px; padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) dashed var(--border-strong); }
+.bmpk__pagehead { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 2px; font-size: 12px; font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bmpk__pagehead > svg { color: var(--text-tertiary); }
+.bmpk__pagerow { display: flex; gap: var(--space-2); }
+.bmpk__policy { display: flex; flex-direction: column; width: 240px; border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-mid, var(--el-low)); overflow: hidden; }
+.bmpk__policyhead { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: var(--bw-thin) solid var(--border-subtle); font-size: var(--fs-sm); color: var(--text-primary); }
+.bmpk__policyhead > svg { color: var(--text-tertiary); }
+.bmpk__policyhead > i { margin-left: auto; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--surface-sunken); font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); color: var(--text-secondary); }
+.bmpk__policyrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: var(--bw-thin) solid var(--border-subtle); font-size: 12.5px; color: var(--text-primary); white-space: nowrap; }
+.bmpk__policyrow:first-of-type { border-top: 0; }
+.bmpk__policyrow > svg { color: var(--text-tertiary); }
+.bmpk__policyrow.is-else { background: var(--surface-sunken); }
+
+/* Tile 4: the three states, top to bottom. */
+.bmpk__states { display: flex; flex-direction: column; align-items: stretch; width: min(100%, 220px); }
+.bmpk__state { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); font-size: var(--fs-sm); color: var(--text-primary); }
+.bmpk__state > svg { flex: none; color: var(--text-tertiary); }
+.bmpk__state > b { font-weight: var(--fw-medium); }
+.bmpk__state.is-on { background: var(--fb-positive-bg); border-color: transparent; color: var(--fb-positive-fg); }
+.bmpk__state.is-on > svg { color: inherit; }
+.bmpk__down { align-self: center; width: 0; height: 22px; border-left: var(--bw-thin) dashed var(--border-strong); }
+.bmpk__toggle { display: inline-flex; align-items: center; justify-content: flex-end; margin-left: auto; width: 30px; height: 18px; padding: 2px; border-radius: var(--radius-full); background: var(--fb-positive-fg); }
+.bmpk__toggle > i { width: 14px; height: 14px; border-radius: 50%; background: var(--surface-raised); }
+
+/* The foot: part of the page, under the tiles. */
+.bmpk__foot { display: flex; align-items: center; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--bw-thin) solid var(--border-subtle); }
+.bmpk__safe { display: inline-flex; align-items: center; gap: var(--space-2); flex: 1; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* Nothing left to move. */
+.bmpk__empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: 64px var(--space-6); text-align: center; }
+.bmpk__emptymark { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bmpk__empty > b { font-size: var(--fs-base); color: var(--text-primary); }
+.bmpk__empty > p { margin: 0 0 var(--space-3); max-width: 420px; font-size: var(--fs-sm); color: var(--text-secondary); }
+
+@media (max-width: 1100px) {
+  .bmv:has(.bmpk) { height: auto; }
+  .bmpk__bento { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .bmpk__tile.is-wide, .bmpk__tile.is-tall { grid-column: auto; grid-row: auto; }
+  .bmpk__pic { min-height: 180px; }
+}
+
+/* The stepper (5 Nov 2026): four steps across the top, the chosen one drawn large below. Replaces the bento. */
+.bmpk__steps { display: flex; flex-direction: column; gap: var(--space-4); flex: 1; min-height: 0; }
+.bmpk__rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.bmpk__rail > li { position: relative; display: flex; align-items: center; min-width: 0; }
+.bmpk__rail button { display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-2) var(--space-3) var(--space-2) 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.bmpk__rail button:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-md); }
+.bmpk__dot { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--surface-raised); border: var(--bw-thin) solid var(--border-strong); font-size: 13px; font-weight: var(--fw-semibold); color: var(--text-secondary); transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+.bmpk__rail li.is-on .bmpk__dot { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-raised); }
+.bmpk__rail li.is-past .bmpk__dot { background: var(--fb-positive-bg); border-color: transparent; color: var(--fb-positive-fg); }
+.bmpk__label { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bmpk__label > em { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.bmpk__label > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bmpk__rail li.is-on .bmpk__label > b { color: var(--text-primary); }
+.bmpk__link { position: relative; flex: 1; height: 2px; min-width: 16px; margin-right: var(--space-3); border-radius: var(--radius-full); background: var(--border-subtle); overflow: hidden; }
+.bmpk__link > i { position: absolute; inset: 0 auto 0 0; display: block; background: var(--text-primary); }
+
+.bmpk__stage { display: flex; flex: 1; min-height: 340px; border-radius: var(--radius-xl, 16px); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); overflow: hidden; }
+.bmpk__scene { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); flex: 1; min-height: 0; }
+.bmpk__scene > .bmpk__pic { border-radius: 0; gap: var(--space-6); }
+.bmpk__scene > .bmpk__words { justify-content: center; gap: var(--space-3); padding: var(--space-7); }
+.bmpk__scene > .bmpk__words > b { font-size: 22px; line-height: 1.25; font-weight: var(--fw-semibold); letter-spacing: -0.015em; color: var(--text-primary); }
+.bmpk__scene > .bmpk__words > p { font-size: var(--fs-md); }
+.bmpk__scene .bmpk__tileicon { width: 40px; height: 40px; }
+
+/* Step 3's picture: the new policy beside the old rows, one traced. */
+.bmpk__review { display: flex; align-items: center; gap: var(--space-5); }
+.bmpk__policyrow.is-traced { background: var(--fb-info-bg); }
+.bmpk__approve { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin: var(--space-3) var(--space-4); padding: var(--space-2) 0; border-radius: var(--radius-md); background: var(--text-primary); font-size: 12.5px; font-weight: var(--fw-medium); color: var(--surface-raised); }
+.bmpk__oldcard { display: flex; align-items: center; gap: var(--space-2); width: 220px; white-space: nowrap; padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) dashed var(--border-strong); font-size: 12.5px; color: var(--text-secondary); }
+.bmpk__oldcard > svg { color: var(--text-tertiary); }
+.bmpk__oldcard > em { margin-left: auto; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--surface-sunken); font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); color: var(--text-primary); }
+.bmpk__oldcard.is-on { border-style: solid; border-color: var(--fb-info-fg); box-shadow: var(--el-low); }
+
+@media (max-width: 1100px) {
+  .bmpk__rail { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--space-2); }
+  .bmpk__scene { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The four steps on one canvas (5 Nov 2026): one dotted ground, one line across the middle with a station per step,
+   pictures and words in turn above and below it. */
+.bmpk__journey { position: relative; display: flex; flex: 1; min-height: 0; border-radius: var(--radius-xl, 16px); background-color: var(--surface-sunken); background-image: radial-gradient(var(--border-default) 1px, transparent 1px); background-size: 18px 18px; border: var(--bw-thin) solid var(--border-subtle); overflow: hidden; }
+.bmpk__path { position: absolute; left: 12.5%; right: 12.5%; top: 50%; height: 3px; margin-top: -1.5px; border-radius: var(--radius-full); background: repeating-linear-gradient(90deg, var(--border-strong) 0 8px, transparent 8px 14px); }
+.bmpk__path > i { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, var(--text-primary), var(--fb-info-fg) 60%, var(--fb-positive-fg)); opacity: 0.85; }
+.bmpk__flow4 { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1; min-height: 0; margin: 0; padding: var(--space-5) 0; list-style: none; }
+.bmpk__col { display: grid; grid-template-rows: minmax(0, 1fr) 48px minmax(0, 1fr); justify-items: center; min-width: 0; min-height: 0; padding: 0 var(--space-4); }
+.bmpk__col > .bmpk__pic { grid-row: 1; align-self: end; flex-direction: column; gap: var(--space-3); min-height: 0; margin-bottom: var(--space-4); padding: 0; background: none; border: 0; }
+.bmpk__col > .bmpk__words { grid-row: 3; align-self: start; align-items: center; gap: 4px; max-width: 250px; margin-top: var(--space-4); padding: 0; text-align: center; }
+.bmpk__col.is-down > .bmpk__pic { grid-row: 3; align-self: start; margin: var(--space-4) 0 0; }
+.bmpk__col.is-down > .bmpk__words { grid-row: 1; align-self: end; margin: 0 0 var(--space-4); }
+.bmpk__col > .bmpk__node { grid-row: 2; align-self: center; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--surface-raised); border: 2px solid var(--text-primary); color: var(--text-primary); box-shadow: 0 0 0 6px var(--surface-sunken), var(--el-low); }
+.bmpk__col:nth-child(2) > .bmpk__node, .bmpk__col:nth-child(3) > .bmpk__node { border-color: var(--fb-info-fg); color: var(--fb-info-fg); }
+.bmpk__col:last-child > .bmpk__node { border-color: var(--fb-positive-fg); background: var(--fb-positive-fg); color: var(--surface-raised); }
+.bmpk__words > em { font-style: normal; font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: 0.02em; color: var(--text-tertiary); }
+.bmpk__words > b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmpk__col .bmpk__words > p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+.bmpk__col .bmpk__to { rotate: 90deg; }
+.bmpk__col .bmpk__to.is-side { rotate: 0deg; }
+.bmpk__duo { display: flex; gap: var(--space-2); }
+.bmpk__duo .bmpk__page { width: 104px; padding: var(--space-2) var(--space-3); }
+.bmpk__col .bmpk__policy { width: 200px; }
+.bmpk__col .bmpk__states { width: 180px; }
+.bmpk__col .bmpk__state { padding: var(--space-2) var(--space-3); }
+.bmpk__col .bmpk__down { height: 14px; }
+.bmpk__col .bmpk__oldcard { width: 200px; }
+.bmpk__col .bmpk__policyrow, .bmpk__col .bmpk__policyhead { padding: var(--space-2) var(--space-3); }
+.bmpk__pairs { display: flex; flex-direction: column; gap: var(--space-2); }
+.bmpk__pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-2); width: 240px; }
+.bmpk__pair .bmpk__piece { justify-content: flex-start; height: 30px; padding: 0 var(--space-3); font-size: 12px; }
+@media (max-width: 1100px) {
+  .bmpk__flow4 { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--space-6); padding: var(--space-5) 0; }
+  .bmpk__path { display: none; }
+  .bmpk__col, .bmpk__col.is-down { grid-template-rows: auto 48px auto; }
+  .bmpk__col.is-down > .bmpk__pic { grid-row: 1; align-self: end; margin: 0 0 var(--space-4); }
+  .bmpk__col.is-down > .bmpk__words { grid-row: 3; align-self: start; margin: var(--space-4) 0 0; }
+}
+/* Short screens: the pictures shrink toward the line so nothing touches the canvas edge. */
+@media (max-height: 820px) and (min-width: 1101px) {
+  .bmpk__col > .bmpk__pic { scale: 0.84; transform-origin: 50% 100%; }
+  .bmpk__col.is-down > .bmpk__pic { transform-origin: 50% 0; }
+  .bmpk__col > .bmpk__pic, .bmpk__col.is-down > .bmpk__pic { margin-block: 0; }
+}
+
+/* The world version (5 Nov 2026): a calm list of four steps, the Walkthrough's isometric world beside it. */
+.bmw { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: var(--space-5); flex: 1; min-height: 0; }
+.bmw__list { display: flex; flex-direction: column; justify-content: center; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.bmw__step { display: flex; align-items: flex-start; gap: var(--space-4); width: 100%; padding: var(--space-4); border: var(--bw-thin) solid transparent; border-radius: var(--radius-lg); background: none; font: inherit; text-align: left; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease; }
+.bmw__step:hover { background: var(--surface-sunken); }
+.bmw__step.is-on { background: var(--surface-raised); border-color: var(--border-default); box-shadow: var(--el-low); }
+.bmw__step:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bmw__n { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-raised); border: var(--bw-thin) solid var(--border-strong); font-size: 13px; font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bmw__step.is-on .bmw__n { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-raised); }
+.bmw__step.is-done .bmw__n { background: var(--blue-soft, var(--surface-sunken)); border-color: transparent; color: var(--blue, var(--text-primary)); }
+.bmw__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bmw__text > b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmw__text > span { font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+.bmw__stage { position: relative; min-height: 320px; border-radius: var(--radius-xl, 16px); background: var(--surface-sunken); border: var(--bw-thin) solid var(--border-subtle); overflow: hidden; }
+.bmw__stage .biw__svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+@media (max-width: 1100px) {
+  .bmw { grid-template-columns: minmax(0, 1fr); }
+  .bmw__stage { min-height: 300px; }
+}
+
+/* The basic version (6 Nov 2026): four steps on one page. A numbered track on top, a full-height card each below:
+   a tinted area with the step's line icon, then its words. */
+.bm4 { display: flex; flex-direction: column; gap: var(--space-4); flex: 1; min-height: 0; padding-top: var(--space-2); }
+.bm4__track, .bm4__cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.bm4__track > li { position: relative; display: flex; align-items: center; }
+.bm4__track > li:not(:last-child)::after { content: ""; position: absolute; left: 40px; right: calc(-1 * var(--space-4)); top: 50%; height: 2px; border-radius: var(--radius-full); background: var(--border-default); }
+.bm4__node { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--text-primary); color: var(--surface-raised); font-size: 13px; font-weight: var(--fw-semibold); }
+.bm4__cards { flex: 1; min-height: 0; }
+.bm4__card { display: flex; flex-direction: column; min-height: 0; border-radius: var(--radius-xl, 16px); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); overflow: hidden; }
+.bm4__pic { display: grid; place-items: center; flex: 1; min-height: 140px; background-color: var(--surface-sunken); background-image: radial-gradient(var(--border-default) 1px, transparent 1px); background-size: 16px 16px; border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.bm4__icon { display: grid; place-items: center; width: 84px; height: 84px; border-radius: 22px; background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); color: var(--text-primary); }
+.bm4__card.is-last .bm4__icon { background: var(--fb-positive-bg); border-color: transparent; color: var(--fb-positive-fg); }
+.bm4__words { display: flex; flex-direction: column; gap: var(--space-2); min-height: 118px; padding: var(--space-5) var(--space-5) var(--space-6); }
+.bm4__n { font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bm4__words > b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bm4__words > p { margin: 0; font-size: var(--fs-sm); line-height: 1.55; color: var(--text-secondary); }
+@media (max-width: 1100px) {
+  .bm4__track { display: none; }
+  .bm4__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* The version dropdown (move-versions.tsx), top right of the page where the head's actions sit. */
+.bmv { position: relative; }
+.bmpk__version { position: absolute; top: 32px; right: 180px; }
+
+/* What moves (6 Nov 2026): the counts, said once, above the steps. */
+.bmpk__sum { display: flex; align-items: stretch; gap: var(--space-3); }
+.bmpk__fig { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; padding: var(--space-4) var(--space-5); border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); }
+.bmpk__fig > b { font-size: 26px; line-height: 1.1; font-weight: var(--fw-semibold); letter-spacing: -0.02em; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.bmpk__fig > span { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bmpk__fig > em { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.bmpk__fig.is-new { background: var(--blue-soft, var(--fb-info-bg)); border-color: transparent; }
+.bmpk__fig.is-new > b { color: var(--blue, var(--fb-info-fg)); }
+.bmpk__figto { align-self: center; flex: none; color: var(--text-tertiary); }
+
+/* The Migrate popup (MoveDialog.tsx MigratePopup): the counts and the four steps; its foot is the dialog's footer. */
+.bmpk.is-popup { gap: var(--space-5); }
+.bmpk.is-popup .bm4__pic { min-height: 120px; }
+.bmpk.is-popup .bm4__words { min-height: 0; padding: var(--space-4) var(--space-4) var(--space-5); }
+.bmpk__foot.is-popup { flex: 1; padding-top: 0; border-top: 0; }
+@media (max-width: 1100px) {
+  .bmpk.is-popup .bm4__track { display: none; }
+  .bmpk.is-popup .bm4__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* The switch-over after Migrate (MoveDialog.tsx MigratePopup): a blue door over the whole console while the rail swaps. */
+.bmgd {
+  position: fixed; inset: 0; z-index: var(--z-toast); display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--fb-info-fg) 78%, var(--surface-raised)), var(--fb-info-fg));
+  color: var(--text-inverse);
+}
+.bmgd__in { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); text-align: center; }
+.bmgd__marks { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+.bmgd__mark { display: grid; place-items: center; width: 64px; height: 64px; border-radius: var(--radius-xl, 16px); border: var(--bw-thin) dashed color-mix(in srgb, var(--text-inverse) 60%, transparent); }
+.bmgd__mark.is-new { border-style: solid; border-color: transparent; background: var(--surface-raised); color: var(--fb-info-fg); box-shadow: var(--el-mid, var(--el-low)); }
+.bmgd__line { display: block; width: 64px; height: 2px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--text-inverse) 70%, transparent); transform-origin: left center; }
+.bmgd__title { font-size: var(--fs-3xl); font-weight: var(--fw-semibold); letter-spacing: -0.01em; }
+.bmgd__line2 { font-size: var(--fs-base); color: color-mix(in srgb, var(--text-inverse) 82%, transparent); }
+
+/* The Migrate popup's body (MoveDialog.tsx MigrateLayout): what moves on the left, how it works on the right. */
+.bmg2 { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-6); align-items: stretch; }
+.bmg2__label { font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bmg2__what { display: flex; flex-direction: column; justify-content: center; gap: var(--space-2); padding: var(--space-5); border-radius: var(--radius-xl, 16px); background-color: var(--surface-sunken); background-image: radial-gradient(var(--border-default) 1px, transparent 1px); background-size: 16px 16px; }
+.bmg2__side { display: flex; flex-direction: column; gap: var(--space-2); }
+.bmg2__tag { font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bmg2__tag.is-new { color: var(--fb-info-fg); }
+/* Today: a pile of old pages, the front one dashed, two more behind it. */
+.bmg2__stack { position: relative; display: flex; flex-direction: column; gap: 2px; margin: 0 12px 12px 0; padding: var(--space-4); border-radius: var(--radius-lg); border: var(--bw-thin) dashed var(--border-strong); background: var(--surface-raised); box-shadow: 6px 6px 0 -1px var(--surface-raised), 6px 6px 0 0 var(--border-default), 12px 12px 0 -1px var(--surface-raised), 12px 12px 0 0 var(--border-subtle); }
+.bmg2__big { font-size: 32px; line-height: 1.1; font-weight: var(--fw-semibold); letter-spacing: -0.02em; color: var(--text-primary); }
+.bmg2__big.is-new { color: var(--fb-info-fg); }
+.bmg2__what1 { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bmg2__pages { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.bmg2__page { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 var(--space-3); border-radius: var(--radius-md); border: var(--bw-thin) dashed var(--border-strong); font-size: 12px; color: var(--text-secondary); }
+.bmg2__page > svg, .bmg2__part > svg { color: var(--text-tertiary); }
+/* Three lines joining into one, between the two. */
+.bmg2__flow { display: block; width: 120px; height: 44px; margin: 0 auto; overflow: visible; }
+.bmg2__flow path { fill: none; stroke: var(--border-strong); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 3 4; }
+.bmg2__flow path.is-head { stroke: var(--fb-info-fg); stroke-dasharray: none; stroke-width: 2; stroke-linejoin: round; }
+/* After: the new policies, solid, and the parts they share. */
+.bmg2__newcard { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--fb-info-fg); box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--fb-info-fg) 55%, transparent); }
+.bmg2__shield { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bmg2__newtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bmg2__note { margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
+.bmg2__parts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.bmg2__part { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bmg2__part > b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmg2__how { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.bmg2__steps { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.bmg2__step { position: relative; display: flex; gap: var(--space-4); padding-bottom: var(--space-5); }
+.bmg2__step:last-child { padding-bottom: 0; }
+.bmg2__step:not(:last-child)::before { content: ""; position: absolute; left: 17px; top: 40px; bottom: 4px; width: 2px; border-radius: var(--radius-full); background: var(--border-subtle); }
+.bmg2__node { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); color: var(--text-primary); }
+.bmg2__step:last-child .bmg2__node { background: var(--fb-positive-bg); border-color: transparent; color: var(--fb-positive-fg); }
+.bmg2__words { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 1px; }
+.bmg2__n { font-size: 12px; color: var(--text-tertiary); }
+.bmg2__words > b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmg2__words > p { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+@media (max-width: 760px) { .bmg2 { grid-template-columns: minmax(0, 1fr); } }

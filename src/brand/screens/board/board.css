@@ -141,6 +141,12 @@
 .bb.is-left-open .bb__acts > :not(.bb__fold__btn),
 .bb.is-left-open .bb__idx__grip { display: none; }
 .bb.is-left-open .bb__idx { pointer-events: none; }
+/* A moved draft, read beside its old policies (BoardBuilder `movedDraft`): nothing to add, move or delete. */
+.bb.is-moved-view .bb__link__add,
+.bb.is-moved-view .bb__link__hint,
+.bb.is-moved-view .bb__acts > :not(.bb__fold__btn),
+.bb.is-moved-view .bb__idx__grip { display: none; }
+.bb.is-moved-view .bb__idx { pointer-events: none; }
 /* An explicitly-sized track outlives the item in it, so closing the panel would
    otherwise leave 560px of empty gutter where it had been.
 
@@ -1426,6 +1432,12 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
    faded by its own animation. The card is a motion element, so nothing here
    moves or transforms it. Two animation names, so a second write restarts
    the edge; under reduced motion it simply stands for the 2 s. */
+/* A moved policy: the rules an old policy became, in the info blue, with the rest quieter. */
+.bb.is-moved-hi .bb__card.is-traced { border-color: var(--fb-info-fg); box-shadow: 0 0 0 1px var(--fb-info-fg); background: var(--fb-info-bg); }
+.bb.is-moved-hi .bb__card:not(.is-traced) { opacity: 0.6; }
+/* Inside a lit rule, the parts the old policy made: its conditions and its Who. */
+.bb.is-moved-hi .bb__card.is-traced .bb__ifrow.is-cond,
+.bb.is-moved-hi .bb__card.is-traced .bb__ifwho { background: var(--fb-info-bg); border-radius: var(--radius-md); box-shadow: 0 0 0 var(--space-1) var(--fb-info-bg); }
 .bb.is-fresh .bb__card.is-traced {
   border-top-color: var(--border-subtle);
   border-right-color: var(--border-subtle);
@@ -3306,7 +3318,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   margin-bottom: var(--space-4);
 }
 .bb__insp .bb__sec__head h3 {
-  margin: 0; flex: 1; min-width: 0;
+  margin: 0; flex: 0 1 auto; min-width: 0;
   font-size: var(--fs-base); font-weight: var(--fw-semibold);
   letter-spacing: 0; text-transform: none;
   color: var(--text-primary);

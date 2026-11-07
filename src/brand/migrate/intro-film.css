@@ -1,0 +1,167 @@
+/* The intro, Explainer (IntroFilm.tsx): one big stage, words one line at a time, a scrub bar with chapters. */
+.bin.is-film { display: block; }
+.bfm { --f-blue: var(--blue, #0d6efd); --f-blue-strong: var(--blue-strong, #0a58ca); --f-blue-soft: var(--blue-soft, #e7f1ff); display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-5) var(--space-4); }
+.bfm__stage { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius-xl, 16px); background: var(--surface-sunken); border: var(--bw-thin) solid var(--border-subtle); overflow: hidden; }
+.bfm__svg { position: absolute; inset: 0; width: 100%; height: 100%; font-family: inherit; }
+.fgrid line { stroke: var(--border-default); stroke-width: 0.6; opacity: 0.5; }
+
+/* The end scene (IntroFilm `end`): the round visual, the words and the one Start migration, over the stage. */
+.bfm__end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-6); background-color: var(--surface-sunken); background-image: radial-gradient(var(--border-default) 1px, transparent 1px); background-size: 22px 22px; text-align: center; }
+.bfm__endhero { display: grid; place-items: center; width: 270px; height: 270px; margin-bottom: var(--space-4); }
+.bfm__endscale { flex: none; transform: scale(0.82); transform-origin: center; }
+.bx-modal .bin .bfm__end h2 { margin: 0; font-size: 26px; line-height: 1.2; font-weight: var(--fw-semibold); letter-spacing: -0.02em; color: var(--text-primary); }
+.bfm__end p { margin: 0; max-width: 520px; font-size: var(--fs-base); line-height: 1.55; color: var(--text-secondary); }
+
+/* The timeline: its own row. Play, then a segment per chapter sized by its length; the playing one fills. */
+.bfm__timeline { display: flex; align-items: flex-start; gap: var(--space-3); }
+.bfm__chapters { display: flex; flex: 1; min-width: 0; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.bfm__chapters > li { min-width: 0; flex-basis: 0; }
+.bfm__chapter { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 8px 0 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.bfm__track { position: relative; display: block; height: 4px; border-radius: var(--radius-full); background: var(--border-default); overflow: hidden; transition: height 0.15s ease; }
+.bfm__track > i { position: absolute; inset: 0 auto 0 0; background: var(--text-primary); border-radius: inherit; }
+.bfm__chapter.is-on .bfm__track > i { background: var(--blue, var(--text-primary)); }
+.bfm__chapter:hover .bfm__track { height: 6px; }
+.bfm__chaptername { overflow: hidden; font-size: 12px; font-weight: var(--fw-medium); white-space: nowrap; text-overflow: ellipsis; color: var(--text-tertiary); }
+.bfm__chapter.is-done .bfm__chaptername { color: var(--text-secondary); }
+.bfm__chapter.is-on .bfm__chaptername { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bfm__chapter:hover .bfm__chaptername { color: var(--text-primary); }
+.bfm__chapter:focus-visible { outline: none; border-radius: var(--radius-sm, 4px); box-shadow: var(--focus-ring); }
+.bfm__play { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; border: var(--bw-thin) solid var(--border-default); background: var(--surface-raised); color: var(--text-primary); cursor: pointer; }
+.bfm__play:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* The words and the buttons: one row, the words left, Not now and Start migration right. */
+.bfm__row { display: flex; align-items: flex-end; gap: var(--space-4); }
+.bfm__words { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: flex-end; gap: 2px; min-height: 64px; }
+.bfm__act { margin-bottom: var(--space-1); font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: 0.02em; color: var(--blue, var(--text-tertiary)); }
+.bfm__words p { margin: 0; font-size: 14px; line-height: 1.4; font-weight: var(--fw-medium); color: var(--text-tertiary); }
+.bfm__words p.is-now { font-size: 22px; line-height: 1.25; font-weight: var(--fw-semibold); letter-spacing: -0.015em; color: var(--text-primary); }
+.bfm__words p:not(.is-now) { display: none; }
+.bfm__words p:nth-last-of-type(2):not(.is-now) { display: block; }
+.bfm__acts { display: flex; flex: none; gap: var(--space-3); }
+.bfm__tools { display: contents; }
+
+/* The world's faces. */
+.fv polygon { stroke-linejoin: round; stroke-width: 1; }
+.fv__top { fill: var(--surface-raised); stroke: var(--border-strong); }
+.fv__front { fill: var(--border-subtle); stroke: var(--border-strong); }
+.fv__side { fill: var(--border-default); stroke: var(--border-strong); }
+.fv.is-ghost polygon { fill: transparent; stroke: var(--border-strong); stroke-dasharray: 4 4; }
+.fv.is-board .fv__top { fill: color-mix(in srgb, var(--surface-raised) 70%, transparent); stroke: var(--border-default); }
+.fv.is-board .fv__front, .fv.is-board .fv__side { fill: var(--border-subtle); stroke: var(--border-default); }
+.fv.is-outline .fv__top { fill: color-mix(in srgb, var(--f-blue) 5%, var(--surface-raised)); stroke: var(--f-blue); stroke-width: 1.5; }
+.fv.is-outline .fv__front { fill: color-mix(in srgb, var(--f-blue) 14%, var(--surface-raised)); stroke: var(--f-blue); }
+.fv.is-outline .fv__side { fill: color-mix(in srgb, var(--f-blue) 24%, var(--surface-raised)); stroke: var(--f-blue); }
+.fv.is-copy .fv__top { fill: var(--surface-raised); stroke: var(--f-blue); stroke-width: 2; stroke-dasharray: 3 3; }
+.fv.is-lit .fv__top { fill: var(--f-blue); stroke: var(--f-blue); }
+.fv.is-lit .fv__front { fill: var(--f-blue-strong); stroke: var(--f-blue-strong); }
+.fv.is-lit .fv__side { fill: color-mix(in srgb, var(--f-blue-strong) 78%, black); stroke: var(--f-blue-strong); }
+.fv.is-good .fv__top { fill: var(--fb-positive-fg); stroke: var(--fb-positive-fg); }
+.fv.is-good .fv__front, .fv.is-good .fv__side { fill: color-mix(in srgb, var(--fb-positive-fg) 75%, black); stroke: var(--fb-positive-fg); }
+.fv.is-bad .fv__top { fill: var(--fb-negative-fg); stroke: var(--fb-negative-fg); }
+.fv.is-bad .fv__front, .fv.is-bad .fv__side { fill: color-mix(in srgb, var(--fb-negative-fg) 75%, black); stroke: var(--fb-negative-fg); }
+
+.ft { font-size: 11px; font-weight: 500; fill: var(--text-primary); }
+.ft.is-b { font-size: 11.5px; font-weight: 600; }
+.ft.is-big { font-size: 13px; font-weight: 600; }
+.ft.is-row { font-size: 10.5px; font-weight: 500; fill: var(--text-secondary); }
+.ft.is-sub { font-size: 9.5px; font-weight: 400; fill: var(--text-tertiary); }
+.ft.is-kicker { font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; fill: var(--f-blue); }
+.ft.is-chip { font-size: 9px; font-weight: 600; }
+.ft.is-blue { fill: var(--f-blue); }
+.ft.is-white, .ft.is-white .ft__k { fill: #fff; }
+.ft__k { font-weight: 700; fill: var(--text-tertiary); }
+.ft.is-pill { font-size: 9.5px; font-weight: 700; fill: var(--text-secondary); }
+.ft.is-pill.is-approved { fill: var(--f-blue); }
+.ft.is-pill.is-active { fill: var(--fb-positive-fg); }
+
+.fw path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fw__track { stroke: var(--border-default); stroke-width: 2; }
+.fw__live { stroke: var(--f-blue); stroke-width: 2.5; }
+.fw__dot { fill: var(--f-blue); }
+.ftoken { stroke: var(--surface-raised); stroke-width: 3; }
+.ftoken.is-good { fill: var(--fb-positive-fg); }
+.ftoken.is-bad { fill: var(--fb-negative-fg); }
+.fmiss { fill: var(--surface-raised); stroke: var(--border-strong); stroke-dasharray: 3 3; }
+.fcursor { fill: var(--text-primary); stroke: var(--surface-raised); stroke-width: 1.2; }
+
+@media (max-width: 860px) {
+  .bfm__words p.is-now { font-size: 18px; }
+  .bfm__marks { display: none; }
+}
+
+/* The 2D view: upright cards, a thin lower edge, a soft shadow when lifted, dots for ground. */
+.fdot { fill: var(--border-default); }
+.fv.is-flat rect { stroke-width: 1; }
+.fv.is-flat .fv__shadow { fill: rgba(33, 37, 41, 0.08); stroke: none; }
+.fv.is-flat.is-ghost rect { fill: transparent; stroke: var(--border-strong); stroke-dasharray: 4 4; }
+.fv.is-flat.is-ghost .fv__front { display: none; }
+.fv.is-flat.is-board .fv__front { display: none; }
+
+/* --- The 2D Explainer (intro-film-2d.tsx): the console's own cards, chips, rows and pills ----------------------- */
+.bfm__svg.is-2d { font-family: inherit; }
+.f2c { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1; filter: drop-shadow(0 1px 2px rgba(33, 37, 41, 0.06)); }
+.f2c.is-dash { fill: color-mix(in srgb, var(--surface-raised) 55%, transparent); stroke: var(--border-strong); stroke-dasharray: 5 4; filter: none; }
+.f2c.is-soft { fill: var(--surface-sunken); stroke: var(--border-default); filter: none; }
+.f2c.is-blue { stroke: var(--f-blue); stroke-width: 1.5; }
+.f2c.is-lit { fill: var(--f-blue); stroke: var(--f-blue); }
+.f2c.is-good { fill: var(--fb-positive-fg); stroke: var(--fb-positive-fg); }
+.f2c.is-bad { fill: var(--fb-negative-fg); stroke: var(--fb-negative-fg); }
+.f2row { fill: var(--surface-sunken); stroke: var(--border-subtle); stroke-width: 1; }
+.f2row.is-lit { fill: color-mix(in srgb, var(--f-blue) 10%, var(--surface-raised)); stroke: var(--f-blue); }
+.f2row.is-dark { fill: rgba(255, 255, 255, 0.14); stroke: transparent; }
+.f2chip { fill: var(--surface-raised); stroke: var(--border-strong); stroke-width: 1; }
+.f2chip.is-dash { stroke: var(--f-blue); stroke-dasharray: 3 3; stroke-width: 1.5; }
+.f2chip.is-lit { fill: var(--f-blue); stroke: var(--f-blue); }
+.f2chip.is-blue { fill: color-mix(in srgb, var(--f-blue) 10%, var(--surface-raised)); stroke: var(--f-blue); }
+.f2num { fill: var(--surface-sunken); stroke: var(--border-default); }
+.f2num.is-white { fill: rgba(255, 255, 255, 0.2); stroke: transparent; }
+.f2pill { stroke: none; }
+.f2pill.is-draft { fill: var(--surface-sunken); }
+.f2pill.is-approved { fill: color-mix(in srgb, var(--f-blue) 14%, var(--surface-raised)); }
+.f2pill.is-active, .f2pill.is-good { fill: var(--fb-positive-bg); }
+.f2pill.is-bad { fill: var(--fb-negative-bg); }
+
+.f2t { font-size: 13px; font-weight: 500; fill: var(--text-primary); }
+.f2t.is-app { font-size: 15px; font-weight: 600; }
+.f2t.is-count { font-size: 40px; font-weight: 600; letter-spacing: -0.01em; }
+.f2t.is-title { font-size: 15px; font-weight: 600; }
+.f2t.is-b { font-size: 14px; font-weight: 600; }
+.f2t.is-big { font-size: 17px; font-weight: 600; }
+.f2t.is-row { font-size: 12.5px; font-weight: 500; fill: var(--text-secondary); }
+.f2t.is-sub { font-size: 12px; font-weight: 400; fill: var(--text-tertiary); }
+.f2t.is-k { font-size: 12px; font-weight: 600; fill: var(--text-tertiary); }
+.f2t.is-kicker { font-size: 12px; font-weight: 600; fill: var(--text-tertiary); }
+.f2t.is-num { font-size: 12px; font-weight: 600; fill: var(--text-secondary); }
+.f2t.is-chip { font-size: 12px; font-weight: 500; fill: var(--text-primary); }
+.f2t.is-chip.is-dash, .f2t.is-chip.is-blue { fill: var(--f-blue); }
+.f2t.is-chip.is-lit { fill: #fff; }
+.f2t.is-pill { font-size: 11.5px; font-weight: 600; fill: var(--text-secondary); }
+.f2t.is-pill.is-approved { fill: var(--f-blue); }
+.f2t.is-pill.is-active, .f2t.is-pill.is-good { fill: var(--fb-positive-fg); }
+.f2t.is-pill.is-bad { fill: var(--fb-negative-fg); }
+.f2t.is-white { fill: #fff; }
+
+.f2w path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.f2w__track { stroke: var(--border-default); stroke-width: 2; }
+.f2w__live { stroke: var(--f-blue); stroke-width: 2.5; }
+.f2w.is-grey .f2w__live { stroke: var(--border-strong); stroke-width: 2; }
+.f2w__dot { fill: var(--f-blue); }
+.f2w.is-grey .f2w__dot { fill: var(--border-strong); }
+.f2tok { stroke: var(--surface-raised); stroke-width: 3; }
+.f2tok.is-good { fill: var(--fb-positive-fg); }
+.f2tok.is-bad { fill: var(--fb-negative-fg); }
+.f2cursor { fill: var(--text-primary); stroke: var(--surface-raised); stroke-width: 1.2; }
+.f2row.is-hot { fill: var(--surface-raised); stroke: var(--text-primary); stroke-width: 1.5; }
+.f2part { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1; filter: drop-shadow(0 1px 2px rgba(33, 37, 41, 0.06)); }
+.f2part.is-pill { stroke: var(--text-primary); stroke-width: 1.5; }
+.f2ico { color: var(--text-tertiary); }
+.f2ico.is-dark { color: var(--text-primary); }
+.f2t.is-cap { font-size: 15px; font-weight: 500; fill: var(--text-secondary); }
+.f2t.is-row.is-strong { fill: var(--text-primary); }
+.f2rule { stroke: var(--border-subtle); stroke-width: 1; }
+.f2grp { fill: var(--surface-sunken); stroke: var(--border-subtle); stroke-width: 1; }
+.f2cell { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1; }
+.f2allow { fill: var(--fb-positive-bg); stroke: transparent; }
+.f2t.is-cell { font-size: 12px; font-weight: 500; fill: var(--text-primary); }
+.f2t.is-cell.is-soft { fill: var(--text-secondary); }
+.f2t.is-good { fill: var(--fb-positive-fg); }

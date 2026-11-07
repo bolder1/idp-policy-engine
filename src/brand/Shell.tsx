@@ -1,8 +1,32 @@
-import { AnimatePresence, motion, animate, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, animate, useReducedMotion, Reorder, useDragControls } from 'motion/react'
 import { TEMPLATES_MANAGED } from './template-phase'
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
+import { MIGRATION_FIRST } from './migrate/phase'
+import { MoveJobPill } from './migrate/move-job-pill'
+import { RailReminder } from './migrate/rail-reminder'
+import { AnnounceStrip } from './migrate/AnnounceStrip'
+import {
+  CUSTOMIZE_SIDEBAR,
+
+  RAIL_DEFAULT,
+  addRow,
+  currentRail,
+  isDefault,
+  moveSection,
+  orderSections,
+  place,
+  removeRow,
+  reorderSection,
+  resolve,
+  sectionKey,
+  step,
+  useRail,
+  type RailPrefs,
+  type RailSection,
+} from './rail-custom'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import {
   Activity,
+  Archive,
   AppWindow,
   ArrowLeft,
   BookOpen,
@@ -10,6 +34,7 @@ import {
   ClipboardCheck,
   CreditCard,
   FileText,
+  GripVertical,
   IdCard,
   KeyRound,
   LayoutGrid,
@@ -18,8 +43,10 @@ import {
   Moon,
   Palette,
   PanelLeft,
+  Plus,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Sun,
   UserRound,
   Users,
@@ -35,6 +62,9 @@ import { ProfileMenu } from './ProfileMenu'
 import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
+import { GlobalSearch } from './GlobalSearch'
+import { GLOBAL_SEARCH, type SearchSources } from './global-search'
+import { ACCESS_CHECKS } from './screens/sign-in-tests/names'
 import { Tip } from './kit'
 import { TONE_ICON } from './toast-tone'
 import { screenOffered } from './edition-screens'
@@ -84,7 +114,7 @@ interface NavItem {
 const NAV: { section?: string; items: NavItem[] }[] = [
   {
     items: [
-      { label: 'Dashboard', icon: LayoutGrid },
+      { label: 'Dashboard', icon: LayoutGrid, screen: { name: 'home' } },
       { label: 'Getting Started', icon: ClipboardCheck },
     ],
   },
@@ -119,6 +149,20 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              anything about it is suspicious. */
           { label: 'Risk signal profile', screen: { name: 'risk-signals' } },
           { label: 'External Hooks', screen: { name: 'hooks' }, tag: SHOWCASE ? undefined : 'In progress' },
+        ],
+      },
+      /* The old console's Policies section, kept until it closes (migrate/OldPolicies.tsx): its three pages, in its
+         words and order. App Login and Adaptive Access move into the new policies; Password Policy stays. */
+      {
+        label: 'Old policy',
+        icon: Archive,
+        screen: { name: 'old-login' },
+        children: [
+          { label: 'App Login Policy', screen: { name: 'old-login' } },
+          { label: 'Password Policy', screen: { name: 'old-password' } },
+          { label: 'Adaptive Access Policy', screen: { name: 'old-adaptive' } },
+          /* The move's own way in, so it stays findable once the banners go (Stripe's Migrations tab). */
+          { label: 'Migration', screen: { name: 'move-policies' } },
         ],
       },
       {
@@ -181,6 +225,14 @@ const NAV: { section?: string; items: NavItem[] }[] = [
     ],
   },
 ]
+
+/* The console's own arrangement, and the lookups the admin's arrangement (rail-custom.ts) is drawn through. */
+const DEFAULT_LAYOUT: RailSection[] = NAV.map((g) => ({ key: sectionKey(g.section), items: g.items.map((i) => i.label) }))
+/* Migration first (migrate/phase.ts): both policy groups read "Policy" in the rail (owner, 6 Nov 2026); the new one keeps
+   its New pill. The keys stay, so saved rail layouts and tour anchors still find them. */
+const railName = (label: string) => (MIGRATION_FIRST && (label === 'Old policy' || label === 'Policies') ? 'Policy' : label)
+const ITEM: Record<string, NavItem> = Object.fromEntries(NAV.flatMap((g) => g.items.map((i) => [i.label, i])))
+const SECTION_TITLE: Record<string, string | undefined> = Object.fromEntries(NAV.map((g) => [sectionKey(g.section), g.section]))
 
 /* What a row says in its Tip. These were native titles, which a keyboard never
    reached. */
@@ -278,7 +330,9 @@ function useNarrow() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { screen, go, features } = useBrand()
+  const { screen, go, features, showToast, legacy, movedLegacy, moved, migrationStarted } = useBrand()
+  /* The Policy builder is new until the move is through: something old left, or moved and not yet approved. */
+  const migrating = legacy.policies.some((lp) => !movedLegacy[lp.id]) || Object.values(moved).some((m) => !m.approved)
   const nav = useRef<HTMLElement>(null)
   const [theme, setTheme] = useTheme()
   const [sound, setSound] = useSoundSetting()
@@ -316,6 +370,79 @@ export function Shell({ children }: { children: ReactNode }) {
      distinction, leaving the builder would expand a rail the admin had
      deliberately closed. */
   const autoCollapsed = useRef(false)
+
+  /* Customize sidebar (rail-custom.ts). The rail itself is the editor while `editing`; Done ends it. A rail that was
+     shut to its icons opens for the edit and shuts again after it. */
+  const [prefs, setPrefs] = useRail()
+  const [editing, setEditing] = useState(false)
+  const [said, setSaid] = useState('')
+  const shutBefore = useRef(false)
+  const regrip = useRef<string | null>(null)
+  const customBtn = useRef<HTMLButtonElement>(null)
+
+  function startEditing() {
+    shutBefore.current = !narrow && collapsed
+    if (shutBefore.current) {
+      autoCollapsed.current = false
+      setCollapsed(false)
+    }
+    setSaid('')
+    setEditing(true)
+  }
+  function stopEditing() {
+    setEditing(false)
+    if (shutBefore.current) setCollapsed(true)
+    shutBefore.current = false
+    requestAnimationFrame(() => customBtn.current?.focus())
+  }
+  function resetRail() {
+    const before = prefs
+    setPrefs(RAIL_DEFAULT)
+    setSaid('Sidebar reset')
+    showToast('Sidebar reset', { label: 'Undo', run: () => setPrefs(before) })
+  }
+  /* Arriving in the mode puts focus on the first grip. A change that moves or removes the control in hand names, as a
+     selector, where focus goes next (the grip that moved, the section's Add page). */
+  useEffect(() => {
+    if (editing) nav.current?.querySelector<HTMLElement>('[data-rail-grip]')?.focus()
+  }, [editing])
+  useEffect(() => {
+    const sel = regrip.current
+    regrip.current = null
+    if (sel) nav.current?.querySelector<HTMLElement>(sel)?.focus()
+  }, [prefs])
+  const layout = resolve(DEFAULT_LAYOUT, prefs.layout)
+  /* Every page global search can open: each built rail page — taken out of the sidebar or not — and the pages opened
+     from inside others. */
+  const searchPages = useMemo<SearchSources['pages']>(
+    () => [
+      ...NAV.flatMap((g) =>
+        g.items.flatMap((item) => [
+          ...(item.screen && !item.children ? [{ label: item.label, meta: g.section, screen: item.screen }] : []),
+          ...(item.children ?? [])
+            .filter((c) => c.screen && screenOffered(c.screen, features))
+            .map((c) => ({ label: c.label, meta: item.label, screen: c.screen! })),
+        ]),
+      ),
+      { label: ACCESS_CHECKS, meta: 'Policies', screen: { name: 'sign-in-tests' } },
+      { label: 'Sign-in activity', meta: 'Policies', screen: { name: 'sign-in-activity' } },
+      { label: 'Display tokens', meta: 'Authentication methods', screen: { name: 'display-tokens' } },
+      { label: 'Add application', meta: 'Apps', screen: { name: 'application-new' } },
+    ],
+    [features],
+  )
+  /* Escape ends it, as it closes every other mode in the console; so does a canvas taking the window. */
+  useEffect(() => {
+    if (!editing) return
+    const on = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') stopEditing()
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  })
+  useEffect(() => {
+    if (full) setEditing(false)
+  }, [full])
 
   useEffect(() => {
     const label = refocus.current
@@ -454,6 +581,10 @@ export function Shell({ children }: { children: ReactNode }) {
         </a>
 
         <div className="bshell__topright">
+          {/* While policies move in the background (migrate/move-job-pill.tsx); nothing while none do. */}
+          <MoveJobPill />
+          {/* At the right with the other tools (owner, 4 Nov 2026), first in the group. */}
+          {GLOBAL_SEARCH && <GlobalSearch pages={searchPages} />}
           {/* The edition switch belongs on the shell, not on a screen: the flag
               it flips spans the list, the create flow and the builder. */}
           {/* Two prototype controls, side by side and both labelled as such.
@@ -528,18 +659,43 @@ export function Shell({ children }: { children: ReactNode }) {
       )}
 
       <aside className="bshell__rail" inert={full || (narrow && !navOpen) ? true : undefined}>
-        <nav className="bshell__nav" aria-label="Console" ref={nav}>
-          {NAV.map((group, gi) => (
-            <div key={group.section ?? gi} className="bshell__group">
-              {group.section && <p className="bshell__section">{group.section}</p>}
+        <nav
+          className={`bshell__nav${editing ? ' is-editing' : ''}`}
+          aria-label="Console"
+          ref={nav}
+          /* Notion's second way in: a right-click anywhere on the rail. */
+          onContextMenu={
+            CUSTOMIZE_SIDEBAR && !editing
+              ? (e) => {
+                  e.preventDefault()
+                  startEditing()
+                }
+              : undefined
+          }
+        >
+          {editing ? (
+            <EditRail prefs={prefs} setPrefs={setPrefs} reduced={reduced} say={setSaid} refocus={regrip} />
+          ) : layout.map((sec) => {
+            /* Migration first (migrate/phase.ts): Old policy until Start migration, then Policies in its place. */
+            const items = sec.items
+              .filter((l) => !prefs.removed.includes(l))
+              .filter((l) => !(l === 'Policies' && !migrationStarted) && !(l === 'Old policy' && MIGRATION_FIRST && migrationStarted))
+              .map((l) => ITEM[l])
+            /* A section with every row taken out loses its heading too. */
+            if (!items.length) return null
+            const title = SECTION_TITLE[sec.key]
+            return (
+            <div key={sec.key} className="bshell__group">
+              {title && <p className="bshell__section">{title}</p>}
 
-              {group.items.map((item) => {
+              {items.map((item) => {
                 const active = isActive(screen, item)
                 const expanded = !collapsed && open === item.label
                 const Ico = item.icon
                 /* Collapsed, the label and the badge are hidden, so the row takes
                    its name from aria-label and shows it in a Tip. */
-                const name = item.badge ? `${item.label}, ${item.badge}` : item.label
+                const badge = item.label === 'Policies' && migrating ? 'New' : item.badge
+                const name = badge ? `${item.label}, ${badge}` : item.label
                 /* A group with one built page in it is not "not built". */
                 const caveat = item.screen || item.children?.some((c) => c.screen) ? null : NOT_BUILT
                 const collapsedTip = caveat ? `${name}. ${caveat}` : name
@@ -557,8 +713,8 @@ export function Shell({ children }: { children: ReactNode }) {
                     aria-label={collapsed ? name : undefined}
                   >
                     <Ico className="bshell__ico" size={20} strokeWidth={1.6} aria-hidden />
-                    <span className="bshell__item-label">{item.label}</span>
-                    {item.badge && <span className="bshell__badge">{item.badge}</span>}
+                    <span className="bshell__item-label">{railName(item.label)}</span>
+                    {badge && <span className="bshell__badge">{badge}</span>}
                     {item.children && (
                       <ChevronRight
                         className={`bshell__chev ${expanded ? 'is-open' : ''}`}
@@ -619,11 +775,48 @@ export function Shell({ children }: { children: ReactNode }) {
                 )
               })}
             </div>
-          ))}
+            )
+          })}
         </nav>
+
+        {!collapsed && <RailReminder />}
+        {CUSTOMIZE_SIDEBAR && (
+          <div className="bshell__foot">
+            <p className="u-sr-only" role="status" aria-live="polite">
+              {said}
+            </p>
+            {editing ? (
+              <div className="bshell__editbar">
+                <button type="button" className="bshell__reset" onClick={resetRail} disabled={isDefault(prefs)}>
+                  Reset
+                </button>
+                <button type="button" className="bshell__done" onClick={stopEditing}>
+                  Done
+                </button>
+              </div>
+            ) : (
+              (() => {
+                const btn = (
+                  <button
+                    type="button"
+                    ref={customBtn}
+                    className="bshell__item bshell__custom"
+                    onClick={startEditing}
+                    aria-label={collapsed ? 'Customize sidebar' : undefined}
+                  >
+                    <SlidersHorizontal className="bshell__ico" size={20} strokeWidth={1.6} aria-hidden />
+                    <span className="bshell__item-label">Customize sidebar</span>
+                  </button>
+                )
+                return collapsed ? <Tip text="Customize sidebar">{btn}</Tip> : btn
+              })()
+            )}
+          </div>
+        )}
       </aside>
 
       <main className="bshell__main" ref={main}>
+        <AnnounceStrip />
         {children}
       </main>
 
@@ -635,6 +828,297 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {/* The toast and the one leave dialog are mounted beside the shell in
           BrandApp's Chrome, so the end-user side has them too. */}
+    </div>
+  )
+}
+
+/* --- Customize sidebar: the rail as its own editor (rail-custom.ts) ------------------------------------------------ */
+
+interface EditProps {
+  prefs: RailPrefs
+  setPrefs: (next: RailPrefs) => void
+  reduced: boolean
+  say: (message: string) => void
+  /** Where focus goes after the change: a selector, read by the shell once the rail has redrawn. */
+  refocus: { current: string | null }
+}
+
+const springy = (reduced: boolean) => (reduced ? { duration: 0 } : { type: 'spring' as const, stiffness: 600, damping: 45 })
+const gripAt = (label: string) => `[data-rail-grip="${label}"]`
+const sectionName = (key: string) => SECTION_TITLE[key] ?? 'the top'
+
+/* The sections, the head first and fixed, the named ones in a Reorder of their own. A row dropped outside its section
+   lands in the section under the pointer, at the row it was let go over: Reorder orders one list, so the crossing is
+   this component's. */
+function EditRail(props: EditProps) {
+  const { prefs, setPrefs, say } = props
+  const box = useRef<HTMLDivElement>(null)
+  const layout = resolve(DEFAULT_LAYOUT, prefs.layout)
+  const [head, ...rest] = layout
+
+  function dropRow(label: string, from: string, y: number) {
+    const now = currentRail()
+    const secs = [...(box.current?.querySelectorAll<HTMLElement>('[data-rail-section]') ?? [])]
+    const el = secs.find((s) => {
+      const r = s.getBoundingClientRect()
+      return y >= r.top && y <= r.bottom
+    })
+    const to = el?.dataset.railSection
+    if (!el || !to || to === from) return
+    const rows = [...el.querySelectorAll<HTMLElement>('[data-rail-row]')]
+    const over = rows.find((r) => {
+      const b = r.getBoundingClientRect()
+      return y < b.top + b.height / 2
+    })?.dataset.railRow
+    const target = resolve(DEFAULT_LAYOUT, now.layout).find((s) => s.key === to)!
+    const index = over ? target.items.indexOf(over) : target.items.length
+    props.refocus.current = gripAt(label)
+    setPrefs(place(now, DEFAULT_LAYOUT, label, to, index))
+    say(`${label} moved to ${sectionName(to)}`)
+  }
+
+  return (
+    <div ref={box}>
+      <EditSection {...props} sec={head} movable={false} onDropRow={dropRow} />
+      <Reorder.Group
+        as="div"
+        axis="y"
+        values={rest.map((s) => s.key)}
+        onReorder={(keys: string[]) => setPrefs(orderSections(currentRail(), DEFAULT_LAYOUT, keys))}
+      >
+        {rest.map((sec) => (
+          <EditSection key={sec.key} {...props} sec={sec} movable onDropRow={dropRow} />
+        ))}
+      </Reorder.Group>
+    </div>
+  )
+}
+
+/* A section in the mode: its heading with a grip (the named ones), its rows, and Add page when a row has been taken out
+   of it. A section emptied of rows keeps its heading here, so a page can be put back into it. */
+function EditSection({
+  sec,
+  movable,
+  onDropRow,
+  ...props
+}: EditProps & { sec: RailSection; movable: boolean; onDropRow: (label: string, from: string, y: number) => void }) {
+  const { prefs, setPrefs, reduced, say, refocus } = props
+  const drag = useDragControls()
+  const title = SECTION_TITLE[sec.key]
+  const shown = sec.items.filter((l) => !prefs.removed.includes(l))
+  const gone = sec.items.filter((l) => prefs.removed.includes(l))
+  const body = (
+    <>
+      {title && (
+        <div className="bshell__edithead">
+          {movable && (
+            <button
+              type="button"
+              className="bshell__grip"
+              data-rail-grip={`§${sec.key}`}
+              aria-label={`Move section ${title}`}
+              aria-keyshortcuts="ArrowUp ArrowDown"
+              onPointerDown={(e) => drag.start(e)}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+                e.preventDefault()
+                const dir = e.key === 'ArrowUp' ? -1 : 1
+                const next = moveSection(prefs, DEFAULT_LAYOUT, sec.key, dir)
+                if (next === prefs) return
+                refocus.current = gripAt(`§${sec.key}`)
+                setPrefs(next)
+                say(`Section ${title} moved ${dir === -1 ? 'up' : 'down'}`)
+              }}
+            >
+              <GripVertical size={16} strokeWidth={1.8} aria-hidden />
+            </button>
+          )}
+          <p className="bshell__section">{title}</p>
+        </div>
+      )}
+      <Reorder.Group
+        as="div"
+        axis="y"
+        values={shown}
+        onReorder={(labels: string[]) => setPrefs(reorderSection(currentRail(), DEFAULT_LAYOUT, sec.key, labels))}
+        className="bshell__editlist"
+      >
+        {shown.map((label) => (
+          <EditRow
+            key={label}
+            item={ITEM[label]}
+            reduced={reduced}
+            onDrop={(y) => onDropRow(label, sec.key, y)}
+            onMove={(dir) => {
+              const next = step(prefs, DEFAULT_LAYOUT, label, dir)
+              if (next === prefs) return
+              refocus.current = gripAt(label)
+              setPrefs(next)
+              const lands = resolve(DEFAULT_LAYOUT, next.layout).find((s) => s.items.includes(label))!.key
+              say(lands === sec.key ? `${label} moved ${dir === -1 ? 'up' : 'down'}` : `${label} moved to ${sectionName(lands)}`)
+            }}
+            onRemove={() => {
+              const at = shown.indexOf(label)
+              const neighbour = shown[at + 1] ?? shown[at - 1]
+              refocus.current = neighbour ? gripAt(neighbour) : `[data-rail-add="${sec.key}"]`
+              setPrefs(removeRow(prefs, label))
+              say(`${label} removed from the sidebar`)
+            }}
+          />
+        ))}
+      </Reorder.Group>
+      {gone.length > 0 && (
+        <AddPage
+          sectionKey={sec.key}
+          labels={gone}
+          reduced={reduced}
+          onAdd={(label) => {
+            refocus.current = gripAt(label)
+            setPrefs(addRow(prefs, label))
+            say(`${label} added back`)
+          }}
+        />
+      )}
+    </>
+  )
+  return movable ? (
+    <Reorder.Item
+      as="div"
+      value={sec.key}
+      dragListener={false}
+      dragControls={drag}
+      className="bshell__editsec"
+      data-rail-section={sec.key}
+      transition={springy(reduced)}
+    >
+      {body}
+    </Reorder.Item>
+  ) : (
+    <div className="bshell__editsec" data-rail-section={sec.key}>
+      {body}
+    </div>
+  )
+}
+
+/* One rail row in the mode: the grip, the row's icon and name, and its ✕. Not a link here — the rows are being
+   arranged, not used. The grip drags (Motion's Reorder, started from the grip alone so the ✕ can still be pressed) and
+   takes the arrow keys, which is Notion's Move up / Move down without the menu. */
+function EditRow({
+  item,
+  reduced,
+  onMove,
+  onRemove,
+  onDrop,
+}: {
+  item: NavItem
+  reduced: boolean
+  onMove: (dir: -1 | 1) => void
+  onRemove: () => void
+  onDrop: (y: number) => void
+}) {
+  const drag = useDragControls()
+  const Ico = item.icon
+  const remove = `Remove ${item.label} from sidebar`
+  return (
+    <Reorder.Item
+      as="div"
+      value={item.label}
+      dragListener={false}
+      dragControls={drag}
+      className="bshell__edit"
+      data-rail-row={item.label}
+      transition={springy(reduced)}
+      whileDrag={reduced ? undefined : { scale: 1.02 }}
+      onDragEnd={(e) => {
+        if ('clientY' in e) onDrop(e.clientY)
+      }}
+    >
+      <button
+        type="button"
+        className="bshell__grip"
+        data-rail-grip={item.label}
+        aria-label={`Move ${item.label}`}
+        aria-keyshortcuts="ArrowUp ArrowDown"
+        onPointerDown={(e) => drag.start(e)}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+          e.preventDefault()
+          onMove(e.key === 'ArrowUp' ? -1 : 1)
+        }}
+      >
+        <GripVertical size={16} strokeWidth={1.8} aria-hidden />
+      </button>
+      <Ico className="bshell__ico" size={20} strokeWidth={1.6} aria-hidden />
+      <span className="bshell__item-label">{railName(item.label)}</span>
+      <Tip text={remove}>
+        <button type="button" className="bshell__eye" aria-label={remove} onClick={onRemove}>
+          <X size={16} strokeWidth={1.8} aria-hidden />
+        </button>
+      </Tip>
+    </Reorder.Item>
+  )
+}
+
+/* "+ Add page" at a section's end: the rows taken out of it, one press each to put one back where it was. A list that
+   opens under the button, inside the rail, rather than a menu floating over the page. Escape shuts the list first and
+   only the next one leaves the mode. */
+function AddPage({
+  sectionKey: key,
+  labels,
+  reduced,
+  onAdd,
+}: {
+  sectionKey: string
+  labels: string[]
+  reduced: boolean
+  onAdd: (label: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div
+      className="bshell__add"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation()
+          setOpen(false)
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="bshell__addbtn"
+        data-rail-add={key}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Plus size={16} strokeWidth={1.8} aria-hidden />
+        Add page
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={reduced ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <ul className="bshell__addlist">
+              {labels.map((label) => {
+                const Ico = ITEM[label].icon
+                return (
+                  <li key={label}>
+                    <button type="button" className="bshell__addrow" onClick={() => onAdd(label)}>
+                      <Ico size={18} strokeWidth={1.6} aria-hidden />
+                      {label}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

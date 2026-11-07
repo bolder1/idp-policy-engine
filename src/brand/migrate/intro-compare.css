@@ -1,0 +1,80 @@
+/* The intro as a before and after (IntroCompare.tsx). */
+.bcp { display: flex; flex-direction: column; gap: var(--space-6); min-height: 560px; padding: var(--space-8) var(--space-8) var(--space-7); }
+
+.bcp__head { display: flex; align-items: flex-start; gap: var(--space-4); padding-right: var(--space-8); }
+.bcp__words { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-width: 0; }
+.bx-modal .bcp__words h2 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: var(--fw-semibold); letter-spacing: -0.02em; color: var(--text-primary); }
+.bcp__words p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); }
+.bcp button.bcp__skip { flex: none; height: 30px; padding: 0 var(--space-4); border-radius: var(--radius-full); border: var(--bw-thin) solid var(--border-subtle); background: var(--surface-raised); font: inherit; font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer; }
+.bcp button.bcp__skip:hover { color: var(--text-primary); }
+
+/* The two sides, the old one quiet, the new one raised. */
+.bcp__sides { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); align-items: stretch; flex: 1; }
+.bcp__side { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-lg); min-height: 330px; }
+.bcp__side.is-before { background: var(--surface-sunken); border: var(--bw-thin) dashed var(--border-default); }
+.bcp__side.is-after { background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); background-image: radial-gradient(var(--border-subtle) 1px, transparent 1px); background-size: 16px 16px; }
+.bcp__arrow { display: grid; place-items: center; color: var(--text-tertiary); }
+.bcp__label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bcp__side.is-after .bcp__label { color: var(--text-primary); }
+.bcp__newtag { margin-left: var(--space-2); padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--fb-positive-bg); color: var(--fb-positive-fg); font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); }
+.bcp__body { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Old pages: flat, grey. */
+.bcp__app { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bcp__page { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); }
+.bcp__page > b, .bcp__card > b { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bcp__page > b > svg, .bcp__card > b > svg { color: var(--text-tertiary); }
+.bcp__rows, .bcp__list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bcp__list { flex-direction: column; align-items: flex-start; }
+.bcp__note { font-size: 12px; color: var(--text-tertiary); }
+.bcp__weight { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.bcp__log { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bcp__log > i { font-style: normal; font-size: 12px; }
+.bcp__log > i.is-ok { color: var(--fb-positive-fg); }
+.bcp__surprise { font-style: normal; font-size: 12px; color: var(--fb-negative-fg); }
+
+/* The pieces that move, and the outlines they leave. */
+.bcp__piece { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); font-size: var(--fs-sm); white-space: nowrap; color: var(--text-primary); }
+.bcp__piece > svg { color: var(--text-tertiary); }
+.bcp__ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 var(--space-3); border-radius: var(--radius-md); border: var(--bw-thin) dashed var(--border-default); font-size: var(--fs-sm); white-space: nowrap; color: var(--text-tertiary); opacity: 0.7; }
+.bcp__slot { display: inline-block; width: 110px; height: 28px; border-radius: var(--radius-md); border: var(--bw-thin) dashed var(--border-subtle); }
+
+/* The new side's cards. */
+.bcp__card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); }
+.bcp__draft, .bcp__kind { margin-left: auto; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--surface-sunken); color: var(--text-secondary); font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); }
+.bcp__rule, .bcp__part, .bcp__ordered { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-height: 32px; }
+.bcp__rule > i, .bcp__n { display: grid; place-items: center; flex: none; min-width: 22px; height: 22px; padding: 0 4px; border-radius: var(--radius-sm); background: var(--surface-sunken); font-style: normal; font-size: 12px; color: var(--text-secondary); }
+.bcp__part > em { width: 80px; flex: none; font-style: normal; font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bcp__ordered { padding: 2px var(--space-2); border-radius: var(--radius-md); border: var(--bw-thin) solid transparent; transition: border-color 0.3s ease; }
+.bcp__ordered.is-hit { border-color: var(--text-primary); }
+.bcp__else { font-size: var(--fs-sm); color: var(--text-secondary); }
+.bcp__used { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 12px; color: var(--text-tertiary); }
+.bcp__answer { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--fb-positive-bg); color: var(--fb-positive-fg); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+
+/* The foot: chapters along the left, the moves on the right. */
+.bcp__foot { display: flex; align-items: center; gap: var(--space-3); padding-top: var(--space-5); border-top: var(--bw-thin) solid var(--border-subtle); }
+.bcp__chapters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); flex: 1; margin: 0 var(--space-5) 0 0; padding: 0; list-style: none; }
+.bcp .bcp__chapters button { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); width: 100%; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--text-tertiary); text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcp .bcp__chapters button.is-on { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bcp .bcp__chapters button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bcp__track { width: 100%; height: 3px; border-radius: var(--radius-full); background: var(--border-default); overflow: hidden; }
+.bcp__track > i { display: block; height: 100%; border-radius: inherit; background: var(--text-primary); transition: width 0.6s ease; }
+.bcp .bcp__chapters button.is-done .bcp__track > i { background: var(--text-secondary); }
+
+/* The switch between this and the story. */
+.bcp__look { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); background: var(--surface-sunken); }
+.bcp__look button { height: 26px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; font: inherit; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+.bcp__look button[aria-pressed='true'] { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+.bin__tools .bcp__look { margin-right: var(--space-2); }
+
+@media (max-width: 860px) {
+  .bcp__sides { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+  .bcp__arrow { transform: rotate(90deg); }
+}
+
+/* The compare look takes the whole popup. */
+.bin.is-compare { display: block; }
+
+/* Sized to the content, not a fixed tall box. */
+.bcp { min-height: 0; }
+.bcp__side { min-height: 300px; }

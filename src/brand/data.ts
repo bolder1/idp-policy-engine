@@ -903,6 +903,12 @@ export interface Policy {
       name and on the canvas (board/PolicyNotice.tsx). Set by duplicatePolicy, taken away for good by a rename
       (store.tsx `keepsCopyMark`); nothing else reads it. */
   copiedFrom?: string
+  /** The old console's sign-in policies this one was moved from (migrate/plan.ts), by name. Set only by Move policies;
+      the list tags the row Moved while it is still monitoring. */
+  movedFrom?: string[]
+  /** The day the policy was added, YYYY-MM-DD: the Policies table's Date added. Stamped by the store on every policy it
+      adds (new, copied, moved); a seed policy without one reads "—". */
+  addedOn?: string
   /** New and not saved yet (owner, 2 Nov 2026: the team wants no empty policies). Held only while its board is open: the
       store drops it on the way out, and its first save with a rule makes it a real policy (policy-draft.ts `newPolicy`). */
   provisional?: NewPolicyStart
@@ -979,6 +985,19 @@ export interface Policy {
      compares the rules and the last row only, so these never make a board
      "unsaved" on their own. */
   checks?: DraftCheck[]
+}
+
+/** Today as `Policy.addedOn` stores it, in local time. */
+export function addedToday(d = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** "Nov 3, 2026", the console's date. Read as a calendar day, so no timezone moves it. */
+export function addedLabel(p: Pick<Policy, 'addedOn'>): string {
+  if (!p.addedOn) return '—'
+  const [y, m, day] = p.addedOn.split('-').map(Number)
+  return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 /** Unpublished edits to a published policy — see `Policy.pendingDraft`. */
@@ -1080,6 +1099,9 @@ export interface Zone {
      exist, so they are editable but not removable. Deleting them would break
      that assumption for every policy written after them. */
   locked?: boolean
+  /** Made by Move policies from an old Adaptive Access policy: waiting until a policy using it is approved, then added
+      (the Zones list tags it "From old policy"). */
+  fromOld?: 'waiting' | 'added'
 }
 
 export const emptyLocation = (): ZoneLocation => ({ countries: [], states: [], cities: [], ranges: [] })

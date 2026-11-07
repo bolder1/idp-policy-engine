@@ -389,7 +389,7 @@ describe('the way back, and the keys', () => {
     /* The editor waits, and is back as Check access shuts (and while the Fixes panel holds the column, 7 Oct 2026);
        Describe it closes it, and Guided setup does too except beside it (`inspBlocked`). */
     expect(builderSrc).toContain('{!testOn && !inspBlocked && !readOpen && !fixesShown && panelAlive && (')
-    expect(builderSrc).toContain('const inspBlocked = describeOpen && !guidedBeside')
+    expect(builderSrc).toContain('const inspBlocked = (describeOpen && !guidedBeside) || movedDraft')
   })
 
   it('Open policy on this policy, or Open rule, goes back to the builder — on that rule', () => {

@@ -13,7 +13,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { Button, RowMenu, Toggle } from '../../kit'
+import { Button, RowMenu, TipDot, Toggle } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import { fallbackRule, type Policy, type Rule } from '../../data'
 import type { Diagnostic } from '../diagnostics'
@@ -346,6 +346,14 @@ export function Inspector({
    `focused` carries the selection's part, and it does the one job the tabs did
    that was worth keeping — saying which third of the rule you arrived at. It
    darkens that section's mark and guide rule rather than hiding the other two. */
+/* What each part of a rule is for, on an info mark beside its heading (owner, 4 Nov 2026: "three headings, three
+   tooltips"). */
+const SECTION_TIP: Record<string, string> = {
+  who: 'The groups and people this rule is for. Anyone else moves on to the next rule.',
+  if: 'What is checked at sign-in, such as zone, device, time or risk. With none, the rule applies to every sign-in.',
+  then: 'What happens when the rule matches: allow, with the factors you pick, or deny.',
+}
+
 function Section({
   id,
   title,
@@ -380,6 +388,7 @@ function Section({
           <Icon size={15} strokeWidth={2} aria-hidden />
           {title}
         </h3>
+        {SECTION_TIP[id] && <TipDot text={SECTION_TIP[id]} label={`About ${title}`} />}
         {action}
       </div>
       {/* Everything that answers the heading hangs off it: set in past the

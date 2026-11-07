@@ -87,6 +87,7 @@ import { boardTourSeen } from '../../tour/board-tour'
 import { useLeaveGuard } from '../../leave-guard'
 import './board.css'
 import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
+import { MovedPanel, PublishMoved } from '../../migrate/moved-panel'
 
 /* Lazy, the way the trail loads its own.
 
@@ -364,6 +365,10 @@ export function BoardBuilder({
   const [hover, setHover] = useState<number | null>(null)
   /* The last row under the pointer — Describe it bolds its answer, as a rule card's. */
   const [hoverLast, setHoverLast] = useState(false)
+  /* A moved policy's old-policies panel lights the rules each old policy became (owner, 6 Nov 2026): on hover, and
+     while one is selected, whose rules also open. */
+  const [movedHover, setMovedHover] = useState<string[] | null>(null)
+  const [movedPicked, setMovedPicked] = useState<string[] | null>(null)
   const [review, setReview] = useState(false)
   /* The checks before saving (guard.ts): running, and the page they opened. */
   const [checking, setChecking] = useState(false)
@@ -654,6 +659,14 @@ export function BoardBuilder({
   const openOnly = (id: string) =>
     setFolds({ ...Object.fromEntries(cardIds().map((k) => [k, false])), [id]: true })
   /* Closing is only ever about the card you pressed; opening closes the rest. */
+  const pickMoved = (ids: string[] | null) => {
+    setMovedPicked(ids)
+    if (!ids?.length) return
+    setFolds({ ...Object.fromEntries(cardIds().map((k) => [k, false])), ...Object.fromEntries(ids.map((k) => [k, true])) })
+    const first = ids.find((k) => k !== 'fallback')
+    const at = first ? draft.rules.findIndex((r) => r.id === first) : -1
+    if (at >= 0) requestAnimationFrame(() => document.querySelector<HTMLElement>(`.bb__card[data-index="${at}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+  }
   const toggleExpand = (ruleId: string) =>
     expandedOf(ruleId) ? setFolds((f) => ({ ...f, [ruleId]: false })) : openOnly(ruleId)
   /* "Start from scratch" is a step Undo can take back (review, 21 Sep 2026). It
@@ -687,9 +700,15 @@ export function BoardBuilder({
   /* Guided setup stands left, right, or left beside the rule panel. Left or right, the canvas is its output and the
      rule panel is closed; beside, the rule panel is open and the canvas can be edited as ever (guided-setup.css). */
   const guidedOpen = GUIDED_SETUP && describeOpen
+  /* A moved policy (owner, 6 Nov 2026): its old policies docked left, unless Guided setup or Check access has the room; Publish in the bar while it is a draft. */
+  const [oldShut, setOldShut] = useState(false)
+  const movedOpen = !guidedOpen && !testOn && !!saved?.movedFrom?.length && !oldShut
+  const movedDraft = !!saved?.movedFrom?.length && saved.status === 'draft' && saved.appIds.length > 0
   const guidedBeside = guidedOpen && guidedSide === 'beside'
   const guidedRight = guidedOpen && guidedSide === 'right'
-  const canvasLocked = describeOpen && !guidedBeside
+  /* A moved draft is for reading (owner, 6 Nov 2026: "where we have Approve and publish we don't need Save and Save as
+     draft; nothing is edited here, only the old and the new policy are seen"): the canvas is locked like Guided setup's. */
+  const canvasLocked = (describeOpen && !guidedBeside) || movedDraft
   /* Beside the rule panel, the canvas is refitted as that panel opens and closes too (`fitKey`, below). */
   const besideInsp =
     guidedBeside && inspOpen && (selection.kind === 'fallback' || selection.kind === 'apps' || (selection.kind === 'rule' && present.rules.some((r) => r.id === selection.id)))
@@ -1295,7 +1314,7 @@ export function BoardBuilder({
      of the adjustment and everything drawn inside the stage follows for
      free. */
   /* Describe it closes the rule panel while it is open; Guided setup does too, except beside it. */
-  const inspBlocked = describeOpen && !guidedBeside
+  const inspBlocked = (describeOpen && !guidedBeside) || movedDraft
   const panelShown = hasSubject && inspOpen && !inspBlocked
 
   /* The panel outlives its own close by one animation.
@@ -2112,7 +2131,8 @@ export function BoardBuilder({
      Describe it has just written, the cards it added or changed are named
      instead, and `.bb.is-fresh` draws them as an accent edge for 2 s. */
   const freshOn = describeOpen && !!fresh
-  const ringed = readOpen && readHover ? [readHover] : freshOn && fresh ? fresh.ids : traced
+  const movedRing = movedOpen ? (movedHover ?? movedPicked) : null
+  const ringed = movedRing ? movedRing : readOpen && readHover ? [readHover] : freshOn && fresh ? fresh.ids : traced
   /* Describe it can be reopened on its thread while the policy is still a
      draft it may write to: the door on the canvas, and the palette. */
   const canDescribe = describeOffered(features.describePolicy, saved)
@@ -2340,6 +2360,7 @@ export function BoardBuilder({
             onSave={saveNow}
             onSaveTemplate={templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
             onCopyRules={BAR_COPY_RULES && copyOffered ? () => openPicker('policy') : undefined}
+            publish={movedDraft ? <PublishMoved policy={saved} /> : undefined}
           />
         }
       />
@@ -2353,7 +2374,7 @@ export function BoardBuilder({
          under Check access is only hidden (check-access.css). */
       /* Describe it opens its own leading track and keeps the right one
          closed (V4 §4.1): the inspector never stands beside it. */
-      className={`bb ${testOn ? 'is-checking' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
+      className={`bb ${testOn ? 'is-checking' : ''}${movedDraft ? ' is-moved-view' : ''}${movedRing ? ' is-moved-hi' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : movedOpen ? ' is-guided is-guided-left' : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
       style={{ '--bb-insp': `${guidedRight ? GUIDED_W : colW}px` } as React.CSSProperties}
     >
       {/* Describe it, on the left in its own track (V4 §4.1). The selection
@@ -2363,6 +2384,16 @@ export function BoardBuilder({
       {/* Guided setup (GUIDED_SETUP): left, right, or left beside the rule panel — its own placement (guided-setup.css).
           Before the canvas on the left; after it on the right, so Tab goes the way the eye does. */}
       {guidedOpen && guidedSide !== 'right' && guidedPanel}
+      {/* A moved policy: its old policies docked left, where Guided setup sits (owner, 6 Nov 2026). */}
+      {movedOpen && (
+        <MovedPanel
+          policy={saved}
+          onClose={() => setOldShut(true)}
+          onLink={setMovedHover}
+          onPick={pickMoved}
+          hoverRule={hover !== null ? (draft.rules[hover]?.id ?? null) : hoverLast ? 'fallback' : null}
+        />
+      )}
       {guidedAppsPage && createPortal(<GuardDrawer {...guidedAppsPage} />, portalRoot())}
       {describeOpen && !GUIDED_SETUP && (
         <DescribePanel
@@ -2425,7 +2456,9 @@ export function BoardBuilder({
       {/* Not for a post sign-in policy: it has no template and nothing to
           describe, so an empty one starts on the chain itself — the start
           node, Add the first rule, Nothing else matched. */}
-      {draft.rules.length === 0 && !scratch && !describing && !readOpen && !post ? (
+      {/* Nor for one moved from the old console (migrate/plan.ts): its last row already decides everyone, so the chooser
+          would offer to start over on a policy that is monitoring sign-ins. */}
+      {!saved.movedFrom?.length && draft.rules.length === 0 && !scratch && !describing && !readOpen && !post ? (
         <BoardEmpty
           /* "No rules" once the policy is live or had rules; the first-run
              question only for a new draft nobody has written in yet. */

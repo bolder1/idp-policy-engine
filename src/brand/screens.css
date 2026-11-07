@@ -180,6 +180,19 @@
 }
 /* Fixed-content columns, sized to their content rather than to their share. */
 .btable__col-status { width: 128px; }
+/* "Opened 12 min ago" and "Added Sep 22, 2026" both fit on one line. */
+.btable__col-activity { width: 176px; }
+.btable__activity { color: var(--text-secondary); white-space: nowrap; }
+/* A row arriving from Move policies: it lights and settles, one after another (`--arrive` is its place). */
+@keyframes btable-arrive {
+  0% { background-color: var(--fb-info-bg); }
+  70% { background-color: var(--fb-info-bg); }
+  100% { background-color: transparent; }
+}
+.btable tr.is-arrived > td { animation: btable-arrive 1.8s var(--ease-standard) both; animation-delay: calc(var(--arrive, 0) * 90ms); }
+@media (prefers-reduced-motion: reduce) {
+  .btable tr.is-arrived > td { animation: none; background-color: var(--fb-info-bg); }
+}
 .btable__col-actions { width: 56px; }
 /* Two icon buttons in the column instead of a kebab (Applications.tsx): the column holds a pair, so it is wider,
    and the pair sits at the same right edge the single kebab did — row ends line up either way. */
@@ -981,3 +994,11 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
 
 /* An application that already has another policy: said in its row, and not tickable. */
 .bassign__row.is-taken { cursor: not-allowed; color: var(--text-tertiary); }
+
+/* Policies: pick rows, act on several (6 Nov 2026). */
+.btable__col-pick { width: 40px; padding-right: 0 !important; }
+.bpol__pick { width: 16px; height: 16px; margin: 0; accent-color: var(--blue, var(--text-primary)); cursor: pointer; vertical-align: middle; }
+.bpol__bulk { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4); border-radius: var(--radius-lg); background: var(--blue-soft, var(--surface-sunken)); }
+.bpol__bulk > b { flex: 1; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* Next step (Policies.tsx): a moved draft's Publish, in a column of its own (owner, 6 Nov 2026). */
+.btable__col-next { width: 128px; }

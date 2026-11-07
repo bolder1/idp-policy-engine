@@ -365,7 +365,10 @@ export function BoardBarActions({
   onSave,
   onSaveTemplate,
   onCopyRules,
+  publish,
 }: {
+  /** A moved draft's Publish (migrate/moved-panel.tsx): beside it the save steps down to a secondary. */
+  publish?: ReactNode
   /** Read as text is open in the panel's slot. */
   reading: boolean
   onRead: () => void
@@ -464,12 +467,13 @@ export function BoardBarActions({
       {/* A disabled button says why. Discard is destructive, but a trigger
           stays neutral and the red is inside its confirm: secondary, as the
           kit SaveBar's Discard is (23 Oct 2026). */}
-      {discard && <Button variant="secondary" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
+      {/* A moved draft is read here, not edited: its Approve and Approve and publish stand alone (owner, 6 Nov 2026). */}
+      {!publish && discard && <Button variant="secondary" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
         Discard
       </Button>}
-      <Button variant="secondary" size="sm" disabled={!unsaved} blocked={stop && unsaved ? stop : undefined} title={!unsaved ? 'No changes to save' : (stop ?? undefined)} onClick={onSaveDraft}>
+      {!publish && <Button variant="secondary" size="sm" disabled={!unsaved} blocked={stop && unsaved ? stop : undefined} title={!unsaved ? 'No changes to save' : (stop ?? undefined)} onClick={onSaveDraft}>
         Save draft
-      </Button>
+      </Button>}
       {/* One word, and it does that word (owner, 23 Sep 2026: "make it save
           only — hide the review part as of now, only show the save directly;
           will think about the review part later").
@@ -493,9 +497,10 @@ export function BoardBarActions({
           whose last step lights nothing is exactly the failure the anchor tests
           exist to catch. The span is `display: contents`-free on purpose: it
           needs a real box for the spotlight to measure. */}
+      {!publish && (
       <span className="bbtop__reviewwrap" data-tour="review">
         <Button
-          variant={quietSave ? 'secondary' : 'brand'}
+          variant={quietSave || publish ? 'secondary' : 'brand'}
           size="sm"
           disabled={!toPublish || saveBlocked || checking}
           blocked={stop && toPublish ? stop : undefined}
@@ -525,6 +530,8 @@ export function BoardBarActions({
           {checking ? 'Checking…' : features.publish ? 'Publish policy' : 'Save policy'}
         </Button>
       </span>
+      )}
+      {publish}
       {/* The policy's other doors, after the verbs that end a draft, the way an application's head ends in its ⋯: Save as
           template (owner, 27 Oct 2026: "add an option for save as template"). Not for a post sign-in policy, which
           decides no sign-in and so has nothing to reuse, and not with no rule on the canvas. */}

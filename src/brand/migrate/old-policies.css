@@ -1,0 +1,165 @@
+/* Old policy pages (OldPolicies.tsx) and the move banner (move-banner.tsx, MoveArt.tsx). The tables are the
+   console's own (.btable, screens.css); this is the banner, its widget and scene, and the bar over a table. */
+
+.bold__muted { color: var(--text-muted); font-size: var(--fs-sm); }
+.bold__name { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bold__empty { margin: 0; padding: var(--space-8); text-align: center; color: var(--text-muted); }
+
+/* --- The move banner ------------------------------------------------------------------------------------
+   One row, all three parts centred on one line: the words and the button on the left, on the old pages the
+   time-left widget in the middle, the animation at the right end. Even padding all round. */
+.bold__banner {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-8);
+  padding: var(--space-6) var(--space-8);
+  border: var(--bw-thin) solid var(--fb-neutral-border); border-radius: var(--radius-xl);
+  background: var(--surface-raised); overflow: hidden;
+}
+/* The new builder's: no dates, so no urgency — the page's own surface and border. */
+.bold__banner.is-quiet { background: var(--surface-raised); border-color: var(--border-default); color: var(--text-primary); }
+/* The old pages' stages, one light tint each, warming as the days go (legacy.ts `stageOf`; owner, 4 Nov 2026): white
+   until two months out, then blue, yellow, a light orange at 15 days and a light red in the last week — never solid. */
+.bold__banner.is-stage0 { background: var(--surface-raised); border-color: var(--border-default); color: var(--text-primary); }
+.bold__banner.is-stage1 { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
+.bold__banner.is-stage2 { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+/* 15 days: the brand's own orange scale, the lightest step for the ground and the next for the border. */
+.bold__banner.is-stage3 { background: var(--start-template-wash); border-color: var(--start-template-wash-2); color: var(--brand-active); }
+/* The last week: red, as a light tint — the ground the negative tone's own, the border a step stronger. */
+.bold__banner.is-stage4 {
+  background: var(--fb-negative-bg); border-color: color-mix(in srgb, var(--fb-negative-fg) 35%, var(--fb-negative-border));
+  color: var(--fb-negative-fg);
+}
+.bold__bannertext { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bold__bannertitle { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: inherit; }
+.bold__bannertext p { margin: 0; max-width: 46ch; font-size: var(--fs-md); color: var(--text-secondary); }
+.bold__banneractions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-3); }
+
+/* The old pages' banner, one row (move-banner.tsx, owner 6 Nov 2026): the mark, the words, the countdown, the
+   button; a soft tint from the left, a faint dot field on the right, and a light that crosses now and then. */
+.bold__banner.is-row {
+  position: relative; display: flex; align-items: center; gap: var(--space-5); isolation: isolate;
+  padding: var(--space-5) var(--space-6);
+  --row-tint: var(--fb-info-bg); --row-ink: var(--fb-info-fg);
+  background: linear-gradient(100deg, var(--row-tint) 0%, color-mix(in srgb, var(--row-tint) 45%, var(--surface-raised)) 55%, var(--surface-raised) 100%);
+  border-color: color-mix(in srgb, var(--row-ink) 22%, var(--border-default));
+  color: var(--text-primary);
+}
+.bold__banner.is-row::after {
+  content: ""; position: absolute; inset: 0 0 0 auto; width: 40%; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(color-mix(in srgb, var(--row-ink) 28%, transparent) 1.2px, transparent 1.4px); background-size: 14px 14px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 70%); mask-image: linear-gradient(90deg, transparent, #000 70%);
+}
+.bold__banner.is-row.is-stage2 { --row-tint: var(--fb-notice-bg); --row-ink: var(--fb-notice-fg); }
+.bold__banner.is-row.is-stage3 { --row-tint: var(--start-template-wash); --row-ink: var(--brand-active); }
+.bold__banner.is-row.is-stage4 { --row-tint: var(--fb-negative-bg); --row-ink: var(--fb-negative-fg); }
+.bold__banner.is-row .bold__bannertext { flex: 1; gap: var(--space-1); }
+.bold__banner.is-row .bold__bannertitle { font-size: var(--fs-lg); color: var(--text-primary); }
+.bold__banner.is-row .bold__bannertext p { max-width: none; font-size: var(--fs-sm); }
+.bold__mark { display: grid; place-items: center; flex: none; width: 64px; height: 56px; }
+.bold__mark .bann__mark { width: 64px; height: 56px; overflow: visible; }
+.bold__mark .bmalert { width: 56px; }
+.bold__go { flex: none; }
+.bold__sweep { position: absolute; top: 0; bottom: 0; left: 0; width: 22%; z-index: -1; pointer-events: none; background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--surface-raised) 70%, transparent), transparent); }
+@media (max-width: 760px) {
+  .bold__banner.is-row { flex-wrap: wrap; }
+  .bold__banner.is-row .bold__bannertext { flex-basis: calc(100% - 64px - var(--space-5)); }
+}
+
+/* --- The countdown, beside the button: a small clock, then days / hrs / min tiles -------------------------- */
+.bold__time { display: inline-flex; align-items: center; gap: var(--space-3); }
+.bold__tiles { display: inline-flex; gap: var(--space-2); }
+.bold__window { display: block; width: min(280px, 100%); height: 5px; margin-top: var(--space-1); border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.bold__window > span { display: block; height: 100%; border-radius: inherit; background: var(--fb-info-fg); }
+.bold__tile {
+  display: inline-flex; flex-direction: column; align-items: center; min-width: 46px;
+  padding: var(--space-1) var(--space-2);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); box-shadow: var(--el-low);
+}
+.bold__tilenum {
+  position: relative; display: inline-grid; overflow: hidden;
+  font-size: var(--fs-lg); font-weight: var(--fw-bold); line-height: 1.25; font-variant-numeric: tabular-nums; color: var(--text-primary);
+}
+.bold__tileunit { font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-muted); }
+
+/* --- The animation (MoveArt.tsx): old tile, a track with a card gliding and chevrons, the new tile ------- */
+.bold__scene { display: flex; justify-content: flex-end; min-width: 0; }
+.bmart { display: flex; align-items: center; gap: var(--space-3); }
+.bmart__tile {
+  position: relative; display: grid; place-items: center; flex: none;
+  width: 56px; height: 56px; border-radius: var(--radius-xl);
+  border: var(--bw-thin) solid var(--border-default); background: var(--surface-raised); box-shadow: var(--el-low);
+}
+.bmart__tile.is-old { color: var(--text-muted); background: var(--surface-sunken); }
+.bmart__tile.is-new { color: var(--brand); border-color: var(--brand-subtle-border); }
+.bmart__ring { position: absolute; inset: -1px; border-radius: inherit; border: 2px solid var(--brand); pointer-events: none; }
+.bmart__track { position: relative; display: flex; align-items: center; justify-content: center; width: 120px; height: 56px; }
+.bmart__rail { position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: repeating-linear-gradient(90deg, var(--border-strong) 0 6px, transparent 6px 11px); }
+.bmart__chevrons { position: relative; display: flex; color: var(--brand); background: inherit; }
+.bmart__chevrons > span { display: inline-flex; margin: 0 -4px; }
+.bmart__card {
+  position: absolute; top: 50%; width: 18px; height: 14px; margin: -7px 0 0 -9px;
+  border: var(--bw-thin) solid var(--text-secondary); border-radius: 3px; background: var(--surface-raised);
+  box-shadow: inset 0 3px 0 var(--start-reuse-wash-2);
+}
+
+/* --- Open new builder (new-builder-button.tsx): a colour of its own, a shine, and the door it opens ----------- */
+button.bnbb {
+  position: relative; display: inline-flex; align-items: center; gap: var(--space-2); overflow: hidden;
+  height: var(--ctl-height-md); padding: 0 var(--space-5);
+  border: 0; border-radius: var(--radius-md);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fb-info-fg) 82%, var(--surface-raised)), var(--fb-info-fg));
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--fb-info-fg) 60%, transparent);
+  font: inherit; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-inverse); cursor: pointer;
+  transition: box-shadow var(--dur-fast) var(--ease-standard), filter var(--dur-fast) var(--ease-standard);
+}
+button.bnbb:hover { filter: brightness(1.06); box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--fb-info-fg) 70%, transparent); }
+button.bnbb:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bnbb__shine {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 40%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--text-inverse) 45%, transparent), transparent);
+}
+.bnbb__icon { position: relative; display: inline-flex; }
+.bnbb__door {
+  position: fixed; inset: 0; z-index: var(--z-toast); display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--fb-info-fg) 78%, var(--surface-raised)), var(--fb-info-fg));
+  color: var(--text-inverse);
+}
+.bnbb__welcome { display: flex; flex-direction: column; align-items: center; gap: var(--space-4); }
+.bnbb__welcome > span:first-child { display: inline-flex; }
+.bnbb__welcometitle { font-size: var(--fs-3xl); font-weight: var(--fw-semibold); letter-spacing: -0.01em; }
+
+/* --- The last fortnight's picture (AlertArt.tsx): a cartoon warning triangle ------------------------------ */
+.bmalert { display: block; width: 150px; height: auto; overflow: visible; }
+.bmalert * { stroke-linecap: round; stroke-linejoin: round; }
+.bmalert__shadow { fill: var(--text-primary); }
+.bmalert__tri { fill: color-mix(in srgb, var(--fb-notice-fg) 45%, var(--surface-raised)); stroke: var(--text-primary); stroke-width: 3; }
+/* Warning colours, not the colour wheel's opposite (owner, 4 Nov 2026: green reads as safe): a red triangle with a white mark on the 15-day orange; hazard yellow with a dark mark on the last week's red, the sign everyone already reads as danger. */
+.is-stage3 .bmalert__tri { fill: var(--fb-negative-fg); }
+.is-stage4 .bmalert__tri { fill: var(--hazard-yellow); }
+.is-stage3 .bmalert__bang { stroke: var(--surface-raised); }
+.is-stage3 .bmalert__dot { fill: var(--surface-raised); }
+.bmalert__shine { fill: none; stroke: var(--surface-raised); stroke-width: 4; opacity: 0.7; }
+.bmalert__bang { fill: none; stroke: var(--text-primary); stroke-width: 7; }
+.bmalert__dot { fill: var(--text-primary); }
+.bmalert__mark { fill: none; stroke: var(--text-primary); stroke-width: 3; }
+
+/* --- The bar over a table and the table's own columns ------------------------------------ */
+.bold__bar-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.bold__spacer { flex: 1 1 auto; }
+.bold .btable tr.is-done td { color: var(--text-muted); }
+.bold .btable td:last-child { white-space: nowrap; }
+.bold__col-tick { width: 88px; }
+.bold__col-action { width: 140px; }
+.bold__yes { color: var(--fb-positive-fg); }
+.bold__no { color: var(--text-disabled); }
+
+/* Narrower: the animation goes first, then everything stacks. */
+@media (max-width: 1200px) {
+
+  .bold__banner .bold__scene { display: none; }
+}
+@media (max-width: 760px) {
+  .bold__banner { grid-template-columns: minmax(0, 1fr); row-gap: var(--space-4); padding: var(--space-5); }
+
+  .bold__scene { justify-content: flex-start; }
+}

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { MIGRATION_FIRST } from '../migrate/phase'
+import { OldPoliciesTab } from '../migrate/old-tab'
 import {
   AlignLeft,
   AppWindow,
@@ -53,11 +55,17 @@ import { ACCESS_CHECK } from './sign-in-tests/names'
 import { DENIAL_REASONS } from './sign-in-tests/phase'
 import { PolicyDetailsDrawer } from './policy-details-drawer'
 import { blankPostSignInPolicy, isPostSignIn } from '../post-sign-in'
+import { blockedReason } from '../migrate/plan'
+import { activityLabel, lastActivity } from '../policy-activity'
+import { MoveBanner } from '../migrate/move-banner'
+import { MoveFinale, MovingBar, MovingShowcase } from '../migrate/finale'
+import { PublishMovedConfirm } from '../migrate/moved-panel'
 /* Here and not in main.tsx's list, against that list's rule, because it can be:
    the sheet sets only margins, on its own class and on the page head through
    `:has()`, which out-weighs console-theme's rule rather than tying with it. So
    landing before kit.css (Policies is eager) leaves source order nothing to decide. */
 import './policies-types.css'
+import { FirstVisit } from '../migrate/first-visit'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -73,13 +81,20 @@ import './policies-types.css'
    not take its dialog — and the keyboard focus — with it.
    -------------------------------------------------------------------------- */
 
-type PolicyKind = 'sign-in' | 'post-sign-in'
+type PolicyKind = 'sign-in' | 'moved' | 'post-sign-in' | 'old'
 
 /* No counts on the tabs (15 Sep 2026): the number is the list's own. */
-const POLICY_KINDS: { value: PolicyKind; label: string }[] = [
-  { value: 'sign-in', label: 'Sign-in' },
-  { value: 'post-sign-in', label: 'Post sign-in' },
-]
+const POLICY_KINDS: { value: PolicyKind; label: string }[] = MIGRATION_FIRST
+  ? [
+      /* Migration first (migrate/phase.ts): the migrated policies and the old ones; Sign-in and Post sign-in wait. */
+      { value: 'sign-in', label: 'New policies' },
+      { value: 'moved', label: 'Migrated policies' },
+      { value: 'old', label: 'Old policies' },
+    ]
+  : [
+      { value: 'sign-in', label: 'Sign-in' },
+      { value: 'post-sign-in', label: 'Post sign-in' },
+    ]
 
 /* The tab a viewer last had open, so the way back from the board — opened
    from the Post sign-in tab, by its New policy or a policy's name — lands on
@@ -92,7 +107,7 @@ let lastKind: PolicyKind | null = null
 function readKind(): PolicyKind {
   try {
     const stored = localStorage.getItem(KIND_KEY)
-    if (stored === 'sign-in' || stored === 'post-sign-in') return stored
+    if (stored && POLICY_KINDS.some((k) => k.value === stored)) return stored as PolicyKind
   } catch {
     /* Blocked: fall through to this visit's copy. */
   }
@@ -108,7 +123,7 @@ function keepKind(kind: PolicyKind) {
   }
 }
 
-type SortKey = 'name' | 'modified' | 'exposure'
+type SortKey = 'name' | 'modified' | 'exposure' | 'activity'
 type StatusFilter = 'all' | 'draft' | 'active' | 'monitor' | 'inactive'
 type RowAction = RowMenuId | 'assign'
 type RowDialog = { kind: 'delete' | 'assign' | 'template' | 'text'; policy: Policy }
@@ -158,7 +173,15 @@ const POLICY_VIEWS: ViewOption<PolicyView>[] = [
   { id: 'coverage', label: 'Coverage view', icon: Grid3x3 },
 ]
 
+/* The preview switch (owner, 3 Nov 2026: "two dropdowns, one for the empty state, one with content"): the new builder
+   as a tenant first meets it, or with the showcase's policies. Shown in the showcase too, because he asked for it there. */
+const START_OPTIONS = [
+  { value: 'empty', label: 'Empty' },
+  { value: 'seeded', label: 'With policies' },
+]
+
 export function Policies() {
+  const store = useBrand()
   const [kind, setKind] = useState<PolicyKind>(readKind)
   const show = (k: PolicyKind) => {
     setKind(k)
@@ -173,11 +196,21 @@ export function Policies() {
         title="Policies"
         caption="Every sign-in, and the session after it, is checked against these policies."
         docs
+        preview={
+          <Picker
+            label="Start"
+            size="md"
+            prefix="Start"
+            value={store.builderStart}
+            options={START_OPTIONS}
+            onChange={(v) => store.setBuilderStart(v as 'empty' | 'seeded')}
+          />
+        }
       />
       <Tabs<PolicyKind> className="bx-tabs--line bpol__types" name="Policy types" value={kind} onChange={show} options={POLICY_KINDS} />
       {/* Each tab brings its own bar and list; a fragment, so they stay rows of
           the page grid as they were before the tabs. */}
-      {kind === 'sign-in' ? <SignInPolicies /> : <PostSignInPolicies />}
+      {kind === 'sign-in' ? <SignInPolicies key="new" origin="new" /> : kind === 'moved' ? <SignInPolicies key="moved" origin="moved" /> : kind === 'old' ? <OldPoliciesTab /> : <PostSignInPolicies />}
     </div>
   )
 }
@@ -185,7 +218,14 @@ export function Policies() {
 /* The Sign-in tab: the page as it was before the tabs, reading sign-in
    policies only. A post sign-in policy is never in this table, its empty state
    or its count of policies deciding sign-ins (spec, Rulings: kept apart). */
-function SignInPolicies() {
+/* A moved policy waits in Migrated policies while it is a draft; published, it is a policy like any made here and
+   graduates to New policies (owner, 6 Nov 2026). */
+const waitingMoved = (p: Policy) => !!p.movedFrom?.length && p.status === 'draft'
+
+/* Two lists over one store (owner, 6 Nov 2026): 'new' is every policy made here, with Save draft and the rest; 'moved' is
+   every policy that came over from the old console, kept as a review queue (view, approve, publish) so a tenant with
+   fifty of them can do five a weekend and come back. */
+function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
   const store = useBrand()
   const resolveName = useNameLookup()
   const libView = POLICY_VIEW
@@ -198,6 +238,18 @@ function SignInPolicies() {
   const [dialog, setDialog] = useState<RowDialog | null>(null)
   /* The policy whose details are in the slider (policy-details-drawer.tsx); kept while it slides out. */
   const [details, setDetails] = useState<{ id: string; open: boolean } | null>(null)
+  /* Rows picked for an action on several at once (owner, 6 Nov 2026: "add checkboxes so the user can do things from
+     outside as well"). Publish acts on the moved drafts among them. */
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
+  /* The moved drafts a Publish press is about: the bulk bar's ticked ones, or one row's. */
+  const [publishAsk, setPublishAsk] = useState<string[] | null>(null)
+  const togglePick = (id: string) =>
+    setPicked((cur) => {
+      const next = new Set(cur)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   const [dialogOpen, setDialogOpen] = useState(false)
   const openDialog = (kind: RowDialog['kind'], policy: Policy) => {
     setDialog({ kind, policy })
@@ -279,9 +331,17 @@ function SignInPolicies() {
   }, [showExposure, store.policies, store.gauntletOverrides, env])
 
   const q = query.trim().toLowerCase()
+  /* One clock per render, so every row's "2 hours ago" is read against the same moment. */
+  const now = Date.now()
 
   /* Sign-in policies only: the Post sign-in tab lists the rest. */
-  const signIn = useMemo(() => store.policies.filter((p) => !isPostSignIn(p)), [store.policies])
+  const signIn = useMemo(
+    () =>
+      store.policies.filter(
+        (p) => !isPostSignIn(p) && !store.held.includes(p.id) && (origin === 'moved' ? waitingMoved(p) : !waitingMoved(p)),
+      ),
+    [store.policies, store.held, origin],
+  )
 
   const rows = useMemo(() => {
     let list = signIn.filter((p) => {
@@ -305,13 +365,20 @@ function SignInPolicies() {
           const byRank = exposureOf(rb).rank - exposureOf(ra).rank
           return (byRank !== 0 ? byRank : rb.breaches - ra.breaches) * d
         }
+        /* Newest first on the first press. Nothing known sorts last either way. */
+        case 'activity': {
+          const ta = lastActivity(a, store.activity, Date.now())?.at
+          const tb = lastActivity(b, store.activity, Date.now())?.at
+          if (ta === undefined || tb === undefined) return ta !== undefined ? -1 : tb !== undefined ? 1 : 0
+          return (tb - ta) * d
+        }
         default:
           return 0
       }
     })
     // System policy is pinned regardless of sort — it always evaluates.
     return [...list.filter((p) => p.isSystem), ...list.filter((p) => !p.isSystem)]
-  }, [signIn, status, q, sort, grades])
+  }, [signIn, status, q, sort, grades, store.activity])
 
   const deciding = useMemo(() => signIn.filter(enforces).length, [signIn])
 
@@ -322,7 +389,14 @@ function SignInPolicies() {
   const systemPolicy = signIn.find((p) => p.isSystem)
   /* A tenant with nothing but the system policy: the list is empty in every
      sense that matters, though the pinned row is there. */
-  const noPolicies = !q && !filtered && signIn.every((p) => p.isSystem)
+  const noPolicies = origin === 'new' && !q && !filtered && signIn.every((p) => p.isSystem)
+  const nothingMoved = origin === 'moved' && !q && !filtered && signIn.length === 0
+  /* Nothing of its own yet: the builder's own empty state takes the bar's and the table's place. */
+  const hero = noPolicies
+  const moving = store.moveJob?.status === 'running'
+  const pickable = rows.filter((p) => !p.isSystem)
+  const nextStep = rows.some((p) => !!p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
+  const pickedDrafts = pickable.filter((p) => picked.has(p.id) && p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
 
   const { setBody, searchRef, markLeaving } = useLeavingFocus(rows)
 
@@ -385,7 +459,7 @@ function SignInPolicies() {
   /* No matches, or no policies at all — the same two states in every view. */
   const empty = (
     <>
-      {rows.length === 0 && (
+      {rows.length === 0 && !nothingMoved && (
         <NoMatches
           noun="policies"
           query={query}
@@ -397,14 +471,21 @@ function SignInPolicies() {
           }}
         />
       )}
+      {/* The page-level empty state every library page has (Zones, Device profiles): owner, 4 Nov 2026. */}
+      {nothingMoved && (
+        <EmptyState
+          icon={ShieldPlus}
+          title="No migrated policies yet"
+          blurb="Policies you move from the old console are kept here until you approve and publish them."
+        />
+      )}
       {noPolicies && (
         <EmptyState
-          compact
           icon={ShieldPlus}
           title="No policies yet"
           blurb={`Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
           action={
-            <Button variant="secondary" icon={Plus} onClick={startDraft}>
+            <Button variant="brand" icon={Plus} onClick={startDraft}>
               New policy
             </Button>
           }
@@ -433,6 +514,19 @@ function SignInPolicies() {
 
   return (
     <>
+      {/* The migration's banner, whatever stage it is at; then, with nothing here yet, the builder's own empty state
+          in place of the bar and the table (owner, 4 Nov 2026: two separate things). */}
+      <FirstVisit />
+      {moving && !store.moveMinimized ? (
+        /* While a move runs the whole page is the move (owner, 5 Nov 2026). */
+        <MovingShowcase />
+      ) : (
+      <>
+      <MoveNote />
+      <MoveFinale />
+      {hero && empty}
+      {!hero && (
+      <>
       {/* The row every list page has — see `PageBar`: the search box, then the
           filter; the view and New on the right. Coverage has no rows to search
           or filter. */}
@@ -490,15 +584,33 @@ function SignInPolicies() {
                 {ACCESS_CHECK}
               </Button>
             )}
-            <Button variant="brand" icon={Plus} onClick={startDraft}>
-              New policy
-            </Button>
+            {origin === 'new' && (
+              <Button variant="brand" icon={Plus} onClick={startDraft}>
+                New policy
+              </Button>
+            )}
           </>
         }
       />
 
       {isCoverage && <Coverage onNew={startDraft} />}
 
+      {!isCoverage && libView === 'table' && picked.size > 0 && (
+        <div className="bpol__bulk" role="toolbar" aria-label="Selected policies">
+          <b>{picked.size === 1 ? '1 selected' : `${picked.size} selected`}</b>
+          <Button variant="secondary" size="sm" icon={Power} disabled={pickedDrafts.length === 0} title={pickedDrafts.length === 0 ? 'Only moved drafts can be published' : undefined} onClick={() => setPublishAsk(pickedDrafts.map((p) => p.id))}>
+            Publish
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setPicked(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
+      <PublishMovedConfirm
+        ids={publishAsk}
+        onClose={() => setPublishAsk(null)}
+        onDone={() => setPicked(new Set())}
+      />
       {!isCoverage && libView === 'table' && (
         <div className="btable-wrap">
           {rows.length > 0 && (
@@ -506,9 +618,29 @@ function SignInPolicies() {
               <table className="btable">
                 <thead>
                   <tr>
+                    <th scope="col" className="btable__col-pick">
+                      <input
+                        type="checkbox"
+                        className="bpol__pick"
+                        aria-label="Select every policy"
+                        checked={pickable.length > 0 && pickable.every((p) => picked.has(p.id))}
+                        ref={(el) => {
+                          if (el) el.indeterminate = picked.size > 0 && !pickable.every((p) => picked.has(p.id))
+                        }}
+                        onChange={(e) => setPicked(e.target.checked ? new Set(pickable.map((p) => p.id)) : new Set())}
+                      />
+                    </th>
                     {head('name', 'Policy name')}
                     <th scope="col">Applications</th>
                     {showExposure && head('exposure', 'Exposure')}
+                    {head('activity', 'Last activity', 'btable__col-activity')}
+                    {/* Next step, a column of its own while moved drafts wait (owner, 6 Nov 2026: "a new column, not with the
+                        status"): each one's Publish. */}
+                    {nextStep && (
+                      <th scope="col" className="btable__col-next">
+                        Next step
+                      </th>
+                    )}
                     <th scope="col" className="btable__col-status">
                       Status
                     </th>
@@ -524,10 +656,15 @@ function SignInPolicies() {
                       policy={p}
                       gauntlet={grades.get(p.id)}
                       showExposure={showExposure}
+                      activity={activityLabel(lastActivity(p, store.activity, now), now)}
                       monitor={monitorOffered(store.features)}
                       trySignIn={store.features.trySignIn}
-                      onOpen={() => setDetails({ id: p.id, open: true })}
+                      onOpen={() => (p.movedFrom?.length ? store.go({ name: 'board', policyId: p.id }) : setDetails({ id: p.id, open: true }))}
                       onAction={(a) => act(p, a)}
+                      onPublish={() => setPublishAsk([p.id])}
+                      nextStep={nextStep}
+                      picked={picked.has(p.id)}
+                      onPick={p.isSystem ? undefined : () => togglePick(p.id)}
                     />
                   ))}
                 </tbody>
@@ -560,6 +697,7 @@ function SignInPolicies() {
                   facts: [
                     { label: 'Apps', value: <PolicyApps policy={p} onAssign={() => act(p, 'assign')} /> },
                     { label: 'Status', value: <StatusPill status={p.status} /> },
+                    { label: 'Last activity', value: activityLabel(lastActivity(p, store.activity, now), now) },
                     ...(showExposure
                       ? [{ label: 'Exposure', value: <PolicyExposure policy={p} gauntlet={grades.get(p.id)} /> }]
                       : []),
@@ -578,6 +716,10 @@ function SignInPolicies() {
           {empty}
           <p className="bpol__foot">{summary}</p>
         </>
+      )}
+      </>
+      )}
+      </>
       )}
 
       {/* The row dialogs, on the page so they outlive the row. */}
@@ -1026,12 +1168,47 @@ function PolicyExposure({ policy, gauntlet }: { policy: Policy; gauntlet?: Gaunt
   )
 }
 
-/* The marks beside a policy's name: System, and a live policy's unpublished edits. */
+/* Move policies' way in (migrate/MovePolicies.tsx): while the old console still holds sign-in policies that have not
+   moved, or moved ones are still drafts. Gone once every one is moved and turned on. A secondary button: the
+   page's orange is New policy. */
+function MoveNote() {
+  const store = useBrand()
+  /* Only rows that CAN move: one whose application already has a policy here waits on nothing the admin can do. */
+  const ctx = { apps: store.moveApps, groups: store.groups, users: store.users, zones: store.zones, policies: store.policies, staged: store.staged }
+  const waiting = store.legacy.policies.filter((lp) => !store.movedLegacy[lp.id] && !blockedReason(lp, ctx)).length
+  const job = store.moveJob
+  const toReview = Object.values(store.moved).filter((m) => !m.approved).length
+  /* Review opens as a popup over this page (owner, 5 Nov 2026); while the move runs the banner has no button. */
+  const open = () => store.openReview()
+  /* Start migration plays the Policy builder intro first, every time (owner, 4 Nov 2026); it ends in the move. */
+  const start = () => store.openIntro('migrate')
+  /* A move under way, or done and waiting for review: what is happening, and View details into it. Nothing it made is
+     in this list until it is approved (owner, 4 Nov 2026). */
+  /* While it runs, folded: a slim bar with Expand (owner, 5 Nov 2026). */
+  if (job?.status === 'running') return <MovingBar />
+  /* Approved ones waiting to be added, or rows landing: the finale's banner says it, alone. */
+  if (store.held.length > 0 || store.landing.length > 0 || store.activating) return null
+  if (toReview > 0)
+    return <MoveBanner where="new" waiting={waiting} secondary progress={{ done: job?.done ?? 0, total: job?.total ?? 0, running: false, toReview }} onAction={open} />
+  /* Just approved: the finale banner (migrate/finale.tsx) takes it from here. */
+  /* Old policies still waiting: the same quiet banner as the empty page, its button a secondary because New policy is
+     this list's orange. */
+  if (waiting > 0) return <MoveBanner where="new" waiting={waiting} secondary onAction={start} />
+  return null
+}
+
+/* The marks beside a policy's name: System, From old policy (moved, still a draft), and a live policy's
+   unpublished edits. */
 function PolicyMarks({ policy }: { policy: Policy }) {
-  if (!policy.isSystem && !policy.pendingDraft) return null
+  const { moved: movedInfo } = useBrand()
+  const moved = !!policy.movedFrom?.length && policy.status === 'draft'
+  /* Draft, then Approved, then Active (owner, 6 Nov 2026): approved in the builder, not yet published. */
+  const approved = moved && !!movedInfo[policy.id]?.reviewed
+  if (!policy.isSystem && !policy.pendingDraft && !moved) return null
   return (
     <span className="btable__marks">
       {policy.isSystem && <Badge tone="system">System</Badge>}
+      {moved && (approved ? <Badge tone="positive">Approved</Badge> : <Badge tone="info">From old policy</Badge>)}
       {policy.pendingDraft && <ChangeState unsaved={false} draft />}
     </span>
   )
@@ -1041,14 +1218,28 @@ function PolicyRow({
   policy,
   gauntlet,
   showExposure,
+  activity,
   monitor,
   trySignIn,
   onOpen,
   onAction,
+  picked = false,
+  onPick,
+  onPublish,
+  nextStep = false,
 }: {
   policy: Policy
+  /** The Next step column is drawn: this row's cell is its Publish, or empty. */
+  nextStep?: boolean
+  /** A moved draft's quick Publish, beside the row menu (owner, 6 Nov 2026). */
+  onPublish?: () => void
+  picked?: boolean
+  /** Ticks the row for an action on several at once; absent on the system policy. */
+  onPick?: () => void
   gauntlet?: GauntletResult
   showExposure: boolean
+  /** "Edited 2 hours ago": the last thing that happened to it (policy-activity.ts). */
+  activity: string
   /** The name's press: its details, in the slider. */
   onOpen: () => void
   /** The edition has the Monitoring status, so the menu offers Monitor. */
@@ -1057,12 +1248,21 @@ function PolicyRow({
   trySignIn: boolean
   onAction: (action: RowAction) => void
 }) {
+  /* Arriving from a move: each row lights in turn, by its place in the move (move-policies.css `.is-arrived`). */
+  const { imported, landing } = useBrand()
+  const at = imported.indexOf(policy.id)
+  const publishable = !!policy.movedFrom?.length && policy.status === 'draft' && policy.appIds.length > 0
+  /* Laid in by Add to Policies, or just made active: one light sweep (finale.css). */
+  const lands = landing.includes(policy.id)
   return (
-    <tr className={policy.isSystem ? 'is-system' : ''}>
+    <tr data-from-old={policy.movedFrom ? 'true' : undefined} className={`${policy.isSystem ? 'is-system' : ''}${at >= 0 && !lands ? ' is-arrived' : ''}${lands ? ' is-landing' : ''}`} style={at >= 0 ? { ['--arrive' as string]: Math.min(at, 12) } : undefined}>
       {/* The row's layout lives on a wrapper INSIDE the cell. `.btable__primary`
           is a flex row, and set on the `<td>` itself it stopped the cell being
           a table cell: it sized to its own content instead of the row, so its
           bottom rule sat 5px above every other column's on each row. */}
+      <td className="btable__col-pick">
+        {onPick && <input type="checkbox" className="bpol__pick" aria-label={`Select ${policy.name}`} checked={picked} onChange={onPick} />}
+      </td>
       <td>
         <div className="btable__primary">
           {/* The mark the list and card views give a policy, so a row reads as
@@ -1082,6 +1282,16 @@ function PolicyRow({
       {showExposure && (
         <td>
           <PolicyExposure policy={policy} gauntlet={gauntlet} />
+        </td>
+      )}
+      <td className="btable__activity">{activity}</td>
+      {nextStep && (
+        <td className="btable__next">
+          {publishable && onPublish && (
+            <Button variant="secondary" size="sm" icon={Power} onClick={onPublish}>
+              Publish
+            </Button>
+          )}
         </td>
       )}
       <td>

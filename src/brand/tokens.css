@@ -188,6 +188,8 @@
   --fb-notice-border: #f0dfa4;
   --fb-notice-fg: #7d5800;
   --fb-notice-dot: #b07a00;
+  /* The warning sign's own yellow: the move banner's last-week triangle (migrate/AlertArt.tsx). */
+  --hazard-yellow: #f7c21c;
   --fb-info-bg: #e9f2fd;
   --fb-info-border: #b9d6f5;
   --fb-info-fg: #155e91;

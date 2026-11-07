@@ -266,6 +266,8 @@ export const showcasePolicies: Policy[] = [
     appIds: [],
     status: 'always-on',
     lastModified: 'System',
+    /* The day the tenant was set up: the system policy comes with it, and nobody has edited it since. */
+    addedOn: '2026-03-04',
     modifiedBy: 'System',
     isSystem: true,
     audience: EVERYONE,

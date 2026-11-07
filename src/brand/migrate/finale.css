@@ -1,0 +1,67 @@
+/* The migration on the Policies page (finale.tsx): the whole page while moving, then one banner at a time. */
+
+/* Moving: the conveyor, the words and the bar, the latest to land. */
+.bfn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-6); flex: 1; min-height: calc(100dvh - var(--nav-topbar-h) - 260px); padding: var(--space-8) var(--space-6); border-radius: var(--radius-xl, 16px); background-color: var(--surface-sunken); background-image: radial-gradient(var(--border-default) 1px, transparent 1px); background-size: 18px 18px; border: var(--bw-thin) solid var(--border-subtle); }
+.bfn__stage { position: relative; width: min(100%, 640px); height: 150px; }
+.bfn__lane { position: absolute; inset: 0; }
+.bfn__old, .bfn__new { position: absolute; top: 50%; translate: 0 -50%; display: flex; flex-direction: column; gap: 6px; padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); }
+.bfn__old { width: 120px; border: var(--bw-thin) dashed var(--border-strong); }
+.bfn__oldhead { display: inline-flex; color: var(--text-tertiary); }
+.bfn__old > i, .bfn__new > i { display: block; height: 6px; border-radius: var(--radius-full); background: var(--border-subtle); }
+.bfn__old > i.is-short { width: 55%; }
+.bfn__new { flex-direction: row; align-items: center; width: 120px; border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-high); color: var(--fb-positive-fg); }
+.bfn__new > i { flex: 1; }
+.bfn__core { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-high); color: var(--text-primary); z-index: 1; }
+.bfn__ring { position: absolute; inset: -10px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--fb-info-fg); border-right-color: var(--fb-info-bg); }
+
+.bfn__words { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); width: min(100%, 420px); text-align: center; }
+.bfn__words h2 { margin: 0; font-size: 22px; font-weight: var(--fw-semibold); letter-spacing: -0.015em; color: var(--text-primary); }
+.bfn__words p { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.bfn__bar { width: 100%; height: 6px; margin-top: var(--space-3); border-radius: var(--radius-full); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); overflow: hidden; }
+.bfn__bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--fb-info-fg), var(--fb-positive-fg)); }
+
+.bfn__recent { display: flex; flex-direction: column; gap: var(--space-2); width: min(100%, 520px); margin: 0; padding: 0; list-style: none; }
+.bfn__recent > li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); box-shadow: var(--el-low); font-size: var(--fs-sm); color: var(--text-primary); }
+.bfn__recent > li > b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-medium); }
+.bfn__logos { display: inline-flex; gap: 4px; }
+.bfn__draft { padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--surface-sunken); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); color: var(--text-secondary); }
+.bfn__tick { color: var(--fb-positive-fg); }
+
+/* The banner: one thing at a time. */
+.bfb { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); padding: var(--space-4) var(--space-5); border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); }
+.bfb.is-done { background: var(--fb-positive-bg); border-color: transparent; }
+.bfb__mark { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-primary); }
+.bfb.is-done .bfb__mark { background: var(--surface-raised); color: var(--fb-positive-fg); }
+.bfb__words { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.bfb__words > b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bfb__words > span { font-size: var(--fs-sm); color: var(--text-secondary); }
+.bfb__spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border-subtle); border-top-color: var(--fb-info-fg); animation: bfb-spin 0.8s linear infinite; }
+@keyframes bfb-spin { to { rotate: 360deg; } }
+
+/* A row laid in, or made active (5 Nov 2026, redone): it fades and settles in from above, its first cell
+   carries a blue edge, and the row's tint fades out. No sweep. */
+@keyframes bfn-row-in {
+  from { opacity: 0; translate: 0 -10px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes bfn-row-tint {
+  0%, 35% { background-color: var(--blue-soft, var(--fb-info-bg)); }
+  100% { background-color: transparent; }
+}
+@keyframes bfn-row-edge {
+  0%, 45% { box-shadow: inset 3px 0 0 var(--blue, var(--fb-info-fg)); }
+  100% { box-shadow: inset 3px 0 0 transparent; }
+}
+.btable tr.is-landing > td { animation: bfn-row-in 0.45s var(--ease-standard) both, bfn-row-tint 2.4s ease-out both; }
+.btable tr.is-landing > td:first-child { animation: bfn-row-in 0.45s var(--ease-standard) both, bfn-row-tint 2.4s ease-out both, bfn-row-edge 2.4s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .btable tr.is-landing > td, .btable tr.is-landing > td:first-child { animation: none; background-color: var(--blue-soft, var(--fb-info-bg)); }
+  .bfb__spin { animation: none; }
+}
+
+/* Minimize (5 Nov 2026): the stage's own button, and the bar it folds into. */
+.bfn { position: relative; }
+.bfn__min { position: absolute; top: var(--space-4); right: var(--space-4); }
+.bfb.is-moving .bfb__mark { background: var(--surface-sunken); }
+.bfb__bar { display: block; width: min(100%, 360px); height: 4px; margin-top: var(--space-2); border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.bfb__bar > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--fb-info-fg), var(--fb-positive-fg)); }

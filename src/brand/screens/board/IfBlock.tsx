@@ -1,5 +1,5 @@
 import { Fragment, type MouseEvent, type ReactNode } from 'react'
-import { ArrowRight, Braces, Split, Users } from 'lucide-react'
+import { ArrowRight, Braces, CornerDownRight, Split, Users } from 'lucide-react'
 
 import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
 import { FaceStack, type FaceItem } from '../../faces'
@@ -285,6 +285,9 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
     return (
       <>
         <div className="bb__ifrow">
+          <span className="bb__ifbranch" aria-hidden>
+            <CornerDownRight size={12} strokeWidth={2} />
+          </span>
           <IfKw>then</IfKw>
         </div>
         <IfSub className="bb__ifaction">
@@ -304,6 +307,9 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
           was a glyph — so the card read "if … ⟶ something … else", and the
           "something" was the only part that says what the rule DOES. */}
       <div className="bb__ifrow">
+        <span className="bb__ifbranch" aria-hidden>
+          <CornerDownRight size={12} strokeWidth={2} />
+        </span>
         <IfKw>then</IfKw>
       </div>
       {/* An outcome nobody has chosen is not printed as one. A rule is born

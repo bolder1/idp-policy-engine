@@ -1,0 +1,173 @@
+/* Move policies' Preview head and tabs, and Done (MovePolicies.tsx, done-stage.tsx). */
+
+/* --- Preview: the move in one sentence, then what happens, a row each ---------------------------- */
+.bmvp { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-7) var(--space-8); border-radius: var(--radius-xl); background: var(--surface-sunken); }
+.bmvp__lead { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary); letter-spacing: -0.01em; }
+.bmvp__rows { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--space-6) var(--space-8); }
+.bmvp__rows li { display: flex; gap: var(--space-5); align-items: flex-start; }
+.bmvp__rows li > svg { flex: none; margin-top: 1px; color: var(--fb-info-fg); }
+.bmvp__rows li.is-caveat > svg { color: var(--fb-notice-fg); }
+.bmvp__rows li > span { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+.bmvp__rows b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+
+.bmv__share { display: inline-flex; align-items: center; gap: var(--space-3); flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
+.bmv__name { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmv__tile.is-info { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
+.bmvl__wrap { display: flex; flex-direction: column; gap: var(--space-8); }
+.bmvl { display: flex; flex-direction: column; }
+
+/* --- Done ------------------------------------------------------------------------------------- */
+.bmd { display: flex; flex-direction: column; gap: var(--space-9); min-width: 0; }
+.bmd__head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-5); padding: var(--space-8); border-radius: var(--radius-xl); background: var(--surface-sunken); }
+.bmd__mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-lg); background: var(--fb-positive-bg); color: var(--fb-positive-fg); flex: none; }
+.bmd__title { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bmd__title h2 { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmd__title p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); }
+
+.bmd__list { display: flex; flex-direction: column; }
+.bmd__listhead { display: flex; align-items: center; gap: var(--space-5); margin-bottom: var(--space-3); }
+.bmd__listhead .bmv__lanehead { margin: 0; }
+.bmd__listhead .bmv__progress { flex: 0 1 160px; }
+.bmd__progress { margin-left: auto; font-size: var(--fs-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.bmd__steps { overflow: hidden; }
+.bmd__step { display: flex; align-items: center; gap: var(--space-6); padding: var(--space-7); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.bmd__step:last-child { border-bottom: 0; }
+.bmd__step.is-next { background: var(--surface-sunken); }
+.bmd__tick {
+  display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: var(--radius-full);
+  border: var(--bw-thin) solid var(--border-strong); background: var(--surface-raised);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); font-variant-numeric: tabular-nums;
+}
+.bmd__step.is-done .bmd__tick { background: var(--fb-positive-bg); border-color: var(--fb-positive-border, var(--border-subtle)); color: var(--fb-positive-fg); }
+.bmd__steptext { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-md); color: var(--text-secondary); }
+.bmd__steptext b { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmd__step.is-done .bmd__steptext b { color: var(--text-secondary); }
+.bmd__gap { padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--fb-notice-bg); color: var(--fb-notice-fg); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); }
+
+.bmd__places { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: var(--space-6); }
+.bmd__place { box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-7); border-radius: var(--radius-2xl); background: var(--surface-sunken); }
+.bmd__placeicon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--space-3); border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); color: var(--text-secondary); }
+.bmd__place b { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmd__placeline { font-size: var(--fs-md); color: var(--text-secondary); }
+.bmd__new { padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--fb-positive-bg); color: var(--fb-positive-fg); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); }
+.bmd__open {
+  display: inline-flex; align-items: center; gap: var(--space-2); margin-top: var(--space-5); align-self: flex-start;
+  padding: 0; border: 0; background: none; font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--accent-strong); cursor: pointer;
+}
+.bmd__open:hover { text-decoration: underline; }
+.bmd__open:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+
+@media (max-width: 720px) {
+  .bmd__step { flex-wrap: wrap; }
+}
+
+/* Step 1's list: the old console's table, one row a policy, picked by the row or its box. */
+.bmv__table tbody tr { cursor: pointer; }
+.bmv__table .bmv__checkcol { width: 44px; padding-right: 0; }
+.bmv__pname { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bmv__app { display: inline-flex; align-items: center; gap: var(--space-3); }
+.bmv__table th { white-space: nowrap; }
+.bmv__table td:nth-child(4), .bmv__table td:nth-child(5) { white-space: nowrap; }
+.bmv__pname { min-width: 180px; }
+
+/* Review as a workspace: queue · the open policy · what was created. */
+.bmw { display: flex; flex-direction: column; gap: var(--space-5); }
+.bmw__body { display: grid; grid-template-columns: 260px minmax(0, 1fr) 240px; gap: var(--space-6); align-items: start; }
+.bmw__queue, .bmw__made { position: sticky; top: var(--space-6); display: flex; flex-direction: column; gap: var(--space-5); }
+.bmw__lane ul, .bmw__made ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.bmw__lanehead { margin: 0 0 var(--space-2); font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bmw button.bmw__item { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3); border: var(--bw-thin) solid transparent; border-radius: var(--radius-md); background: none; text-align: left; cursor: pointer; color: var(--text-primary); }
+.bmw button.bmw__item:hover { background: var(--surface-sunken); }
+.bmw button.bmw__item.is-on { background: var(--surface-raised); border-color: var(--border-default); box-shadow: var(--el-low); }
+.bmw button.bmw__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bmw__itemtext { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.bmw__itemtext > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.bmw__itemtext > em { font-style: normal; font-size: 12px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmw__lane.is-attention .bmw__itemtext > em { color: var(--fb-warning-fg, var(--text-secondary)); }
+.bmw__tick { flex: none; color: var(--fb-positive-fg); }
+.bmw__made-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.bmw__madeicon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--text-primary); }
+.bmw__madenote { margin: 0; font-size: 12px; color: var(--text-tertiary); }
+/* In the middle column the old rows sit above the canvas. */
+.bmw__main .bmr__body { grid-template-columns: 1fr; display: flex; flex-direction: column; }
+@media (max-width: 1100px) { .bmw__body { grid-template-columns: 220px minmax(0, 1fr); } .bmw__made { grid-column: 1 / -1; position: static; } }
+@media (max-width: 760px) { .bmw__body { grid-template-columns: 1fr; } .bmw__queue { position: static; } }
+
+/* Review, redone (owner, 5 Nov 2026): a queue of policy cards on the left, one policy's detail filling the right. */
+.bmw2 { display: flex; flex-direction: column; gap: var(--space-5); }
+.bmw2__top { display: flex; align-items: center; gap: var(--space-4); padding-bottom: var(--space-5); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.bmw2__progress { display: flex; align-items: center; gap: var(--space-4); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bmw2__progress b { color: var(--text-primary); }
+.bmw2__bar { width: 160px; height: 6px; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.bmw2__bar > i { display: block; height: 100%; border-radius: inherit; background: var(--fb-positive-fg); }
+.bmw2__body { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: var(--space-7); align-items: start; }
+
+.bmw2__queue { position: sticky; top: var(--space-5); display: flex; flex-direction: column; gap: var(--space-6); max-height: calc(100vh - 220px); overflow: auto; padding-right: var(--space-2); }
+.bmw2__lane > h3 { margin: 0 0 var(--space-3); font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bmw2__lane ul { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.bmw2 button.bmw2__item { display: flex; align-items: center; gap: var(--space-4); width: 100%; padding: var(--space-4); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); text-align: left; cursor: pointer; color: var(--text-primary); transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.bmw2 button.bmw2__item:hover { border-color: var(--border-strong); }
+.bmw2 button.bmw2__item.is-on { border-color: var(--text-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.bmw2 button.bmw2__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bmw2__logo { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--surface-sunken); }
+.bmw2__itemtext { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.bmw2__itemtext > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+.bmw2__itemtext > em { display: inline-flex; align-items: center; gap: 4px; font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.bmw2__lane.is-attention .bmw2__itemtext > em { color: var(--fb-notice-fg); }
+.bmw2__lane.is-approved .bmw2__itemtext > em { color: var(--fb-positive-fg); }
+.bmw2__lane.is-approved button.bmw2__item { background: var(--surface-sunken); }
+.bmw2__made { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); font-size: var(--fs-sm); color: var(--text-primary); }
+.bmw2__made > svg { color: var(--text-tertiary); flex: none; }
+.bmw2__made > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmw2__made > i { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.bmw2__made > i.is-added { color: var(--fb-positive-fg); }
+
+.bmw2__detail { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; padding: var(--space-6); border-radius: var(--radius-xl, 16px); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); }
+.bmw2__head { display: flex; align-items: center; gap: var(--space-4); }
+.bmw2__headlogo { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.bmw2__headtext { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.bmw2__headtext h2 { margin: 0; font-size: var(--fs-lg, 18px); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmw2__headtext > span { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bmw2__issues { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: var(--space-4); list-style: none; border-radius: var(--radius-lg); background: var(--fb-notice-bg); }
+.bmw2__issues li { display: flex; align-items: flex-start; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-primary); }
+.bmw2__issues li > span:last-child { display: flex; flex-direction: column; gap: 1px; }
+.bmw2__issues b { font-weight: var(--fw-semibold); }
+.bmw2__issueicon { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--fb-notice-fg); }
+
+/* The canvas takes the room; the old rows sit beside it. */
+.bmw2 .bmr__stage { padding: 0; gap: var(--space-4); }
+.bmw2 .bmr__stagehead.is-bare { justify-content: flex-end; }
+.bmw2 .bmr__body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--space-5); }
+.bmw2 .bmr__new { order: 1; }
+.bmw2 .bmr__old { order: 2; }
+.bmw2 .bmr__canvas { min-height: 520px; max-height: calc(100vh - 300px); }
+@media (max-width: 1200px) { .bmw2 .bmr__body { grid-template-columns: minmax(0, 1fr); } .bmw2 .bmr__old { order: 0; } }
+@media (max-width: 900px) { .bmw2__body { grid-template-columns: minmax(0, 1fr); } .bmw2__queue { position: static; max-height: none; } }
+
+/* Replay sits on the New policy heading's line, not a row of its own. */
+.bmw2 .bmr__stage { position: relative; }
+.bmw2 .bmr__stagehead.is-bare { position: absolute; top: -8px; right: calc(280px + var(--space-5)); z-index: 1; }
+@media (max-width: 1200px) { .bmw2 .bmr__stagehead.is-bare { position: static; } }
+
+/* Review, one policy at a time (owner, 5 Nov 2026): Back and Next on top, the policy filling the page. */
+.bmw3 { display: flex; flex-direction: column; gap: var(--space-5); }
+.bmw3__top { display: flex; align-items: center; gap: var(--space-4); padding-bottom: var(--space-5); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.bmw3__where { display: inline-flex; align-items: center; gap: var(--space-4); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bmw3__detail { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.bmw2__headtext h2 { display: flex; align-items: center; gap: var(--space-3); }
+.bmw3__state { padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); }
+.bmw3__state.is-attention { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bmw3__state.is-ready { background: var(--surface-sunken); color: var(--text-secondary); }
+.bmw3__state.is-approved { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bmw3 .bmr__stage { position: relative; padding: 0; gap: var(--space-4); }
+.bmw3 .bmr__stagehead.is-bare { position: absolute; top: -8px; right: calc(320px + var(--space-8)); z-index: 2; }
+.bmw3 .bmr__body { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-8); }
+.bmw3 .bmr__new { order: 1; }
+.bmw3 .bmr__old { order: 2; }
+.bmw3 .bmr__canvas { min-height: 560px; max-height: calc(100vh - 300px); }
+.bmw3 .bmr__card { cursor: default; transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
+.bmw3 .bmr__card.is-lit { border-color: var(--text-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-primary) 10%, transparent); }
+/* The line from a rule to the old row it came from. */
+.bmr__links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }
+.bmr__links path { fill: none; stroke: var(--text-primary); stroke-width: 1.5; stroke-dasharray: 4 4; }
+@media (max-width: 1100px) { .bmw3 .bmr__body { grid-template-columns: minmax(0, 1fr); } .bmw3 .bmr__stagehead.is-bare { position: static; } .bmr__links { display: none; } }

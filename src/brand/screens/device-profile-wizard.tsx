@@ -570,14 +570,15 @@ export function DeviceProfileWizard({
 
    The ladder spans the full width of the form it heads, and the connectors take
    the free space, so the spacing is even at three, four or five steps. */
-function Steps({
+/* Exported for Move policies (migrate/MovePolicies.tsx), the one other page that walks steps. */
+export function Steps({
   steps,
   at,
   canOpen,
   done,
   onOpen,
 }: {
-  steps: WizardStep[]
+  steps: ReadonlyArray<Pick<WizardStep, 'label'> & { id: string }>
   at: number
   canOpen: (index: number) => boolean
   done: (index: number) => boolean

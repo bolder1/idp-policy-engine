@@ -434,8 +434,8 @@ describe('where it stands', () => {
   })
 
   it('beside the rule panel, the rule panel stays open and the canvas editable', () => {
-    expect(builderSrc).toContain('const inspBlocked = describeOpen && !guidedBeside')
-    expect(builderSrc).toContain('const canvasLocked = describeOpen && !guidedBeside')
+    expect(builderSrc).toContain('const inspBlocked = (describeOpen && !guidedBeside) || movedDraft')
+    expect(builderSrc).toContain('const canvasLocked = (describeOpen && !guidedBeside) || movedDraft')
     expect(builderSrc).toContain("onMove={(from, to) => (canvasLocked ? undefined : move(from, to))}")
   })
 })

@@ -1,0 +1,118 @@
+/* Review moved policies, a page (ReviewPage.tsx), and its V1 split (review-split.tsx). */
+.brvp { position: relative; }
+.brvp__look { position: absolute; top: 32px; right: 32px; }
+.brvp .brv { gap: var(--space-5); }
+
+.brs { display: flex; flex-direction: column; gap: var(--space-5); }
+.brs__split { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: var(--space-5); align-items: start; }
+.brs__side { font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.brs__canvas.brv2__canvas { min-height: 420px; max-height: calc(100vh - 360px); }
+
+/* The old rows: a card each, what it became on the right of its title. */
+.brs__old { position: sticky; top: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); max-height: calc(100vh - 220px); padding: var(--space-5); border-radius: var(--radius-xl, 16px); background: var(--surface-sunken); border: var(--bw-thin) dashed var(--border-default); overflow: auto; }
+.brs__oldhead { display: flex; flex-direction: column; gap: 2px; }
+.brs__oldhead > b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.brs__old ol { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.brs__card { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; padding: var(--space-4); border-radius: var(--radius-lg); border: var(--bw-thin) solid var(--border-subtle); background: var(--surface-raised); text-align: left; font: inherit; color: var(--text-secondary); cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.brs__card:hover, .brs__card.is-on { border-color: var(--border-strong); box-shadow: var(--el-low); }
+.brs__card.is-pinned { border-color: var(--fb-info-fg); box-shadow: 0 0 0 1px var(--fb-info-fg); }
+.brs__card:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.brs__card.is-left { opacity: 0.7; }
+.brs__cardtop { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.brs__cardtop > b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.brs__pin { flex: none; color: var(--fb-info-fg); }
+.brs__became { flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--surface-sunken); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); color: var(--text-primary); }
+.brs__became.is-left { color: var(--text-tertiary); text-decoration: line-through; }
+.brs__line { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 12.5px; line-height: 1.45; }
+.brs__line > svg { flex: none; margin-top: 2px; color: var(--text-tertiary); }
+.brs__parts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.brs__why { font-size: 12px; color: var(--text-tertiary); }
+
+@media (max-width: 1100px) {
+  .brs__split { grid-template-columns: minmax(0, 1fr); }
+  .brs__old { position: static; max-height: none; }
+}
+
+/* V1 fits the screen (owner, 5 Nov 2026: "remove the scroll from the whole page"): each side scrolls on its own, the
+   footer stays in view. */
+.brvp.is-v1 { flex: 1 1 0; min-height: 520px; padding-bottom: var(--space-4); display: flex; flex-direction: column; }
+.brvp.is-v1 .bpage__head { flex: none; }
+.brs { flex: 1; min-height: 0; }
+.brs__stage { flex: 1; min-height: 0; display: flex; }
+.brs__stage > .brs__split { flex: 1; min-height: 0; align-items: stretch; }
+.brs__new.bdetail.brv2 { min-height: 0; overflow: hidden; }
+.brs__canvas.brv2__canvas { flex: 1; min-height: 0; max-height: none; }
+.brs__note { margin: 0; padding: var(--space-3) var(--space-6); border-top: var(--bw-thin) solid var(--border-subtle); font-size: 12.5px; color: var(--text-tertiary); }
+.brs__old { position: static; max-height: none; min-height: 0; }
+.brs__foot { flex: none; display: flex; align-items: center; gap: var(--space-4); padding-top: var(--space-4); border-top: var(--bw-thin) solid var(--border-subtle); }
+
+/* Approve all, then Go to Policies: top right of the page, where the version switch was. */
+.brs__top { position: absolute; top: 32px; right: 32px; }
+
+/* The canvas version (6 Nov 2026): old policies docked left like Guided setup, the builder's canvas on the right. */
+.brs__split.is-canvas-right { grid-template-columns: minmax(340px, 400px) minmax(0, 1fr); }
+.brs__split.is-canvas-right .brs__old { background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); padding: 0; gap: 0; }
+.brs__split.is-canvas-right .brs__oldhead { gap: 4px; padding: var(--space-4) var(--space-5); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.brs__oldtitle { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-base); color: var(--text-primary); }
+.brs__oldtitle > b { font-weight: var(--fw-semibold); }
+.brs__oldsub { font-size: 12.5px; color: var(--text-tertiary); }
+.brs__split.is-canvas-right .brs__old ol { gap: var(--space-3); padding: var(--space-4); overflow: auto; }
+.brs__hint { font-size: 12.5px; color: var(--text-tertiary); }
+
+/* An old policy card: sentences with tokens, the Adaptive checks with what each became, where it went. */
+.brs__split.is-canvas-right .brs__card { gap: var(--space-3); padding: var(--space-4); border-color: var(--border-default); }
+.brs__card.is-linked { border-color: var(--fb-info-fg); box-shadow: 0 0 0 1px var(--fb-info-fg); background: color-mix(in srgb, var(--fb-info-bg) 45%, var(--surface-raised)); }
+.brs__kind { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--surface-sunken); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); color: var(--text-secondary); }
+.brs__kind.is-adaptive { align-self: flex-start; background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.brs__said { font-size: var(--fs-sm); line-height: 2; color: var(--text-secondary); }
+.brs__tok { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
+.brs__tok > b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.brs__chip { display: inline-flex; align-items: center; height: 22px; padding: 0 var(--space-2); border-radius: var(--radius-md); background: var(--surface-sunken); font-size: 12.5px; font-weight: var(--fw-medium); color: var(--text-primary); vertical-align: middle; white-space: nowrap; }
+.brs__chip.is-mfa { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.brs__chip.is-made { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.brs__adaptive { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-3); border-top: var(--bw-thin) dashed var(--border-default); }
+.brs__checks { display: flex; flex-direction: column; gap: var(--space-2); }
+.brs__check { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 12.5px; color: var(--text-secondary); }
+.brs__checkfrom { display: inline-flex; align-items: center; gap: 5px; color: var(--text-primary); }
+.brs__checkfrom > svg { color: var(--text-tertiary); }
+.brs__arrow { color: var(--text-tertiary); }
+.brs__onfail { font-size: 12px; color: var(--text-tertiary); }
+.brs__foot { display: flex; align-items: center; gap: var(--space-2); padding-top: var(--space-3); border-top: var(--bw-thin) solid var(--border-subtle); }
+.brs__footk { font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+
+/* The builder's Old policies panel (moved-panel.tsx), docked where Guided setup sits. */
+.bgs.bmvp { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.bmvp__head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-5) var(--space-1); }
+.bmvp__x { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); cursor: pointer; }
+.bmvp__x:hover { background: var(--surface-sunken); }
+.bmvp__sub { margin: 0; padding: 0 var(--space-5) var(--space-3); border-bottom: var(--bw-thin) solid var(--border-subtle); font-size: 12.5px; color: var(--text-tertiary); }
+.bmvp__list { display: flex; flex-direction: column; gap: var(--space-3); flex: 1; min-height: 0; margin: 0; padding: var(--space-4); list-style: none; overflow: auto; }
+.bmvp__list .brs__card { gap: var(--space-3); padding: var(--space-4); }
+
+/* Policies, Old policies tab (old-tab.tsx): the same cards, grouped by application. */
+.bold-tab { display: flex; flex-direction: column; gap: var(--space-6); }
+.bold-tab__bar { max-width: 420px; }
+.bold-tab__empty { margin: 0; padding: var(--space-8) 0; text-align: center; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bold-tab__app { display: flex; flex-direction: column; gap: var(--space-3); }
+.bold-tab__apphead { display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bold-tab__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.bold-tab__grid .brs__card { gap: var(--space-3); padding: var(--space-4); height: 100%; border-color: var(--border-default); }
+
+/* One old policy as a card with a hierarchy (owner, 6 Nov 2026: "I cannot see where the hierarchy is … this is Old
+   Policy 1, Old Policy 2"): a head strip with its number, then its name, then labelled rows, the Adaptive Access
+   block, and what it became. The cards are separated by a gap and a visible edge. */
+.brs__card { padding: 0; gap: 0; overflow: hidden; border-color: var(--border-default); background: var(--surface-raised); }
+.brs__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--surface-sunken); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.brs__no { font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.brs__name { display: block; padding: var(--space-3) var(--space-4) var(--space-2); font-size: var(--fs-base); font-weight: var(--fw-semibold); line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+.brs__rows { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
+.brs__row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-secondary); }
+.brs__row > i { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.brs__flow { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.brs__muted { font-size: 12px; color: var(--text-tertiary); }
+.brs__card .brs__adaptive { margin: 0 var(--space-4) var(--space-3); padding: var(--space-3); border: var(--bw-thin) solid var(--fb-info-border); border-radius: var(--radius-md); background: var(--fb-info-bg); }
+.brs__card .brs__adaptive .brs__kind.is-adaptive { padding: 0; background: none; }
+.brs__card .brs__foot { margin: 0; padding: var(--space-2) var(--space-4); background: var(--surface-sunken); border-top: var(--bw-thin) solid var(--border-subtle); }
+.brs__card .brs__why { padding: var(--space-2) var(--space-4) var(--space-3); }
+.bmvp__list .brs__card, .bold-tab__grid .brs__card, .brs__split.is-canvas-right .brs__card { gap: 0; padding: 0; }
+.bmvp__list { gap: var(--space-4); }

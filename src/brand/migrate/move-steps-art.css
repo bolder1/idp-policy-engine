@@ -1,0 +1,21 @@
+/* The four pictures on Move policies (move-steps-art.tsx). */
+.bma { display: block; width: min(90%, 260px); height: auto; overflow: visible; font-family: inherit; }
+.bma__old { fill: var(--surface-raised); stroke: var(--border-strong); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.bma__new { fill: var(--surface-raised); stroke: var(--blue, #0d6efd); stroke-width: 1.5; }
+.bma__new.is-plain { stroke: var(--border-default); }
+.bma__app { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1.2; }
+.bma__bar { fill: var(--border-default); }
+.bma__bar.is-soft { fill: var(--border-subtle); }
+.bma__bar.is-blue { fill: var(--blue, #0d6efd); }
+.bma__chip { fill: var(--surface-sunken); stroke: var(--border-default); stroke-width: 1; }
+.bma__chip.is-blue { fill: var(--blue-soft, #e7f1ff); stroke: transparent; }
+.bma__chip.is-green { fill: var(--fb-positive-bg); stroke: transparent; }
+.bma__k { font-size: 10px; font-weight: 700; fill: var(--text-tertiary); }
+.bma__line { stroke: var(--border-subtle); stroke-width: 1; }
+.bma__wire { fill: none; stroke: var(--blue, #0d6efd); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bma__icobg { fill: var(--blue-soft, #e7f1ff); }
+.bma__ico { fill: none; stroke: var(--blue, #0d6efd); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.bma__tick { fill: var(--fb-positive-bg); }
+.bma__tickmark { fill: none; stroke: var(--fb-positive-fg); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.bma__switch { fill: var(--fb-positive-fg); }
+.bma__knob { fill: var(--surface-raised); }

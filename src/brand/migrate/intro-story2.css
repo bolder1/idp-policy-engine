@@ -1,0 +1,83 @@
+/* The intro, Story v2 (IntroStory2.tsx): the light grey stage, true isometric SVG scenes, one blue. */
+.bin.is-story2 { display: block; }
+.bs2 { --s2-blue: var(--blue, #0d6efd); --s2-blue-strong: var(--blue-strong, #0a58ca); --s2-blue-soft: var(--blue-soft, #e7f1ff); display: flex; flex-direction: column; gap: var(--space-5); min-height: 560px; padding: var(--space-6); }
+.bs2__stage { position: relative; flex: 1; min-height: 440px; border-radius: var(--radius-xl, 16px); background-color: var(--surface-sunken); background-image: radial-gradient(var(--border-default) 1px, transparent 1px); background-size: 20px 20px; border: var(--bw-thin) solid var(--border-subtle); overflow: hidden; }
+.bs2__scene { position: absolute; inset: var(--space-4) var(--space-4) var(--space-4) 33%; display: grid; place-items: center; }
+.s2svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; font-family: inherit; }
+.bs2__words { position: absolute; left: var(--space-7); top: 50%; translate: 0 -50%; display: flex; flex-direction: column; gap: var(--space-3); width: 28%; }
+.bx-modal .bin .bs2__words h2 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: var(--fw-semibold); letter-spacing: -0.025em; color: var(--text-primary); }
+.bs2__words p { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-secondary); }
+.bs2__paused { position: absolute; right: var(--space-4); top: var(--space-4); display: inline-flex; align-items: center; gap: 4px; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); font-size: 12px; color: var(--text-secondary); }
+
+/* Slab faces: white top, two shaded sides, a hairline edge. Outline = blue edge on a pale top; lit = solid blue. */
+.s2s polygon { stroke-linejoin: round; stroke-width: 1; }
+.s2s__top { fill: var(--surface-raised); stroke: var(--border-strong); }
+.s2s__front { fill: var(--border-subtle); stroke: var(--border-strong); }
+.s2s__side { fill: var(--border-default); stroke: var(--border-strong); }
+.s2s.is-outline .s2s__top { fill: color-mix(in srgb, var(--s2-blue) 5%, var(--surface-raised)); stroke: var(--s2-blue); stroke-width: 1.5; }
+.s2s.is-outline .s2s__front, .s2s.is-outline .s2s__side { stroke: var(--s2-blue); }
+.s2s.is-outline .s2s__front { fill: color-mix(in srgb, var(--s2-blue) 14%, var(--surface-raised)); }
+.s2s.is-outline .s2s__side { fill: color-mix(in srgb, var(--s2-blue) 24%, var(--surface-raised)); }
+.s2s.is-lit .s2s__top { fill: var(--s2-blue); stroke: var(--s2-blue); }
+.s2s.is-lit .s2s__front { fill: var(--s2-blue-strong); stroke: var(--s2-blue-strong); }
+.s2s.is-lit .s2s__side { fill: color-mix(in srgb, var(--s2-blue-strong) 80%, black); stroke: var(--s2-blue-strong); }
+
+/* Words in a scene. */
+.s2t { font-size: 12.5px; font-weight: 500; fill: var(--text-primary); }
+.s2t.is-big { font-size: 15px; font-weight: 600; }
+.s2t.is-sub { font-size: 11.5px; font-weight: 400; fill: var(--text-tertiary); }
+.s2t.is-blue { fill: var(--s2-blue); }
+.s2t.is-white { fill: #fff; }
+.s2cap { font-size: 12px; font-weight: 500; fill: var(--text-tertiary); }
+.s2grid { fill: none; stroke: var(--border-default); stroke-dasharray: 2 2; }
+
+/* Wires. */
+.s2w path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.s2w__track { stroke: var(--border-default); stroke-width: 2; }
+.s2w__live { stroke: var(--s2-blue); stroke-width: 2.5; }
+.s2w__dot { fill: var(--s2-blue); }
+
+/* The fan: tiles, curves, policy pills. */
+.s2f__track { fill: none; stroke: var(--border-default); stroke-width: 1.5; stroke-dasharray: 3 5; }
+.s2f__live { fill: none; stroke: url(#s2-fan); stroke-width: 2; stroke-linecap: round; }
+.s2f__dot { fill: var(--fb-positive-fg); }
+.s2n { fill: var(--surface-raised); stroke: var(--s2-blue); stroke-width: 1.5; }
+.s2n__ico { fill: var(--s2-blue-soft); }
+.s2n__glyph { fill: none; stroke: var(--s2-blue); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.s2p { fill: var(--surface-raised); stroke: var(--border-default); stroke-width: 1; transition: stroke 0.3s ease; }
+.s2p.is-on { stroke: var(--fb-positive-fg); }
+
+/* The gate and the target. */
+.s2doc { fill: var(--surface-raised); stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 2; }
+.s2doc__line { fill: var(--border-default); }
+.s2doc__line.is-soft { fill: var(--border-subtle); }
+.s2gate { fill: color-mix(in srgb, var(--s2-blue) 12%, var(--surface-raised)); stroke: color-mix(in srgb, var(--s2-blue) 40%, transparent); transition: fill 0.4s ease; }
+.s2gate.is-on { fill: color-mix(in srgb, var(--s2-blue) 22%, var(--surface-raised)); }
+.s2gate__core { fill: var(--s2-blue); }
+.s2cross line, .s2cross circle { fill: none; stroke: var(--border-strong); stroke-width: 1; }
+.s2cross circle { stroke-dasharray: 2 6; }
+.s2target { fill: var(--surface-raised); stroke: var(--border-strong); stroke-width: 1; transition: stroke 0.3s ease; }
+.s2target.is-on { stroke: var(--fb-positive-fg); stroke-width: 1.5; }
+.s2pill.is-draft { fill: var(--surface-sunken); }
+.s2pill.is-approved { fill: var(--s2-blue-soft); }
+.s2pill.is-active { fill: var(--fb-positive-bg); }
+.s2t.is-pill { font-size: 11.5px; font-weight: 600; fill: var(--text-secondary); }
+.s2t.is-pill.is-approved { fill: var(--s2-blue); }
+.s2t.is-pill.is-active { fill: var(--fb-positive-fg); }
+
+/* The foot. */
+.bs2__foot { display: flex; align-items: center; gap: var(--space-3); }
+.bs2__tools { display: contents; }
+.bs2__dots { display: inline-flex; align-items: center; gap: var(--space-2); flex: 1; justify-content: center; }
+.bs2__dots > button { position: relative; width: 8px; height: 8px; padding: 0; border: 0; border-radius: var(--radius-full); background: var(--border-strong); cursor: pointer; overflow: hidden; }
+.bs2__dots > button.is-on { width: 36px; background: var(--border-default); }
+.bs2__dots > button.is-on:not(:has(i)) { background: var(--text-primary); }
+.bs2__dots > button > i { position: absolute; inset: 0 auto 0 0; display: block; background: var(--text-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .s2gate, .s2p, .s2target { transition: none; }
+}
+@media (max-width: 860px) {
+  .bs2__scene { inset: 40% 0 0 0; }
+  .bs2__words { top: var(--space-6); translate: none; width: auto; right: var(--space-6); }
+}

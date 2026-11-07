@@ -7,6 +7,7 @@ import { showcaseTenant } from '../fixtures'
 import { isPostSignIn } from '../post-sign-in'
 import { Policies } from './Policies'
 import { DENIAL_REASONS } from './sign-in-tests/phase'
+import { MIGRATION_FIRST } from '../migrate/phase'
 import policiesSrc from './Policies.tsx?raw'
 import typesCss from './policies-types.css?raw'
 
@@ -89,8 +90,22 @@ const tenant = () => showcaseTenant().policies
 const postNames = () => tenant().filter(isPostSignIn).map((p) => p.name)
 const signInNames = () => tenant().filter((p) => !isPostSignIn(p)).map((p) => p.name)
 
+/* Migration first (migrate/phase.ts): the tabs are New policies and Old policies; Sign-in and Post sign-in wait,
+   and the blocks below that read them run again when the flag is off. */
+describe.runIf(MIGRATION_FIRST)('Policies: migration first', () => {
+  it('has line tabs New policies and Old policies under the head, with no counts', () => {
+    const out = render()
+    expect(tabsOf(out)).toEqual(['New policies', 'Migrated policies', 'Old policies'])
+    expect(out).toContain('bx-tabs--line bpol__types')
+    for (const t of tabsOf(out)) expect(t).not.toMatch(/\d/)
+  })
+  it('opens on New policies when nothing is stored', () => {
+    expect(selected(render())).toBe('New policies')
+  })
+})
+
 describe('Policies: the two type tabs', () => {
-  it('has line tabs Sign-in and Post sign-in under the head, with no counts', () => {
+  it.skipIf(MIGRATION_FIRST)('has line tabs Sign-in and Post sign-in under the head, with no counts', () => {
     const out = render()
     expect(tabsOf(out)).toEqual(['Sign-in', 'Post sign-in'])
     expect(out).toContain('bx-tabs--line bpol__types')
@@ -99,7 +114,7 @@ describe('Policies: the two type tabs', () => {
     for (const t of tabsOf(out)) expect(t).not.toMatch(/\d/)
   })
 
-  it('opens on Sign-in when nothing is stored, and on the stored tab when it is', () => {
+  it.skipIf(MIGRATION_FIRST)('opens on Sign-in when nothing is stored, and on the stored tab when it is', () => {
     expect(selected(render())).toBe('Sign-in')
     expect(selected(render('post-sign-in'))).toBe('Post sign-in')
   })
@@ -112,7 +127,7 @@ describe('Policies: the two type tabs', () => {
     expect(keep).toMatch(/try \{\s*localStorage\.setItem/)
   })
 
-  it('opens on Sign-in when storage throws', () => {
+  it.skipIf(MIGRATION_FIRST)('opens on Sign-in when storage throws', () => {
     vi.stubGlobal('localStorage', {
       getItem: () => {
         throw new Error('blocked')
@@ -158,7 +173,7 @@ describe('Policies: the Sign-in tab', () => {
   })
 })
 
-describe('Policies: the Post sign-in tab', () => {
+describe.skipIf(MIGRATION_FIRST)('Policies: the Post sign-in tab', () => {
   const out = render('post-sign-in')
 
   it('lists post sign-in policies only, under Policy name, Applications, Status and Actions', () => {
@@ -271,7 +286,7 @@ describe('Policies: the Post sign-in tab', () => {
   })
 })
 
-describe('Policies: the Post sign-in tab with none', () => {
+describe.skipIf(MIGRATION_FIRST)('Policies: the Post sign-in tab with none', () => {
   it('says so, with New policy, and still one orange button', () => {
     seed.post = 'none'
     const out = render('post-sign-in')

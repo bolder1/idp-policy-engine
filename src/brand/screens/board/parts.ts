@@ -19,6 +19,10 @@ import type { Part } from './model'
    the person asking for it used. The id underneath is still `'when'`. */
 export const PART_LABEL: Record<Part, string> = { who: 'Who', when: 'Condition' }
 
+/* The three parts of a rule, as the card and the panel name them (owner, 4 Nov 2026: "people, condition and
+   outcome" in place of who, if and then, which read as a sentence that did not hold together). */
+export const RULE_PART = { who: 'People', if: 'Conditions', then: 'Outcome' } as const
+
 /* A rule nobody has answered anything on yet.
 
    Not "no who and no conditions": a rule with neither that says Deny catches

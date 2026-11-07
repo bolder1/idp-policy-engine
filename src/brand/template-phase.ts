@@ -12,8 +12,10 @@
        picker offers Xecurify's templates alone.
    Use template on the board stays: picking one of Xecurify's is this phase. Hidden, not deleted: on, all of it comes
    back as it was.
+
+   ON again (owner, 6 Nov 2026: "bring Save as template back"; the popup shows saved templates and Xecurify's).
    -------------------------------------------------------------------------- */
-export const TEMPLATES_MANAGED: boolean = false
+export const TEMPLATES_MANAGED: boolean = true
 
 /* A template card's face (owner, 2 Nov 2026: "real-time showcase might be a problem … based on the template, add custom
    SVGs"): on, a picture of what the template is about (create/CardPicture.tsx); off, the live rule stack it drew

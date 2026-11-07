@@ -1073,6 +1073,8 @@ export interface FingerprintProfile {
   restrictionSet: boolean
 
   usedIn: number
+  /** Made by a move from an old device limit: `waiting` until a policy using it is approved, then `added`. */
+  fromOld?: 'waiting' | 'added'
 }
 
 /* --- Coherence, as functions rather than as care -------------------------------

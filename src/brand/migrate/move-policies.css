@@ -1,0 +1,233 @@
+/* Move policies (MovePolicies.tsx and its stages), an inner page, and the top bar's pill (move-job-pill.tsx).
+   The ladder is the device profile wizard's (.bdpw__steps); the Review canvas is the builder's (board.css). */
+
+.bmove__muted { color: var(--text-muted); font-size: var(--fs-sm); }
+.bmove__empty { margin: 0; padding: var(--space-8) 0; color: var(--text-muted); text-align: center; }
+
+/* --- The check: the kit's tick box, as a button ------------------------------------ */
+.bmove__check {
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--ctl-height-sm); height: var(--ctl-height-sm);
+  padding: 0; border: 0; border-radius: var(--radius-sm);
+  background: none; cursor: pointer;
+}
+.bmove__check:disabled { cursor: not-allowed; opacity: 0.45; }
+.bmove__check:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bmove__dash { width: 8px; height: 2px; border-radius: 1px; background: currentColor; }
+
+/* --- Shared -------------------------------------------------------------------------------- */
+.bmv .bdpw__steps { margin-bottom: 0; }
+.bmv__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4); padding: var(--space-12) 0; color: var(--text-muted); font-size: var(--fs-md); }
+.bmv__lanehead { margin: 0 0 var(--space-3); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bmv__spacer { flex: 1 1 auto; }
+.bmv__chev { margin-left: auto; color: var(--text-muted); transition: rotate var(--dur-fast) var(--ease-standard); }
+.bmv__group.is-open .bmv__chev, [aria-expanded='true'] > .bmv__chev { rotate: 180deg; }
+.bmv__progress { height: 6px; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.bmv__progress > span { display: block; height: 100%; border-radius: inherit; background: var(--fb-positive-fg); }
+
+/* --- Select --------------------------------------------------------------------------------- */
+.bmv__select { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.bmv__bar { display: flex; align-items: center; gap: var(--space-3); }
+.bmv__bar > :nth-child(2) { flex: 1 1 auto; }
+.bmv__views { display: flex; gap: var(--space-1); }
+/* The list is the Zones list (.blist in screens.css): one row per application, its facts as labelled chips,
+   and the application's old policies folded under it. The item, not the row, carries the rule between them. */
+.bmv__list { overflow: hidden; }
+.bmv__item + .bmv__item { border-top: var(--bw-thin) solid var(--border-subtle); }
+.bmv__list .blist__row { border-bottom: 0; border-radius: 0; }
+.bmv__lead { margin-right: calc(var(--space-2) * -1); }
+.bmv__tile { background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); }
+.bmv__chip {
+  font-style: normal; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); line-height: var(--pill-line);
+  background: var(--surface-inset); border: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--pill-fs); font-weight: var(--pill-fw); color: var(--text-secondary); white-space: nowrap;
+}
+.bmv__chip.is-more { color: var(--text-tertiary); }
+.bmv__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.bmv__fold {
+  display: inline-flex; align-items: center; gap: var(--space-2); height: var(--ctl-height-sm); padding: 0 var(--space-3);
+  border: 0; border-radius: var(--radius-md); background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap;
+}
+.bmv__fold:hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+.bmv__fold .bmv__chev { margin-left: 0; }
+.bmv__subs { list-style: none; margin: 0; padding: 0; overflow: hidden; background: var(--surface-sunken); }
+.bmv__sub {
+  display: grid; grid-template-columns: auto minmax(120px, 0.6fr) minmax(0, 2fr); align-items: center; column-gap: var(--space-4);
+  /* Lined up under the name: the row's 20px inset, the check and the tile with their gaps. */
+  padding: var(--space-3) var(--space-6) var(--space-3) var(--space-6);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-md); color: var(--text-body); cursor: pointer;
+}
+.bmv__sub:hover { background: var(--int-ghost-bg-hover); }
+.bmv__sub.is-blocked { grid-template-columns: auto minmax(0, 1fr) auto; cursor: default; color: var(--text-muted); }
+.bmv__subname { font-weight: var(--fw-medium); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The cards are the template card (.bgcard in create/create.css): a tile, the name, who it is for, one wide button. */
+.bmv__cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: var(--space-6); }
+.bmv__tcard {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0;
+  padding: var(--space-7); border-radius: var(--radius-2xl);
+  background: var(--surface-sunken); border: var(--bw-thin) solid transparent;
+  transition: border-color var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard);
+}
+.bmv__tcard:hover { border-color: var(--border-subtle); }
+.bmv__tcard.is-on { border-color: var(--fb-info-border); }
+.bmv__cardicon {
+  display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--space-3);
+  border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle);
+}
+.bmv__cardh { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmv__cardsub { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmv__tcard .bmv__chips { margin: var(--space-2) 0 var(--space-6); }
+.bmv__cardcta {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  margin-top: auto; height: var(--ctl-height-md); padding: 0 var(--space-5);
+  border-radius: var(--radius-md); background: var(--int-neutral-bg); border: var(--bw-thin) solid var(--int-neutral-border);
+  color: var(--int-neutral-text); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bmv__cardcta:hover { background: var(--surface-sunken); border-color: var(--border-strong); }
+.bmv__tcard.is-on .bmv__cardcta { color: var(--fb-info-fg); border-color: var(--fb-info-border); }
+.bmv__cardcta:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bmv__blocked { border: var(--bw-thin) dashed var(--border-default); border-radius: var(--radius-lg); overflow: hidden; }
+.bmv__blockedhead {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3) var(--space-4);
+  border: 0; background: none; font: inherit; font-size: var(--fs-md); color: var(--text-secondary); cursor: pointer; text-align: left;
+}
+.bmv__blockedhead .bmv__chev { margin-left: 0; order: -1; }
+.bmv__selbar {
+  position: sticky; bottom: 0; z-index: var(--z-sticky); display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) 0; border-top: var(--bw-thin) solid var(--border-default); background: var(--surface-page);
+}
+.bmv__selcount { font-size: var(--fs-md); color: var(--text-secondary); }
+.bmv__selcount b { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+
+/* --- Check -------------------------------------------------------------------------------- */
+
+/* --- Move: the story on the left, the counts on the right ------------------------------------- */
+.bmv__moving { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: var(--space-6); align-items: start; }
+.bmvs {
+  display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-6);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-xl); background: var(--surface-raised);
+}
+.bmvs__steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); }
+.bmvs__step { height: 4px; border-radius: var(--radius-full); background: var(--surface-sunken); transition: background-color var(--dur-normal) var(--ease-standard); }
+.bmvs__step.is-done { background: var(--fb-info-border); }
+.bmvs__step.is-on { background: var(--fb-info-fg); }
+.bmvs__beat { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
+.bmvs__stage {
+  position: relative; display: grid; place-items: center; width: 100%; height: 240px; margin-bottom: var(--space-3);
+  border-radius: var(--radius-lg); background-color: var(--surface-sunken);
+  background-image: radial-gradient(var(--border-default) 1px, transparent 1.2px); background-size: 16px 16px;
+}
+.bmvs__title { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmvs__line { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); }
+.bmvs__bar { display: inline-block; height: 8px; border-radius: var(--radius-full); background: var(--border-default); }
+.bmvs__bar.is-soft { background: var(--border-subtle); }
+.bmvs__table { position: relative; width: 320px; padding: var(--space-3); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); overflow: hidden; }
+.bmvs__row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-2); }
+.bmvs__row + .bmvs__row { border-top: var(--bw-thin) solid var(--border-subtle); }
+.bmvs__dot { width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--border-default); flex: none; }
+.bmvs__scan { position: absolute; left: 0; right: 0; height: 22%; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--fb-info-fg) 14%, transparent), transparent); pointer-events: none; }
+.bmvs__share { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--space-4); }
+.bmvs__app { position: absolute; top: 0; width: 26px; height: 26px; border-radius: var(--radius-md); border: 2px solid var(--surface-raised); box-shadow: var(--el-low); }
+.bmvs__app.is-0 { background: var(--start-reuse); }
+.bmvs__app.is-1 { background: var(--brand); }
+.bmvs__app.is-2 { background: var(--fb-positive-fg); }
+.bmvs__card { display: flex; flex-direction: column; gap: var(--space-3); width: 240px; margin-top: 40px; padding: var(--space-4); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--el-low); }
+.bmvs__card.is-big { width: 280px; margin-top: 0; }
+.bmvs__cardhead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.bmvs__chain { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.bmvs__pill { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-pill); background: var(--surface-raised); }
+.bmvs__pilldot { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--brand); }
+.bmvs__rule { position: relative; display: flex; align-items: center; gap: var(--space-3); width: 260px; height: 34px; padding: 0 var(--space-3); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised); overflow: hidden; }
+.bmvs__rule.is-last { border-style: dashed; background: var(--surface-sunken); }
+.bmvs__edge { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--start-reuse); }
+.bmvs__chip { margin-left: auto; width: 34px; height: 14px; border-radius: var(--radius-pill); }
+.bmvs__chip.is-allow { background: var(--fb-positive-bg); border: var(--bw-thin) solid var(--fb-positive-border); }
+.bmvs__chip.is-mfa { background: var(--fb-positive-strong-bg); border: var(--bw-thin) solid var(--fb-positive-strong-border); }
+.bmvs__chip.is-deny { background: var(--fb-negative-bg); border: var(--bw-thin) solid var(--fb-negative-border); }
+.bmvs__land { position: relative; }
+.bmvs__tick { position: absolute; right: -12px; top: -12px; display: inline-flex; color: var(--fb-positive-fg); background: var(--surface-raised); border-radius: var(--radius-full); }
+.bmvx {
+  display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-xl); background: var(--surface-raised);
+}
+.bmvx__head { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmvx__head b { font-variant-numeric: tabular-nums; }
+.bmvx__head svg { color: var(--fb-positive-fg); }
+.bmvx__stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin: 0; }
+.bmvx__stats > div { padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.bmvx__stats dt { font-size: var(--fs-sm); color: var(--text-muted); }
+.bmvx__stats dd { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.bmvx__recent ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.bmvx__recent li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); font-size: var(--fs-md); }
+.bmvx__logos { display: inline-flex; gap: 2px; }
+.bmvx__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmvx__tag { font-size: var(--fs-xs); color: var(--fb-info-fg); }
+.bmvx__actions { display: flex; justify-content: flex-end; gap: var(--space-3); padding-top: var(--space-2); border-top: var(--bw-thin) solid var(--border-subtle); }
+
+/* --- Review: the queue with the old cards, and the policy building itself ---------------------- */
+/* Review is one list, the Zones list: each moved policy a row, the open one unfolding in place onto its old rows
+   beside the new policy building itself. */
+.bmr { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.bmr__bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
+.bmr__bar .bmv__progress { flex: 0 1 180px; }
+.bmr__count { font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
+.bmr__count b { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.bmr__list { overflow: hidden; }
+.bmr__item + .bmr__item { border-top: var(--bw-thin) solid var(--border-subtle); }
+.bmr__list .blist__row { border-bottom: 0; border-radius: 0; }
+.bmr__item.is-open > .bmr__row { background: var(--surface-sunken); }
+.bmr__state { flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); white-space: nowrap; }
+.bmr__state.is-todo { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bmr__state.is-done { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bmr__open { overflow: hidden; border-top: var(--bw-thin) solid var(--border-subtle); }
+.bmr__stage { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding: var(--space-5) var(--space-6) var(--space-6); }
+.bmr__stagehead { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.bmr__caption {
+  flex: 1 1 320px; min-width: 0; display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-md);
+  background: var(--fb-info-bg); color: var(--fb-info-fg); font-size: var(--fs-md);
+}
+.bmr__stepcount { margin-left: auto; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.bmr__auto { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-md); color: var(--text-secondary); }
+.bmr__notes { display: flex; flex-direction: column; gap: var(--space-2); }
+.bmr__notice { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--fb-notice-bg); color: var(--fb-notice-fg); font-size: var(--fs-sm); }
+.bmr__notice.is-join { background: var(--surface-sunken); color: var(--text-secondary); }
+.bmr__body { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+.bmr__old { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.bmr__new { min-width: 0; }
+.bmr__card {
+  padding: var(--space-3); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised);
+  transition: border-color var(--dur-normal) var(--ease-standard), box-shadow var(--dur-normal) var(--ease-standard);
+}
+.bmr__card.is-lit { border-color: var(--fb-info-fg); box-shadow: 0 0 0 3px var(--fb-info-bg); }
+.bmr__card header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); }
+.bmr__card header > span { display: flex; flex-direction: column; font-size: var(--fs-md); }
+.bmr__card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.bmr__card li { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bmr__card li > svg { flex: none; color: var(--text-muted); }
+.bmr__card li.is-out > span:first-of-type { text-decoration: line-through; color: var(--text-muted); }
+.bmr__note { margin-left: auto; padding: 0 var(--space-2); border-radius: var(--radius-pill); background: var(--fb-notice-bg); color: var(--fb-notice-fg); font-size: var(--fs-xs); white-space: nowrap; }
+.bmr__note.is-out { background: var(--surface-sunken); color: var(--text-muted); }
+.bmr__canvas { min-height: 420px; max-height: calc(100vh - 220px); overflow: auto; border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-sunken); }
+
+/* --- The top bar's pill ------------------------------------------------------------------------ */
+.bmvpill {
+  display: inline-flex; align-items: center; gap: var(--space-2); height: var(--ctl-height-sm); padding: 0 var(--space-3);
+  border: var(--bw-thin) solid var(--fb-info-border); border-radius: var(--radius-pill); background: var(--fb-info-bg); color: var(--fb-info-fg);
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.bmvpill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bmvpill__track { fill: none; stroke: var(--fb-info-border); stroke-width: 2.5; }
+.bmvpill__fill { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; rotate: -90deg; transform-origin: 9px 9px; transition: stroke-dashoffset var(--dur-normal) var(--ease-standard); }
+
+@media (max-width: 1120px) {
+  .bmv__moving, .bmr__body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .bmv__sub { grid-template-columns: auto minmax(0, 1fr); }
+  .bmv__sub > :nth-child(n + 3) { grid-column: 2; }
+}

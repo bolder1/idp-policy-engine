@@ -1,0 +1,80 @@
+/* The intro, Walkthrough (IntroWorld.tsx): one isometric world on the light grey stage, a step rail, one action. */
+.bin.is-world { display: block; }
+.biw, .bmw { --w-blue: var(--blue, #0d6efd); --w-blue-strong: var(--blue-strong, #0a58ca); --w-blue-soft: var(--blue-soft, #e7f1ff); }
+.biw { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 580px; }
+
+/* The rail: the five steps, the current one dark, the done ones ticked off in blue. */
+.biw__rail { display: flex; flex-direction: column; gap: 2px; padding: var(--space-7) var(--space-4) var(--space-5); border-right: var(--bw-thin) solid var(--border-subtle); }
+.biw__step { position: relative; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 0; border-radius: var(--radius-md); background: none; font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary); text-align: left; cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease; }
+.biw__step:hover { background: var(--surface-sunken); color: var(--text-secondary); }
+.biw__step:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.biw__step.is-on { background: var(--surface-sunken); color: var(--text-primary); font-weight: var(--fw-semibold); }
+.biw__step.is-done { color: var(--text-secondary); }
+.biw__stepico { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: var(--radius-md); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); color: inherit; transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+.biw__step.is-on .biw__stepico { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-raised); }
+.biw__step.is-done .biw__stepico { background: var(--w-blue-soft); border-color: transparent; color: var(--w-blue); }
+.biw__railfoot { margin-top: auto; padding: var(--space-3); }
+
+/* The main column: the world, the words, the foot. */
+.biw__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding: var(--space-6) var(--space-6) var(--space-5); }
+.biw__stage { position: relative; flex: 1; min-height: 360px; border-radius: var(--radius-xl, 16px); background: var(--surface-sunken); border: var(--bw-thin) solid var(--border-subtle); overflow: hidden; }
+.biw__svg { position: absolute; inset: 0; width: 100%; height: 100%; font-family: inherit; }
+.biw__ground line { stroke: var(--border-default); stroke-width: 0.6; opacity: 0.55; }
+
+.biw__copy { display: flex; align-items: flex-start; gap: var(--space-5); min-height: 64px; }
+.biw__words { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.bx-modal .bin .biw__words h2 { margin: 0; font-size: 20px; line-height: 1.25; font-weight: var(--fw-semibold); letter-spacing: -0.015em; color: var(--text-primary); }
+.biw__words p { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+.biw__people { display: flex; gap: var(--space-2); flex: none; }
+.biw__people > button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: var(--bw-thin) solid var(--border-default); background: var(--surface-raised); font: inherit; text-align: left; cursor: pointer; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.biw__people > button > b { font-size: var(--fs-sm); color: var(--text-primary); }
+.biw__people > button > span { font-size: 12px; color: var(--text-tertiary); }
+.biw__people > button.is-on { border-color: var(--w-blue); box-shadow: 0 0 0 1px var(--w-blue); }
+.biw__people > button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.biw__foot { display: flex; align-items: center; gap: var(--space-3); }
+.biw__spacer { flex: 1; }
+
+/* Slab faces. */
+.wv polygon { stroke-linejoin: round; stroke-width: 1; transition: fill 0.35s ease, stroke 0.35s ease; }
+.wv__top { fill: var(--surface-raised); stroke: var(--border-strong); }
+.wv__front { fill: var(--border-subtle); stroke: var(--border-strong); }
+.wv__side { fill: var(--border-default); stroke: var(--border-strong); }
+.wv.is-ghost polygon { fill: transparent; stroke: var(--border-strong); stroke-dasharray: 4 4; }
+.wv.is-outline .wv__top { fill: color-mix(in srgb, var(--w-blue) 5%, var(--surface-raised)); stroke: var(--w-blue); stroke-width: 1.5; }
+.wv.is-outline .wv__front { fill: color-mix(in srgb, var(--w-blue) 14%, var(--surface-raised)); stroke: var(--w-blue); }
+.wv.is-outline .wv__side { fill: color-mix(in srgb, var(--w-blue) 24%, var(--surface-raised)); stroke: var(--w-blue); }
+.wv.is-lit .wv__top { fill: var(--w-blue); stroke: var(--w-blue); }
+.wv.is-lit .wv__front { fill: var(--w-blue-strong); stroke: var(--w-blue-strong); }
+.wv.is-lit .wv__side { fill: color-mix(in srgb, var(--w-blue-strong) 78%, black); stroke: var(--w-blue-strong); }
+.wv.is-good .wv__top { fill: var(--fb-positive-fg); stroke: var(--fb-positive-fg); }
+.wv.is-good .wv__front, .wv.is-good .wv__side { fill: color-mix(in srgb, var(--fb-positive-fg) 75%, black); stroke: var(--fb-positive-fg); }
+.wv.is-bad .wv__top { fill: var(--fb-negative-fg); stroke: var(--fb-negative-fg); }
+.wv.is-bad .wv__front, .wv.is-bad .wv__side { fill: color-mix(in srgb, var(--fb-negative-fg) 75%, black); stroke: var(--fb-negative-fg); }
+
+/* Words on the faces. */
+.wt { font-size: 12px; font-weight: 500; fill: var(--text-primary); }
+.wt.is-big { font-size: 14px; font-weight: 600; }
+.wt.is-sub { font-size: 10.5px; font-weight: 400; fill: var(--text-tertiary); }
+.wt.is-kicker { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; fill: var(--w-blue); text-transform: uppercase; }
+.wt.is-row { font-size: 11.5px; font-weight: 500; }
+.wt__k { font-weight: 700; fill: var(--text-tertiary); }
+.wt.is-chip { font-size: 10px; font-weight: 600; }
+.wt.is-blue { fill: var(--w-blue); }
+.wt.is-white, .wt.is-white .wt__k { fill: #fff; }
+
+/* Wires and the sign-in token. */
+.ww path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.ww__track { stroke: var(--border-default); stroke-width: 2; }
+.ww__live { stroke: var(--w-blue); stroke-width: 2.5; }
+.ww__dot { fill: var(--w-blue); }
+.biw__token { fill: var(--w-blue); stroke: var(--surface-raised); stroke-width: 3; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wv polygon, .biw__step, .biw__stepico { transition: none; }
+}
+@media (max-width: 860px) {
+  .biw { grid-template-columns: minmax(0, 1fr); }
+  .biw__rail { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: var(--bw-thin) solid var(--border-subtle); padding: var(--space-4); }
+  .biw__railfoot { margin: 0 0 0 auto; }
+  .biw__copy { flex-direction: column; }
+}

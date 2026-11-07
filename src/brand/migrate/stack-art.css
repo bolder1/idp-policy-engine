@@ -1,0 +1,15 @@
+/* The old pages' banner picture (stack-art.tsx): still, isometric, one blue. */
+.bsa { display: block; width: 300px; height: 134px; overflow: visible; font-family: inherit; }
+.bsa__slab polygon { stroke-linejoin: round; stroke-width: 1; }
+.bsa__slab.is-old .bsa__top { fill: var(--surface-raised); stroke: var(--border-strong); stroke-dasharray: 3 3; }
+.bsa__slab.is-old .bsa__front { fill: var(--surface-sunken); stroke: var(--border-strong); stroke-dasharray: 3 3; }
+.bsa__slab.is-old .bsa__side { fill: var(--border-subtle); stroke: var(--border-strong); stroke-dasharray: 3 3; }
+.bsa__slab.is-new .bsa__top { fill: var(--blue, #0d6efd); stroke: var(--blue, #0d6efd); }
+.bsa__slab.is-new .bsa__front { fill: var(--blue-strong, #0a58ca); stroke: var(--blue-strong, #0a58ca); }
+.bsa__slab.is-new .bsa__side { fill: color-mix(in srgb, var(--blue-strong, #0a58ca) 78%, black); stroke: var(--blue-strong, #0a58ca); }
+.bsa__t { font-size: 10.5px; font-weight: 600; fill: var(--text-secondary); }
+.bsa__t.is-new { font-size: 12px; fill: #fff; }
+.bsa__t.is-sub { font-size: 9.5px; font-weight: 500; fill: rgba(255, 255, 255, 0.8); }
+.bsa__shield { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; }
+.bsa__wire { fill: none; stroke: var(--blue, #0d6efd); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bsa__dot { fill: var(--blue, #0d6efd); }

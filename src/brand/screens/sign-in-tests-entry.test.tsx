@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Shell } from '../Shell'
 import { BrandProvider } from '../store'
 import { TEMPLATES_MANAGED } from '../template-phase'
+import { MIGRATION_FIRST } from '../migrate/phase'
 import { Policies } from './Policies'
 import { SignInTests } from './SignInTests'
 import { TestingSessionProvider } from './testing/session'
@@ -61,8 +62,10 @@ describe('Sign-in tests — out of the rail', () => {
       </BrandProvider>,
     )
     const sub = [...out.matchAll(/class="bshell__subitem[^"]*"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1]))
-    expect(sub[0]).toBe('All Policies')
     expect(sub).not.toContain('Sign-in tests')
+    /* Migration first (migrate/phase.ts): before Migrate the rail carries the old pages, not the Policies submenu. */
+    if (MIGRATION_FIRST) return
+    expect(sub[0]).toBe('All Policies')
     /* Templates is on hold (template-phase.ts): in the rail only while the tenant manages templates. */
     if (TEMPLATES_MANAGED) expect(sub).toContain('Templates')
     else expect(sub).not.toContain('Templates')

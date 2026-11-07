@@ -1,0 +1,50 @@
+/* The Dashboard's hub card (HomeHub.tsx): text and the way in on the left, the product picture on the right. */
+
+.bhome { display: flex; flex-direction: column; gap: var(--space-9); }
+.bhub {
+  display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr); align-items: center; gap: var(--space-9);
+  padding: var(--space-9); border-radius: var(--radius-2xl);
+  background: var(--surface-sunken); border: var(--bw-thin) solid var(--border-subtle);
+}
+.bhub__text { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); min-width: 0; }
+.bpage .bhub .bhub__text h2 { margin: 0; font-size: var(--fs-2xl, var(--fs-xl)); font-weight: var(--fw-semibold); color: var(--text-primary); letter-spacing: -0.015em; }
+.bhub__text p { margin: 0; font-size: var(--fs-base); line-height: 1.55; color: var(--text-secondary); max-width: 520px; }
+.bhub__new { padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius); background: var(--fb-info-bg); color: var(--fb-info-fg); font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); }
+.bhub__facts { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.bhub__facts li { display: flex; align-items: flex-start; gap: var(--space-4); font-size: var(--fs-md); line-height: 1.5; color: var(--text-body); }
+.bhub__facts li > svg { flex: none; margin-top: 2px; color: var(--fb-info-fg); }
+.bhub__actions { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-5); }
+.bhub__art {
+  display: grid; place-items: center; min-width: 0; padding: var(--space-8); border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  background-image: radial-gradient(var(--card-dot, var(--border-subtle)) 1px, transparent 1px); background-size: 16px 16px;
+  border: var(--bw-thin) solid var(--border-subtle);
+}
+.bhub .bmv__progress { width: min(100%, 280px); }
+
+/* After the move: the steps beside the text, a tick or the step's icon each. */
+.bhub--steps { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.bhub__steps { list-style: none; margin: 0; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); border-radius: var(--radius-xl); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); }
+.bhub__steps li { display: flex; align-items: center; gap: var(--space-4); font-size: var(--fs-md); color: var(--text-secondary); }
+.bhub__steps li.is-next { color: var(--text-primary); font-weight: var(--fw-semibold); }
+.bhub__steps li.is-done { color: var(--text-tertiary); text-decoration: line-through; }
+.bhub__tick { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: var(--radius-full); background: var(--surface-sunken); border: var(--bw-thin) solid var(--border-subtle); color: var(--text-secondary); }
+.bhub__steps li.is-done .bhub__tick { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bhub__steps li.is-next .bhub__tick { background: var(--fb-info-bg); color: var(--fb-info-fg); border-color: var(--fb-info-border); }
+
+@media (max-width: 1120px) {
+  .bhub, .bhub--steps { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The first visit's card (first-visit.tsx): a mark, then three facts a row each. */
+.bfv { display: flex; flex-direction: column; gap: var(--space-7); }
+.bfv__mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-lg); background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bfv__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+.bfv__rows li { display: flex; gap: var(--space-5); align-items: flex-start; }
+.bfv__rows li > svg { flex: none; margin-top: 1px; color: var(--fb-info-fg); }
+.bfv__rows li > span { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+.bfv__rows b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+
+/* The hub's picture is the intro's dark stage, one piece on it. */
+.bhub__art.bin { display: block; min-height: 0; padding: 0; border: 0; background: none; }
+.bhub__art .bin__stage { border-radius: var(--radius-xl); min-height: 300px; padding: var(--space-9) var(--space-7); }

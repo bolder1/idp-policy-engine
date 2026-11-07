@@ -229,6 +229,115 @@
    on arrival — which showed as a block of dark, empty rows under one icon. */
 .bshell.is-collapsed .bshell__sub { display: none; }
 
+/* --- Customize sidebar (rail-custom.ts) ------------------------------------ */
+
+/* The way in, under the last section and pinned to the rail's foot, as Notion keeps its own. A rail row in every way
+   but its place, so it collapses to its icon with the rest. */
+.bshell__foot { flex: none; border-top: var(--bw-thin) solid var(--shell-border); padding: 4px 0; }
+.bshell__custom { color: var(--shell-text-muted); }
+.bshell__custom:hover { color: var(--shell-text); }
+
+/* The mode: each row is the grip, the icon, the name and the eye, on the row's own 40px. */
+.bshell__editlist { display: flex; flex-direction: column; }
+.bshell__edit {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 6px 0 4px;
+  background: var(--shell-bg);
+  font-size: var(--fs-base);
+  font-weight: 300;
+  line-height: 1.35;
+  color: var(--shell-text);
+  user-select: none;
+}
+.bshell__edit:hover { background: var(--shell-item-hover); }
+.bshell__edit:has(> .bshell__grip:active) { background: var(--shell-raised); z-index: 1; }
+
+/* A section in the mode: its own ground so a dragged section carries its rows; an emptied one keeps a drop height. */
+.bshell__editsec { position: relative; background: var(--shell-bg); padding-bottom: 4px; }
+.bshell__editsec:has(> .bshell__edithead > .bshell__grip:active) { background: var(--shell-raised); z-index: 2; }
+.bshell__editlist { min-height: 8px; }
+.bshell__edithead { display: flex; align-items: center; gap: 4px; padding-left: 4px; }
+.bshell__edithead .bshell__section { margin: 8px 4px; }
+
+/* Add page: quiet, like Notion's "+ Add section", and the list it opens is rail rows at sub-item size. */
+.bshell__addbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 12px 4px 10px;
+  font-size: var(--fs-md);
+  color: var(--shell-text-muted);
+  text-align: left;
+}
+.bshell__addbtn:hover,
+.bshell__addbtn[aria-expanded='true'] { color: var(--shell-text); background: var(--shell-item-hover); }
+.bshell__addlist { list-style: none; margin: 0; padding: 2px 0 4px 24px; }
+.bshell__addrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: var(--fs-md);
+  font-weight: 300;
+  color: var(--shell-text);
+  text-align: left;
+}
+.bshell__addrow:hover { background: var(--shell-item-hover); }
+.bshell__addbtn:focus-visible,
+.bshell__addrow:focus-visible { outline: var(--bw-thin) solid var(--shell-text); outline-offset: -3px; }
+
+.bshell__grip,
+.bshell__eye {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  color: var(--shell-text-muted);
+}
+.bshell__grip { cursor: grab; touch-action: none; }
+.bshell__grip:active { cursor: grabbing; }
+.bshell__grip:hover,
+.bshell__eye:hover { color: var(--shell-text); background: var(--shell-item-hover); }
+.bshell__grip:focus-visible,
+.bshell__eye:focus-visible,
+.bshell__reset:focus-visible,
+.bshell__done:focus-visible {
+  outline: var(--bw-thin) solid var(--shell-text);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+.bshell__edit .bx-tip { display: inline-flex; }
+
+/* Reset and Done. Done is the rail's own light button, never the brand: the page beside it keeps its one orange. */
+.bshell__editbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.bshell__reset {
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-base);
+  color: var(--shell-text-secondary);
+}
+.bshell__reset:hover:not(:disabled) { color: var(--shell-text); background: var(--shell-item-hover); }
+.bshell__reset:disabled { color: var(--shell-text-muted); opacity: 0.6; cursor: default; }
+.bshell__done {
+  flex: 1;
+  min-height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--shell-text);
+  color: var(--shell-bg);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+}
+.bshell__done:hover { background: var(--shell-text-secondary); }
+
 /* No marker dot on the collapsed rail: dots are out of the console. The "New"
    badge shows again when the rail opens, and the row's name says it. */
 
@@ -490,3 +599,125 @@
 .bshell__brand.is-on .bshell__brand-knob { transform: translateX(12px); }
 @media (prefers-reduced-motion: reduce) {
   .bshell__brand-track, .bshell__brand-knob { transition: none; }}
+
+/* --- Global search (global-search.ts) --------------------------------------- */
+
+/* A field in the bar's right-hand group, before the tools: a button that looks like the field it opens, as Notion's
+   sidebar search does. */
+.bsearch__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: min(320px, 28vw);
+  height: 34px;
+  margin-right: var(--space-2);
+  padding: 0 var(--space-3) 0 var(--space-5);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+  text-align: left;
+}
+.bsearch__field:hover { border-color: var(--text-tertiary); }
+.bsearch__ph { flex: 1; min-width: 0; }
+.bsearch__kbd {
+  flex: none;
+  padding: 0 var(--space-3);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 20px;
+  color: var(--text-tertiary);
+}
+
+/* The palette: near the top, not centred, so the list grows down from the field. */
+.bsearch__scrim {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh var(--space-6) var(--space-6);
+  z-index: calc(var(--z-modal) + 50);
+}
+.bsearch {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100%);
+  max-height: 70vh;
+  border-radius: var(--radius-xl);
+  background: var(--surface-overlay);
+  box-shadow: var(--el-overlay);
+  overflow: hidden;
+}
+.bsearch:focus { outline: none; }
+.bsearch__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: 0 var(--space-7);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+.bsearch__input {
+  flex: 1;
+  min-width: 0;
+  height: 52px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--fs-lg);
+}
+.bsearch__input:focus { outline: none; box-shadow: none; }
+.bsearch__list { overflow-y: auto; padding: var(--space-3) var(--space-3) var(--space-4); }
+.bsearch__list:empty { display: none; }
+.bsearch__heading {
+  margin: var(--space-4) var(--space-5) var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-tertiary);
+}
+.bsearch__hit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-height: 38px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+/* The highlighted row is selection, so blue (rebrand.css): never the brand. */
+.bsearch__hit.is-on { background: var(--accent-soft); color: var(--accent-strong); }
+.bsearch__ico { flex: none; color: var(--text-tertiary); }
+.bsearch__hit.is-on .bsearch__ico { color: var(--accent-strong); }
+.bsearch__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bsearch__meta { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bsearch__empty { margin: var(--space-6) var(--space-5); font-size: var(--fs-base); color: var(--text-secondary); }
+
+/* No room for the field on a phone: the bar keeps an icon's width and the palette fills the width. */
+@media (max-width: 900px) {
+  .bsearch__field { width: 37px; margin-left: auto; padding: 0; justify-content: center; border-color: transparent; background: transparent; }
+  .bsearch__ph, .bsearch__kbd { display: none; }
+  .bsearch__scrim { padding-top: var(--space-6); }
+}
+
+/* The rail's reminder before the old policies close (migrate/rail-reminder.tsx), drawn in the rail's own colours. */
+.brail-note {
+  position: relative; flex: none; display: flex; flex-direction: column; gap: var(--space-2);
+  margin: var(--space-4) var(--space-5); padding: var(--space-6); border-radius: var(--radius-lg);
+  background: var(--shell-raised); border: var(--bw-thin) solid var(--shell-border);
+  font-size: var(--fs-sm); color: var(--shell-text-secondary);
+}
+.brail-note b { padding-right: var(--space-7); font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--shell-text); line-height: 1.4; }
+.brail-note__x { position: absolute; top: var(--space-4); right: var(--space-4); display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--shell-text-muted); cursor: pointer; }
+.brail-note__x:hover { background: var(--shell-item-hover); color: var(--shell-text); }
+.brail-note__go {
+  align-self: flex-start; margin-top: var(--space-3); height: var(--ctl-height-sm); padding: 0 var(--space-5);
+  border: var(--bw-thin) solid var(--shell-border-strong); border-radius: var(--radius-md); background: none;
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--shell-text); cursor: pointer;
+}
+.brail-note__go:hover { background: var(--shell-item-hover); }
+.brail-note__x:focus-visible, .brail-note__go:focus-visible { outline: none; box-shadow: var(--focus-ring); }

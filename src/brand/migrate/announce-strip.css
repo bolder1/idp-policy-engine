@@ -1,0 +1,69 @@
+/* The launch banner (AnnounceStrip.tsx), in two looks to show (owner, 5 Nov 2026): the full-width strip, and the inset
+   card after Google Workspace's. Its colours are its own and live here only (owner, 4 Nov 2026: "no need to follow the
+   system" for it). */
+
+.bann {
+  --bann-from: #0b3b8f;
+  --bann-mid: #1d5fe0;
+  --bann-to: #3d8bff;
+  --bann-glow: #7cc4ff;
+  --bann-bg: #0a3a9c;
+  --bann-ink: #ffffff;
+  --bann-ink-soft: rgba(255, 255, 255, 0.82);
+  --bann-chip: rgba(255, 255, 255, 0.16);
+  --bann-pill: #a8c7fa;
+  --bann-pill-hover: #c2d7fc;
+  --bann-pill-ink: #062e6f;
+  position: relative; flex: none; overflow: hidden; color: var(--bann-ink);
+}
+
+/* The look switch, small, inside the banner. */
+.bann__look { position: relative; z-index: 1; flex: none; display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); background: rgba(255, 255, 255, 0.12); }
+.bann .bann__look button { height: 24px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; color: var(--bann-ink-soft); font: inherit; font-size: 12px; cursor: pointer; }
+.bann .bann__look button[aria-pressed='true'] { background: rgba(255, 255, 255, 0.22); color: var(--bann-ink); }
+.bann .bann__look button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bann-ink); }
+
+/* --- Strip: the full width of the content column, deep blue into a brighter blue, a light that sweeps it. --- */
+/* The card's colours (owner, 5 Nov 2026): one deep blue, a pale pill. */
+.bann.is-strip { background: var(--bann-bg); }
+.bann.is-strip .bann__orb { display: none; }
+.bann.is-strip .bann__in { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--space-5); max-width: 1560px; min-height: 52px; padding: var(--space-4) var(--space-9); }
+.bann.is-strip .bann__text { flex: 1 1 auto; min-width: 0; margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--bann-ink-soft); }
+.bann.is-strip .bann__text > span::before { content: "·"; margin: 0 var(--space-4); color: rgba(255, 255, 255, 0.55); }
+.bann.is-strip .bann__text b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--bann-ink); letter-spacing: -0.005em; }
+.bann.is-strip button.bann__go { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); height: var(--ctl-height-sm); padding: 0 var(--space-6); border: 0; border-radius: var(--radius-full); background: var(--bann-pill); color: var(--bann-pill-ink); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
+.bann.is-strip button.bann__go:hover { background: var(--bann-pill-hover); }
+.bann.is-strip button.bann__x { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--bann-ink-soft); cursor: pointer; }
+.bann.is-strip button.bann__x:hover { background: var(--bann-chip); color: var(--bann-ink); }
+.bann__sweep { position: absolute; top: 0; bottom: 0; left: 0; width: 28%; z-index: 0; pointer-events: none; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.14), transparent); }
+.bann__orb { position: absolute; z-index: 0; border-radius: 50%; filter: blur(28px); pointer-events: none; }
+.bann__orb.is-a { width: 220px; height: 120px; top: -60px; right: 18%; background: var(--bann-glow); opacity: 0.45; }
+.bann__orb.is-b { width: 180px; height: 100px; bottom: -70px; left: 30%; background: #a9b8ff; opacity: 0.35; }
+
+/* --- Card: inset, rounded, one deep blue, our mark, a bold line over a softer one, a pale pill. --- */
+.bann.is-card { display: flex; align-items: center; gap: var(--space-7); margin: var(--space-6) var(--space-9) 0; padding: var(--space-7) var(--space-8) var(--space-7) var(--space-7); border-radius: 14px; background: var(--bann-bg); }
+.bann.is-card > :not(.bann__shine) { position: relative; z-index: 1; }
+.bann.is-card .bann__mark { flex: none; width: 64px; height: 56px; overflow: visible; }
+.bann__shine { position: absolute; top: 0; bottom: 0; left: 0; width: 28%; z-index: 0; pointer-events: none; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.14), transparent); }
+.bann.is-card .bann__text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; margin: 0; }
+.bann.is-card .bann__text b { font-size: var(--fs-lg, 17px); font-weight: var(--fw-semibold); color: var(--bann-ink); letter-spacing: -0.005em; }
+.bann.is-card .bann__text span { font-size: var(--fs-md); line-height: 1.45; color: rgba(255, 255, 255, 0.8); }
+.bann.is-card button.bann__go { flex: none; height: 40px; padding: 0 var(--space-7); border: 0; border-radius: var(--radius-full); background: var(--bann-pill); color: var(--bann-pill-ink); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
+.bann.is-card button.bann__go:hover { background: var(--bann-pill-hover); }
+.bann.is-card button.bann__x { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--bann-ink); cursor: pointer; }
+.bann.is-card button.bann__x:hover { background: rgba(255, 255, 255, 0.12); }
+
+.bann button.bann__go:focus-visible, .bann button.bann__x:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bann-from), 0 0 0 4px var(--bann-ink); }
+
+@media (max-width: 720px) {
+  .bann.is-strip .bann__in { flex-wrap: wrap; padding: var(--space-5) var(--space-6); }
+  .bann.is-strip .bann__text { flex-basis: 100%; order: 3; }
+  .bann.is-card { flex-wrap: wrap; margin: var(--space-4) var(--space-5) 0; }
+  .bann.is-card .bann__text { flex-basis: calc(100% - 80px); }
+}
+
+/* Not on inner pages (owner, 5 Nov 2026): a page with a way back up is a detail, and the strip is for the lists. */
+.bshell__main:has(.bpage__crumbs) > .bann { display: none; }
+
+/* The strip carries the card's mark too, small (owner, 5 Nov 2026). */
+.bann.is-strip .bann__mark { flex: none; width: 36px; height: 32px; overflow: visible; margin-right: calc(-1 * var(--space-2)); }

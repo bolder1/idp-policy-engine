@@ -509,7 +509,7 @@ function ZoneList({
       name: z.name,
       tile: <meta.icon size={18} strokeWidth={1.8} />,
       tileClass: `bz7__tile is-${meta.tint}`,
-      badge: z.fromOld === 'added' ? <Badge tone="info">From old policy</Badge> : undefined,
+      badge: z.fromOld === 'added' ? <Badge tone="neutral">From old policy</Badge> : undefined,
       attrs: { 'data-zone-id': z.id, ...(usesId === z.id ? { 'data-docked': 'true' } : {}), ...(z.fromOld === 'added' ? { 'data-from-old': 'true' } : {}) },
       onOpen: () => onOpen(z.id),
       facts: [

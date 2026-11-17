@@ -14,10 +14,9 @@
 .bshell.is-collapsed { --nav-sidebar-w: 64px; }
 .bshell { transition: grid-template-columns var(--dur-normal) var(--ease-standard), grid-template-rows var(--dur-normal) var(--ease-standard); }
 
-/* Full view (Shell.tsx `CANVAS_FULL_VIEW`): a canvas takes the window. Both tracks close to nothing, so the rail and
-   the bar fold away rather than vanish; every offset written against the bar's height (toasts, docks) follows. */
-.bshell.is-full { --nav-sidebar-w: 0px; --nav-topbar-h: 0px; }
-.bshell.is-full .bshell__top { height: auto; min-height: 0; overflow: hidden; box-shadow: none; padding-block: 0; }
+/* Full view (Shell.tsx `CANVAS_FULL_VIEW`): a canvas takes the window. The rail folds away; the top bar stays (owner, 10 Nov 2026). */
+.bshell.is-full { --nav-sidebar-w: 0px; }
+.bshell.is-full .bshell__burger { visibility: hidden; }
 .bshell.is-full .bshell__rail { min-width: 0; }
 
 /* --- Topbar --------------------------------------------------------------- */
@@ -721,3 +720,8 @@
 }
 .brail-note__go:hover { background: var(--shell-item-hover); }
 .brail-note__x:focus-visible, .brail-note__go:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* The rail in two zones (owner, 9 Nov 2026: "a dedicated space for the nav items and for the card, so things don't
+   overlap"): the items scroll in their own area; the reminder card and Customize sidebar sit below a divider, fixed. */
+.bshell__nav { min-height: 0; }
+.bshell__rail > .brail-note { margin: 0; border-radius: 0; border-width: var(--bw-thin) 0 0; padding: var(--space-6) var(--space-7); }

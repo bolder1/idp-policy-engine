@@ -65,3 +65,81 @@
 .bfb.is-moving .bfb__mark { background: var(--surface-sunken); }
 .bfb__bar { display: block; width: min(100%, 360px); height: 4px; margin-top: var(--space-2); border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
 .bfb__bar > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--fb-info-fg), var(--fb-positive-fg)); }
+/* Stat cards in the review banner: a count over its label. */
+.bfb__stats { display: flex; gap: var(--space-5); margin: 0; flex: none; }
+.bfb__stat { display: flex; flex-direction: column; align-items: center; min-width: 84px; padding: var(--space-3) var(--space-6); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.bfb__stat dd { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.bfb__stat dt { font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; }
+.bfb__stat:first-child dd { color: var(--fb-info-fg); }
+.bfb__stat:last-child dd { color: var(--fb-positive-fg); }
+
+/* Work is under way and there is nothing honest to count: a bar that slides along, then repeats. */
+.bfb__bar.is-indeterminate > i { width: 35%; animation: bfb-slide 1.5s ease-in-out infinite; }
+@keyframes bfb-slide { from { margin-left: -35%; } to { margin-left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .bfb__bar.is-indeterminate > i { width: 100%; animation: none; opacity: 0.5; } }
+
+/* At the top of the page, as the launch strip (owner, 9 Nov 2026: "move it at the top like this"): full width, the
+   strip's blue, a pale pill for the button. */
+.bshell__banner:empty { display: none; }
+.bfb.bann.is-top { margin: 0; padding: var(--space-4) var(--space-9); border: 0; border-radius: 0; background: var(--bann-bg); color: var(--bann-ink); }
+.bfb.is-top .bfb__mark, .bfb.is-top.is-done .bfb__mark { background: var(--bann-chip); color: var(--bann-ink); }
+.bfb.is-top .bfb__words > b { color: var(--bann-ink); }
+.bfb.is-top .bfb__words > span { color: var(--bann-ink-soft); }
+.bfb.is-top .bfb__spin { border-color: var(--bann-chip); border-top-color: var(--bann-ink); }
+.bfb.is-top .bfb__bar { background: var(--bann-chip); }
+.bfb.is-top .bfb__bar > i { background: var(--bann-pill); }
+.bfb.is-top .bx-btn { background: var(--bann-pill); color: var(--bann-pill-ink); border-color: transparent; }
+.bfb.is-top .bx-btn:hover { background: var(--bann-pill-hover); }
+.bfb.is-top .bx-btn--ghost { background: none; color: var(--bann-ink); }
+.bfb.is-top .bx-btn--ghost:hover { background: var(--bann-chip); }
+
+/* One look per state (owner, 9 Nov 2026): work in progress (adding, publishing all) is slate with a spinner; what needs
+   the admin (Publish all, Add to Policies) is the strip's blue; complete is green. The strip's own colours, set on the
+   banner, so every rule above follows. */
+.bfb.bann.is-work { --bann-bg: #334155; --bann-ink-soft: rgba(255, 255, 255, 0.78); --bann-chip: rgba(255, 255, 255, 0.14); --bann-pill: #cbd5e1; --bann-pill-hover: #e2e8f0; --bann-pill-ink: #1e293b; }
+.bfb.bann.is-done { --bann-bg: #0b6b43; --bann-chip: rgba(255, 255, 255, 0.18); --bann-pill: #b7e6cd; --bann-pill-hover: #d2f0e0; --bann-pill-ink: #064a2e; }
+.bfb.is-work.is-top .bfb__bar > i { background: var(--bann-ink); }
+
+
+/* The moving screen, with logos only (owner, 9 Nov 2026): two piles of application tiles either side of the shield. */
+.bfn__stage { width: min(100%, 620px); height: 120px; }
+.bfn__pile { position: absolute; top: 50%; translate: 0 -50%; width: 120px; height: 56px; }
+.bfn__pile.is-waiting { left: 8%; }
+.bfn__pile.is-landed { right: 8%; }
+.bfn__logo { position: absolute; top: 0; display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-low); }
+.bfn__logo.is-old { border-style: dashed; }
+
+/* In the page, as the banner it was (owner, 9 Nov 2026): the old pages' light blue banner, not the dark strip. */
+.bfb.bann.is-ready, .bfb.bann.is-work { padding: var(--space-5) var(--space-6); background: var(--fb-info-bg); border-color: var(--fb-info-border); }
+.bfb.bann.is-ready .bfb__mark, .bfb.bann.is-work .bfb__mark { width: 40px; height: 40px; background: var(--surface-raised); color: var(--fb-info-fg); }
+/* The review banner, white (owner, 10 Nov 2026: amber, then violet, then "go blue or all white"): the page's own
+   surface, so the blue Start review is the one colour in it. */
+.bfb.bann.is-review { background: var(--surface-raised); border-color: var(--border-default); box-shadow: var(--el-low); }
+.bfb.bann.is-review .bfb__mark { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+
+/* The move, left to right (MovingShowcase, 9 Nov 2026): grey waiting lane, the shield with its progress ring, the
+   coloured lane of those done. */
+.bfn__flow { display: grid; grid-template-columns: 1fr 56px auto 40px 1fr; align-items: center; gap: var(--space-3); width: min(100%, 820px); }
+.bfn__flow .bfn__lane { position: static; inset: auto; display: flex; gap: var(--space-3); min-height: 48px; align-items: center; }
+.bfn__flow .bfn__lane.is-left { flex-direction: row-reverse; justify-content: flex-start; }
+.bfn__flow .bfn__lane.is-right { justify-content: flex-start; }
+.bfn__hub { position: relative; display: grid; place-items: center; width: 112px; height: 112px; }
+.bfn__prog { position: absolute; inset: 0; width: 100%; height: 100%; rotate: -90deg; }
+.bfn__prog circle { fill: none; stroke-width: 4; }
+.bfn__prog .is-track { stroke: var(--border-subtle); }
+.bfn__prog .is-fill { stroke: var(--fb-info-fg); stroke-linecap: round; }
+.bfn__shield { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-high); color: var(--fb-info-fg); }
+.bfn__tile { position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-md); border: var(--bw-thin) dashed var(--border-strong); background: var(--surface-raised); filter: grayscale(1); }
+.bfn__tile.is-done { filter: none; border-style: solid; border-color: var(--border-default); box-shadow: var(--el-low); }
+.bfn__tick { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--fb-positive-fg); color: var(--surface-raised); border: 2px solid var(--surface-sunken); }
+
+/* Three grey lanes in, a funnel, one coloured lane out (9 Nov 2026). */
+.bfn__lanes { display: flex; flex-direction: column; gap: 12px; }
+.bfn__funnel { display: block; width: 56px; height: 156px; overflow: visible; }
+.bfn__funnel path { fill: none; stroke: var(--border-strong); stroke-width: 1.5; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; transition: stroke var(--dur-normal) var(--ease-standard); }
+.bfn__funnel path.is-next { stroke: var(--fb-info-fg); stroke-dasharray: none; }
+.bfn__link { display: block; height: 0; border-top: 1.5px solid var(--fb-info-fg); }
+.bfn__flow .bfn__lane.is-left .bfn__tile { opacity: 0.9; }
+
+/* The review banner's split button opens a menu below it, so the banner no longer clips (owner, 10 Nov 2026). */
+.bfb.bann.is-review { overflow: visible; }

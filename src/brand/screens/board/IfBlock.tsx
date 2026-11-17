@@ -1,4 +1,5 @@
-import { Fragment, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, useContext, type MouseEvent, type ReactNode } from 'react'
+import { CondTagsContext, condTokens } from './cond-tags'
 import { ArrowRight, Braces, CornerDownRight, Split, Users } from 'lucide-react'
 
 import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
@@ -398,6 +399,7 @@ export function IfBlock({
   terminal?: boolean
   mark?: (row: string) => ReactNode
 }) {
+  const tagged = useContext(CondTagsContext)
   /* Every card, as stored. People and groups are the rule's `who`, not
      conditions, so nothing here is filtered out and no alternative's letter
      can move. */
@@ -637,7 +639,7 @@ export function IfBlock({
                     <IfKw tone={join}>{join}</IfKw>
                   </div>
                 )}
-                <div className="bb__ifrow is-cond">
+                <div className="bb__ifrow is-cond" data-ct={tagged ? condTokens(c) : undefined}>
                   <CondReadout c={c} resolve={resolve} />
                   {mark?.(c.id)}
                 </div>

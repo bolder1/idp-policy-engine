@@ -66,6 +66,16 @@ export const CHECKS_NOTE: ProfileNote = {
   ],
 }
 
+/** The remediation step: what the user sees when a device fails a check (owner, 10 Nov 2026: "why is the right side empty"). */
+export const REMEDIATION_NOTE: ProfileNote = {
+  title: 'How remediation works',
+  lines: [
+    'When a device fails a check, the user can be told what to fix instead of only being denied.',
+    'A grace period lets a device keep signing in while it is brought into line.',
+  ],
+  foot: 'After the due date, a device that still fails is denied.',
+}
+
 export const SIGNALS_NOTE: ProfileNote = {
   title: 'How signals work',
   lines: ['What changed since the last sign-in adds up to a score, and the score picks the outcome.'],

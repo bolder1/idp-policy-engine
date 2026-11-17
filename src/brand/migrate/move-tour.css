@@ -1,0 +1,6 @@
+/* The migration tour (MoveTour.tsx): its card width, and the progress dots in the card's foot. */
+.bmt .bmt__card { width: 360px; }
+.bmt__dots { flex: 1; display: flex; gap: var(--space-2); }
+.bmt__dots i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--border-strong); transition: width var(--dur-normal) var(--ease-standard), background-color var(--dur-normal) var(--ease-standard); }
+.bmt__dots i.is-done { background: var(--fb-info-border); }
+.bmt__dots i.is-on { width: 18px; background: var(--fb-info-fg); }

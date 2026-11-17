@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { MIGRATION_FIRST } from '../migrate/phase'
 import { OldPoliciesTab } from '../migrate/old-tab'
+import { BANNER_VARIANTS, setBannerVariant, useBannerVariant, type BannerVariant } from '../migrate/banner-variant'
+import { RejectDialog } from '../migrate/migration-results'
+import { EXPERIENCES, isBuilt, clearRejected, markRolledBack, setExperience, useExperience, useReviewFacts, type MigrationExperience } from '../migrate/experience'
+import { MigrationResults } from '../migrate/migration-results'
 import {
   AlignLeft,
   AppWindow,
@@ -14,6 +18,7 @@ import {
   Pencil,
   Plus,
   Power,
+  Rocket,
   PowerOff,
   Radar,
   Table2,
@@ -21,13 +26,17 @@ import {
   ShieldPlus,
   Trash2,
   Waypoints,
+  Undo2,
+  Headset,
+  Check,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppsPeek } from './apps-peek'
-import { Badge, Button, Modal, RowMenu, SearchBox, StatusPill, Tabs, type MenuItem } from '../kit'
+import { Badge, Button, Confirm, Modal, RowMenu, SearchBox, StatusPill, Tabs, type MenuItem } from '../kit'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import type { LibView, ViewOption } from './library-view-state'
 import { PageBar } from './page-bar'
@@ -48,6 +57,7 @@ import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
 import { rowMenu, statusOptions, type RowMenuId, monitorOffered } from './status-options'
 import { useStatusChange } from './use-status-change'
+import { BulkBar } from '../bulk-bar'
 import { SHOWCASE } from '../showcase'
 import { screenOffered } from '../edition-screens'
 import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
@@ -58,6 +68,7 @@ import { blankPostSignInPolicy, isPostSignIn } from '../post-sign-in'
 import { blockedReason } from '../migrate/plan'
 import { activityLabel, lastActivity } from '../policy-activity'
 import { MoveBanner } from '../migrate/move-banner'
+import { MigrateEmpty } from '../migrate/MoveDialog'
 import { MoveFinale, MovingBar, MovingShowcase } from '../migrate/finale'
 import { PublishMovedConfirm } from '../migrate/moved-panel'
 /* Here and not in main.tsx's list, against that list's rule, because it can be:
@@ -175,6 +186,23 @@ const POLICY_VIEWS: ViewOption<PolicyView>[] = [
 
 /* The preview switch (owner, 3 Nov 2026: "two dropdowns, one for the empty state, one with content"): the new builder
    as a tenant first meets it, or with the showcase's policies. Shown in the showcase too, because he asked for it there. */
+/* Two tabs, and inside New policies two lists (owner, 10 Nov 2026: "inside New policies, two tabs, on the left, segregated"):
+   the policies made here, and the migrated drafts waiting for review. A published migrated policy joins the first,
+   tagged Migrated, and its old policies panel goes. */
+/* Two versions of New policies (owner, 10 Nov 2026: "with tabs, the current one; no tabs, the old one, the single table"):
+   with tabs, two lists with a nav on the left; no tabs, one table with the migrated drafts among the rest. A preview
+   switch, in the showcase too, because he asked for the dropdown. */
+type NewSub = 'new' | 'moved'
+const NEW_SUBS: { value: NewSub; label: string }[] = [
+  { value: 'new', label: 'Live policies' },
+  { value: 'moved', label: 'Under review' },
+]
+/* Assisted and Self-serve (owner, 16 Nov 2026): two places, Policies for the policies and Migration for the work. */
+const NEW_SUBS_REVIEW: { value: NewSub; label: string }[] = [
+  { value: 'new', label: 'Policies' },
+  { value: 'moved', label: 'Migration' },
+]
+
 const START_OPTIONS = [
   { value: 'empty', label: 'Empty' },
   { value: 'seeded', label: 'With policies' },
@@ -183,10 +211,26 @@ const START_OPTIONS = [
 export function Policies() {
   const store = useBrand()
   const [kind, setKind] = useState<PolicyKind>(readKind)
+  const [sub, setSub] = useState<NewSub>(() => (readKind() === 'moved' ? 'moved' : 'new'))
+  /* Two tabs: a stored Migrated tab is New policies' second list. */
+  const shown = kind === 'moved' ? 'sign-in' : kind
+  const kinds = POLICY_KINDS.filter((k) => k.value !== 'moved')
   const show = (k: PolicyKind) => {
     setKind(k)
     keepKind(k)
   }
+  /* A move starting opens the Migrated list: the policies it makes land there, drafts first. */
+  const running = store.moveJob?.status === 'running'
+  const bannerVariant = useBannerVariant()
+  const experience = useExperience()
+  const hasMoved = running || store.policies.some((p) => !!p.movedFrom?.length)
+  useEffect(() => {
+    if (running && MIGRATION_FIRST) {
+      setKind('sign-in')
+      keepKind('sign-in')
+      setSub('moved')
+    }
+  }, [running])
 
   /* One head over both tabs, so its caption names both types rather than
      only the sign-in check it said before 13 Oct 2026. */
@@ -197,6 +241,7 @@ export function Policies() {
         caption="Every sign-in, and the session after it, is checked against these policies."
         docs
         preview={
+          <>
           <Picker
             label="Start"
             size="md"
@@ -205,12 +250,40 @@ export function Policies() {
             options={START_OPTIONS}
             onChange={(v) => store.setBuilderStart(v as 'empty' | 'seeded')}
           />
+          {/* The migration experience, for the review of the three variations (owner, 16 Nov 2026): Today as built,
+              Assisted (approve or reject), Self-serve (edit and approve). */}
+          <Picker label="Experience" size="md" prefix="Experience" value={experience} options={EXPERIENCES} onChange={(v) => setExperience(v as MigrationExperience)} />
+          {/* The migration banner while drafts wait: two cards, or the one it was (owner, 12 Nov 2026). Today only. */}
+          {isBuilt(experience) && <Picker label="Banner" size="md" prefix="Banner" value={bannerVariant} options={BANNER_VARIANTS} onChange={(v) => setBannerVariant(v as BannerVariant)} />}
+          </>
         }
       />
-      <Tabs<PolicyKind> className="bx-tabs--line bpol__types" name="Policy types" value={kind} onChange={show} options={POLICY_KINDS} />
+      {/* The migration banner sits above the tabs (owner, 10 Nov 2026), and steps aside while a move runs full page. */}
+      {/* With tabs, the migration banner belongs to the Migrated list (owner, 10 Nov 2026); Your policies shows it only until something has migrated. */}
+      {shown === 'sign-in' && !(running && !store.moveMinimized) && <MoveFinale origin="moved" />}
+      <Tabs<PolicyKind> className="bx-tabs--line bpol__types" name="Policy types" value={shown} onChange={show} options={kinds} />
       {/* Each tab brings its own bar and list; a fragment, so they stay rows of
           the page grid as they were before the tabs. */}
-      {kind === 'sign-in' ? <SignInPolicies key="new" origin="new" /> : kind === 'moved' ? <SignInPolicies key="moved" origin="moved" /> : kind === 'old' ? <OldPoliciesTab /> : <PostSignInPolicies />}
+      {shown === 'sign-in' ? (
+        <div className="bpol__main">
+          {/* Live and In review (owner, 12 Nov 2026: "segregate both types of policies inside the new policy"): a segment
+              control over two lists. It appears once something has migrated; before that there is one list. */}
+          {hasMoved && <Tabs<NewSub> className="bpol__sub" name="Policies by state" value={sub} onChange={setSub} options={isBuilt(experience) ? NEW_SUBS : NEW_SUBS_REVIEW} />}
+          {hasMoved && sub === 'moved' && !isBuilt(experience) ? (
+            !(running && !store.moveMinimized) && <MigrationResults />
+          ) : (
+            <>
+              {/* The Review and Approve cards are the Under review list's own (owner, 12 Nov 2026). */}
+              {hasMoved && sub === 'moved' && !(running && !store.moveMinimized) && <MoveFinale place="review" />}
+              <SignInPolicies key={hasMoved ? sub : 'new'} origin={hasMoved ? sub : 'new'} />
+            </>
+          )}
+        </div>
+      ) : kind === 'old' ? (
+        <OldPoliciesTab />
+      ) : (
+        <PostSignInPolicies />
+      )}
     </div>
   )
 }
@@ -225,7 +298,7 @@ const waitingMoved = (p: Policy) => !!p.movedFrom?.length && p.status === 'draft
 /* Two lists over one store (owner, 6 Nov 2026): 'new' is every policy made here, with Save draft and the rest; 'moved' is
    every policy that came over from the old console, kept as a review queue (view, approve, publish) so a tenant with
    fifty of them can do five a weekend and come back. */
-function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
+function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved' | 'all'; /** New policies in two sections: the migrated drafts to review, then the policies made here. */ sectioned?: boolean }) {
   const store = useBrand()
   const resolveName = useNameLookup()
   const libView = POLICY_VIEW
@@ -241,8 +314,11 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
   /* Rows picked for an action on several at once (owner, 6 Nov 2026: "add checkboxes so the user can do things from
      outside as well"). Publish acts on the moved drafts among them. */
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
+  const clearPicked = useCallback(() => setPicked(new Set()), [])
   /* The moved drafts a Publish press is about: the bulk bar's ticked ones, or one row's. */
   const [publishAsk, setPublishAsk] = useState<string[] | null>(null)
+  /* Roll back a migrated policy (owner, 17 Nov 2026): the new one goes inactive, the old one decides again. */
+  const [rollAsk, setRollAsk] = useState<Policy | null>(null)
   const togglePick = (id: string) =>
     setPicked((cur) => {
       const next = new Set(cur)
@@ -338,7 +414,7 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
   const signIn = useMemo(
     () =>
       store.policies.filter(
-        (p) => !isPostSignIn(p) && !store.held.includes(p.id) && (origin === 'moved' ? waitingMoved(p) : !waitingMoved(p)),
+        (p) => !isPostSignIn(p) && !store.held.includes(p.id) && (origin === 'all' ? true : origin === 'moved' ? waitingMoved(p) : !waitingMoved(p)),
       ),
     [store.policies, store.held, origin],
   )
@@ -389,14 +465,29 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
   const systemPolicy = signIn.find((p) => p.isSystem)
   /* A tenant with nothing but the system policy: the list is empty in every
      sense that matters, though the pinned row is there. */
-  const noPolicies = origin === 'new' && !q && !filtered && signIn.every((p) => p.isSystem)
+  /* Two tabs, empty (owner, 9 Nov 2026: "a dedicated banner for migration and an empty state for new policies"): the page
+     is laid out as it is with policies, the migration banner on top and New policies' own empty state under it. */
+  const noPolicies = origin !== 'moved' && !q && !filtered && signIn.every((p) => p.isSystem)
+  /* Two tabs: with nothing of its own, the one list starts at the migrate card, New policy beside Migrate. */
   const nothingMoved = origin === 'moved' && !q && !filtered && signIn.length === 0
+  /* Old policies that can still move: with nothing moved yet, the empty state below is the one way in (owner, 9 Nov
+     2026: "creating the migration twice doesn't make sense"), so the banner steps aside. */
+  const canMove = store.legacy.policies.some((lp) => !store.movedLegacy[lp.id])
   /* Nothing of its own yet: the builder's own empty state takes the bar's and the table's place. */
   const hero = noPolicies
-  const moving = store.moveJob?.status === 'running'
+  /* The move is the Migrated policies tab's: its screen shows only there (owner, 9 Nov 2026). */
+  const moving = origin !== 'new' && store.moveJob?.status === 'running'
   const pickable = rows.filter((p) => !p.isSystem)
+  /* Two sections (owner, 10 Nov 2026: "segregate the existing policies and the migrated list"): the migrated drafts to
+     review first, then the policies made here, system default included. With no drafts waiting there is one plain list. */
+  const toReview = sectioned && origin === 'all' ? rows.filter(waitingMoved) : []
   const nextStep = rows.some((p) => !!p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
-  const pickedDrafts = pickable.filter((p) => picked.has(p.id) && p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
+  const reviewFacts = useReviewFacts()
+  const bulkExperience = useExperience()
+  const pickedMoved = pickable.filter((p) => picked.has(p.id) && p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
+  /* Today (owner, 17 Nov 2026): bulk Approve, and Publish only what is approved; Yesterday published any moved draft. */
+  const pickedToApprove = pickedMoved.filter((p) => !store.moved[p.id]?.reviewed)
+  const pickedDrafts = pickedMoved.filter((p) => !reviewFacts[p.id]?.rejected && (bulkExperience !== 'today' || !!store.moved[p.id]?.reviewed))
 
   const { setBody, searchRef, markLeaving } = useLeavingFocus(rows)
 
@@ -472,11 +563,12 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
         />
       )}
       {/* The page-level empty state every library page has (Zones, Device profiles): owner, 4 Nov 2026. */}
-      {nothingMoved && (
+      {nothingMoved && canMove && <MigrateEmpty />}
+      {nothingMoved && !canMove && origin === 'moved' && (
         <EmptyState
           icon={ShieldPlus}
-          title="No migrated policies yet"
-          blurb="Policies you move from the old console are kept here until you approve and publish them."
+          title="Nothing waiting to publish"
+          blurb="Policies you publish move to New policies. The old ones stay in the Old policies tab."
         />
       )}
       {noPolicies && (
@@ -509,6 +601,91 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
     </span>
   )
 
+  /* One table, or two when New policies is in sections (owner, 10 Nov 2026: "the columns differ, not in a single table"):
+     the migrated drafts carry From and Next step; the policies made here carry Last activity. */
+  const renderTable = (list: Policy[], kind: 'all' | 'review' | 'mine') => {
+    const review = kind === 'review'
+    const next = review || (kind === 'all' && nextStep)
+    const pick = list.filter((p) => !p.isSystem)
+    return (
+      <section className="btable__section" key={kind}>
+        {kind !== 'all' && (
+          <h3 className="btable__sectionhead">
+            {review ? 'Migrated, to review' : 'Your policies'}
+            <span>{review ? 'From your old policies. Open each, approve it, then publish.' : 'Made in the new builder.'}</span>
+          </h3>
+        )}
+        <div className="btable__scroll">
+          <table className="btable">
+            <thead>
+              <tr>
+                <th scope="col" className="btable__col-pick">
+                  <input
+                    type="checkbox"
+                    className="bpol__pick"
+                    aria-label={review ? 'Select every migrated policy' : 'Select every policy'}
+                    checked={pick.length > 0 && pick.every((p) => picked.has(p.id))}
+                    ref={(el) => {
+                      if (el) el.indeterminate = pick.some((p) => picked.has(p.id)) && !pick.every((p) => picked.has(p.id))
+                    }}
+                    onChange={(e) =>
+                      setPicked((cur) => {
+                        const n = new Set(cur)
+                        pick.forEach((p) => (e.target.checked ? n.add(p.id) : n.delete(p.id)))
+                        return n
+                      })
+                    }
+                  />
+                </th>
+                {head('name', 'Policy name')}
+                <th scope="col">Applications</th>
+                {showExposure && !review && head('exposure', 'Exposure')}
+                {review ? (
+                  <th scope="col" className="btable__col-activity">
+                    From
+                  </th>
+                ) : (
+                  head('activity', 'Last activity', 'btable__col-activity')
+                )}
+                <th scope="col" className="btable__col-status">
+                  Status
+                </th>
+                {next && (
+                  <th scope="col" className="btable__col-next">
+                    Next step
+                  </th>
+                )}
+                <th scope="col" className="btable__actions btable__col-actions">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody ref={kind === 'mine' ? undefined : setBody}>
+              {list.map((p) => (
+                <PolicyRow
+                  key={p.id}
+                  policy={p}
+                  gauntlet={grades.get(p.id)}
+                  showExposure={showExposure && !review}
+                  activity={review ? `${p.movedFrom?.length ?? 0} old ${p.movedFrom?.length === 1 ? 'policy' : 'policies'}` : activityLabel(lastActivity(p, store.activity, now), now)}
+                  monitor={monitorOffered(store.features)}
+                  trySignIn={store.features.trySignIn}
+                  onOpen={() => (p.movedFrom?.length ? store.go({ name: 'board', policyId: p.id }) : setDetails({ id: p.id, open: true }))}
+                  onAction={(a) => act(p, a)}
+                  onPublish={() => setPublishAsk([p.id])}
+                  onRollBack={() => setRollAsk(p)}
+                  nextStep={next}
+                  picked={picked.has(p.id)}
+                  onPick={p.isSystem ? undefined : () => togglePick(p.id)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )
+  }
+
   /* The dialog's policy as it is now, or as it was when it was deleted. */
   const current = dialog ? (store.policies.find((p) => p.id === dialog.policy.id) ?? dialog.policy) : null
 
@@ -522,10 +699,10 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
         <MovingShowcase />
       ) : (
       <>
-      <MoveNote />
-      <MoveFinale />
-      {hero && empty}
-      {!hero && (
+      {!(nothingMoved && canMove) && <MoveNote />}
+      {/* Nothing migrated yet: the migrate card alone, no search, filter or table around it (owner, 9 Nov 2026). */}
+      {(hero || (nothingMoved && canMove)) && empty}
+      {!hero && !(nothingMoved && canMove) && (
       <>
       {/* The row every list page has — see `PageBar`: the search box, then the
           filter; the view and New on the right. Coverage has no rows to search
@@ -574,17 +751,18 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
                 exactly as the route is. */}
             {/* Sign-in activity beside it (owner, 5 Oct 2026: "move the sign-in activities in the main policy screen with the
                 check access button"): the week's sign-ins and why any were refused. */}
-            {DENIAL_REASONS && screenOffered({ name: 'sign-in-tests' }, store.features) && (
+            {/* None of the three in Under review (owner, 12 Nov 2026: "can remove"): that list is for reviewing, not for testing. */}
+            {origin !== 'moved' && DENIAL_REASONS && screenOffered({ name: 'sign-in-tests' }, store.features) && (
               <Button variant="secondary" icon={ListChecks} onClick={() => store.go({ name: 'sign-in-activity' })}>
                 Sign-in activity
               </Button>
             )}
-            {screenOffered({ name: 'sign-in-tests' }, store.features) && (
+            {origin !== 'moved' && screenOffered({ name: 'sign-in-tests' }, store.features) && (
               <Button variant="secondary" icon={LogIn} onClick={() => store.go({ name: 'sign-in-tests' })}>
                 {ACCESS_CHECK}
               </Button>
             )}
-            {origin === 'new' && (
+            {origin !== 'moved' && (
               <Button variant="brand" icon={Plus} onClick={startDraft}>
                 New policy
               </Button>
@@ -595,82 +773,70 @@ function SignInPolicies({ origin }: { origin: 'new' | 'moved' }) {
 
       {isCoverage && <Coverage onNew={startDraft} />}
 
-      {!isCoverage && libView === 'table' && picked.size > 0 && (
-        <div className="bpol__bulk" role="toolbar" aria-label="Selected policies">
-          <b>{picked.size === 1 ? '1 selected' : `${picked.size} selected`}</b>
-          <Button variant="secondary" size="sm" icon={Power} disabled={pickedDrafts.length === 0} title={pickedDrafts.length === 0 ? 'Only moved drafts can be published' : undefined} onClick={() => setPublishAsk(pickedDrafts.map((p) => p.id))}>
-            Publish
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setPicked(new Set())}>
-            Clear
-          </Button>
-        </div>
-      )}
+      {/* The global selection bar (bulk-bar.tsx, owner 9 Nov 2026): floats at the foot of the window. */}
+      <BulkBar
+        count={!isCoverage && libView === 'table' ? picked.size : 0}
+        label="Selected policies"
+        onClear={clearPicked}
+        actions={[
+          ...(bulkExperience === 'today'
+            ? [
+                {
+                  label: 'Approve',
+                  icon: Check,
+                  disabledReason: pickedToApprove.length === 0 ? 'Nothing selected is waiting for approval' : undefined,
+                  onClick: () => {
+                    const ids = pickedToApprove.map((p) => p.id)
+                    ids.forEach((id) => {
+                      store.reviewMoved(id, true)
+                      clearRejected(id)
+                    })
+                    store.showToast(ids.length === 1 ? '1 policy approved' : `${ids.length} policies approved`, { label: 'Undo', run: () => ids.forEach((id) => store.reviewMoved(id, false)) })
+                  },
+                },
+              ]
+            : []),
+          {
+            label: 'Publish',
+            icon: Rocket,
+            disabledReason: pickedDrafts.length === 0 ? (bulkExperience === 'today' ? 'Approve them first' : 'Only moved drafts can be published') : undefined,
+            onClick: () => setPublishAsk(pickedDrafts.map((p) => p.id)),
+          },
+        ]}
+      />
       <PublishMovedConfirm
         ids={publishAsk}
         onClose={() => setPublishAsk(null)}
         onDone={() => setPicked(new Set())}
       />
+      <Confirm
+        open={!!rollAsk}
+        onClose={() => setRollAsk(null)}
+        destructive={false}
+        title={`Roll back ${rollAsk?.name ?? ''}?`}
+        confirmLabel="Roll back"
+        confirmIcon={Undo2}
+        onConfirm={() => {
+          const p = rollAsk
+          setRollAsk(null)
+          if (!p) return
+          store.setPolicyStatus(p.id, 'inactive')
+          markRolledBack(p.id, true)
+          store.showToast(`${p.name} rolled back. The old policy decides again.`)
+        }}
+      >
+        The old policy decides sign-ins for its applications again. This policy becomes inactive and stays here to fix. Nothing is deleted.
+      </Confirm>
       {!isCoverage && libView === 'table' && (
         <div className="btable-wrap">
-          {rows.length > 0 && (
-            <div className="btable__scroll">
-              <table className="btable">
-                <thead>
-                  <tr>
-                    <th scope="col" className="btable__col-pick">
-                      <input
-                        type="checkbox"
-                        className="bpol__pick"
-                        aria-label="Select every policy"
-                        checked={pickable.length > 0 && pickable.every((p) => picked.has(p.id))}
-                        ref={(el) => {
-                          if (el) el.indeterminate = picked.size > 0 && !pickable.every((p) => picked.has(p.id))
-                        }}
-                        onChange={(e) => setPicked(e.target.checked ? new Set(pickable.map((p) => p.id)) : new Set())}
-                      />
-                    </th>
-                    {head('name', 'Policy name')}
-                    <th scope="col">Applications</th>
-                    {showExposure && head('exposure', 'Exposure')}
-                    {head('activity', 'Last activity', 'btable__col-activity')}
-                    {/* Next step, a column of its own while moved drafts wait (owner, 6 Nov 2026: "a new column, not with the
-                        status"): each one's Publish. */}
-                    {nextStep && (
-                      <th scope="col" className="btable__col-next">
-                        Next step
-                      </th>
-                    )}
-                    <th scope="col" className="btable__col-status">
-                      Status
-                    </th>
-                    <th scope="col" className="btable__actions btable__col-actions">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody ref={setBody}>
-                  {rows.map((p) => (
-                    <PolicyRow
-                      key={p.id}
-                      policy={p}
-                      gauntlet={grades.get(p.id)}
-                      showExposure={showExposure}
-                      activity={activityLabel(lastActivity(p, store.activity, now), now)}
-                      monitor={monitorOffered(store.features)}
-                      trySignIn={store.features.trySignIn}
-                      onOpen={() => (p.movedFrom?.length ? store.go({ name: 'board', policyId: p.id }) : setDetails({ id: p.id, open: true }))}
-                      onAction={(a) => act(p, a)}
-                      onPublish={() => setPublishAsk([p.id])}
-                      nextStep={nextStep}
-                      picked={picked.has(p.id)}
-                      onPick={p.isSystem ? undefined : () => togglePick(p.id)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {rows.length > 0 && (sectioned && origin === 'all' && toReview.length > 0 ? (
+            <>
+              {renderTable(toReview, 'review')}
+              {rows.length > toReview.length && renderTable(rows.filter((p) => !waitingMoved(p)), 'mine')}
+            </>
+          ) : (
+            renderTable(rows, 'all')
+          ))}
           {empty}
           <footer className="btable__foot">{summary}</footer>
         </div>
@@ -1113,6 +1279,17 @@ function policyMenu(policy: Policy, { monitor, trySignIn }: { monitor: boolean; 
   }))
 }
 
+/* A migrated draft's menu (owner, 17 Nov 2026): it is in review, so only review actions. No edit, read as text,
+   template, duplicate or delete; a rejected one goes to support. */
+function reviewMenu(review: 'review' | 'approved' | 'rejected'): MenuItem[] {
+  return [
+    { id: 'review', label: 'Review', icon: Eye },
+    { id: 'test', label: 'Check access', icon: LogIn },
+    ...(review === 'approved' ? [{ id: 'unapprove', label: 'Take back approval', icon: Undo2, divide: true }] : [{ id: 'approve', label: 'Approve', icon: Check, divide: true }]),
+    ...(review === 'rejected' ? [{ id: 'support', label: 'Contact support', icon: Headset }] : [{ id: 'reject', label: 'Reject', icon: X }]),
+  ]
+}
+
 /* The applications, as marks with the full list on hover; with none, the
    control that assigns them. The table's cell and the list's and card's fact. */
 function PolicyApps({ policy, onAssign }: { policy: Policy; onAssign: () => void }) {
@@ -1180,8 +1357,8 @@ function MoveNote() {
   const toReview = Object.values(store.moved).filter((m) => !m.approved).length
   /* Review opens as a popup over this page (owner, 5 Nov 2026); while the move runs the banner has no button. */
   const open = () => store.openReview()
-  /* Start migration plays the Policy builder intro first, every time (owner, 4 Nov 2026); it ends in the move. */
-  const start = () => store.openIntro('migrate')
+  /* Start migration opens the Migrate popup straight away (owner, 9 Nov 2026); the intro stays on See what's new. */
+  const start = () => store.openMoveDialog()
   /* A move under way, or done and waiting for review: what is happening, and View details into it. Nothing it made is
      in this list until it is approved (owner, 4 Nov 2026). */
   /* While it runs, folded: a slim bar with Expand (owner, 5 Nov 2026). */
@@ -1197,18 +1374,14 @@ function MoveNote() {
   return null
 }
 
-/* The marks beside a policy's name: System, From old policy (moved, still a draft), and a live policy's
-   unpublished edits. */
+/* The marks beside a policy's name: System, and a live policy's unpublished edits. */
 function PolicyMarks({ policy }: { policy: Policy }) {
-  const { moved: movedInfo } = useBrand()
-  const moved = !!policy.movedFrom?.length && policy.status === 'draft'
-  /* Draft, then Approved, then Active (owner, 6 Nov 2026): approved in the builder, not yet published. */
-  const approved = moved && !!movedInfo[policy.id]?.reviewed
-  if (!policy.isSystem && !policy.pendingDraft && !moved) return null
+  /* "From old policy" is gone, and Approved moved to the Status column (owner, 10 Nov 2026). */
+  /* Published, it graduates to New policies and keeps a tag saying where it came from (owner, 10 Nov 2026). */
+  if (!policy.isSystem && !policy.pendingDraft) return null
   return (
     <span className="btable__marks">
       {policy.isSystem && <Badge tone="system">System</Badge>}
-      {moved && (approved ? <Badge tone="positive">Approved</Badge> : <Badge tone="info">From old policy</Badge>)}
       {policy.pendingDraft && <ChangeState unsaved={false} draft />}
     </span>
   )
@@ -1226,6 +1399,7 @@ function PolicyRow({
   picked = false,
   onPick,
   onPublish,
+  onRollBack,
   nextStep = false,
 }: {
   policy: Policy
@@ -1233,6 +1407,8 @@ function PolicyRow({
   nextStep?: boolean
   /** A moved draft's quick Publish, beside the row menu (owner, 6 Nov 2026). */
   onPublish?: () => void
+  /** A migrated, active policy's Roll back (owner, 17 Nov 2026): the old policy decides again. */
+  onRollBack?: () => void
   picked?: boolean
   /** Ticks the row for an action on several at once; absent on the system policy. */
   onPick?: () => void
@@ -1249,7 +1425,15 @@ function PolicyRow({
   onAction: (action: RowAction) => void
 }) {
   /* Arriving from a move: each row lights in turn, by its place in the move (move-policies.css `.is-arrived`). */
-  const { imported, landing } = useBrand()
+  const { imported, landing, moved: movedInfo, showToast, reviewMoved } = useBrand()
+  const [rejecting, setRejecting] = useState(false)
+  const liveFacts = useReviewFacts()
+  /* Yesterday's version (kept for comparison): Draft plus Approved, the full menu, Publish on every draft. */
+  const old = useExperience() === 'yesterday'
+  const facts = old ? ({} as typeof liveFacts) : liveFacts
+  const migrated = !old && !!policy.movedFrom?.length
+  /* A migrated draft is in review, not a draft (owner, 17 Nov 2026): Under review, Approved or Rejected. */
+  const review = migrated && policy.status === 'draft' ? (facts[policy.id]?.rejected ? 'rejected' : movedInfo[policy.id]?.reviewed ? 'approved' : 'review') : null
   const at = imported.indexOf(policy.id)
   const publishable = !!policy.movedFrom?.length && policy.status === 'draft' && policy.appIds.length > 0
   /* Laid in by Add to Policies, or just made active: one light sweep (finale.css). */
@@ -1274,6 +1458,8 @@ function PolicyRow({
             {policy.name}
           </button>
           <PolicyMarks policy={policy} />
+          {/* Migrated or made here: the two act differently (Roll back), so the list says which (owner, 17 Nov 2026). */}
+          {migrated && !review && <Badge tone="neutral">Migrated</Badge>}
         </div>
       </td>
       <td>
@@ -1285,24 +1471,69 @@ function PolicyRow({
         </td>
       )}
       <td className="btable__activity">{activity}</td>
+      <td>
+        <span className="btable__marks">
+          {old && !!policy.movedFrom?.length && policy.status === 'draft' ? (
+            <>
+              <StatusPill status={policy.status} />
+              {!!movedInfo[policy.id]?.reviewed && <Badge tone="positive">Approved</Badge>}
+            </>
+          ) : review === 'review' ? (
+            <Badge tone="info">Under review</Badge>
+          ) : review === 'approved' ? (
+            <Badge tone="positive">Approved</Badge>
+          ) : review === 'rejected' ? (
+            <Badge tone="negative">Rejected</Badge>
+          ) : (
+            <StatusPill status={policy.status} />
+          )}
+          {migrated && policy.status === 'inactive' && !!facts[policy.id]?.rolledBack && <Badge tone="notice">Rolled back</Badge>}
+        </span>
+      </td>
       {nextStep && (
         <td className="btable__next">
-          {publishable && onPublish && (
-            <Button variant="secondary" size="sm" icon={Power} onClick={onPublish}>
-              Publish
+          {/* Rejected cannot be published until it is approved again inside (owner, 17 Nov 2026): support instead. */}
+          {review === 'rejected' ? (
+            <Button variant="secondary" size="sm" icon={Headset} onClick={() => showToast('Contact support: this flow is planned next')}>
+              Contact support
             </Button>
+          ) : review === 'review' ? (
+            /* Not reviewed yet: Review first; Publish comes once it is approved (owner, 17 Nov 2026). */
+            <Button variant="secondary" size="sm" icon={Eye} onClick={onOpen}>
+              Review
+            </Button>
+          ) : (
+            publishable &&
+            onPublish && (
+              <Button variant="secondary" size="sm" icon={Rocket} onClick={onPublish}>
+                Publish
+              </Button>
+            )
           )}
         </td>
       )}
-      <td>
-        <StatusPill status={policy.status} />
-      </td>
       <td className="btable__actions">
         <RowMenu
           label={`Actions for ${policy.name}`}
-          items={policyMenu(policy, { monitor, trySignIn })}
-          onSelect={(id) => onAction(id as RowAction)}
+          items={review ? reviewMenu(review) : [
+            ...policyMenu(policy, { monitor, trySignIn }),
+            ...(migrated && policy.status === 'active' && onRollBack ? [{ id: 'rollback', label: 'Roll back to old policy', icon: Undo2, divide: true }] : []),
+          ]}
+          onSelect={(id) => {
+            if (id === 'rollback') return onRollBack?.()
+            if (id === 'review') return onOpen()
+            if (id === 'approve') {
+              reviewMoved(policy.id, true)
+              clearRejected(policy.id)
+              return showToast(`${policy.name} approved`, { label: 'Undo', run: () => reviewMoved(policy.id, false) })
+            }
+            if (id === 'unapprove') return reviewMoved(policy.id, false)
+            if (id === 'reject') return setRejecting(true)
+            if (id === 'support') return showToast('Contact support: this flow is planned next')
+            onAction(id as RowAction)
+          }}
         />
+        <RejectDialog policy={rejecting ? policy : null} variant="today" onClose={() => setRejecting(false)} />
       </td>
     </tr>
   )

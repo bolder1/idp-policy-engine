@@ -100,11 +100,77 @@ function ActionCell({ state, pick, name }: { state: RowState; pick: string[]; na
   )
 }
 
+/* The App Login table, shared (owner, 9 Nov 2026: "the table we have in policy before migration, same table after
+   migration in the Old policies tab"). */
+export function OldLoginTable({ rows: shown, viewOnly = false }: { rows: LegacyPolicy[]; /** The Old policies tab: read only, no Action column and no new policy's status (owner, 9 Nov 2026). */ viewOnly?: boolean }) {
+  const store = useBrand()
+  const { ctx, stateOf } = useOldEstate()
+  const appName = (id: string) => ctx.apps.find((a) => a.id === id)?.name ?? id
+  return (
+    <div className="btable-wrap">
+      <div className="btable__scroll">
+        <table className="btable">
+          <thead>
+            <tr>
+              <th scope="col">Policy Name</th>
+              <th scope="col">Group Name</th>
+              <th scope="col">Application Name</th>
+              <th scope="col">First Factor</th>
+              <th scope="col" className="bold__col-tick">
+                2FA
+              </th>
+              <th scope="col" className="bold__col-tick">
+                Adaptive
+              </th>
+              {!viewOnly && (
+                <th scope="col" className="bold__col-action">
+                  Action
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((lp) => {
+              const state = stateOf(lp)
+              const moved = state.kind === 'moved' ? store.policyById(state.policyId) : undefined
+              return (
+                <tr key={lp.id} className={!viewOnly && state.kind !== 'old' ? 'is-done' : ''}>
+                  <td>
+                    <div className="btable__primary">
+                      <span className="bold__name">{lp.name}</span>
+                      {moved && !viewOnly && <StatusPill status={moved.status} />}
+                    </div>
+                  </td>
+                  <td>{groupName(lp.groupId, ctx)}</td>
+                  <td>{appName(lp.appId)}</td>
+                  <td>{lp.firstFactor}</td>
+                  <td>
+                    <Tick on={!!lp.mfa} label="2FA" />
+                  </td>
+                  <td>
+                    <Tick on={!!lp.adaptive} label="Adaptive" />
+                  </td>
+                  {!viewOnly && (
+                    <td>
+                      <ActionCell state={state} name={lp.name} pick={[lp.id]} />
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {shown.length === 0 && <p className="bold__empty">No policies match</p>}
+    </div>
+  )
+}
+
 /* --- App Login Policies ----------------------------------------------------------------- */
 
 export function OldLoginPolicies() {
   const store = useBrand()
-  const { ctx, stateOf, rows } = useOldEstate()
+  const { ctx, rows } = useOldEstate()
   const [q, setQ] = useState('')
   const appName = (id: string) => ctx.apps.find((a) => a.id === id)?.name ?? id
   const key = q.trim().toLowerCase()
@@ -126,58 +192,7 @@ export function OldLoginPolicies() {
           Add Policy
         </Button>
       </div>
-      <div className="btable-wrap">
-        <div className="btable__scroll">
-          <table className="btable">
-            <thead>
-              <tr>
-                <th scope="col">Policy Name</th>
-                <th scope="col">Group Name</th>
-                <th scope="col">Application Name</th>
-                <th scope="col">First Factor</th>
-                <th scope="col" className="bold__col-tick">
-                  2FA
-                </th>
-                <th scope="col" className="bold__col-tick">
-                  Adaptive
-                </th>
-                <th scope="col" className="bold__col-action">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((lp) => {
-                const state = stateOf(lp)
-                const moved = state.kind === 'moved' ? store.policyById(state.policyId) : undefined
-                return (
-                  <tr key={lp.id} className={state.kind !== 'old' ? 'is-done' : ''}>
-                    <td>
-                      <div className="btable__primary">
-                        <span className="bold__name">{lp.name}</span>
-                        {moved && <StatusPill status={moved.status} />}
-                      </div>
-                    </td>
-                    <td>{groupName(lp.groupId, ctx)}</td>
-                    <td>{appName(lp.appId)}</td>
-                    <td>{lp.firstFactor}</td>
-                    <td>
-                      <Tick on={!!lp.mfa} label="2FA" />
-                    </td>
-                    <td>
-                      <Tick on={!!lp.adaptive} label="Adaptive" />
-                    </td>
-                    <td>
-                      <ActionCell state={state} name={lp.name} pick={[lp.id]} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        {shown.length === 0 && <p className="bold__empty">No policies match</p>}
-      </div>
+      <OldLoginTable rows={shown} />
     </div>
   )
 }

@@ -613,12 +613,13 @@ export interface BrandStore {
   closeIntro: () => void
   /** The Start migration popup (migrate/MoveDialog.tsx; owner, 4 Nov 2026): a summary and the pick list, then the move
       runs in the background. `pick` preselects old policies. */
-  moveDialog: { pick?: string[] } | null
+  moveDialog: { pick?: string[]; consented?: boolean } | null
   /** Review as a popup (migrate/ReviewDialog.tsx; owner, 5 Nov 2026), over any page. */
   reviewOpen: boolean
   openReview: () => void
   closeReview: () => void
-  openMoveDialog: (pick?: string[]) => void
+  /** `consented`: the intro already asked, so the popup's Migrate starts the move. */
+  openMoveDialog: (pick?: string[], consented?: boolean) => void
   /** Migrate has been pressed in the Migrate popup (migrate/phase.ts MIGRATION_FIRST): the rail opens the new Policies. */
   migrationStarted: boolean
   /** The Migrate popup's Migrate: the move starts, the rail swaps, and the console lands on New policies. */
@@ -655,8 +656,8 @@ export interface BrandStore {
   migratedById: (id: string) => Policy | undefined
   clearImported: () => void
   /* The migration's finale (owner, 5 Nov 2026): approved policies wait off the list until Add to Policies lays them
-     in row by row; Make all active turns every moved draft active, one row at a time, and deletes the old policies
-     they came from; then a done state. */
+     in row by row; Make all active turns every moved draft active, one row at a time; the old policies
+     they came from stay; then a done state. */
   /** Approved moved policies not yet laid into the list. */
   held: readonly string[]
   /** Rows lighting up right now (being added, or being made active). */
@@ -665,7 +666,7 @@ export interface BrandStore {
   revealHeld: () => void
   /** True while Make all active runs. */
   activating: boolean
-  /** Makes every moved draft active, one row at a time, then deletes the old policies they came from. */
+  /** Makes every moved draft active, one row at a time. The old policies they came from stay in the Old policies tab. */
   activateMoved: () => void
   /** The migration is finished: every moved policy active, the old ones deleted. Null until then. */
   migrationDone: { active: number; deleted: number } | null
@@ -772,7 +773,7 @@ function leaveGroup(u: User, groupId: string): User {
 /* A sign-in policy the empty new builder keeps: the tenant's system policy, and every post sign-in policy (another tab). */
 const keptWhenEmpty = (p: Policy) => !!p.isSystem || p.type === 'Session'
 
-export function BrandProvider({ children, fresh = false }: { children: ReactNode; fresh?: boolean }) {
+export function BrandProvider({ children }: { children: ReactNode; fresh?: boolean }) {
   /* The tenant the console opens on. The showcase build loads the presentation
      tenant (showcase-seed.ts); every other build loads the Security IT
      Manager's, which is the default persona below. Chosen once, lazily, and
@@ -780,11 +781,12 @@ export function BrandProvider({ children, fresh = false }: { children: ReactNode
   const [seed] = useState<Tenant>(() => (SHOWCASE ? showcaseTenant() : tenantAt('medium')))
   /* `fresh` (the app passes it, tests do not): the new builder as a tenant first meets it, with no sign-in policies
      of its own yet, so the move from the old builder starts on an empty page (owner, 3 Nov 2026). */
-  const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => (fresh ? seed.policies.filter(keptWhenEmpty) : seed.policies))
-  const [builderStart, setBuilderStartState] = useState<'empty' | 'seeded'>(fresh ? 'empty' : 'seeded')
+  const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)
+  /* With policies is the default start (owner, 11 Nov 2026); `fresh` no longer empties it. */
+  const [builderStart, setBuilderStartState] = useState<'empty' | 'seeded'>('seeded')
   const [deadlineView, setDeadlineView] = useState<DeadlineView>('now')
   const [intro, setIntro] = useState<{ mode: 'learn' | 'migrate'; pick?: string[] } | null>(null)
-  const [moveDialog, setMoveDialog] = useState<{ pick?: string[] } | null>(null)
+  const [moveDialog, setMoveDialog] = useState<{ pick?: string[]; consented?: boolean } | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [setupDone, setSetupDone] = useState<string[]>([])
   const [moveTour, setMoveTour] = useState(false)
@@ -1236,13 +1238,9 @@ export function BrandProvider({ children, fresh = false }: { children: ReactNode
       closeReview: () => setReviewOpen(false),
       /* The move form is a page now (owner, 5 Nov 2026). */
       /* With migration first, the intro ends in the Migrate popup; the rail only swaps on its Migrate (owner, 6 Nov 2026). */
-      openMoveDialog: (pick) => {
-        if (MIGRATION_FIRST && !migrationStarted) {
-          setMoveDialog({ pick })
-          return
-        }
-        go({ name: 'move-policies', pick })
-      },
+      /* Every way into the move opens the Migrate popup (owner, 9 Nov 2026: "remove this page; on click I want a popup"):
+         the count and three steps, then the consent, then the move. The Move policies page stays routable, unused. */
+      openMoveDialog: (pick, consented) => setMoveDialog({ pick, consented }),
       migrationStarted,
       closeMoveDialog: () => setMoveDialog(null),
       movedProfiles: fingerprints.filter((f) => !!f.fromOld),
@@ -1269,7 +1267,7 @@ export function BrandProvider({ children, fresh = false }: { children: ReactNode
         setMoveDialog(null)
         setMigrationStarted(true)
         try {
-          localStorage.setItem('brand-policies-type', 'sign-in')
+          localStorage.setItem('brand-policies-type', 'moved')
         } catch {
           /* the tab just isn't remembered */
         }

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ExternalLink } from 'lucide-react'
 import { AlertArt } from './AlertArt'
 import { NewBuilderButton } from './new-builder-button'
 import { Button } from '../kit'
 import { addedLabel } from '../data'
 import { OLD_CLOSES, SHOW_TIME_DAYS, countdown, daysLeft, deadlineNow, stageOf, timeLeft, type DeadlineView } from './legacy'
 import { MoveArt } from './MoveArt'
+import { guideUrl } from './guide-link'
 import { BannerMark } from './AnnounceStrip'
 import './old-policies.css'
 
@@ -120,19 +121,19 @@ export function MoveBanner({
     )
   if (where === 'new')
     return (
-      <section className="bold__banner is-quiet" aria-label="Bring your old policies over">
+      /* The old pages' banner, white and still (owner, 9 Nov 2026: "the same old policy close card, but a white, simple
+         one"): its mark, the words, and the blue Start migration in one row. */
+      <section className="bold__banner is-row is-white" aria-label="Bring your old policies over">
+        <span className="bold__mark" aria-hidden>
+          <BannerMark reduce />
+        </span>
         <div className="bold__bannertext">
           <h2 className="bold__bannertitle">Bring your old policies over</h2>
           <p>{waiting === 1 ? '1 policy from the old builder can move here, rules and all.' : `${waiting} policies from the old builder can move here, rules and all.`}</p>
-          <div className="bold__banneractions">
-            <Button variant={secondary ? 'secondary' : 'brand'} size="sm" iconRight={ArrowRight} onClick={onAction}>
-              Start migration
-            </Button>
-          </div>
         </div>
-        <div className="bold__scene">
-          <MoveArt pace="calm" />
-        </div>
+        <span className="bold__go">
+          <NewBuilderButton label="Migrate my policies" door={false} onOpen={onAction} />
+        </span>
       </section>
     )
   const now = deadlineNow(view, today)
@@ -154,10 +155,14 @@ export function MoveBanner({
       <div className="bold__bannertext">
         <h2 className="bold__bannertitle">Old policies close on {addedLabel({ addedOn: OLD_CLOSES })}</h2>
         <p>Move them to the new builder. Anything still here then is merged for you.</p>
+        {/* How it works, in a tab of its own (owner, 10 Nov 2026): a link in the words, not a second button. */}
+        <Button variant="link" size="sm" iconRight={ExternalLink} onClick={() => window.open(guideUrl(), '_blank', 'noopener')}>
+          See how it works
+        </Button>
       </div>
       {showTime && <Countdown now={now} />}
       <span className="bold__go">
-        <NewBuilderButton onOpen={onAction} />
+        <NewBuilderButton label="Migrate my policies" onOpen={onAction} />
       </span>
     </section>
   )

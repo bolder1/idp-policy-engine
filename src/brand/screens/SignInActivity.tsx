@@ -95,6 +95,28 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
     go({ name: 'sign-in-tests' })
   }
 
+  /* Nothing of the tenant's own yet, only the system policy: no application is being decided by a policy, so there are
+     no sign-ins and no changes to list. The modelled sample belongs to a tenant that has policies. */
+  if (policies.every((p) => p.isSystem)) {
+    return (
+      <div className="bpage sia">
+        <PageHead title="Sign-in activity" caption="The week’s sign-ins across every application, and why any were refused." crumb={crumb} />
+        <div className="btable-wrap">
+          <EmptyState
+            icon={ListChecks}
+            title="No sign-ins to show yet"
+            blurb="Sign-ins and policy changes appear here once a policy is deciding sign-ins to an application."
+            action={
+              <Button variant="secondary" onClick={() => go({ name: 'policies' })}>
+                Go to policies
+              </Button>
+            }
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bpage sia">
       <PageHead

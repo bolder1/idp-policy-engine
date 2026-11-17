@@ -183,6 +183,16 @@
 /* "Opened 12 min ago" and "Added Sep 22, 2026" both fit on one line. */
 .btable__col-activity { width: 176px; }
 .btable__activity { color: var(--text-secondary); white-space: nowrap; }
+
+/* Publish in the row: the rocket lifts off on hover or focus, then settles back. */
+.btable__next .bx-btn svg { transition: transform 0.25s ease, color 0.2s ease; }
+.btable__next .bx-btn:hover,
+.btable__next .bx-btn:focus-visible { border-color: var(--blue); background: var(--blue-soft); color: var(--blue-strong); }
+@media (prefers-reduced-motion: no-preference) {
+  .btable__next .bx-btn:hover svg,
+  .btable__next .bx-btn:focus-visible svg { transform: translate(2px, -2px) rotate(-8deg); }
+  .btable__next .bx-btn:active svg { transform: translate(4px, -4px) rotate(-8deg); }
+}
 /* A row arriving from Move policies: it lights and settles, one after another (`--arrive` is its place). */
 @keyframes btable-arrive {
   0% { background-color: var(--fb-info-bg); }
@@ -998,7 +1008,19 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
 /* Policies: pick rows, act on several (6 Nov 2026). */
 .btable__col-pick { width: 40px; padding-right: 0 !important; }
 .bpol__pick { width: 16px; height: 16px; margin: 0; accent-color: var(--blue, var(--text-primary)); cursor: pointer; vertical-align: middle; }
-.bpol__bulk { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4); border-radius: var(--radius-lg); background: var(--blue-soft, var(--surface-sunken)); }
-.bpol__bulk > b { flex: 1; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 /* Next step (Policies.tsx): a moved draft's Publish, in a column of its own (owner, 6 Nov 2026). */
 .btable__col-next { width: 128px; }
+
+/* A section heading inside the policies table (owner, 10 Nov 2026). */
+.btable__group td { padding: var(--space-3) var(--space-4); background: var(--surface-sunken); border-bottom: var(--bw-thin) solid var(--border-subtle); font-size: var(--fs-sm); color: var(--text-tertiary); }
+.btable__group b { margin-right: var(--space-3); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+
+/* Sections: each its own table, with its heading above (owner, 10 Nov 2026). */
+.btable__section + .btable__section { margin-top: var(--space-6); }
+.btable__sectionhead { margin: 0; padding: var(--space-3) var(--space-4); display: flex; align-items: baseline; gap: var(--space-3); font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.btable__sectionhead span { font-size: var(--fs-sm); font-weight: var(--fw-regular, 400); color: var(--text-tertiary); }
+
+/* New policies' two lists: a second tab row above them (owner, 10 Nov 2026). */
+.bpol__main { min-width: 0; }
+.bpol__sub { margin: 0 0 var(--space-4); align-self: flex-start; }
+.btable__appname { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: left; }

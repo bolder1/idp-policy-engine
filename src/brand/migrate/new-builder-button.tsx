@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { MIGRATION_FIRST } from './phase'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { PartyPopper } from 'lucide-react'
+import { PartyPopper, type LucideIcon } from 'lucide-react'
 
 /* -----------------------------------------------------------------------------
    Open new builder, as an occasion (owner, 4 Nov 2026: "a good animated button with a
@@ -18,7 +18,7 @@ import { PartyPopper } from 'lucide-react'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
-export function NewBuilderButton({ onOpen, label, door: withDoor = !MIGRATION_FIRST }: { onOpen: () => void; /** The words; the banner's own by default. */ label?: string; /** False: no door, the press opens straight away. With migration first the banner opens the intro without one (owner, 6 Nov 2026). */ door?: boolean }) {
+export function NewBuilderButton({ onOpen, label, disabled = false, door: withDoor = !MIGRATION_FIRST, icon: Icon = PartyPopper, blink = false }: { onOpen: () => void; /** The icon blinks instead of wiggling (an eye, for Start review). */ blink?: boolean; /** The mark beside the words; the party popper by default (Start review has its own, owner 10 Nov 2026). */ icon?: LucideIcon; /** Not pressable yet. */ disabled?: boolean; /** The words; the banner's own by default. */ label?: string; /** False: no door, the press opens straight away. With migration first the banner opens the intro without one (owner, 6 Nov 2026). */ door?: boolean }) {
   const reduce = useReducedMotion()
   const ref = useRef<HTMLButtonElement>(null)
   const [door, setDoor] = useState<{ x: number; y: number } | null>(null)
@@ -36,7 +36,7 @@ export function NewBuilderButton({ onOpen, label, door: withDoor = !MIGRATION_FI
 
   return (
     <>
-      <button ref={ref} type="button" className="bnbb" onClick={press}>
+      <button ref={ref} type="button" className="bnbb" onClick={press} disabled={disabled}>
         {!reduce && (
           <motion.span
             className="bnbb__shine"
@@ -50,10 +50,10 @@ export function NewBuilderButton({ onOpen, label, door: withDoor = !MIGRATION_FI
           className="bnbb__icon"
           aria-hidden
           initial={false}
-          animate={reduce ? undefined : { rotate: [0, 14, -8, 0], scale: [1, 1.18, 1] }}
+          animate={reduce ? undefined : blink ? { scaleY: [1, 1, 0.1, 1, 1] } : { rotate: [0, 14, -8, 0], scale: [1, 1.18, 1] }}
           transition={reduce ? undefined : { duration: 1.2, repeat: Infinity, repeatDelay: 2.4 }}
         >
-          <PartyPopper size={15} strokeWidth={2.2} />
+          <Icon size={15} strokeWidth={2.2} />
         </motion.span>
         {label ?? (MIGRATION_FIRST ? 'See what’s new' : 'Open new builder')}
       </button>

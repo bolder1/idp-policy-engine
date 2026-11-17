@@ -1,0 +1,10 @@
+/* The migration numbers (review-cards.tsx): one panel, a column per state, rules between. Tokens only. */
+.brc { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); margin-bottom: var(--space-4); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); overflow: hidden; }
+.brc__cell { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; padding: var(--space-4) var(--space-5); box-shadow: calc(-1 * var(--bw-thin)) 0 0 var(--border-default); }
+.brc__label { font-size: var(--fs-sm); color: var(--text-secondary); }
+.brc__num { font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.brc__cell.is-review .brc__num { color: var(--fb-info-fg); }
+.brc__cell.is-approved .brc__num { color: var(--fb-positive-fg); }
+.brc__cell.is-rejected .brc__num { color: var(--fb-negative-fg); }
+/* Every action on the same line across the panel, whatever the label's length. */
+.brc__act { display: flex; min-height: 32px; margin-top: var(--space-2); max-width: 100%; }

@@ -9,6 +9,8 @@
    Its own file so the scene file exports components only. */
 
 const END = 88
+/** Where the 2D film opens. 0: it opens on Salesforce, App Login then Adaptive Access, then every application at once. */
+export const FILM_START = 0
 
 /** Monotone cubic (Fritsch-Carlson) through (ts, vs), read at t. */
 function monotone(ts: readonly number[], vs: readonly number[], t: number): number {
@@ -46,12 +48,12 @@ function monotone(ts: readonly number[], vs: readonly number[], t: number): numb
 
 /* Where the camera looks (world x, world y, width). */
 const CAM: [number, number, number, number][] = [
+  /* Salesforce: its App Login rows, then its Adaptive Access rows */
   [0, -420, -40, 650],
   [10.4, -420, -56, 600],
-  [12.6, -380, -110, 760],
-  [14.4, 0, -126, 1240],
-  [16, 10, -120, 1300],
-  /* the wall of 146: tilted, panned across slowly */
+  /* every application at once, then the wall of 146: tilted, panned across slowly (owner, 9 Nov 2026: straight from
+     Salesforce to all of them, not four first) */
+  [12.4, 0, -126, 1240],
   [17.8, -360, -230, 1280],
   [21.6, 340, 40, 1240],
   /* into Salesforce's copy, out again for the copies edited by hand */
@@ -60,10 +62,10 @@ const CAM: [number, number, number, number][] = [
   [26, 0, -90, 1700],
   [28.2, 0, -80, 1640],
   /* taken apart: the old Adaptive policy, its checks lifting out */
-  [30.2, 0, -30, 960],
-  [34, -30, 0, 900],
-  [38, 30, 0, 900],
-  [41.2, 0, 0, 920],
+  /* One steady framing for the whole chapter (owner, 9 Nov 2026: "make the camera movement smooth, and give the user time to
+     read"): the cards open in place, so the camera only drifts. */
+  [30.2, 0, -20, 960],
+  [41.4, 0, -8, 940],
   /* the builder: the Library and the canvas, then rule 1 with its Inspector */
   [43.6, -90, 0, 1150],
   [46.6, 260, -30, 1000],
@@ -91,8 +93,7 @@ const W = CAM.map((c) => c[3])
 const TILT: [number, number][] = [
   [0, 0],
   [11.6, 0],
-  [14, 0.36],
-  [16, 0.4],
+  [13.4, 0.6],
   [17.8, 0.8],
   [21.6, 0.8],
   [23.2, 0],

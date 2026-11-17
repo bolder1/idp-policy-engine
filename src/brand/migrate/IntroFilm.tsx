@@ -1,11 +1,12 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AnimatePresence, useReducedMotion } from 'motion/react'
-import { Pause, Play } from 'lucide-react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { Blocks, Boxes, Maximize2, Minimize2, ChevronLeft, Info, ChevronRight, Files, Laptop, ListTree, MapPin, Pause, Play, Puzzle, RotateCcw, RotateCw, Rocket, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { Button } from '../kit'
 import { RESOLVED_LOGOS } from '../logos/manifest.generated'
 import { Scene2D } from './intro-film-2d'
-import { camera2D } from './intro-film-2d-camera'
+import { FILM_START, camera2D } from './intro-film-2d-camera'
 import { NewBuilderButton } from './new-builder-button'
+import { ACTS, actsFor, speed2D, type FilmVersion } from './intro-film-acts'
 import './old-policies.css'
 import './intro-film.css'
 
@@ -163,29 +164,23 @@ function camera(t: number): string {
   return `${(lerp(x0, x1, k) - w / 2).toFixed(1)} ${(lerp(y0, y1, k) - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`
 }
 
-/* The words: one line at a time, grouped by act; the act's earlier lines stay, dimmed. */
-const ACTS: { title: string; at: number; lines: [number, string][] }[] = [
-  { title: 'Today', at: 0, lines: [[0.6, 'Every application gets its own policies.'], [5, 'One for who signs in, and how.'], [8, 'Another for where, when, and on what device.'], [12, 'Then do it again for the next application.'], [16, 'And the next.']] },
-  { title: 'The cost', at: 18, lines: [[18.3, 'The same checks, copied everywhere.'], [22.3, 'Change one IP range…'], [25, '…and you change it in four places.']] },
-  { title: 'Taken apart', at: 28, lines: [[28.3, 'The new Policy builder starts by pulling the checks out.'], [33, 'Places and networks become one zone.'], [36.5, 'Device limits become one device profile.'], [39.5, 'Made once. Kept in your library.']] },
-  { title: 'The builder', at: 42, lines: [[42.3, 'This is the Policy builder.'], [46, 'A rule says who…'], [50, '…if what is true…'], [54, '…then how they sign in.'], [57, 'One rule holds what used to take two pages.']] },
-  { title: 'Many rules', at: 60, lines: [[60.3, 'Add another rule. And another.'], [65, 'One policy can cover many applications.'], [69, 'Eight policies become one.']] },
-  { title: 'Check access', at: 72, lines: [[72.3, 'Know the answer before it goes live.'], [75.5, 'Priya gets in.'], [79.5, 'Arun doesn’t.']] },
-  { title: 'Your move', at: 82, lines: [[82.3, 'Your old policies move over as drafts.'], [84.5, 'Approve them, then publish.']] },
-]
-
-/* The 2D film says the estate as it is (owner, 6 Nov 2026): many old policies per application, 146 in all. */
-const LINES_2D: Record<number, string> = {
-  5: 'App Login policies for who signs in, and how.',
-  8: 'Adaptive Access policies for where, when, and on what device.',
-  12: 'Then more for the next application.',
-  16: 'Until there are 146 of them.',
-  25: '…and only that copy changes.',
-  69: 'Five Salesforce policies become one.',
+/** Each chapter's own colour (intro-film.css, by `data-ch`), its mark, and the line it leaves behind when it ends (owner,
+ *  9 Nov 2026: "fun, interactive, colourful ... one chapter done, fold it ... a small pop-up after each chapter"). */
+const CHAPTER: Record<string, { key: string; Icon: LucideIcon; took: string }> = {
+  Today: { key: 'today', Icon: Boxes, took: '146 old policies, across 24 applications.' },
+  'The cost': { key: 'cost', Icon: Files, took: 'Every change is made by hand, copy by copy.' },
+  'Taken apart': { key: 'taken', Icon: Puzzle, took: 'Zones and device profiles, made once.' },
+  'New zones': { key: 'zones', Icon: MapPin, took: 'Places and networks, made once.' },
+  'New device profiles': { key: 'devices', Icon: Laptop, took: 'Device limits, made once.' },
+  'The builder': { key: 'builder', Icon: Blocks, took: 'One rule: who, if what, then how.' },
+  'Many rules': { key: 'rules', Icon: ListTree, took: 'One policy can cover many applications.' },
+  'Check access': { key: 'access', Icon: ShieldCheck, took: 'Know the answer before it goes live.' },
+  'Your move': { key: 'move', Icon: Rocket, took: '' },
 }
-/* Lines only the 2D film has: the copies, edited by hand (owner, 6 Nov 2026). */
-const EXTRA_2D: Record<string, [number, string][]> = { 'The cost': [[26, 'Every other copy, you find and edit by hand. One at a time.']] }
-const ACTS_2D = ACTS.map((a) => ({ ...a, lines: [...a.lines.map(([at, line]) => [at, LINES_2D[at] ?? line] as [number, string]), ...(EXTRA_2D[a.title] ?? [])] }))
+
+/** How fast the 2D film's clock runs at t: quick while Salesforce's rows build and while the wall comes in, steadier
+ *  on App Login and on Adaptive Access, so neither is rushed and nothing waits; slow again through Taken apart, where the
+ *  zone and the device profile each need time to be read (owner, 9 Nov 2026: "very fast, can't see anything"). */
 
 /* --- The world at time t ------------------------------------------------------------ */
 
@@ -480,22 +475,49 @@ function Scene({ t }: { t: number }) {
 export function IntroFilm({
   extra,
   onStart,
+  ask = false,
   onLater,
   flat = false,
+  v = 'v1',
   end,
+  player = false,
 }: {
   extra?: ReactNode
   /** Start migration: the Migrate popup. */
   onStart: () => void
+  /** Ask, in the canvas, before Start opens the new builder. */
+  ask?: boolean
   onLater: () => void
   flat?: boolean
+  /** v0 is the film as it was; v1 the updated one (owner, 10 Nov 2026). */
+  v?: FilmVersion
   /** The film's last scene (owner, 6 Nov 2026: "at the end of the video, this round visual, and the migration starts
       from there only"): its picture and words, over the stage. */
   end?: { hero: ReactNode; title: string; body: string }
+  /** One video with a player's controls (play, pause, back and forward 10 seconds, a scrubber and the time), not the
+      chapter trail and the buttons (owner, 10 Nov 2026). */
+  player?: boolean
 }) {
   const reduce = useReducedMotion() === true
-  const [t, setT] = useState(0)
+  /* The 2D film opens on the wall of applications, not on one (owner, 9 Nov 2026). */
+  const from = flat ? FILM_START : 0
+  const [t, setT] = useState(from)
   const [playing, setPlaying] = useState(!reduce)
+  /* The consent, in the canvas: the stage flips to it, the film waits (owner, 9 Nov 2026: not a second popup). */
+  const [asking, setAsking] = useState(false)
+  const [ack, setAck] = useState(false)
+  const resume = useRef(false)
+  const openAsk = () => {
+    resume.current = playing
+    setPlaying(false)
+    setAck(false)
+    setAsking(true)
+  }
+  const closeAsk = () => {
+    setAsking(false)
+    setAck(false)
+    if (resume.current) setPlaying(true)
+  }
   const tRef = useRef(t)
   tRef.current = t
   useEffect(() => {
@@ -503,7 +525,8 @@ export function IntroFilm({
     let raf = 0
     let last = performance.now()
     const tick = (now: number) => {
-      const next = Math.min(END, tRef.current + (now - last) / 1000)
+      /* The 2D film runs fast through the empty stretches and at reading speed on the two policy beats (owner, 9 Nov 2026). */
+      const next = Math.min(END, tRef.current + ((now - last) / 1000) * (flat ? speed2D(tRef.current, v) : 1))
       last = now
       setT(next)
       if (next >= END) setPlaying(false)
@@ -511,24 +534,108 @@ export function IntroFilm({
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [playing])
+  }, [playing, flat, v])
 
-  const acts = flat ? ACTS_2D : ACTS
+  const acts = flat ? actsFor(v) : ACTS
+  /* The player's clock is the viewer's: seconds of watching, not the film's own t, which runs at a different pace in
+     different stretches. Built once by walking the film at its own speeds. */
+  const clock = useMemo(() => {
+    const step = 0.1
+    const at: number[] = [0]
+    for (let x = from; x < END; x += step) at.push(at[at.length - 1] + step / (flat ? speed2D(x, v) : 1))
+    return at
+  }, [from, flat, v])
+  const total = clock[clock.length - 1]
+  const realOf = (x: number) => {
+    const i = Math.max(0, Math.min(clock.length - 1, (x - from) / 0.1))
+    const lo = Math.floor(i)
+    return clock[lo] + ((clock[Math.min(clock.length - 1, lo + 1)] - clock[lo]) * (i - lo))
+  }
+  const filmOf = (secs: number) => {
+    let lo = 0
+    let hi = clock.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (clock[mid] < secs) lo = mid + 1
+      else hi = mid
+    }
+    return Math.min(END, from + lo * 0.1)
+  }
+  /* Full width (owner, 10 Nov 2026): the whole film fills the screen, its controls with it. */
+  const root = useRef<HTMLDivElement>(null)
+  const [full, setFull] = useState(false)
+  /* Where the browser refuses real full screen (a webview, an embedded frame), the film fills the window instead. */
+  const [filled, setFilled] = useState(false)
+  useEffect(() => {
+    const on = () => setFull(document.fullscreenElement === root.current)
+    document.addEventListener('fullscreenchange', on)
+    return () => document.removeEventListener('fullscreenchange', on)
+  }, [])
+  useEffect(() => {
+    if (!filled) return
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setFilled(false)
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [filled])
+  const toggleFull = () => {
+    if (document.fullscreenElement) return void document.exitFullscreen()
+    if (filled) return setFilled(false)
+    const el = root.current
+    if (!el?.requestFullscreen) return setFilled(true)
+    /* Some webviews neither enter full screen nor settle the request, so a short look decides. */
+    const fill = () => setFilled(true)
+    try {
+      el.requestFullscreen().catch(fill)
+    } catch {
+      fill()
+    }
+    window.setTimeout(() => {
+      if (!document.fullscreenElement) fill()
+    }, 500)
+  }
+  const isFull = full || filled
+  const watched = realOf(t)
+  const seek = (secs: number) => jump(filmOf(Math.max(0, Math.min(total, secs))))
+  const mmss = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`
   const act = acts.reduce((cur, a, i) => (t >= a.at ? i : cur), 0)
   const shown = acts[act].lines.filter(([at]) => t >= at)
   const endOp = end ? seg(t, 84.6, 85.4) : 0
   const jump = (to: number) => {
+    /* Going back from the end plays again. */
+    if (t >= END && to < END) setPlaying(true)
     setT(to)
     if (to >= END) setPlaying(false)
   }
+  const atEnd = acts[act].title === 'Your move'
+  const replay = () => {
+    setT(from)
+    setPlaying(true)
+  }
+  const startOf = (i: number) => Math.max(acts[i].at, from)
+  /* Back: the start of this chapter, or the one before when it has only just begun. Forward: the next chapter's start. */
+  const back = () => jump(startOf(t - startOf(act) > 2 || act === 0 ? act : act - 1))
+  const forward = () => act < acts.length - 1 && jump(startOf(act + 1))
   const toggle = () => {
-    if (t >= END) setT(0)
+    if (t >= END) setT(from)
     setPlaying((p) => !p)
   }
 
+  /* v1: the words inside the canvas (owner, 10 Nov 2026), so the eye stays on the film while it reads; v0: in the row below. */
+  const words = (
+    <div className={`bfm__words${player ? ' is-below' : ''}`} aria-live="polite">
+      <span className="bfm__act">{acts[act].title}</span>
+      {shown.map(([at, line], i) => (
+        <p key={at} className={i === shown.length - 1 ? 'is-now' : ''} style={{ opacity: i === shown.length - 1 ? (at <= from ? 1 : Math.max(0.2, seg(t, at, at + 0.45))) : 0.38 }}>
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+
   return (
-    <div className="bfm">
+    <div ref={root} className={`bfm${end && endOp > 0.5 ? ' is-end' : ''}${isFull ? ' is-full' : ''}${filled ? ' is-filled' : ''}`} data-ch={CHAPTER[acts[act].title]?.key}>
       <div className="bfm__stage">
+        {v === 'v1' && !player && words}
         <svg viewBox={flat ? camera2D(t) : camera(t)} className={`bfm__svg${flat ? ' is-2d' : ''}`} role="img" aria-label={`${acts[act].title}: ${shown.length ? shown[shown.length - 1][1] : ''}`}>
           <defs>
             <filter id="bfm-glow" x="-40%" y="-40%" width="180%" height="180%">
@@ -544,7 +651,7 @@ export function IntroFilm({
             </pattern>
           </defs>
           <FlatContext.Provider value={flat}>
-            {flat ? <Scene2D t={t} /> : <Scene t={t} />}
+            {flat ? <Scene2D t={t} v={v} /> : <Scene t={t} />}
           </FlatContext.Provider>
         </svg>
         {end && endOp > 0 && (
@@ -563,60 +670,155 @@ export function IntroFilm({
             </div>
             <h2 style={{ opacity: seg(t, 86.2, 86.8) }}>{end.title}</h2>
             <p style={{ opacity: seg(t, 86.5, 87.1) }}>{end.body}</p>
+            {/* The way on, in the middle with the words (owner, 9 Nov 2026: no bottom row on this scene). */}
+            <span className="bfm__endacts" style={{ opacity: seg(t, 86.8, 87.4) }}>
+              <NewBuilderButton label="Migrate your old policy" door={false} onOpen={ask ? openAsk : onStart} />
+            </span>
+            <span className="bfm__endsub" style={{ opacity: seg(t, 87, 87.6) }}>
+              <button type="button" className="bfm__replay" onClick={replay}>
+                <RotateCcw size={14} strokeWidth={2.3} aria-hidden />
+                Watch again
+              </button>
+              <Button variant="ghost" onClick={onLater}>
+                Not now
+              </Button>
+            </span>
           </div>
         )}
-      </div>
+        {/* The timeline, a row of its own (owner, 6 Nov 2026): play, then one segment per chapter, named; a press
+            anywhere in a segment goes to that moment. */}
+        {player && (
+          <div className="bfm__player" role="group" aria-label="Video controls">
+            <button type="button" className="bfm__play" aria-label={t >= END ? 'Watch again' : playing ? 'Pause' : 'Play'} onClick={toggle}>
+              {t >= END ? <RotateCcw size={15} strokeWidth={2.4} aria-hidden /> : playing ? <Pause size={15} strokeWidth={2.4} aria-hidden /> : <Play size={15} strokeWidth={2.4} aria-hidden />}
+            </button>
+            <button type="button" className="bfm__skip" aria-label="Back 10 seconds" onClick={() => seek(watched - 10)}>
+              <RotateCcw size={28} strokeWidth={1.6} aria-hidden />
+              <span aria-hidden>10</span>
+            </button>
+            <button type="button" className="bfm__skip" aria-label="Forward 10 seconds" onClick={() => seek(watched + 10)}>
+              <RotateCw size={28} strokeWidth={1.6} aria-hidden />
+              <span aria-hidden>10</span>
+            </button>
+            <input
+              className="bfm__scrub"
+              type="range"
+              min={0}
+              max={Math.round(total * 10)}
+              value={Math.round(watched * 10)}
+              aria-label="Position"
+              aria-valuetext={`${mmss(watched)} of ${mmss(total)}`}
+              style={{ ['--pos' as string]: `${total ? (watched / total) * 100 : 0}%` }}
+              onChange={(e) => seek(Number(e.target.value) / 10)}
+            />
+            <span className="bfm__time">
+              {mmss(watched)} / {mmss(total)}
+            </span>
+            <button type="button" className="bfm__skip" aria-label={isFull ? 'Exit full screen' : 'Full screen'} onClick={toggleFull}>
+              {isFull ? <Minimize2 size={18} strokeWidth={2} aria-hidden /> : <Maximize2 size={18} strokeWidth={2} aria-hidden />}
+            </button>
 
-      {/* The timeline, a row of its own (owner, 6 Nov 2026): play, then one segment per chapter, named; a press
-          anywhere in a segment goes to that moment. */}
-      <div className="bfm__timeline">
-        <button type="button" className="bfm__play" aria-label={playing ? 'Pause' : 'Play'} onClick={toggle}>
-          {playing ? <Pause size={15} strokeWidth={2.4} aria-hidden /> : <Play size={15} strokeWidth={2.4} aria-hidden />}
-        </button>
-        <ol className="bfm__chapters" aria-label="Chapters">
-          {acts.map((a, i) => {
-            const to = i < acts.length - 1 ? acts[i + 1].at : END
-            const fill = Math.max(0, Math.min(1, (t - a.at) / (to - a.at)))
-            return (
-              <li key={a.title} style={{ flexGrow: to - a.at }}>
-                <button
-                  type="button"
-                  className={`bfm__chapter${i === act ? ' is-on' : i < act ? ' is-done' : ''}`}
-                  aria-current={i === act ? 'step' : undefined}
-                  onClick={(e) => {
-                    const r = e.currentTarget.getBoundingClientRect()
-                    jump(a.at + Math.max(0, Math.min(0.98, (e.clientX - r.left) / r.width)) * (to - a.at))
-                  }}
-                >
-                  <span className="bfm__track" aria-hidden>
-                    <i style={{ width: `${fill * 100}%` }} />
-                  </span>
-                  <span className="bfm__chaptername">{a.title}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ol>
-      </div>
-
-      {/* The words and the buttons, one row */}
-      <div className="bfm__row">
-        <div className="bfm__words" aria-live="polite">
-          <span className="bfm__act">{acts[act].title}</span>
-          {shown.map(([at, line], i) => (
-            <p key={at} className={i === shown.length - 1 ? 'is-now' : ''} style={{ opacity: i === shown.length - 1 ? Math.max(0.2, seg(t, at, at + 0.45)) : 0.38 }}>
-              {line}
-            </p>
-          ))}
+          </div>
+        )}
+        <div className="bfm__timeline">
+          {atEnd || player ? null : (
+            <>
+              <button type="button" className="bfm__play" aria-label={playing ? 'Pause' : 'Play'} onClick={toggle}>
+                {playing ? <Pause size={15} strokeWidth={2.4} aria-hidden /> : <Play size={15} strokeWidth={2.4} aria-hidden />}
+              </button>
+              <button type="button" className="bfm__nav" aria-label="Previous chapter" onClick={back}>
+                <ChevronLeft size={16} strokeWidth={2.4} aria-hidden />
+              </button>
+              <ol className="bfm__chapters" aria-label="Chapters">
+                {acts.map((act0, i) => {
+                  if (act0.title === 'Your move') return null
+                  const a = { ...act0, at: Math.max(act0.at, from) }
+                  const to = i < acts.length - 1 ? acts[i + 1].at : END
+                  const fill = Math.max(0, Math.min(1, (t - a.at) / (to - a.at)))
+                  const state = i === act ? 'on' : i < act ? 'done' : 'next'
+                  const { key, Icon } = CHAPTER[a.title] ?? { key: 'today', Icon: Boxes }
+                  return (
+                    <li key={a.title} className={`is-${state}`} data-ch={key}>
+                      <button
+                        type="button"
+                        className="bfm__chapter"
+                        title={a.title}
+                        aria-label={a.title}
+                        aria-current={state === 'on' ? 'step' : undefined}
+                        onClick={(e) => {
+                          if (state !== 'on') return jump(a.at)
+                          const r = e.currentTarget.getBoundingClientRect()
+                          jump(a.at + Math.max(0, Math.min(0.98, (e.clientX - r.left) / r.width)) * (to - a.at))
+                        }}
+                      >
+                        <span className="bfm__track" aria-hidden>
+                          <i style={{ width: `${fill * 100}%` }} />
+                        </span>
+                        <span className="bfm__chlabel">
+                          <Icon size={13} strokeWidth={2.3} aria-hidden />
+                          {state !== 'done' && <span className="bfm__chaptername">{a.title}</span>}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+              <button type="button" className="bfm__nav" aria-label="Next chapter" onClick={forward} disabled={act >= acts.length - 2}>
+                <ChevronRight size={16} strokeWidth={2.4} aria-hidden />
+              </button>
+            </>
+          )}
         </div>
+      </div>
+      {/* In the guide the words are text to read under the film, not a card over it. */}
+      {v === 'v1' && player && words}
+
+      <AnimatePresence>
+        {asking && (
+          <motion.div
+            key="ask"
+            className="bfm__ask"
+            role="dialog"
+            aria-label="Open the new Policy builder"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, rotateY: 80 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, rotateY: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, rotateY: -80 }}
+            transition={{ duration: reduce ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <span className="bfm__askhero" aria-hidden>
+              <i />
+              <i />
+              <i />
+              <span className="bfm__askbadge">
+                <Info size={26} strokeWidth={1.75} />
+              </span>
+            </span>
+            <h2>Open the new Policy builder?</h2>
+            <p>Nothing is migrated yet: you choose when to start. Old policies stay readable in the Old policies tab.</p>
+            <label className="bfm__askack">
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+              I understand the old pages are replaced.
+            </label>
+            <span className="bfm__askacts">
+              <Button variant="secondary" onClick={closeAsk}>
+                Back
+              </Button>
+              <NewBuilderButton label="Open the builder" door={false} disabled={!ack} onOpen={onStart} />
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* The buttons, one row; the words are in the canvas */}
+      <div className="bfm__row" hidden={player}>
+        {v === 'v0' && words}
         <span className="bfm__tools">{extra}</span>
         {/* One Start migration, always in this place (owner, 6 Nov 2026: "don't move the button"), in the old banner's
             blue; the end scene above it only shows where it leads. */}
-        <span className="bfm__acts">
+        <span className="bfm__acts" style={asking ? { visibility: 'hidden' } : undefined}>
           <Button variant="secondary" onClick={onLater}>
             Not now
           </Button>
-          <NewBuilderButton label="Start migration" door={false} onOpen={onStart} />
+          <NewBuilderButton label="Migrate your old policy" door={false} onOpen={ask ? openAsk : onStart} />
         </span>
       </div>
     </div>

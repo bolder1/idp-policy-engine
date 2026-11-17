@@ -352,7 +352,7 @@ describe('what a kind can collect', () => {
   })
 
   it('gives every reach a card', () => {
-    expect(REACHES.map((r) => r.id).sort()).toEqual(['agent', 'agentless'])
+    expect(REACHES.map((r) => r.id).sort()).toEqual(['agent', 'agentless', 'authenticator'])
   })
 })
 

@@ -1,41 +1,76 @@
-import { motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, X } from 'lucide-react'
 import { Button } from '../kit'
 import { useBrand, type BrandScreen } from '../store'
-import { GAP, measureSelector, place, type Rect } from '../tour/spotlight'
+import type { Rect } from '../tour/spotlight'
 import '../tour/tour.css'
+import './move-tour.css'
 
 /* -----------------------------------------------------------------------------
-   Where your policies went: the tour Done offers (owner, 4 Nov 2026). It walks the
-   places a move filled, a page a stop, and lights the moved thing on each: the moved
-   policies, a zone made from an old check, the new device profiles. It starts by itself
-   once every moved policy is in the list (finale.tsx AutoAdd).
+   Where your policies went: the tour Done offers (owner, 4 Nov 2026), redone 9 Nov 2026 ("make it smooth, next and
+   back; fix the whole walkthrough").
 
-   The builder tour's card, scrim and ring (tour.css, `btr`) and its rules: non-modal,
-   Escape from anywhere, never moving on by itself. Timers, not animation frames, so it
-   still lights its stop while the pane is hidden.
+   Each stop is a page and a thing on it: the migrated policies, the zones made from old checks, the device profiles.
+   Moving between stops is one calm sequence: the light and the card fade, the page changes and settles, then the
+   light grows round the new thing and the card glides in beside it. The card always sits inside the content area,
+   under the lit thing (over it when there is no room below), never over the rail. Non-modal; Esc leaves; arrows step.
+   Timers, not animation frames, so it still settles while the pane is hidden.
    -------------------------------------------------------------------------- */
 
 interface Stop {
   id: string
   screen: BrandScreen
-  /** What to light; the page head when the first is not there. */
+  /** What to light: every match, as one box. */
   sel: string
+  /** Lit instead when nothing matches. */
+  fallback: string
   heading: string
   body: string
 }
 
-/* Three stops, after every moved policy is in (owner, 6 Nov 2026: all policies, zones, device profiles; Templates
-   stays hidden for now). */
 const STOPS: Stop[] = [
-  { id: 'policies', screen: { name: 'policies' }, sel: 'tr[data-from-old]', heading: 'All your policies', body: 'One per application, from your old policies. Open one to compare it with the old ones, approve it, then publish. Until then the old policy stays in effect.' },
-  { id: 'zones', screen: { name: 'zones' }, sel: '[data-from-old]', heading: 'Zones', body: 'Old IP and location checks are zones now. Edit one here and every rule using it follows.' },
-  { id: 'devices', screen: { name: 'fingerprint' }, sel: '.bpage__head', heading: 'Device profiles', body: 'Device limits are device profiles now. Check the device a person signs in from, its OS and health, in any rule.' },
+  { id: 'policies', screen: { name: 'policies' }, sel: 'tr[data-from-old]', fallback: '.btable-wrap', heading: 'Your migrated policies', body: 'One per application, as drafts. Open one to compare it with the old policy, approve it, then publish.' },
+  { id: 'zones', screen: { name: 'zones' }, sel: '[data-from-old]', fallback: '.bpage > :nth-child(3)', heading: 'Zones', body: 'Old IP and location checks are zones now. Change one here and every rule using it follows.' },
+  { id: 'devices', screen: { name: 'fingerprint' }, sel: '.bpage .blist, .bpage .btable-wrap, .bpage .bcards', fallback: '.bpage__head', heading: 'Device profiles', body: 'Device limits are device profiles now: the device, its OS and health, in any rule.' },
+  /* The tour ends where the work is (owner, 10 Nov 2026: "this should end in the policy tab … start review"): back on
+     Policies, the review banner lit, and the last button starts the review rather than only closing. */
+  { id: 'review', screen: { name: 'policies' }, sel: '.bann', fallback: '.btable-wrap', heading: 'Review and publish', body: 'Start review opens the first draft in the builder. Compare, approve, then publish. Back and Next walk the rest.' },
 ]
 
-const CARD = { w: 340, h: 220, lead: 80 }
-const POLL_MS = 250
+const CARD = { w: 360, h: 196 }
+const PAD = 8
+const EDGE = 16
+/** The page changes, then settles, then the light comes: a beat each. */
+const LEAVE_MS = 180
+const SETTLE_MS = 420
+const POLL_MS = 300
+const EASE = [0.22, 1, 0.36, 1] as const
+
+/** Every match of `sel` (visible ones, up to the window's foot) as one padded box. */
+function measureAll(sel: string): Rect | null {
+  const els = [...document.querySelectorAll<HTMLElement>(sel)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
+  if (!els.length) return null
+  const top = Math.min(...els.map((r) => r.top))
+  const left = Math.min(...els.map((r) => r.left))
+  const right = Math.max(...els.map((r) => r.right))
+  /* A long list is lit to the window's foot, leaving room for the card above it. */
+  const bottom = Math.min(Math.max(...els.map((r) => r.bottom)), window.innerHeight - EDGE)
+  return { top: top - PAD, left: left - PAD, width: right - left + PAD * 2, height: Math.max(0, bottom - top) + PAD * 2 }
+}
+
+/** Under the lit box, else over it, else inside its top; always within the content area. */
+function cardAt(rect: Rect) {
+  const main = document.querySelector('.bshell__main')?.getBoundingClientRect()
+  const minL = (main?.left ?? 0) + EDGE
+  const maxL = (main?.right ?? window.innerWidth) - CARD.w - EDGE
+  const left = Math.max(minL, Math.min(maxL, rect.left))
+  const below = rect.top + rect.height + 12
+  if (below + CARD.h <= window.innerHeight - EDGE) return { top: below, left }
+  const above = rect.top - 12 - CARD.h
+  if (above >= EDGE + 52) return { top: above, left }
+  return { top: Math.max(EDGE + 52, rect.top + 12), left: Math.max(minL, Math.min(maxL, rect.left + rect.width - CARD.w - 12)) }
+}
 
 export function MoveTour() {
   const store = useBrand()
@@ -43,6 +78,8 @@ export function MoveTour() {
   const open = store.moveTour
   const [i, setI] = useState(0)
   const [rect, setRect] = useState<Rect | null>(null)
+  /* False while moving between stops: the light and the card are away. */
+  const [shown, setShown] = useState(false)
   const card = useRef<HTMLDivElement | null>(null)
   const stop = STOPS[i]
   const last = i === STOPS.length - 1
@@ -54,32 +91,68 @@ export function MoveTour() {
   }, [open])
 
   const measure = useCallback(() => {
-    const r = measureSelector(stop.sel) ?? measureSelector('.bpage__head') ?? measureSelector('.bbtop')
-    setRect((prev) => (prev && r && Math.round(prev.top) === Math.round(r.top) && Math.round(prev.left) === Math.round(r.left) && Math.round(prev.width) === Math.round(r.width) ? prev : r))
-  }, [stop.sel])
+    const r = measureAll(stop.sel) ?? measureAll(stop.fallback)
+    setRect((prev) => (prev && r && Math.round(prev.top) === Math.round(r.top) && Math.round(prev.left) === Math.round(r.left) && Math.round(prev.width) === Math.round(r.width) && Math.round(prev.height) === Math.round(r.height) ? prev : r))
+  }, [stop])
 
+  /* One stop's arrival: away, page, settle, scroll, light. */
   useEffect(() => {
     if (!open) return
-    go.current(stop.screen)
-    const settle = window.setTimeout(() => {
-      document.querySelector<HTMLElement>(stop.sel)?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' })
-      measure()
-    }, 160)
-    const poll = window.setInterval(measure, POLL_MS)
+    setShown(false)
+    const timers: number[] = []
+    let poll = 0
+    timers.push(
+      window.setTimeout(() => go.current(stop.screen), reduce ? 0 : LEAVE_MS),
+      window.setTimeout(
+        () => {
+          const el = document.querySelector<HTMLElement>(stop.sel) ?? document.querySelector<HTMLElement>(stop.fallback)
+          el?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' })
+        },
+        reduce ? 60 : LEAVE_MS + SETTLE_MS * 0.5,
+      ),
+      window.setTimeout(
+        () => {
+          measure()
+          setShown(true)
+          poll = window.setInterval(measure, POLL_MS)
+        },
+        reduce ? 120 : LEAVE_MS + SETTLE_MS + 260,
+      ),
+    )
     window.addEventListener('resize', measure)
     return () => {
-      window.clearTimeout(settle)
+      timers.forEach((t) => window.clearTimeout(t))
       window.clearInterval(poll)
       window.removeEventListener('resize', measure)
     }
   }, [open, stop, measure, reduce])
 
   const leave = useCallback(() => store.setMoveTour(false), [store])
-  const keys = useRef({ leave, next: () => {}, back: () => {} })
-  keys.current = { leave, next: () => (last ? leave() : setI((n) => n + 1)), back: () => setI((n) => Math.max(0, n - 1)) }
+
+  /* The tour belongs to its stop's page: going anywhere else (a policy into the builder, a rail item) ends it. */
+  const here = store.screen.name
+  const arrived = useRef(false)
+  useEffect(() => {
+    arrived.current = false
+  }, [open, i])
   useEffect(() => {
     if (!open) return
-    card.current?.focus()
+    if (here === stop.screen.name) arrived.current = true
+    else if (arrived.current) leave()
+  }, [open, here, stop, leave])
+
+  /* The first migrated draft, where Start review opens (the review banner's own start, finale.tsx). */
+  const firstDraft = store.policies.find((p) => p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
+  const startReview = useCallback(() => {
+    leave()
+    if (firstDraft) go.current({ name: 'board', policyId: firstDraft.id })
+  }, [leave, firstDraft])
+  const next = useCallback(() => (last ? startReview() : setI((n) => n + 1)), [last, startReview])
+  const back = useCallback(() => setI((n) => Math.max(0, n - 1)), [])
+  const keys = useRef({ leave, next, back })
+  keys.current = { leave, next, back }
+  useEffect(() => {
+    if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation()
@@ -90,70 +163,97 @@ export function MoveTour() {
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, i])
+  }, [open])
+  useEffect(() => {
+    if (shown) card.current?.focus({ preventScroll: true })
+  }, [shown, i])
 
   if (!open) return null
-  /* Beside the lit element where a side has room, else under it (or over it, near the foot). */
-  const p = place(rect, CARD)
-  const pos =
-    !rect || p.centred || p.side !== 'none'
-      ? p
-      : (() => {
-          const below = rect.top + rect.height + GAP
-          const fits = below + CARD.h <= window.innerHeight - GAP
-          return { ...p, left: Math.max(GAP, Math.min(window.innerWidth - CARD.w - GAP, rect.left + rect.width - CARD.w)), top: fits ? below : Math.max(GAP, rect.top - GAP - CARD.h) }
-        })()
-  const spring = reduce ? { duration: 0 } : { type: 'spring' as const, stiffness: 320, damping: 34 }
+  const lit = shown && rect
+  const pos = rect ? cardAt(rect) : { top: 0, left: 0 }
+  const glide = reduce ? { duration: 0 } : { duration: 0.45, ease: EASE }
 
   return (
     <div className="btr bmt">
-      <p className="u-sr-only" aria-live="polite">{`Stop ${i + 1} of ${STOPS.length}. ${stop.heading}. ${stop.body}`}</p>
+      <p className="u-sr-only" aria-live="polite">{shown ? `Stop ${i + 1} of ${STOPS.length}. ${stop.heading}. ${stop.body}` : ''}</p>
       <svg className="btr__scrim" aria-hidden>
         <defs>
           <mask id="bmt-hole">
             <rect x="0" y="0" width="100%" height="100%" fill="#fff" />
-            {rect && <motion.rect initial={false} animate={{ x: rect.left, y: rect.top, width: rect.width, height: rect.height }} transition={spring} rx="12" fill="#000" />}
+            <AnimatePresence>
+              {lit && (
+                <motion.rect
+                  key={stop.id}
+                  initial={reduce ? false : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: 0, height: 0, opacity: 0 }}
+                  animate={{ x: rect.left, y: rect.top, width: rect.width, height: rect.height, opacity: 1 }}
+                  exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.15 } }}
+                  transition={glide}
+                  rx="12"
+                  fill="#000"
+                />
+              )}
+            </AnimatePresence>
           </mask>
         </defs>
         <rect x="0" y="0" width="100%" height="100%" mask="url(#bmt-hole)" />
       </svg>
-      {rect && <motion.span className="btr__ring" aria-hidden initial={false} animate={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }} transition={spring} />}
+      <AnimatePresence>
+        {lit && (
+          <motion.span
+            key={`ring-${stop.id}`}
+            className="btr__ring"
+            aria-hidden
+            initial={reduce ? false : { top: rect.top + 6, left: rect.left + 6, width: rect.width - 12, height: rect.height - 12, opacity: 0 }}
+            animate={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height, opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.15 } }}
+            transition={glide}
+          />
+        )}
+      </AnimatePresence>
       <div className="btr__cardslot">
-        <motion.div
-          key={stop.id}
-          ref={card}
-          tabIndex={-1}
-          role="dialog"
-          aria-modal="false"
-          aria-label={`Where your policies went, stop ${i + 1} of ${STOPS.length}`}
-          className={`btr__card bmt__card ${p.centred ? 'is-centred' : ''}`}
-          style={{ top: pos.top, left: pos.left }}
-          initial={{ opacity: 0, y: reduce ? 0 : 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduce ? 0 : 0.2, ease: [0.2, 0, 0, 1] }}
-        >
-          <button type="button" className="btr__x" aria-label="Leave the tour" onClick={leave}>
-            <X size={14} strokeWidth={2} />
-          </button>
-          <div className="btr__body">
-            <span className="btr__count">
-              Stop {i + 1} of {STOPS.length}
-            </span>
-            <h2>{stop.heading}</h2>
-            <p>{stop.body}</p>
-          </div>
-          <footer className="btr__foot">
-            <span className="btr__dots" aria-hidden />
-            {i > 0 && (
-              <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={keys.current.back}>
-                Back
-              </Button>
-            )}
-            <Button variant="primary" size="sm" iconRight={last ? undefined : ArrowRight} onClick={keys.current.next}>
-              {last ? 'Done' : 'Next'}
-            </Button>
-          </footer>
-        </motion.div>
+        <AnimatePresence>
+          {lit && (
+            <motion.div
+              key={`card-${stop.id}`}
+              ref={card}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="false"
+              aria-label={`Where your policies went, stop ${i + 1} of ${STOPS.length}`}
+              className="btr__card bmt__card"
+              initial={reduce ? { opacity: 0, top: pos.top, left: pos.left } : { opacity: 0, top: pos.top + 10, left: pos.left }}
+              animate={{ opacity: 1, top: pos.top, left: pos.left }}
+              exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.15 } }}
+              transition={reduce ? { duration: 0 } : { duration: 0.35, ease: EASE, delay: 0.12 }}
+            >
+              <button type="button" className="btr__x" aria-label="Leave the tour" onClick={leave}>
+                <X size={14} strokeWidth={2} />
+              </button>
+              <div className="btr__body">
+                <span className="btr__count">
+                  Stop {i + 1} of {STOPS.length}
+                </span>
+                <h2>{stop.heading}</h2>
+                <p>{stop.body}</p>
+              </div>
+              <footer className="btr__foot">
+                <span className="bmt__dots" aria-hidden>
+                  {STOPS.map((s, n) => (
+                    <i key={s.id} className={n === i ? 'is-on' : n < i ? 'is-done' : ''} />
+                  ))}
+                </span>
+                {i > 0 && (
+                  <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={back}>
+                    Back
+                  </Button>
+                )}
+                <Button variant="primary" size="sm" iconRight={last ? undefined : ArrowRight} onClick={next}>
+                  {last ? (firstDraft ? 'Start review' : 'Done') : 'Next'}
+                </Button>
+              </footer>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

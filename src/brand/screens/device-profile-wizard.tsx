@@ -4,7 +4,7 @@ import { ArrowLeft, Check, Lock } from 'lucide-react'
 
 import { Button, Drawer, TipDot, TipMark } from '../kit'
 import { ChangeList, ChangeSection } from '../change-list'
-import { DEVICES_NOTE, TYPE_NOTE, itemsNote } from './profile-notes'
+import { DEVICES_NOTE, REMEDIATION_NOTE, TYPE_NOTE, itemsNote } from './profile-notes'
 import { TierPick } from '../tier-pick'
 import { NoMatches } from '../empty'
 import { useLeaveGuard } from '../leave-guard'
@@ -25,12 +25,15 @@ import {
   type ProfileMode,
 } from '../fingerprint'
 import { footerEdge } from '../footer-edge'
-import { LIST_COLUMNS, checkName, kindChoices, reachChoices, versionError } from './device-profile-choices'
+import { useShows } from './board/builder-version'
+import { RemediationForm } from './device-profile-remediation'
+import { LIST_COLUMNS, checkName, deviceGroupsOf, inDeviceGroup, kindChoices, reachChoices, versionError, type DeviceGroup } from './device-profile-choices'
 import {
   AgentBanner,
   AttrControl,
   AttrStep,
 
+  CategoryRail,
   CheckMark,
 
   ChoiceTiles,
@@ -132,7 +135,8 @@ export function DeviceProfileWizard({
      Its reason is then said under the question it is about, in the form. */
   const [tried, setTried] = useState<WizardStepId | null>(null)
 
-  const steps = wizardSteps(s.mode, step3)
+  const v1 = useShows('deviceUpdate')
+  const steps = wizardSteps(s.mode, step3, v1)
   const here = Math.min(at, steps.length - 1)
   const step = steps[here]
   const last = steps.length - 1
@@ -289,7 +293,7 @@ export function DeviceProfileWizard({
             </header>
             <ChoiceTiles
               labelledBy={reachId}
-              options={reachChoices()}
+              options={reachChoices(v1)}
               value={s.reach}
               onPick={(reach) => update((cur) => withWizardReach(cur, reach))}
             />
@@ -422,8 +426,21 @@ export function DeviceProfileWizard({
       aside = <SidePanel note={itemsNote(s.mode)} />
       break
 
+    case 'remediation':
+      body = (
+        <>
+          <RemediationForm
+            value={s.remediation}
+            onChange={(remediation) => update((cur) => ({ ...cur, remediation }))}
+            issue={tried === 'remediation' ? issueOf('remediation') : null}
+          />
+        </>
+      )
+      aside = <SidePanel note={REMEDIATION_NOTE} />
+      break
+
     case 'review':
-      body = <Review state={s} step3={step3} onEdit={toStep} />
+      body = <Review state={s} step3={step3} onEdit={toStep} v1={v1} />
       break
   }
 
@@ -662,13 +679,16 @@ function InlineChecks({
   /* The families being shown; empty is all of them. Same filter the catalogue
      drawer carries, so the step and the drawer narrow the same way. */
   const [cats, setCats] = useState<AttrCategory[]>([])
+  /* V1: the device type chosen in the rail; null is all of them. */
+  const [group, setGroup] = useState<DeviceGroup | null>(null)
   /* The last row pressed, by id, for a shift-press run. */
   const anchor = useRef<string | null>(null)
 
   const offered = offeredAttributes(mode, reach)
-  const categories = offered.length >= CATEGORY_FILTER_MIN ? categoriesOf(offered) : []
+  const rail = useShows('deviceUpdate') && mode === 'os'
+  const categories = !rail && offered.length >= CATEGORY_FILTER_MIN ? categoriesOf(offered) : []
   const chosen = offered.filter((a) => a.always || picked.includes(a.id)).length
-  const shown = filterAttributes(offered, q, cats)
+  const shown = filterAttributes(offered, q, cats).filter((a) => !rail || !group || inDeviceGroup(a.id, group))
   const blockedShown = filterAttributes(blockedAttributes(mode, reach), q, cats)
   const hasLock = alwaysOn(mode).length > 0
 
@@ -679,7 +699,8 @@ function InlineChecks({
   }
 
   return (
-    <div className="bfp2__pick bdpw__pick">
+    <div className={`bfp2__pick bdpw__pick${rail ? ' has-rail' : ''}`}>
+      {rail && <CategoryRail groups={deviceGroupsOf(offered.map((a) => a.id))} group={group} onGroup={setGroup} />}
       <PickBar
         mode={mode}
         q={q}
@@ -876,10 +897,12 @@ function Review({
   state,
   step3,
   onEdit,
+  v1 = false,
 }: {
   state: WizardState
   step3: Step3Shape
   onEdit: (step: WizardStepId) => void
+  v1?: boolean
 }) {
   return (
     <div className="bdpw__review">
@@ -889,7 +912,7 @@ function Review({
           on screen, and a visible one would stack two headings over one line. */}
       <h2 className="u-sr-only">Review</h2>
       <ChangeList layout="list">
-        {reviewSections(state, step3).map((sec) => (
+        {reviewSections(state, step3, v1).map((sec) => (
           <ChangeSection
             key={sec.step}
             layout="list"

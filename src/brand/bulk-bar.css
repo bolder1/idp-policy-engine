@@ -1,0 +1,23 @@
+/* The selection bar (bulk-bar.tsx): floats at the foot of the window while rows are picked. Light, with a green Publish
+   (owner, 10 Nov 2026). Tokens only. */
+.bbulk__dock { position: fixed; z-index: var(--z-sticky); left: 0; right: 0; bottom: var(--space-8); display: flex; justify-content: center; pointer-events: none; }
+.bbulk {
+  pointer-events: auto; display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-5); border-radius: var(--radius-xl);
+  background: var(--surface-raised); color: var(--text-primary); border: var(--bw-thin) solid var(--border-default); box-shadow: var(--el-high);
+  font-size: var(--fs-md);
+}
+.bbulk__count { display: inline-flex; align-items: baseline; gap: var(--space-2); padding-right: var(--space-2); white-space: nowrap; color: var(--text-secondary); }
+.bbulk__count b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.bbulk__sep { width: var(--bw-thin); height: 20px; background: var(--border-default); }
+.bbulk__act, .bbulk__x {
+  display: inline-flex; align-items: center; gap: var(--space-2); height: 32px; padding: 0 var(--space-4);
+  border: var(--bw-thin) solid transparent; border-radius: var(--radius-md); background: none; font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium);
+  color: var(--text-primary); cursor: pointer; white-space: nowrap;
+}
+.bbulk__act { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.bbulk__x { width: 32px; padding: 0; justify-content: center; color: var(--text-secondary); }
+.bbulk__act:hover:not(:disabled) { background: color-mix(in srgb, var(--fb-positive-bg) 70%, var(--fb-positive-border)); }
+.bbulk__x:hover { background: var(--surface-inset); color: var(--text-primary); }
+.bbulk__act:disabled { background: var(--surface-inset); border-color: transparent; color: var(--text-disabled, var(--text-tertiary)); cursor: not-allowed; }
+.bbulk__act:focus-visible, .bbulk__x:focus-visible { outline: none; box-shadow: var(--focus-ring); }

@@ -2,6 +2,8 @@ import {
   Check,
   ClipboardCheck,
   Clock,
+  BookmarkCheck,
+  BookmarkPlus,
   CopyPlus,
   Fingerprint,
   Gauge,
@@ -18,7 +20,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 
-import { Badge, Button, DecisionChip, Modal, RowMenu } from '../kit'
+import { Badge, Button, DecisionChip, IconButton, Modal, RowMenu } from '../kit'
 import { conditionType, type AccessDecision, type Rule, type Scenario } from '../data'
 import { leaves } from '../predicate'
 import { narrowToAudience, withoutMissing, type TemplateLibrary, type TemplateNeed } from '../screens/board/apply-template'
@@ -279,6 +281,7 @@ export function TemplateCard({
   onUse,
   onPreview,
   onDelete,
+  saved,
   useLabel = 'Use',
   done,
   fallback = '1fa',
@@ -290,6 +293,9 @@ export function TemplateCard({
   onPreview: () => void
   /** Only on this tenant's own templates, which it may take away; a template Xecurify ships has no menu. */
   onDelete?: () => void
+  /** A policy of the tenant's, in Inherit from an existing policy: one press saves it as a template, another removes it
+      (owner, 10 Nov 2026: "basic add and remove", an icon button, no form). */
+  saved?: { on: boolean; toggle: () => void }
   useLabel?: string
   /** The store: what has been done with it already ("Added"), said where the button was. */
   done?: string
@@ -411,6 +417,7 @@ export function TemplateCard({
                 return <Ico size={18} strokeWidth={1.9} />
               })()}
             </span>
+            {saved && <SaveToggle saved={saved} />}
           </div>
         )}
         {/* Signals first, then the labels, then the words — Apollo's order, and
@@ -676,4 +683,10 @@ export function scenarioCard(s: Scenario, directory?: WhoDirectory, library?: Te
     needs,
     from: !s.provided && s.addedFrom ? 'Xecurify templates' : undefined,
   }
+}
+
+/* Save as template on a policy's card and row, as one icon (owner, 10 Nov 2026): the bookmark adds it to your templates
+   under the policy's name, pressed again it takes it away. Blue while saved, the selection colour. */
+export function SaveToggle({ saved }: { saved: { on: boolean; toggle: () => void } }) {
+  return <IconButton icon={saved.on ? BookmarkCheck : BookmarkPlus} label={saved.on ? 'Remove from templates' : 'Save as template'} pressed={saved.on} tone="ghost" onClick={saved.toggle} />
 }

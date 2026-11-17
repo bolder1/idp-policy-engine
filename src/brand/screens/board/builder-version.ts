@@ -41,6 +41,7 @@ const SINCE = {
   discard: 'v2', // Discard in the bar
   testing: 'v3', // Check access and Past sign-ins
   guideMe: 'full', // Guide me, on the canvas
+  deviceUpdate: 'v1', // Device profiles: health Remediation step, category rail, Authenticator app collector
 } as const satisfies Record<string, BuilderVersion>
 
 export type BuilderFeature = keyof typeof SINCE

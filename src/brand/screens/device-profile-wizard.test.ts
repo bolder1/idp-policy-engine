@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+/* The finished wizard, with every hidden part shown (screens/device-profile-phase.ts). */
+vi.mock('./device-profile-phase', () => ({ AGENT_REACH: true, SIGNALS_STEP: true, ENROL_OPTIONS: true }))
 
 import {
   OS_ATTRIBUTES,

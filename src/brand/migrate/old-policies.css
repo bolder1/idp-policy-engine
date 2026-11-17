@@ -57,7 +57,7 @@
 .bold__mark { display: grid; place-items: center; flex: none; width: 64px; height: 56px; }
 .bold__mark .bann__mark { width: 64px; height: 56px; overflow: visible; }
 .bold__mark .bmalert { width: 56px; }
-.bold__go { flex: none; }
+.bold__go { display: flex; flex: none; align-items: center; gap: var(--space-3); }
 .bold__sweep { position: absolute; top: 0; bottom: 0; left: 0; width: 22%; z-index: -1; pointer-events: none; background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--surface-raised) 70%, transparent), transparent); }
 @media (max-width: 760px) {
   .bold__banner.is-row { flex-wrap: wrap; }
@@ -163,3 +163,10 @@ button.bnbb:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
   .bold__scene { justify-content: flex-start; }
 }
+
+/* The New policies banner (owner, 9 Nov 2026): the old pages' row, white and still. */
+.bold__banner.is-row.is-white { background: var(--surface-raised); border-color: var(--border-default); }
+.bold__banner.is-row.is-white::before, .bold__banner.is-row.is-white::after { display: none; }
+
+/* "See how it works" under the banner's words: a link, set flush with the text above it. */
+.bold__bannertext > .bx-btn--link { align-self: flex-start; height: auto; margin-left: calc(var(--space-3) * -1); padding-block: var(--space-1); }

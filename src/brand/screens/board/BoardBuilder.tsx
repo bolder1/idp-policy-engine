@@ -87,7 +87,10 @@ import { boardTourSeen } from '../../tour/board-tour'
 import { useLeaveGuard } from '../../leave-guard'
 import './board.css'
 import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
-import { MovedPanel, PublishMoved } from '../../migrate/moved-panel'
+import { MovedPanel, MovedWalk, PublishMoved } from '../../migrate/moved-panel'
+import { CondTagsContext } from './cond-tags'
+import { markRolledBack, useExperience } from '../../migrate/experience'
+import { useWalkPublished } from '../../migrate/walk-published'
 
 /* Lazy, the way the trail loads its own.
 
@@ -368,6 +371,8 @@ export function BoardBuilder({
   /* A moved policy's old-policies panel lights the rules each old policy became (owner, 6 Nov 2026): on hover, and
      while one is selected, whose rules also open. */
   const [movedHover, setMovedHover] = useState<string[] | null>(null)
+  /* The attribute under the pointer in the opened old policy (owner, 12 Nov 2026): the conditions it became light up. */
+  const [condLink, setCondLink] = useState<string | null>(null)
   const [movedPicked, setMovedPicked] = useState<string[] | null>(null)
   const [review, setReview] = useState(false)
   /* The checks before saving (guard.ts): running, and the page they opened. */
@@ -471,9 +476,11 @@ export function BoardBuilder({
      the panel edits properly anyway, were what filled the space.
 
      Unfolding is one click on a card, or one on the toolbar for all of them. */
-  const [density, setDensity] = useState<'outline' | 'detailed'>('outline')
+  /* A migrated draft opens with every card open (owner, 9 Nov 2026: "make things open"): it is there to be read and compared. */
+  const [density, setDensity] = useState<'outline' | 'detailed'>(() => (saved?.movedFrom?.length ? 'detailed' : 'outline'))
   const [folds, setFolds] = useState<Record<string, boolean>>({})
-  const expandedOf = (ruleId: string) => folds[ruleId] ?? density === 'detailed'
+  /* Hovering an old policy opens the rules it became, so they can be read and used at once (owner, 10 Nov 2026). */
+  const expandedOf = (ruleId: string) => !!movedHover?.includes(ruleId) || (folds[ruleId] ?? density === 'detailed')
   /* `openOnly` and `toggleExpand` are below, where `draft` exists: closing the
      others means naming them. */
   const setChainDensity = (d: 'outline' | 'detailed') => {
@@ -667,6 +674,14 @@ export function BoardBuilder({
     const at = first ? draft.rules.findIndex((r) => r.id === first) : -1
     if (at >= 0) requestAnimationFrame(() => document.querySelector<HTMLElement>(`.bb__card[data-index="${at}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
   }
+  /* ...and the first of them slides into view. */
+  useEffect(() => {
+    const first = movedHover?.find((k) => k !== 'fallback')
+    if (!first) return
+    const at = draft.rules.findIndex((r) => r.id === first)
+    if (at >= 0) requestAnimationFrame(() => document.querySelector<HTMLElement>(`.bb__card[data-index="${at}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movedHover])
   const toggleExpand = (ruleId: string) =>
     expandedOf(ruleId) ? setFolds((f) => ({ ...f, [ruleId]: false })) : openOnly(ruleId)
   /* "Start from scratch" is a step Undo can take back (review, 21 Sep 2026). It
@@ -702,13 +717,22 @@ export function BoardBuilder({
   const guidedOpen = GUIDED_SETUP && describeOpen
   /* A moved policy (owner, 6 Nov 2026): its old policies docked left, unless Guided setup or Check access has the room; Publish in the bar while it is a draft. */
   const [oldShut, setOldShut] = useState(false)
-  const movedOpen = !guidedOpen && !testOn && !!saved?.movedFrom?.length && !oldShut
-  const movedDraft = !!saved?.movedFrom?.length && saved.status === 'draft' && saved.appIds.length > 0
+  const walkPublished = useWalkPublished()
+  /* The old policies panel is the Migrated policies' (owner, 10 Nov 2026): once published, a policy is a new one and the panel goes,
+     except while the review walk still has it open. */
+  const movedOpen = !guidedOpen && !testOn && !!saved?.movedFrom?.length && (saved.status === 'draft' || walkPublished.has(saved.id)) && !oldShut
+  /* A draft just published stays in view, read-only, until the admin leaves (migrate/walk-published.ts). */
+  const movedDraft = !!saved?.movedFrom?.length && (saved.status === 'draft' || walkPublished.has(saved.id)) && saved.appIds.length > 0
+  /* Change it before it goes active (owner, 9 Nov 2026): Edit unlocks a migrated draft, with the normal Save draft and
+     Discard; Done editing returns to the review view. Each draft opens locked. */
+  const [movedEditing, setMovedEditing] = useState(false)
+  useEffect(() => setMovedEditing(false), [saved?.id])
+  const movedLocked = movedDraft && !movedEditing
   const guidedBeside = guidedOpen && guidedSide === 'beside'
   const guidedRight = guidedOpen && guidedSide === 'right'
   /* A moved draft is for reading (owner, 6 Nov 2026: "where we have Approve and publish we don't need Save and Save as
      draft; nothing is edited here, only the old and the new policy are seen"): the canvas is locked like Guided setup's. */
-  const canvasLocked = (describeOpen && !guidedBeside) || movedDraft
+  const canvasLocked = (describeOpen && !guidedBeside) || movedLocked
   /* Beside the rule panel, the canvas is refitted as that panel opens and closes too (`fitKey`, below). */
   const besideInsp =
     guidedBeside && inspOpen && (selection.kind === 'fallback' || selection.kind === 'apps' || (selection.kind === 'rule' && present.rules.some((r) => r.id === selection.id)))
@@ -780,7 +804,10 @@ export function BoardBuilder({
      Break-in test only while they are back — the Break-in test on a policy
      it runs on. */
   const pagesAllowed = boardPagesAllowed(features.policyTesting, features.breakInTest, draft)
-  const views = checkViews({ policyTesting: features.policyTesting, breakIn: pagesAllowed.breakIn })
+  const experience = useExperience()
+  const [rollAsk, setRollAsk] = useState(false)
+  /* A migrated draft has never decided a sign-in, so it has no past sign-ins to show (owner, 17 Nov 2026). */
+  const views = checkViews({ policyTesting: features.policyTesting, breakIn: pagesAllowed.breakIn }).filter((v) => !(movedDraft && experience !== 'yesterday' && v === 'past'))
   /* A post sign-in policy keeps the structural findings only: the rest read a
      rule as a sign-in (post-board.ts `postFindings`). Nor is a rule shadowed
      on hover there — that is worked out from what each rule decides. */
@@ -1314,7 +1341,7 @@ export function BoardBuilder({
      of the adjustment and everything drawn inside the stage follows for
      free. */
   /* Describe it closes the rule panel while it is open; Guided setup does too, except beside it. */
-  const inspBlocked = (describeOpen && !guidedBeside) || movedDraft
+  const inspBlocked = (describeOpen && !guidedBeside) || movedLocked
   const panelShown = hasSubject && inspOpen && !inspBlocked
 
   /* The panel outlives its own close by one animation.
@@ -2360,11 +2387,31 @@ export function BoardBuilder({
             onSave={saveNow}
             onSaveTemplate={templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
             onCopyRules={BAR_COPY_RULES && copyOffered ? () => openPicker('policy') : undefined}
-            publish={movedDraft ? <PublishMoved policy={saved} /> : undefined}
+            onRollBack={experience === 'today' && !!saved?.movedFrom?.length && saved.status === 'active' ? () => setRollAsk(true) : undefined}
+            publish={movedLocked ? <PublishMoved policy={saved} onEdit={walkPublished.has(saved.id) ? undefined : () => setMovedEditing(true)} /> : undefined}
           />
         }
       />
 
+    {saved && (
+      <Confirm
+        open={rollAsk}
+        onClose={() => setRollAsk(false)}
+        destructive={false}
+        title={`Roll back ${saved.name}?`}
+        confirmLabel="Roll back"
+        confirmIcon={Undo2}
+        onConfirm={() => {
+          setRollAsk(false)
+          store.setPolicyStatus(saved.id, 'inactive')
+          markRolledBack(saved.id, true)
+          store.showToast(`${saved.name} rolled back. The old policy decides again.`)
+        }}
+      >
+        The old policy decides sign-ins for its applications again. This policy becomes inactive and stays here to fix. Nothing is deleted.
+      </Confirm>
+    )}
+    <CondTagsContext.Provider value={movedOpen}>
     <div
       ref={shell}
       /* Check access keeps the ordinary two tracks, the right-hand one its
@@ -2376,6 +2423,7 @@ export function BoardBuilder({
          closed (V4 §4.1): the inspector never stands beside it. */
       className={`bb ${testOn ? 'is-checking' : ''}${movedDraft ? ' is-moved-view' : ''}${movedRing ? ' is-moved-hi' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : movedOpen ? ' is-guided is-guided-left' : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
       style={{ '--bb-insp': `${guidedRight ? GUIDED_W : colW}px` } as React.CSSProperties}
+      data-cond-link={condLink ?? undefined}
     >
       {/* Describe it, on the left in its own track (V4 §4.1). The selection
           is cleared while it is open, so the rule editor is never beside it.
@@ -2391,8 +2439,16 @@ export function BoardBuilder({
           onClose={() => setOldShut(true)}
           onLink={setMovedHover}
           onPick={pickMoved}
+          onCheck={setCondLink}
           hoverRule={hover !== null ? (draft.rules[hover]?.id ?? null) : hoverLast ? 'fallback' : null}
         />
+      )}
+      {/* Closed, the old policies come back from a button where the panel stood (owner, 9 Nov 2026). */}
+      {oldShut && !!saved?.movedFrom?.length && !guidedOpen && !testOn && (
+        <button type="button" className="bb__oldopen" onClick={() => setOldShut(false)}>
+          <PastIcon size={15} strokeWidth={2} aria-hidden />
+          Old policies
+        </button>
       )}
       {guidedAppsPage && createPortal(<GuardDrawer {...guidedAppsPage} />, portalRoot())}
       {describeOpen && !GUIDED_SETUP && (
@@ -2600,18 +2656,31 @@ export function BoardBuilder({
              dock and the reason it was rebuilt; a pair of glyphs was the
              narrowest and read as nothing. One verb with its mark is both short
              and legible. The glyph is the card's own fold mark. */
-          <button
-            type="button"
-            className="bb__densitybtn"
-            onClick={() => setChainDensity(density === 'outline' ? 'detailed' : 'outline')}
-          >
-            {density === 'outline' ? (
-              <ChevronsUpDown size={14} strokeWidth={2} aria-hidden />
-            ) : (
-              <ChevronsDownUp size={14} strokeWidth={2} aria-hidden />
+          <>
+            {/* A migrated draft's Back and Next live here, beside Collapse all (owner, 9 Nov 2026). */}
+            {movedDraft && movedEditing && (
+              <>
+                <button type="button" className="bb__densitybtn" disabled={unsaved} title={unsaved ? 'Save or discard your changes first' : undefined} onClick={() => setMovedEditing(false)}>
+                  <Check size={14} strokeWidth={2} aria-hidden />
+                  Done editing
+                </button>
+                <span className="bb__float__sep" aria-hidden />
+              </>
             )}
-            {density === 'outline' ? 'Expand all' : 'Collapse all'}
-          </button>
+            {movedLocked && <MovedWalk policyId={saved.id} />}
+            <button
+              type="button"
+              className="bb__densitybtn"
+              onClick={() => setChainDensity(density === 'outline' ? 'detailed' : 'outline')}
+            >
+              {density === 'outline' ? (
+                <ChevronsUpDown size={14} strokeWidth={2} aria-hidden />
+              ) : (
+                <ChevronsDownUp size={14} strokeWidth={2} aria-hidden />
+              )}
+              {density === 'outline' ? 'Expand all' : 'Collapse all'}
+            </button>
+          </>
         }
       />
       )}
@@ -2936,6 +3005,7 @@ export function BoardBuilder({
       </Confirm>
 
     </div>
+    </CondTagsContext.Provider>
     </PostBoardContext.Provider>
   )
 }

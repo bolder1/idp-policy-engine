@@ -1472,3 +1472,9 @@
 .bmarket__hero .bdetail__head { justify-content: flex-start; }
 .bmarket__hero .bdetail__head .bdetail__words { margin: 0; text-align: left; }
 .bdetail__foot .bdetail__footnote { margin-left: 0; margin-right: auto; }
+
+/* Save as template as a bookmark: top right of your policies' cards, at the end of their rows (owner, 10 Nov 2026). */
+.bgcard.is-bare .bgcard__top:has(.bx-iconbtn) { display: flex; }
+.bpl__item { position: relative; }
+.bpl__head, .bpl__item .bpl__row { padding-right: calc(var(--space-6) + var(--ctl-height-md) + var(--space-4)); }
+.bpl__save { position: absolute; top: 50%; right: var(--space-6); display: flex; margin-top: calc(var(--ctl-height-md) / -2); }

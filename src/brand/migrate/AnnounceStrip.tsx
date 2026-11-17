@@ -44,7 +44,8 @@ export function AnnounceStrip() {
   const [shut, setShut] = useState(false)
   const [look, setLook] = useState<Look>(readLook)
   const unmoved = store.legacy.policies.some((lp) => !store.movedLegacy[lp.id])
-  if (shut || !unmoved || !ON.includes(store.screen.name)) return null
+  /* Gone once the migration has started (owner, 9 Nov 2026: "after migration, remove this"). */
+  if (shut || !unmoved || store.migrationStarted || !ON.includes(store.screen.name)) return null
   const pick = (v: Look) => {
     setLook(v)
     try {

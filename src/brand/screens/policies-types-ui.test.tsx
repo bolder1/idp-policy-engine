@@ -72,7 +72,8 @@ const text = (html: string) =>
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()
-const tabsOf = (html: string) => [...html.matchAll(/role="tab"[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]))
+/* The page's own tabs: the second row inside New policies is a list switch, not a policy type. */
+const tabsOf = (html: string) => [...html.split('aria-label="New policies lists"')[0].matchAll(/role="tab"[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]))
 const selected = (html: string) => text(html.match(/role="tab"[^>]*aria-selected="true"[^>]*>(.*?)<\/button>/)?.[1] ?? '')
 /** The policy names in the table, as its name buttons say them. */
 const namesIn = (html: string) => [...html.matchAll(/class="btable__link"[^>]*>(.*?)<\/button>/g)].map((m) => text(m[1]))
@@ -95,7 +96,7 @@ const signInNames = () => tenant().filter((p) => !isPostSignIn(p)).map((p) => p.
 describe.runIf(MIGRATION_FIRST)('Policies: migration first', () => {
   it('has line tabs New policies and Old policies under the head, with no counts', () => {
     const out = render()
-    expect(tabsOf(out)).toEqual(['New policies', 'Migrated policies', 'Old policies'])
+    expect(tabsOf(out)).toEqual(['New policies', 'Old policies'])
     expect(out).toContain('bx-tabs--line bpol__types')
     for (const t of tabsOf(out)) expect(t).not.toMatch(/\d/)
   })

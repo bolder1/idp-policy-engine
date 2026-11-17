@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
-import { AlignLeft, ChevronRight, CopyPlus, GraduationCap, LayoutTemplate, LogIn, Pencil } from 'lucide-react'
+import { AlignLeft, Undo2, ChevronRight, CopyPlus, GraduationCap, LayoutTemplate, LogIn, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { DemoButton } from '../../tour/DemoButton'
@@ -364,6 +364,7 @@ export function BoardBarActions({
   onDiscard,
   onSave,
   onSaveTemplate,
+  onRollBack,
   onCopyRules,
   publish,
 }: {
@@ -414,6 +415,8 @@ export function BoardBarActions({
   /* Save this policy as a template (owner, 27 Oct 2026). Absent where it cannot be: a post sign-in policy, or one with
      no rule on its canvas, so the ⋯ is not drawn with nothing in it. */
   onSaveTemplate?: () => void
+  /** A migrated, active policy (owner, 17 Nov 2026): back to its old policy. */
+  onRollBack?: () => void
   /* Copy rules from another policy (owner, 2 Nov 2026). Absent with no policy to copy from. */
   onCopyRules?: () => void
 }) {
@@ -535,15 +538,16 @@ export function BoardBarActions({
       {/* The policy's other doors, after the verbs that end a draft, the way an application's head ends in its ⋯: Save as
           template (owner, 27 Oct 2026: "add an option for save as template"). Not for a post sign-in policy, which
           decides no sign-in and so has nothing to reuse, and not with no rule on the canvas. */}
-      {(onSaveTemplate || onCopyRules) && !post && (
+      {(onSaveTemplate || onCopyRules || onRollBack) && !post && (
         <RowMenu
           label="More for this policy"
           size="sm"
           items={[
             ...(onCopyRules ? [{ id: 'copy', label: 'Copy rules from a policy', icon: CopyPlus }] : []),
             ...(onSaveTemplate ? [{ id: 'template', label: 'Save as template', icon: LayoutTemplate }] : []),
+            ...(onRollBack ? [{ id: 'rollback', label: 'Roll back to old policy', icon: Undo2, divide: !!(onSaveTemplate || onCopyRules) }] : []),
           ]}
-          onSelect={(id) => (id === 'copy' ? onCopyRules?.() : onSaveTemplate?.())}
+          onSelect={(id) => (id === 'copy' ? onCopyRules?.() : id === 'rollback' ? onRollBack?.() : onSaveTemplate?.())}
         />
       )}
     </>

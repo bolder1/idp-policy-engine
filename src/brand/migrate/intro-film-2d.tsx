@@ -17,7 +17,6 @@ import { cam2D, tilt2D, tiltMatrix } from './intro-film-2d-camera'
    -------------------------------------------------------------------------- */
 
 type P = [number, number]
-const END = 88
 const clamp = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x)
 const ease = (x: number) => {
   const k = clamp(x)
@@ -165,6 +164,16 @@ const LIB_ZONE: P = [LIB.x + LIB.w / 2, LIB.y + 104]
 const LIB_DEV: P = [LIB.x + LIB.w / 2, LIB.y + 204]
 const LIB_ROW = { w: 208, h: 50 }
 
+/* Check access: who is run, the rule that decides each (a dash is the default), and what they get. */
+const PEOPLE: { name: string; rule: string; label: string; tone: 'good' | 'bad' | 'active'; at: number }[] = [
+  { name: 'Priya', rule: '1', label: 'Allowed', tone: 'good', at: 73.4 },
+  { name: 'Dev', rule: '1', label: 'Allowed', tone: 'good', at: 74 },
+  { name: 'Meera', rule: '2', label: 'OTP', tone: 'active', at: 76 },
+  { name: 'Arun', rule: '–', label: 'Denied', tone: 'bad', at: 78.4 },
+  { name: 'Sam', rule: '–', label: 'Denied', tone: 'bad', at: 79 },
+  { name: 'Lena', rule: '–', label: 'Denied', tone: 'bad', at: 79.6 },
+]
+
 /* Rule 1's If, as the Inspector shows it: one group, all must match. */
 const COND = [
   { icon: Globe, attr: 'Network zone', op: 'is in zone', value: 'Corporate offices', at: 50.2 },
@@ -182,9 +191,12 @@ const R1 = { y: -128, h: 150 }
 const R2 = { y: 52, h: 56 }
 const R3 = { y: 138, h: 56 }
 
-export function Scene2D({ t }: { t: number }) {
+export function Scene2D({ t, v = 'v1' }: { t: number; v?: 'v0' | 'v1' }) {
+  const v1 = v === 'v1'
   /* Act 1: Salesforce's stack builds row by row; the other three, then the wall of 24 and its count. */
-  const stackOp = (n: number) => (n === SF ? seg(t, 0, 0.8) : MAIN.includes(n) ? seg(t, 12.4 + MAIN.indexOf(n) * 0.4, 13 + MAIN.indexOf(n) * 0.4) : seg(t, 15.8 + STACKS[n].d * 0.12, 16.4 + STACKS[n].d * 0.12))
+  /* Salesforce opens first, to show App Login and Adaptive Access; then every application arrives at once, shut, a ripple
+     from the middle (owner, 9 Nov 2026: not four first, then the rest). */
+  const stackOp = (n: number) => (n === SF ? seg(t, 0, 0.5) : seg(t, 12.2 + STACKS[n].d * 0.08, 12.7 + STACKS[n].d * 0.08))
   const rowOp = (n: number, kind: 'l' | 'a', i: number) => (n !== SF ? 1 : kind === 'l' ? seg(t, 0.9 + i * 0.5, 1.4 + i * 0.5) : seg(t, 8.3 + i * 0.6, 8.8 + i * 0.6))
   /* The four followed stacks fold shut as the wall comes in; every other application arrives shut. */
   /* Only Salesforce opens; it shuts as the next applications arrive, shut (owner, 6 Nov 2026). */
@@ -226,26 +238,40 @@ export function Scene2D({ t }: { t: number }) {
   const camS = camW / 1000
 
   /* Act 3: the old Adaptive policy, its rows lifting out, the two parts becoming pills, then Library rows. */
-  const oldOp = seg(t, 28.6, 29.6) * (1 - seg(t, 38.4, 39.2))
-  const zoneLift = seg(t, 33.2, 34.6)
-  const devLift = seg(t, 36.8, 38.2)
-  const rowHot = (i: number) => (toZone(i) ? span(t, 32.4, 34.8, 0.3) : span(t, 36, 38.4, 0.3))
+  /* Taken apart (owner, 9 Nov 2026): the old Adaptive policy first, then its IP and place checks combine into one zone card
+     where they are; that card opens into its details, which say what a zone can hold; it closes, and the device limit does
+     the same into a device profile. Nothing happens off screen: the camera goes to the card that is opening. */
+  const zoneFocus = span(t, 31.7, 34.7, 0.5)
+  const devFocus = span(t, 36.1, 39.3, 0.5)
+  const focus = Math.max(zoneFocus, devFocus)
+  const oldOp = seg(t, 28.6, 29.6) * (1 - seg(t, 39.6, 40.2)) * (1 - 0.85 * focus)
+  const zoneLift = seg(t, 30.6, 31.4)
+  const devLift = seg(t, 35, 35.8)
+  const rowHot = (i: number) => (toZone(i) ? span(t, 30, 31.6, 0.3) : span(t, 34.6, 36, 0.3))
   /* A card appears the moment its checks land on it, so nothing is ever half there. */
-  const zoneOp = seg(t, 34.45, 34.75)
-  const devOp = seg(t, 38.05, 38.35)
-  const toPill = seg(t, 39.6, 40.8)
+  const zoneOp = seg(t, 31.35, 31.65)
+  const devOp = seg(t, 35.75, 36.05)
+  const toPill = seg(t, 39.6, 40.4)
   const toLib = seg(t, 42, 44)
-  const named = span(t, 40, 42.4, 0.4)
-  const part = (at: P, lib: P) => {
+  const named = span(t, 39.8, 41.8, 0.4)
+  /* A part opens into its details page in the middle of the stage, then folds back to where it was. */
+  const OPEN = { w: 400, h: 262, c: [0, -10] as P }
+  const part = (at: P, lib: P, open: number) => {
     const pillW = 190
-    const w = toLib > 0 ? lerp(pillW, LIB_ROW.w, toLib) : lerp(PART.w, pillW, toPill)
-    const h = toLib > 0 ? lerp(PILL_H, LIB_ROW.h, toLib) : lerp(PART.h, PILL_H, toPill)
-    const rx = toLib > 0 ? lerp(PILL_H / 2, 10, toLib) : lerp(10, PILL_H / 2, toPill)
-    const c: P = [lerp(at[0], lib[0], toLib), lerp(at[1], lib[1], toLib)]
-    return { c, w, h, rx, sub: toLib > 0.6 ? seg(t, 43, 44) : 1 - toPill }
+    let w = toLib > 0 ? lerp(pillW, LIB_ROW.w, toLib) : lerp(PART.w, pillW, toPill)
+    let h = toLib > 0 ? lerp(PILL_H, LIB_ROW.h, toLib) : lerp(PART.h, PILL_H, toPill)
+    let rx = toLib > 0 ? lerp(PILL_H / 2, 10, toLib) : lerp(10, PILL_H / 2, toPill)
+    let c: P = [lerp(at[0], lib[0], toLib), lerp(at[1], lib[1], toLib)]
+    if (open > 0) {
+      w = lerp(w, OPEN.w, open)
+      h = lerp(h, OPEN.h, open)
+      rx = lerp(rx, 12, open)
+      c = [lerp(c[0], OPEN.c[0], open), lerp(c[1], OPEN.c[1], open)]
+    }
+    return { c, w, h, rx, open, sub: toLib > 0.6 ? seg(t, 43, 44) : 1 - toPill }
   }
-  const zonePart = part(ZONE, LIB_ZONE)
-  const devPart = part(DEV, LIB_DEV)
+  const zonePart = part(ZONE, LIB_ZONE, zoneFocus)
+  const devPart = part(DEV, LIB_DEV, devFocus)
 
   /* Act 4: the builder. */
   const libOp = seg(t, 42.4, 43.6)
@@ -266,18 +292,26 @@ export function Scene2D({ t }: { t: number }) {
   const collapseOp = span(t, 69, 71.8, 0.4)
 
   /* Act 6. */
+  /* A list of people run through the rules together, each with the rule that decided it: some by rule 1, one by rule 2,
+     the rest by the default (owner, 10 Nov 2026). The rule they stop at lights as its people arrive. */
+  const r1Good = v1 ? t >= 73.4 && t < 76 : t >= 75.4 && t < 78.2
+  const r2Hot = v1 && t >= 76 && t < 78.4
+  const r3Bad = v1 ? t >= 78.4 && t < 82.2 : t >= 81 && t < 82.2
+  /* v0: two people, one token each. */
   const priya = span(t, 72.4, 78.2, 0.4)
-  const arun = span(t, 78.2, END + 1, 0.4)
+  const arun = span(t, 78.2, 89, 0.4)
   const tok1 = seg(t, 73.6, 75.4)
   const tok2 = seg(t, 78.6, 81)
-  const r1Good = t >= 75.4 && t < 78.2
-  const r3Bad = t >= 81 && t < 82.2
 
   /* Act 7. */
   const status = t < 82.6 ? null : t < 84.2 ? 'Draft' : t < 85.8 ? 'Approved' : 'Active'
 
   const startPt: P = [START.x + START.w / 2, START.y + START.h]
   const spine = RX + 28
+  const ruleTone = (good: boolean, bad: boolean, focus: boolean): Tone => (good ? 'good' : bad ? 'bad' : focus ? 'blue' : 'plain')
+  const r1Tone = ruleTone(r1Good, false, t >= 45 && t < 58)
+  const r3Tone = ruleTone(false, r3Bad, false)
+  const r2Tone: Tone = r2Hot ? 'blue' : 'plain'
   const r1Pt: P = [spine, R1.y + 22]
   const r2Pt: P = [spine, R2.y + 28]
   const r3Pt: P = [spine, R3.y + 28]
@@ -287,9 +321,6 @@ export function Scene2D({ t }: { t: number }) {
     const i = Math.min(n - 1, Math.floor(f))
     return [lerp(path[i][0], path[i + 1][0], f - i), lerp(path[i][1], path[i + 1][1], f - i)]
   }
-  const ruleTone = (good: boolean, bad: boolean, focus: boolean): Tone => (good ? 'good' : bad ? 'bad' : focus ? 'blue' : 'plain')
-  const r1Tone = ruleTone(r1Good, false, t >= 45 && t < 58)
-  const r3Tone = ruleTone(false, r3Bad, false)
   const onDark = (tone: Tone) => (tone === 'good' || tone === 'bad' ? ' is-white' : '')
 
   return (
@@ -402,7 +433,7 @@ export function Scene2D({ t }: { t: number }) {
             const py = lerp(y, to[1] - 19 + (i === 2 ? 18 : 0), lift)
             const Icon = i === 0 ? MonitorSmartphone : i === 1 ? Network : MapPin
             return (
-              <g key={r} transform={`translate(${px.toFixed(1)},${py.toFixed(1)})`} opacity={1 - seg(t, toZone(i) ? 34.55 : 38.15, toZone(i) ? 34.75 : 38.35)}>
+              <g key={r} transform={`translate(${px.toFixed(1)},${py.toFixed(1)})`} opacity={1 - seg(t, toZone(i) ? 31.35 : 35.75, toZone(i) ? 31.65 : 36.05)}>
                 <rect x={-6} y={-4} width={OLD_AD.w - 20} height={30} rx={6} className={`f2row${rowHot(i) > 0.5 ? ' is-hot' : ''}`} opacity={rowHot(i)} />
                 <Icon x={4} y={4} width={14} height={14} strokeWidth={2} className="f2ico" />
                 <text x={26} y={16} className="f2t is-row">
@@ -419,15 +450,53 @@ export function Scene2D({ t }: { t: number }) {
         </text>
       )}
 
-      {/* Act 3-4: the zone and the device profile, named once, then kept in the Library */}
+      {/* Act 3-4: the zone and the device profile. Each opens into its details, what it can hold, then folds back, is named
+          once, and is kept in the Library. */}
       {[
-        { key: 'zone', p: zonePart, op: zoneOp, Icon: Globe, name: 'Corporate offices', kind: 'Zone', sub: 'IP 203.0.113.0/24 · India' },
-        { key: 'dev', p: devPart, op: devOp, Icon: MonitorSmartphone, name: 'Known devices', kind: 'Device profile', sub: 'At most 2 devices per user' },
-      ].map(({ key, p, op, Icon, name, kind, sub }) =>
-        op > 0.001 ? (
-          <g key={key} transform={`translate(${(p.c[0] - p.w / 2).toFixed(1)},${(p.c[1] - p.h / 2).toFixed(1)})`} opacity={op * libFocus}>
+        {
+          key: 'zone', p: zonePart, op: zoneOp, other: devFocus, Icon: Globe, name: 'Corporate offices', kind: 'Zone', sub: 'IP 203.0.113.0/24 · India',
+          about: 'Where a sign-in can come from.',
+          rows: [['IP network', '203.0.113.0/24'], ['IP address or ASN', 'AS64500'], ['Country', 'India'], ['City, with a range', 'Pune · 25 km']],
+        },
+        {
+          key: 'dev', p: devPart, op: devOp, other: zoneFocus, Icon: MonitorSmartphone, name: 'Known devices', kind: 'Device profile', sub: 'At most 2 devices per user',
+          about: 'How a device is recognised, and how many.',
+          rows: [['Signals', 'Browser, OS, hardware ID'], ['Device limit', 'At most 2 per user'], ['Registration', 'Automatic or by approval'], ['Mobile devices', 'Allowed']],
+        },
+      ].map(({ key, p, op, other, Icon, name, kind, sub, about, rows }) => {
+        if (op <= 0.001) return null
+        const detail = clamp((p.open - 0.55) / 0.45)
+        return (
+          <g key={key} transform={`translate(${(p.c[0] - p.w / 2).toFixed(1)},${(p.c[1] - p.h / 2).toFixed(1)})`} opacity={op * libFocus * (1 - 0.85 * other)}>
             <rect width={p.w} height={p.h} rx={p.rx} className={`f2part${toPill > 0.5 && toLib < 0.5 ? ' is-pill' : ''}`} />
-            {p.h > 46 ? (
+            {p.open > 0.02 ? (
+              <g opacity={detail}>
+                <Icon x={18} y={20} width={16} height={16} strokeWidth={2} className="f2ico is-dark" />
+                <text x={42} y={33} className="f2t is-kicker">
+                  {kind}
+                </text>
+                <text x={18} y={68} className="f2t is-app">
+                  {name}
+                </text>
+                <text x={18} y={88} className="f2t is-sub">
+                  {about}
+                </text>
+                <text x={18} y={118} className="f2t is-kicker">
+                  What it can hold
+                </text>
+                {rows.map(([k, v], i) => (
+                  <g key={k} transform={`translate(18,${128 + i * 31})`} opacity={seg(t, (key === 'zone' ? 32.3 : 36.7) + i * 0.3, (key === 'zone' ? 32.7 : 37.1) + i * 0.3)}>
+                    <rect width={OPEN.w - 36} height={25} rx={6} className="f2row" />
+                    <text x={10} y={17} className="f2t is-sub">
+                      {k}
+                    </text>
+                    <text x={OPEN.w - 46} y={17} textAnchor="end" className="f2t is-row is-strong">
+                      {v}
+                    </text>
+                  </g>
+                ))}
+              </g>
+            ) : p.h > 46 ? (
               <>
                 <Icon x={14} y={p.h / 2 - 16} width={16} height={16} strokeWidth={2} className="f2ico is-dark" />
                 <text x={38} y={p.h / 2 - 3} className="f2t is-b">
@@ -446,8 +515,8 @@ export function Scene2D({ t }: { t: number }) {
               </>
             )}
           </g>
-        ) : null,
-      )}
+        )
+      })}
 
       {/* the applications this one policy covers */}
       {[
@@ -599,7 +668,7 @@ export function Scene2D({ t }: { t: number }) {
 
       {/* Act 5: more rules */}
       <Wire path={[[spine, R1.y + R1.h], [spine, R2.y]]} k={r2Op} tone="grey" />
-      <Card x={RX} y={R2.y} w={RW} h={R2.h} op={r2Op}>
+      <Card x={RX} y={R2.y} w={RW} h={R2.h} tone={r2Tone} op={r2Op}>
         <rect x={14} y={17} width={22} height={22} rx={6} className="f2num" />
         <text x={25} y={32} textAnchor="middle" className="f2t is-num">
           2
@@ -630,8 +699,8 @@ export function Scene2D({ t }: { t: number }) {
           return <Card key={i} x={lerp(sf.x + 10, RX + RW / 2 - w / 2, collapse)} y={lerp(sf.y + 30 + y, R1.y + 60, collapse)} w={w} h={h} tone="dash" op={collapseOp * (1 - collapse * 0.7)} />
         })}
 
-      {/* Act 6: two people, two sign-ins */}
-      {priya > 0 && (
+      {/* Act 6: check access, a list of people with their outcomes */}
+      {!v1 && priya > 0 && (
         <Card x={RX + RW + 50} y={-226} w={240} h={64} tone="plain" op={priya}>
           <text x={16} y={27} className="f2t is-b">
             Priya
@@ -641,7 +710,7 @@ export function Scene2D({ t }: { t: number }) {
           </text>
         </Card>
       )}
-      {arun > 0 && (
+      {!v1 && arun > 0 && (
         <Card x={RX + RW + 50} y={-226} w={240} h={64} tone="plain" op={arun}>
           <text x={16} y={27} className="f2t is-b">
             Arun
@@ -651,12 +720,27 @@ export function Scene2D({ t }: { t: number }) {
           </text>
         </Card>
       )}
-      {tok1 > 0 && tok1 < 1 && <circle className="f2tok is-good" r={8} cx={along(tok1, [startPt, [startPt[0], R1.y - 14], [spine, R1.y - 14], r1Pt])[0]} cy={along(tok1, [startPt, [startPt[0], R1.y - 14], [spine, R1.y - 14], r1Pt])[1]} />}
-      {tok2 > 0 && tok2 < 1 && (
+      {!v1 && tok1 > 0 && tok1 < 1 && <circle className="f2tok is-good" r={8} cx={along(tok1, [startPt, [startPt[0], R1.y - 14], [spine, R1.y - 14], r1Pt])[0]} cy={along(tok1, [startPt, [startPt[0], R1.y - 14], [spine, R1.y - 14], r1Pt])[1]} />}
+      {!v1 && tok2 > 0 && tok2 < 1 && (
         <circle className="f2tok is-bad" r={8} cx={along(tok2, [startPt, [startPt[0], R1.y - 14], [spine, R1.y - 14], r1Pt, r2Pt, r3Pt])[0]} cy={along(tok2, [startPt, [startPt[0], R1.y - 14], [spine, R1.y - 14], r1Pt, r2Pt, r3Pt])[1]} />
       )}
-      {r1Good && <Pill x={RX + RW + 14} y={R1.y + 14} label="Allowed" tone="good" />}
-      {r3Bad && <Pill x={RX + RW + 14} y={R3.y + 18} label="Denied" tone="bad" />}
+      {!v1 && r1Good && <Pill x={RX + RW + 14} y={R1.y + 14} label="Allowed" tone="good" />}
+      {!v1 && r3Bad && <Pill x={RX + RW + 14} y={R3.y + 18} label="Denied" tone="bad" />}
+      {v1 && PEOPLE.map((p, i) => {
+        const op = seg(t, p.at, p.at + 0.4) * (1 - seg(t, 82.2, 82.8))
+        return (
+          <Card key={p.name} x={RX + RW + 50} y={-226 + i * 52} w={290} h={44} tone="plain" op={op}>
+            <rect x={10} y={12} width={20} height={20} rx={6} className="f2num" />
+            <text x={20} y={27} textAnchor="middle" className="f2t is-num">
+              {p.rule}
+            </text>
+            <text x={42} y={27} className="f2t is-b">
+              {p.name}
+            </text>
+            <Pill x={290 - 12 - (textW(p.label, 11.5) + 16)} y={12} label={p.label} tone={p.tone} />
+          </Card>
+        )
+      })}
       </g>
 
       {/* the count at the top of the picture: how many there are, then how few are done by hand */}

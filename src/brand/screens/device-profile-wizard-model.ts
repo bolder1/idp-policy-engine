@@ -24,9 +24,14 @@ import {
   type FingerprintProfile,
   type ProfileMode,
   type ProfileReach,
+  DEFAULT_REMEDIATION,
+  remediationIssue,
+  remediationLabel,
   type Registration,
+  type Remediation,
   type Roster,
 } from '../fingerprint'
+import { SIGNALS_STEP } from './device-profile-phase'
 import { checkLine } from './profile-aside'
 
 /* -----------------------------------------------------------------------------
@@ -49,7 +54,7 @@ import { checkLine } from './profile-aside'
 /** Where the checks are set: on the row that chooses them, or on a step of their own. */
 export type Step3Shape = 'inline' | 'split'
 
-export type WizardStepId = 'profile' | 'devices' | 'items' | 'choose' | 'values' | 'review'
+export type WizardStepId = 'profile' | 'devices' | 'items' | 'choose' | 'values' | 'remediation' | 'review'
 
 export interface WizardStep {
   id: WizardStepId
@@ -60,16 +65,23 @@ export interface WizardStep {
    take", so the Devices step is still the trusted device's alone and the last
    step is still named by the kind's own noun. The wizard only adds what a full
    page has room for: a values step when they are split out, and a review. */
-export function wizardSteps(mode: ProfileMode, step3: Step3Shape): WizardStep[] {
-  const base = stepsFor(mode)
+export function wizardSteps(mode: ProfileMode, step3: Step3Shape, v1 = false): WizardStep[] {
+  const base = stepsFor(mode, v1)
+  /* V1 adds Remediation after a health profile's checks. */
+  const remediation = v1 && !asksReach(mode)
+  const items = base.length - 1 - (remediation ? 1 : 0)
   const steps: WizardStep[] = base
-    .slice(0, -1)
+    .slice(0, items)
     .map((label): WizardStep => ({ id: label === 'Devices' ? 'devices' : 'profile', label }))
-  if (step3 === 'inline') {
-    steps.push({ id: 'items', label: base[base.length - 1] })
+  /* The Signals step is hidden in this version (device-profile-phase.ts); the other kinds keep their checks. */
+  if (asksReach(mode) && !SIGNALS_STEP) {
+    /* no step: a device profile starts with the signals its restriction type offers */
+  } else if (step3 === 'inline') {
+    steps.push({ id: 'items', label: base[items] })
   } else {
     steps.push({ id: 'choose', label: `Choose ${ITEM_NOUN[mode].many}` }, { id: 'values', label: 'Set values' })
   }
+  if (remediation) steps.push({ id: 'remediation', label: 'Remediation' })
   steps.push({ id: 'review', label: 'Review' })
   return steps
 }
@@ -90,6 +102,8 @@ export interface WizardState {
   restrictMobile: boolean
   maxDevices: number | null
   roster: Roster | null
+  /** Device health only, V1. */
+  remediation: Remediation
 }
 
 /* Device health first, as the drawer did: it is the kind with nothing to set
@@ -107,6 +121,7 @@ export const initialWizard = (): WizardState => ({
   restrictMobile: false,
   maxDevices: DEFAULT_MAX_DEVICES,
   roster: null,
+  remediation: DEFAULT_REMEDIATION,
 })
 
 /** Anything answered at all. Leaving after this asks first. */
@@ -140,11 +155,17 @@ export function withMode(s: WizardState, mode: ProfileMode): WizardState {
 
 /* A roster is matched on MAC, which only an agent reads, so going agentless
    takes the roster option away and the answer already given with it. */
+/* With the Signals step hidden, the restriction type is the whole choice: every first-phase signal it offers is on. */
+function defaultSignals(s: WizardState, reach: ProfileReach): Partial<WizardState> {
+  if (SIGNALS_STEP || !asksReach(s.mode)) return {}
+  return { picked: offeredAttributes(s.mode, reach).filter((a) => !a.always && (a.phase ?? 1) === 1).map((a) => a.id) }
+}
+
 export function withWizardReach(s: WizardState, reach: ProfileReach): WizardState {
   if (reach === s.reach) return s
-  return reach === 'agentless'
-    ? { ...s, reach, registration: 'self', roster: null, maxDevices: s.maxDevices ?? DEFAULT_MAX_DEVICES }
-    : { ...s, reach }
+  return reach !== 'agent'
+    ? { ...s, ...defaultSignals(s, reach), reach, registration: 'self', roster: null, maxDevices: s.maxDevices ?? DEFAULT_MAX_DEVICES }
+    : { ...s, ...defaultSignals(s, reach), reach }
 }
 
 /* Picking the value a check already has writes nothing: the profile page's
@@ -186,6 +207,8 @@ export function draftOf(s: WizardState): FingerprintProfile {
     autoRegister: s.autoRegister,
     restrictMobile: s.restrictMobile,
     restrictionSet: asksReach(s.mode),
+    /* Only a health profile that shows instructions stores one, so every other draft is the profile it always was. */
+    ...(s.mode === 'os' && s.remediation.show ? { remediation: s.remediation } : {}),
     usedIn: 0,
   })
 }
@@ -210,6 +233,8 @@ export function stepIssue(step: WizardStepId, s: WizardState, names: Iterable<st
          (owner, 26 Sep 2026), not in the footer. */
       if (s.reach === null) return 'Choose a device restriction type.'
       return s.registration === 'pre-approved' && !s.roster ? 'Upload a device roster.' : null
+    case 'remediation':
+      return remediationIssue(d)
     case 'choose':
       return chosenAttributes(d).length === 0 ? empty : mac
     case 'items':
@@ -392,7 +417,7 @@ export function checkValue(a: Attribute, v: AttrConfigValue | undefined): string
 
 /* Everything the profile will be, in the order the steps asked it. Read off
    `draftOf`, so an unticked row's kept value is not reported as part of it. */
-export function reviewSections(s: WizardState, step3: Step3Shape): ReviewSection[] {
+export function reviewSections(s: WizardState, step3: Step3Shape, v1 = false): ReviewSection[] {
   const d = draftOf(s)
   const sections: ReviewSection[] = [
     {
@@ -445,6 +470,15 @@ export function reviewSections(s: WizardState, step3: Step3Shape): ReviewSection
       pill: true as const,
     })),
   })
+  if (v1 && d.mode === 'os') {
+    const r = s.remediation
+    sections.push({
+      step: 'remediation',
+      title: 'Remediation',
+      summary: remediationLabel(r),
+      facts: [{ label: 'Remediation instructions', value: remediationLabel(r), pill: true }],
+    })
+  }
   return sections
 }
 
@@ -465,8 +499,8 @@ export interface LiveSection extends ReviewSection {
   pending: string | null
 }
 
-export function liveSections(s: WizardState, step3: Step3Shape): LiveSection[] {
-  return reviewSections(s, step3).map((sec) => {
+export function liveSections(s: WizardState, step3: Step3Shape, v1 = false): LiveSection[] {
+  return reviewSections(s, step3, v1).map((sec) => {
     const steps: WizardStepId[] = sec.step === 'values' ? ['choose', 'values'] : [sec.step]
     let pending: string | null = null
     if (sec.step === 'devices' && s.reach === null) pending = 'Not chosen yet'

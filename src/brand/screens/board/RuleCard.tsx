@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useId, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useContext, useId, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import {
   ArrowRight,
   ArrowUpRight,
@@ -29,6 +29,7 @@ import type { CardTone } from '../testing/trace-pills'
 import { useCardHighlighted, type CardHighlight } from './card-highlight'
 import { DECISION_NAME, TONE, type Part } from './model'
 import { ActionRow, CondReadout, IfBlock, IfChip, IfKw } from './IfBlock'
+import { CondTagsContext, condTokens } from './cond-tags'
 import { isPristine, stateLabel } from './parts'
 import { postActionLabel } from '../../post-sign-in'
 import { postTone, usePostBoard } from './post-board'
@@ -938,6 +939,7 @@ function TraceMarkView({ mark, skipped = false, pop }: { mark: TraceRowMark | nu
    Engineering"), the first condition opening with `if` and the rest with
    their join. */
 function TraceIf({ rule, resolve, marks, pop, via }: { rule: Rule; resolve: NameLookup; marks: TraceMarks; pop: boolean; via: string }) {
+  const tagged = useContext(CondTagsContext)
   const cards = rule.when.cards
   const top = topJoin(rule.when)
   const whoName = (kind: 'group' | 'user', id: string) => resolve(kind, id)
@@ -981,7 +983,7 @@ function TraceIf({ rule, resolve, marks, pop, via }: { rule: Rule; resolve: Name
               </div>
             )}
             {k.conditions.map((c, j) => (
-              <div key={c.id} className={`bb__trow is-cond${skipped.has(c.id) ? ' is-skipped' : ''}`}>
+              <div key={c.id} className={`bb__trow is-cond${skipped.has(c.id) ? ' is-skipped' : ''}`} data-ct={tagged ? condTokens(c) : undefined}>
                 <span className="bb__trow__kw">{i === 0 && j === 0 ? <IfKw>if</IfKw> : j === 0 ? <IfKw tone={top}>{top}</IfKw> : <IfKw tone={join}>{join}</IfKw>}</span>
                 <span className="bb__trow__body">
                   <CondReadout c={c} resolve={resolve} />

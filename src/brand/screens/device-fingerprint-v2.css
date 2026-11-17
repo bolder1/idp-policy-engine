@@ -1615,3 +1615,40 @@
 .bfp2__enrolchecklabel { grid-column: 2; font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bfp2__enrolcheckhint { grid-column: 1 / -1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
 .bfp2__enrolcheck:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- Device health · Remediation (V1) ----------------------------------------- */
+.bfp2__remfield { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; max-width: 480px; }
+.bfp2__remlabel { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bfp2__remhint { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* --- Device health · category rail (V1) ---------------------------------------
+   The picker's children sit in two columns: the rail down the left, everything
+   else (bar, list, notes) stacked on the right. */
+.bfp2__pick.has-rail {
+  display: grid; grid-template-columns: 168px minmax(0, 1fr);
+  column-gap: var(--space-6); row-gap: var(--space-4); align-content: start;
+}
+.bfp2__pick.has-rail > :not(.bfp2__rail) { grid-column: 2; min-width: 0; }
+.bfp2__rail {
+  grid-column: 1; grid-row: 1 / span 4; align-self: start;
+  position: sticky; top: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.bfp2__railitem {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: var(--ctl-height-sm); padding: 0 var(--space-4);
+  border: 0; border-radius: var(--radius-md); background: transparent;
+  font: inherit; font-size: var(--fs-base); color: var(--text-secondary);
+  text-align: left; cursor: pointer;
+}
+.bfp2__railitem:hover { background: var(--bg-hover, var(--accent-soft)); color: var(--text-primary); }
+.bfp2__railitem.is-on { background: var(--accent-soft); color: var(--accent-strong); font-weight: var(--fw-medium); }
+.bfp2__railitem:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+@container (max-width: 520px) {
+  .bfp2__pick.has-rail { grid-template-columns: minmax(0, 1fr); }
+  .bfp2__pick.has-rail > :not(.bfp2__rail), .bfp2__rail { grid-column: 1; grid-row: auto; }
+  .bfp2__rail { position: static; flex-direction: row; flex-wrap: wrap; }
+}
+
+/* A registration method with one answer, shown as read-only text (owner, 10 Nov 2026). */
+.bfp2__enrolfixed { display: block; padding: var(--space-2) var(--space-3); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--fs-md); }

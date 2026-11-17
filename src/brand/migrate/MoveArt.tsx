@@ -13,8 +13,8 @@ export type CranePace = 'calm' | 'busy' | 'rush'
 
 const TRIP: Record<CranePace, number> = { calm: 2.6, busy: 1.8, rush: 1.1 }
 
-export function MoveArt({ pace = 'calm' }: { pace?: CranePace }) {
-  const still = useReducedMotion()
+export function MoveArt({ pace = 'calm', fixed = false }: { pace?: CranePace; /** Drawn still (owner, 9 Nov 2026: the New policies banner's picture is static). */ fixed?: boolean }) {
+  const still = useReducedMotion() || fixed
   const trip = TRIP[pace]
   return (
     <div className={`bmart is-${pace}`} role="img" aria-label="Old policies moving to the new policy builder">

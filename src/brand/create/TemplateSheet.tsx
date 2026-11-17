@@ -15,10 +15,11 @@ import { useBrand, useNameLookup } from '../store'
 import { copySources } from '../screens/board/copy-rules'
 import { scenarioFromPolicy } from '../template-from-policy'
 import { TEMPLATES_MANAGED } from '../template-phase'
+import { canSaveAsTemplate } from '../screens/status-options'
 import { buildTemplate, type TemplateLibrary } from '../screens/board/apply-template'
 import type { WhoDirectory } from '../rule-who'
 import { TEMPLATE_CATEGORIES } from '../template-phase'
-import { TemplateCard, TemplatePreview, UsedBy, scenarioCard, type CardModel } from './TemplateCard'
+import { SaveToggle, TemplateCard, TemplatePreview, UsedBy, scenarioCard, type CardModel } from './TemplateCard'
 import { DetailHead, TemplateDetail } from './TemplateDetail'
 
 /* -----------------------------------------------------------------------------
@@ -126,6 +127,26 @@ export function TemplateSheet({
   const [policyPreview, setPolicyPreview] = useState<Policy | null>(null)
   const sheet = useRef<HTMLDivElement>(null)
   const resolve = useNameLookup()
+  /* Save as template on each of your policies, in its card and its row (owner, 10 Nov 2026). The same dialog as the
+     Policies list's row menu and the builder's bar. */
+  const store = useBrand()
+  const savedOf = (p: Policy) => {
+    if (!canSaveAsTemplate(p)) return undefined
+    const own = store.scenarios.find((s) => !s.provided && s.fromPolicy === p.id)
+    const toggle = () => {
+      if (own) {
+        store.removeScenario(own.id)
+        store.showToast(`${own.name} removed from templates`)
+        return
+      }
+      const names = new Set(store.scenarios.map((s) => s.name.toLowerCase()))
+      let name = p.name
+      for (let n = 2; names.has(name.toLowerCase()); n++) name = `${p.name} (${n})`
+      store.addScenario({ ...scenarioFromPolicy(p, { name, description: '', category: 'Uncategorized' }, Date.now(), resolve), fromPolicy: p.id })
+      store.showToast(`${name} saved as a template`)
+    }
+    return { on: !!own, toggle }
+  }
 
   /* From the store, so a template saved from a policy is on the tenant's shelf
      the next time this opens. The directory and library are the ones applying
@@ -238,7 +259,7 @@ export function TemplateSheet({
       {shelf === 'policies' && policyList.length > 0 && (
         <div className="bgal__grid">
           {policyList.map((p) => (
-            <TemplateCard key={p.id} m={policyCard(p)} compact fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} useLabel="Inherit" />
+            <TemplateCard key={p.id} m={policyCard(p)} compact fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} saved={savedOf(p)} useLabel="Inherit" />
           ))}
         </div>
       )}
@@ -496,14 +517,14 @@ export function TemplateSheet({
                       <span />
                     </li>
                     {policyList.map((p) => (
-                      <PolicyRow key={p.id} m={policyCard(p)} onPreview={() => setPolicyPreview(p)} />
+                      <PolicyRow key={p.id} m={policyCard(p)} onPreview={() => setPolicyPreview(p)} saved={savedOf(p)} />
                     ))}
                   </ul>
                 )}
                 {shelf === 'policies' && policyList.length > 0 && view === 'cards' && (
                   <div className="bgal__grid">
                     {policyList.map((p) => (
-                      <TemplateCard key={p.id} m={policyCard(p)} compact fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} useLabel="Inherit" />
+                      <TemplateCard key={p.id} m={policyCard(p)} compact fallback={fallback} onUse={() => takePolicy(p)} onPreview={() => setPolicyPreview(p)} saved={savedOf(p)} useLabel="Inherit" />
                     ))}
                   </div>
                 )}
@@ -606,15 +627,18 @@ function Card({
   onPreview: () => void
 }) {
   const m = useMemo(() => scenarioCard(s, directory, library), [s, directory, library])
+  /* Your own templates have no drawn picture to show, so they take the plain card Inherit uses: icon, name, button
+     (owner, 10 Nov 2026). Xecurify's keep their pictures. */
+  if (!s.provided) return <TemplateCard m={{ ...m, category: undefined }} compact fallback={fallback} onUse={onUse} onPreview={onPreview} useLabel="Use" />
   return <TemplateCard m={m} fallback={fallback} onUse={onUse} onPreview={onPreview} useLabel="Use" />
 }
 
 
 /* A policy as a row of the list (owner, 3 Nov 2026: "give me a good list experience … the whole row on hover", then "simple and useful": a name, where it runs, and the action): the whole row is
    the button, so it highlights and opens the preview from anywhere on it; the action says itself on hover and focus. */
-function PolicyRow({ m, onPreview }: { m: CardModel; onPreview: () => void }) {
+function PolicyRow({ m, onPreview, saved }: { m: CardModel; onPreview: () => void; saved?: { on: boolean; toggle: () => void } }) {
   return (
-    <li>
+    <li className="bpl__item">
       <button type="button" className="bpl__row" onClick={onPreview} aria-label={`Preview and inherit ${m.name}`}>
         <span className="bpl__name" title={m.name}>
           {m.name}
@@ -625,6 +649,12 @@ function PolicyRow({ m, onPreview }: { m: CardModel; onPreview: () => void }) {
           <ChevronRight size={14} strokeWidth={2} aria-hidden />
         </span>
       </button>
+      {/* Beside the row's button, not in it: a button cannot hold another. */}
+      {saved && (
+        <span className="bpl__save">
+          <SaveToggle saved={saved} />
+        </span>
+      )}
     </li>
   )
 }

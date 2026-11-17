@@ -13,26 +13,13 @@
 .bfm__end p { margin: 0; max-width: 520px; font-size: var(--fs-base); line-height: 1.55; color: var(--text-secondary); }
 
 /* The timeline: its own row. Play, then a segment per chapter sized by its length; the playing one fills. */
-.bfm__timeline { display: flex; align-items: flex-start; gap: var(--space-3); }
-.bfm__chapters { display: flex; flex: 1; min-width: 0; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.bfm__chapters > li { min-width: 0; flex-basis: 0; }
-.bfm__chapter { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 8px 0 0; border: 0; background: none; text-align: left; cursor: pointer; }
-.bfm__track { position: relative; display: block; height: 4px; border-radius: var(--radius-full); background: var(--border-default); overflow: hidden; transition: height 0.15s ease; }
-.bfm__track > i { position: absolute; inset: 0 auto 0 0; background: var(--text-primary); border-radius: inherit; }
-.bfm__chapter.is-on .bfm__track > i { background: var(--blue, var(--text-primary)); }
-.bfm__chapter:hover .bfm__track { height: 6px; }
-.bfm__chaptername { overflow: hidden; font-size: 12px; font-weight: var(--fw-medium); white-space: nowrap; text-overflow: ellipsis; color: var(--text-tertiary); }
-.bfm__chapter.is-done .bfm__chaptername { color: var(--text-secondary); }
-.bfm__chapter.is-on .bfm__chaptername { font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bfm__chapter:hover .bfm__chaptername { color: var(--text-primary); }
-.bfm__chapter:focus-visible { outline: none; border-radius: var(--radius-sm, 4px); box-shadow: var(--focus-ring); }
 .bfm__play { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; border: var(--bw-thin) solid var(--border-default); background: var(--surface-raised); color: var(--text-primary); cursor: pointer; }
 .bfm__play:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* The words and the buttons: one row, the words left, Not now and Start migration right. */
 .bfm__row { display: flex; align-items: flex-end; gap: var(--space-4); }
 .bfm__words { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: flex-end; gap: 2px; min-height: 64px; }
-.bfm__act { margin-bottom: var(--space-1); font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: 0.02em; color: var(--blue, var(--text-tertiary)); }
+.bfm__act { margin-bottom: var(--space-1); font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: 0.02em; color: var(--ch, var(--blue, var(--text-tertiary))); }
 .bfm__words p { margin: 0; font-size: 14px; line-height: 1.4; font-weight: var(--fw-medium); color: var(--text-tertiary); }
 .bfm__words p.is-now { font-size: 22px; line-height: 1.25; font-weight: var(--fw-semibold); letter-spacing: -0.015em; color: var(--text-primary); }
 .bfm__words p:not(.is-now) { display: none; }
@@ -165,3 +152,151 @@
 .f2t.is-cell { font-size: 12px; font-weight: 500; fill: var(--text-primary); }
 .f2t.is-cell.is-soft { fill: var(--text-secondary); }
 .f2t.is-good { fill: var(--fb-positive-fg); }
+
+/* The timeline inside the canvas, along its foot (owner, 9 Nov 2026): a soft fade of the stage's own colour so the
+   chapter names read over the scene. */
+.bfm__stage > .bfm__timeline { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; padding: var(--space-8) var(--space-4) var(--space-3); background: linear-gradient(to top, var(--surface-sunken) 45%, transparent); }
+
+/* The chapter bar (owner, 9 Nov 2026): six equal segments that never resize, each a thin track in its chapter's colour under its
+   mark and name. Done ones are full and coloured, the playing one fills as it goes, the ones to come are grey. The colours
+   are set by data-ch, here and nowhere else. The last scene has no segment: the bar is only Replay. */
+:where(.bfm, .bfm__chapters > li) { --ch: #4f7cf0; }
+[data-ch='today'] { --ch: #4f7cf0; }
+[data-ch='cost'] { --ch: #e5484d; }
+[data-ch='taken'] { --ch: #8e5cf0; }
+[data-ch='zones'] { --ch: #7b61e8; }
+[data-ch='devices'] { --ch: #a24bd6; }
+[data-ch='builder'] { --ch: #0e9fb8; }
+[data-ch='rules'] { --ch: #d98a0b; }
+[data-ch='access'] { --ch: #2f9e5b; }
+[data-ch='move'] { --ch: #d6479a; }
+.bfm__timeline { display: flex; align-items: center; gap: var(--space-3); }
+.bfm__nav { display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text-tertiary); cursor: pointer; transition: color 0.15s ease, background 0.15s ease; }
+.bfm__nav:hover:not(:disabled) { color: var(--text-primary); background: var(--surface-raised); }
+.bfm__nav:disabled { opacity: 0.35; cursor: default; }
+.bfm__nav:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bfm__chapters { display: flex; flex: 1; min-width: 0; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.bfm__chapters > li { flex: 1 1 0; min-width: 0; }
+.bfm__chapter { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 6px 0 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.bfm__chapter:focus-visible { outline: none; border-radius: var(--radius-sm, 4px); box-shadow: var(--focus-ring); }
+.bfm__track { position: relative; display: block; height: 4px; border-radius: var(--radius-full); background: var(--border-default); overflow: hidden; transition: height 0.15s ease; }
+.bfm__track > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--ch); }
+.bfm__chapter:hover .bfm__track { height: 6px; }
+.bfm__chlabel { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--text-tertiary); transition: color 0.15s ease; }
+.bfm__chlabel > svg { flex: none; }
+.bfm__chaptername { overflow: hidden; font-size: 12px; font-weight: var(--fw-medium); white-space: nowrap; text-overflow: ellipsis; }
+.bfm__chapters > li.is-done .bfm__chlabel { color: var(--ch); }
+.bfm__chapters > li.is-on .bfm__chlabel { color: var(--text-primary); }
+.bfm__chapters > li.is-on .bfm__chlabel > svg { color: var(--ch); }
+.bfm__chapters > li.is-on .bfm__chaptername { font-weight: var(--fw-semibold); }
+.bfm__chapter:hover .bfm__chlabel { color: var(--ch); }
+.bfm__timeline:empty { display: none; }
+.bfm__end .bfm__replay { margin-top: var(--space-2); }
+.bfm__replay { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 var(--space-4); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-full); background: var(--surface-raised); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: var(--fw-medium); cursor: pointer; }
+.bfm__replay:hover { background: var(--surface-sunken); }
+.bfm__replay:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* The watch experience (owner, 9 Nov 2026: "dim the background, I mean the overlay, not the card"; "an ambient light like
+   YouTube, changing by chapter"). The film's card stays as it is. What is dimmed is the room around it: the overlay goes near
+   black, and a soft light in the chapter's two colours spreads from behind the card and eases from one chapter to the next. */
+@property --amb { syntax: '<color>'; inherits: true; initial-value: #4f7cf0; }
+@property --amb2 { syntax: '<color>'; inherits: true; initial-value: #8e5cf0; }
+.bx-scrim:has(.bfm) { --amb: #4f7cf0; --amb2: #8e5cf0; transition: --amb 1.6s ease, --amb2 1.6s ease; }
+.bx-scrim:has(.bfm[data-ch='today']) { --amb: #4f7cf0; --amb2: #8e5cf0; }
+.bx-scrim:has(.bfm[data-ch='cost']) { --amb: #e5484d; --amb2: #d98a0b; }
+.bx-scrim:has(.bfm[data-ch='taken']) { --amb: #8e5cf0; --amb2: #d6479a; }
+.bx-scrim:has(.bfm[data-ch='zones']) { --amb: #7b61e8; --amb2: #a24bd6; }
+.bx-scrim:has(.bfm[data-ch='devices']) { --amb: #a24bd6; --amb2: #d6479a; }
+.bx-scrim:has(.bfm[data-ch='builder']) { --amb: #0e9fb8; --amb2: #4f7cf0; }
+.bx-scrim:has(.bfm[data-ch='rules']) { --amb: #d98a0b; --amb2: #2f9e5b; }
+.bx-scrim:has(.bfm[data-ch='access']) { --amb: #2f9e5b; --amb2: #0e9fb8; }
+.bx-scrim:has(.bfm[data-ch='move']) { --amb: #d6479a; --amb2: #4f7cf0; }
+/* The overlay: near black, no gradient (owner, 9 Nov 2026: "remove gradient, work on the border only"). The colour lives
+   on the card's edge alone: a thin conic gradient runs round it in the chapter's colours, easing between chapters. The plain
+   intro (One page, Carousel) is a plain popup: the kit's own overlay, no gradient edge (owner, 9 Nov 2026). */
+@property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.bx-scrim:has(.bfm) { background: rgba(4, 6, 10, 0.9) !important; }
+.bx-scrim:has(.bfm) > .bx-modal {
+  position: relative; z-index: 1; border: 2px solid transparent; box-shadow: none;
+  background:
+    linear-gradient(var(--surface-raised), var(--surface-raised)) padding-box,
+    conic-gradient(from var(--ang), var(--amb), var(--amb2), color-mix(in srgb, var(--amb) 50%, #fff), color-mix(in srgb, var(--amb2) 65%, #fff), var(--amb)) border-box;
+  animation: bfm-ang 10s linear infinite;
+}
+@keyframes bfm-ang { to { --ang: 360deg; } }
+.bfm__act { color: var(--ch, var(--blue, var(--text-tertiary))); }
+[data-ch='today'] { --ch2: #8e5cf0; }
+@media (prefers-reduced-motion: reduce) { .bx-scrim:has(.bfm) > .bx-modal { animation: none; } .bx-scrim:has(.bfm) { transition: none; } }
+
+/* Done chapters fold to their icon; the one playing opens; the ones to come share the rest (owner, 9 Nov 2026). */
+.bfm__chapters > li { flex: 1 1 60px; transition: flex-grow 0.45s var(--ease-standard), flex-basis 0.45s var(--ease-standard); }
+.bfm__chapters > li.is-done { flex: 0 0 44px; }
+.bfm__chapters > li.is-on { flex: 2.4 1 60px; }
+.bfm__chapters > li.is-done .bfm__chlabel { justify-content: center; }
+.bfm__track > i { background: linear-gradient(90deg, var(--ch), var(--ch2, var(--ch))); }
+@media (prefers-reduced-motion: reduce) { .bfm__chapters > li { transition: none; } }
+
+/* The consent, inside the canvas (owner, 9 Nov 2026): the stage flips to it. Blue, soft, one card. */
+.bfm { position: relative; }
+.bfm__ask { position: absolute; inset: var(--space-3); z-index: 5; border-radius: var(--radius-xl, 16px); border: var(--bw-thin) solid var(--border-subtle); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4); padding: var(--space-9) var(--space-8); text-align: center; background: radial-gradient(70% 60% at 50% 0%, var(--fb-info-bg), var(--surface-raised) 78%); }
+.bfm__ask h2 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: var(--fw-semibold); letter-spacing: -0.02em; color: var(--text-primary); }
+.bfm__ask p { margin: 0; max-width: 600px; font-size: var(--fs-base); line-height: 1.55; color: var(--text-secondary); }
+.bfm__askhero { position: relative; display: grid; place-items: center; width: 168px; height: 168px; margin-bottom: var(--space-2); }
+.bfm__askhero i { position: absolute; border-radius: 50%; border: var(--bw-thin) solid color-mix(in srgb, var(--f-blue) 28%, transparent); animation: bfm-askring 3.2s ease-in-out infinite; }
+.bfm__askhero i:nth-child(1) { width: 96px; height: 96px; }
+.bfm__askhero i:nth-child(2) { width: 132px; height: 132px; animation-delay: 0.3s; }
+.bfm__askhero i:nth-child(3) { width: 168px; height: 168px; animation-delay: 0.6s; }
+.bfm__askbadge { position: relative; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--surface-raised); color: var(--f-blue); box-shadow: var(--el-low); }
+.bfm__askacts { display: flex; gap: var(--space-4); margin-top: var(--space-6); }
+.bfm__askack { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-5); white-space: nowrap; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); font-size: var(--fs-sm); color: var(--text-primary); cursor: pointer; }
+.bfm__askack input { width: 16px; height: 16px; accent-color: var(--f-blue); }
+.bnbb:disabled { opacity: 0.45; cursor: not-allowed; filter: saturate(0.4); }
+@keyframes bfm-askring { 0%, 100% { opacity: 0.35; scale: 0.96; } 50% { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .bfm__askhero i { animation: none; } }
+
+/* A finished chapter is a plain round mark with its icon: no colour, no bar. */
+.bfm__chapters > li.is-done { flex: 0 0 32px; }
+.bfm__chapters > li.is-done .bfm__chapter { align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 50%; border: var(--bw-thin) solid var(--border-default); background: var(--surface-sunken); }
+.bfm__chapters > li.is-done .bfm__track { display: none; }
+.bfm__chapters > li.is-done .bfm__chlabel { justify-content: center; color: var(--text-tertiary); }
+.bfm__chapters > li.is-done .bfm__chapter:hover { background: var(--surface-raised); }
+.bfm__chapters > li.is-done .bfm__chapter:hover .bfm__chlabel { color: var(--text-primary); }
+
+/* The closing scene has no bottom row: its buttons are in the middle with its words (owner, 9 Nov 2026). The row folds away. */
+.bfm__row { max-height: 160px; transition: max-height 0.4s var(--ease-standard), opacity 0.25s ease; }
+.bfm.is-end .bfm__row { max-height: 0; min-height: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+.bfm__endacts { display: flex; margin-top: var(--space-5); }
+.bfm__endsub { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
+.bfm__end .bfm__endsub .bfm__replay { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .bfm__row { transition: none; } }
+
+/* The words in the canvas, top left, as a caption card over the film (owner, 10 Nov 2026); the row below keeps only the buttons. */
+.bfm__stage > .bfm__words { position: absolute; top: var(--space-4); left: var(--space-4); z-index: 2; flex: none; max-width: min(46%, 420px); min-height: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg, 12px); border: var(--bw-thin) solid var(--border-subtle); background: var(--surface-raised); box-shadow: var(--el-mid); transition: opacity 0.25s ease; }
+.bfm.is-end .bfm__stage > .bfm__words { opacity: 0; pointer-events: none; }
+/* In the guide: plain text under the film, a fixed height so the page does not jump as the lines change. */
+.bfm__words.is-below { flex: none; justify-content: flex-start; min-height: 96px; padding: 0 var(--space-2); }
+.bfm.is-full .bfm__words.is-below { min-height: 120px; }
+.bfm.is-end .bfm__words.is-below { opacity: 0; }
+.bfm__row { justify-content: flex-end; }
+
+/* The player (owner, 10 Nov 2026): one video, with a player's own controls along its foot. */
+.bfm__stage > .bfm__player { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-8) var(--space-4) var(--space-3); background: linear-gradient(to top, var(--surface-sunken) 45%, transparent); }
+.bfm__skip { position: relative; display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text-secondary); cursor: pointer; }
+.bfm__skip > span { position: absolute; top: 50%; left: 50%; font-size: 9px; font-weight: var(--fw-semibold); line-height: 1; letter-spacing: -0.02em; transform: translate(-50%, -40%); }
+.bfm__skip:hover { color: var(--text-primary); background: var(--surface-raised); }
+.bfm__skip:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bfm__scrub { flex: 1; min-width: 0; height: 16px; margin: 0; appearance: none; background: transparent; cursor: pointer; }
+.bfm__scrub::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--text-primary) var(--pos, 0%), var(--border-default) var(--pos, 0%)); }
+.bfm__scrub::-moz-range-track { height: 4px; border-radius: 2px; background: var(--border-default); }
+.bfm__scrub::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--text-primary); }
+.bfm__scrub::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; margin-top: -4px; border: 0; border-radius: 50%; background: var(--text-primary); }
+.bfm__scrub::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--text-primary); }
+.bfm__scrub:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
+.bfm__time { flex: none; min-width: 78px; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; color: var(--text-secondary); text-align: right; }
+.bfm__row[hidden] { display: none; }
+
+/* Full width: the film alone on the screen, its stage as large as the screen allows. */
+.bfm.is-full { justify-content: center; padding: var(--space-6); background: var(--surface-raised); }
+.bfm.is-filled { position: fixed; inset: 0; z-index: 1000; }
+.bfm.is-full .bfm__stage { width: min(100%, calc((100vh - 96px) * 16 / 9)); margin-inline: auto; }
+.bfm.is-full .bfm__words p.is-now { font-size: 28px; }

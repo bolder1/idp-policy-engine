@@ -9,8 +9,10 @@ import {
   MonitorSmartphone,
   Pencil,
   Plus,
+  ShieldCheck,
   Sliders,
   Trash2,
+  Wrench,
 } from 'lucide-react'
 
 import {
@@ -34,6 +36,8 @@ import {
   PROFILE_NAME_MAX,
   asksReach,
   attrOf,
+  remediationIssue,
+  remediationOf,
   blankProfile,
   chosenAttributes,
   countLabel,
@@ -85,6 +89,8 @@ import {
   modeFixedTip,
 } from './device-profile-basic'
 import { DeviceProfileWizard } from './device-profile-wizard'
+import { RemediationForm } from './device-profile-remediation'
+import { useShows } from './board/builder-version'
 import { NewProfileDialog } from './new-profile-dialog'
 import { CREATE_VERSIONS, readCreateVersion, writeCreateVersion, type CreateVersion } from './device-profile-version'
 import { SHOWCASE } from '../showcase'
@@ -791,7 +797,7 @@ function DiscardDialog({
    dialog's Discard rather than a retype.
    -------------------------------------------------------------------------- */
 
-type ProfileTab = 'basic' | 'attributes'
+type ProfileTab = 'basic' | 'attributes' | 'remediation'
 
 /* How a health profile works, beside a new one's empty list. */
 /* `ENROLMENT_KEYS` and `enrolmentAnswered` stood here: the save flipped
@@ -1066,6 +1072,10 @@ function ProfilePage({
   /* The same test the create wizard uses to decide whether it has two steps or
      three. One question, one answer, both surfaces. */
   const tabbed = asksReach(draft.mode)
+  /* V1: a health profile gets a Remediation tab beside its checks. */
+  const v1 = useShows('deviceUpdate')
+  const healthTabs = v1 && !tabbed
+  const changeRemediation = (remediation: FingerprintProfile['remediation']) => setDraft((d) => ({ ...d, remediation }))
   /* "Change what it reads", from the signals drawer. Straight to the Basic
      details tab, where the reach tiles are. It used to open a slider on top of
      that tab, because the tab itself was read-only; the tab holds the live form
@@ -1169,7 +1179,7 @@ function ProfilePage({
                           text="Decides which signals are available. Hardware identifiers need the Device Agent."
                         />
                       </header>
-                      <ChoiceTiles labelledBy={reachAskId} options={reachChoices()} value={null} onPick={answerReach} />
+                      <ChoiceTiles labelledBy={reachAskId} options={reachChoices(v1)} value={null} onPick={answerReach} />
                       {reachHeld && (
                         <p className="bdpw__said" role="status">
                           {reachHeld}
@@ -1191,6 +1201,50 @@ function ProfilePage({
                   />
                 </div>
                 <SidePanel note={itemsNote(draft.mode)} />
+              </div>
+            )}
+          </div>
+        </>
+      ) : healthTabs ? (
+        <>
+          <Tabs
+            className="bx-tabs--line bfp2__tabs"
+            name="Profile"
+            value={tab === 'remediation' ? 'remediation' : 'attributes'}
+            onChange={setTab}
+            panelId="bfp2-panel"
+            options={[
+              { value: 'attributes', label: attrTab, icon: ShieldCheck },
+              { value: 'remediation', label: 'Remediation', icon: Wrench },
+            ]}
+          />
+          <div id="bfp2-panel" role="tabpanel" className="bfp2__panel">
+            {tab === 'remediation' ? (
+              <RemediationForm
+                value={remediationOf(draft)}
+                onChange={changeRemediation}
+                issue={remediationIssue(draft)}
+              />
+            ) : (
+              <div className="bz7__cols">
+          <div className="bz7__work">
+            {/* A new health profile has no checks yet, and that list is the
+                whole page, so its empty state is drawn as a page's is. */}
+            <ChosenList
+              draft={draft}
+              fullEmpty={isNew}
+              /* While the footer is up it holds the view's one orange button,
+                 and the empty list then says why the save is held. */
+              saving={dirty}
+              onEdit={() => setEditing(true)}
+              onConfig={setConfig}
+              onWeight={setWeight}
+              onRemove={removeCheck}
+            />
+          </div>
+          {/* How the checks work, in the wizard's words — the same panel a new
+              profile's empty state gets, since neither reads the draft. */}
+          <SidePanel note={itemsNote(draft.mode)} />
               </div>
             )}
           </div>
@@ -1478,6 +1532,7 @@ function BasicDetailsForm({
      current value — this is "somebody has asked for a change and not yet
      confirmed it", which is a different thing and reads as one. */
   const [pendingReach, setPendingReach] = useState<ProfileReach | null>(null)
+  const v1 = useShows('deviceUpdate')
 
   const reachId = useId()
   /* Both confirmation buttons take away the panel they sit in, so without this
@@ -1518,7 +1573,7 @@ function BasicDetailsForm({
        and removes nothing — it makes rows available — so a confirmation there
        would be a question about a change with no cost. */
     const loses = profile.enabled.some((id) => attrOf(profile.mode, id)?.needsAgent)
-    if (reach === 'agentless' && loses) setPendingReach(reach)
+    if (reach !== 'agent' && loses) setPendingReach(reach)
     else commitReach(reach)
   }
 
@@ -1540,7 +1595,7 @@ function BasicDetailsForm({
               print it twice. */}
           <ChoiceTiles
             labelledBy={reachId}
-            options={reachChoices()}
+            options={reachChoices(v1)}
             value={profile.reach}
             onPick={pressReach}
           />

@@ -2,6 +2,7 @@ import { AnimatePresence, motion, animate, useReducedMotion, Reorder, useDragCon
 import { TEMPLATES_MANAGED } from './template-phase'
 import { MIGRATION_FIRST } from './migrate/phase'
 import { MoveJobPill } from './migrate/move-job-pill'
+import { clearWalkPublished } from './migrate/walk-published'
 import { RailReminder } from './migrate/rail-reminder'
 import { AnnounceStrip } from './migrate/AnnounceStrip'
 import {
@@ -340,6 +341,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const narrow = useNarrow()
   const full = CANVAS_FULL_VIEW && RAIL_SHUT_SCREENS.includes(screen.name)
   const reduced = useReducedMotion() ?? false
+  /* Leaving the builder ends the review walk: what was published in it is then only in New policies. */
+  useEffect(() => {
+    if (screen.name !== 'board') clearWalkPublished()
+  }, [screen.name])
   /* The open: the canvas grows out of the page while the chrome folds away. Only on the way in. */
   const main = useRef<HTMLElement | null>(null)
   const wasFull = useRef(full)
@@ -563,7 +568,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className={`bshell ${!narrow && collapsed ? 'is-collapsed' : ''} ${narrow && navOpen ? 'is-navopen' : ''}${full ? ' is-full' : ''}`}>
-      <header className="bshell__top" inert={full ? true : undefined}>
+      <header className="bshell__top">
         <Tip text={railLabel}>
           <button
             type="button"
@@ -817,6 +822,8 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <main className="bshell__main" ref={main}>
         <AnnounceStrip />
+        {/* The slot the migration banner (migrate/finale.tsx) is drawn into, above the page like the launch strip. */}
+        <div id="bshell-top" className="bshell__banner" />
         {children}
       </main>
 

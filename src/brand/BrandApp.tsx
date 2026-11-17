@@ -14,6 +14,8 @@ import { FRESH_BUILDER } from './migrate/legacy'
 import { IntroCarousel } from './migrate/IntroCarousel'
 import { MoveTour } from './migrate/MoveTour'
 import { HomeHub } from './migrate/HomeHub'
+import { MigrationGuide } from './migrate/MigrationGuide'
+import { guideRequested } from './migrate/guide-link'
 import './theme-mode'
 
 /* -----------------------------------------------------------------------------
@@ -251,6 +253,16 @@ function Chrome() {
 
 export function BrandApp() {
   usePrefetchScreens()
+
+  /* "See how it works" opens the migration guide in a tab of its own: an article, with no console around it. */
+  if (guideRequested())
+    return (
+      <MotionConfig reducedMotion="user">
+        <div className="brand-root">
+          <MigrationGuide />
+        </div>
+      </MotionConfig>
+    )
 
   return (
     <MotionConfig reducedMotion="user">

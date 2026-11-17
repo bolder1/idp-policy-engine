@@ -1,5 +1,6 @@
 import { MonitorCheck } from 'lucide-react'
-import { Fingerprint, Globe, type LucideIcon, Microchip } from 'lucide-react'
+import { AGENT_REACH } from './device-profile-phase'
+import { Fingerprint, Globe, type LucideIcon, Microchip, Smartphone } from 'lucide-react'
 
 import {
   MODES,
@@ -51,6 +52,7 @@ export const MODE_ICON: Record<ProfileMode, LucideIcon> = {
 export const REACH_ICON: Record<ProfileReach, LucideIcon> = {
   agentless: Globe,
   agent: Microchip,
+  authenticator: Smartphone,
 }
 
 /** One answer on a `ChoiceTiles` group. See the component for the shape. */
@@ -74,8 +76,8 @@ export const kindChoices = (): Choice<ProfileMode>[] =>
     tip: m.blurb,
   }))
 
-export const reachChoices = (): Choice<ProfileReach>[] =>
-  REACHES.map((r) => ({
+export const reachChoices = (v1 = false): Choice<ProfileReach>[] =>
+  REACHES.filter((r) => (v1 || r.id !== 'authenticator') && (AGENT_REACH || r.id !== 'agent')).map((r) => ({
     id: r.id,
     label: r.label,
     icon: REACH_ICON[r.id],
@@ -118,3 +120,47 @@ export const LIST_COLUMNS: Record<'os' | 'device', { left: string; right: string
      weird — call it something else, like signals"). */
   os: { left: 'Attribute', right: 'Requirement' },
 }
+
+/* --- Device health, filed by the device it runs on (V1) ------------------------------------------
+   The rail on the Checks step names device types, not families (owner, 10 Nov 2026): Windows, macOS, Linux, iOS,
+   Android, and "Any device" for what no device type owns. A check can sit under several — Chrome runs on four of
+   them — so this is a map, not a field on the attribute, and the families (Platform, Browser, Security, Client) stay
+   as the rows' own marks and the search. */
+export type DeviceGroup = 'windows' | 'macos' | 'linux' | 'ios' | 'android' | 'any'
+
+export const DEVICE_GROUPS: { id: DeviceGroup; label: string }[] = [
+  { id: 'windows', label: 'Windows' },
+  { id: 'macos', label: 'macOS' },
+  { id: 'linux', label: 'Linux' },
+  { id: 'ios', label: 'iOS' },
+  { id: 'android', label: 'Android' },
+  { id: 'any', label: 'Any device' },
+]
+
+const GROUPS_OF: Record<string, DeviceGroup[]> = {
+  'device-type': ['any'],
+  'os-windows': ['windows'],
+  'os-macos': ['macos'],
+  'os-ios': ['ios'],
+  'os-android': ['android'],
+  'browser-chrome': ['windows', 'macos', 'linux', 'android'],
+  'browser-edge': ['windows', 'macos'],
+  'browser-firefox': ['windows', 'macos', 'linux', 'android'],
+  'browser-safari': ['macos', 'ios'],
+  integrity: ['ios', 'android'],
+  'screen-lock': ['windows', 'macos', 'linux', 'ios', 'android'],
+  'disk-encryption': ['windows', 'macos', 'linux', 'android'],
+  firewall: ['windows', 'macos', 'linux'],
+  'security-software': ['windows', 'macos', 'linux'],
+  'secure-boot': ['windows'],
+  'security-patch': ['android'],
+  'mo-authenticator': ['ios', 'android'],
+  'mo-agent': ['windows', 'macos', 'linux'],
+}
+
+/** Is this check one of the device type's? An id the map does not know sits under Any device. */
+export const inDeviceGroup = (id: string, group: DeviceGroup): boolean => (GROUPS_OF[id] ?? ['any']).includes(group)
+
+/** The device types that have at least one of these checks. */
+export const deviceGroupsOf = (ids: string[]): DeviceGroup[] =>
+  DEVICE_GROUPS.map((g) => g.id).filter((g) => ids.some((id) => inDeviceGroup(id, g)))

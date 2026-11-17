@@ -3861,6 +3861,8 @@ export interface Scenario {
   when?: string
   /** On a tenant's own template added from the Xecurify store: the shipped template it is a copy of (30 Oct 2026). */
   addedFrom?: string
+  /** On a tenant's own template saved from one of its policies with the card's bookmark: that policy (10 Nov 2026). */
+  fromPolicy?: string
   /* Who the policy this template builds should govern.
 
      It used to be stamped on each built rule, which meant a two-rule template

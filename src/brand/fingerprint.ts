@@ -508,6 +508,54 @@ export const OS_ATTRIBUTES: Attribute[] = [
     },
   },
 
+  /* --- Security, added 10 Nov 2026 (owner: "find the relevant options we can give inside the current list") ---------
+
+     Five rows, each one a check BOTH Okta's device assurance and Duo's device health offer (docs/research/competitors,
+     30 Sep 2026): encryption, firewall, security software, Secure Boot and TPM, Android patch level. The sixth of the six
+     was not a row — Screen lock was already here, and now sits under the desktop device types too (Duo's "system password
+     set", Okta's macOS lock screen).
+
+     `phase: 2` on all five, and that is the honest mark. Nothing in the repo shows what the miniOrange Authenticator or
+     Agent can read on a desktop (device-compliance-report.md, open question 8). Like the other requirements an absent
+     signal is a failed condition, so the row is safe to offer; the phase says it is not collected yet. */
+  {
+    id: 'disk-encryption', category: 'Security', name: 'Disk encryption',
+    purpose: 'Whether the drive is encrypted — BitLocker on Windows, FileVault on macOS, the platform’s own on Linux and Android. A lost laptop with an encrypted disk is a hardware loss; without one, it is a data loss.',
+    priority: 'High', weight: 20, phase: 2,
+  },
+  {
+    id: 'firewall', category: 'Security', name: 'Firewall',
+    purpose: 'Whether the operating system’s firewall is switched on.',
+    priority: 'Medium', weight: 10, phase: 2,
+  },
+  {
+    id: 'security-software', category: 'Security', name: 'Antivirus or EDR running',
+    purpose: 'Whether security software is installed and running. Any recognised product passes.',
+    priority: 'Medium', weight: 10, phase: 2,
+  },
+  {
+    id: 'secure-boot', category: 'Security', name: 'Secure Boot and TPM',
+    purpose: 'Whether the machine starts only software the vendor signed, and holds its keys in a hardware chip. The check that the operating system under every other row has not been swapped.',
+    priority: 'Medium', weight: 20, phase: 2,
+    config: {
+      kind: 'choice',
+      label: 'Require',
+      value: 'Secure Boot on and TPM 2.0',
+      options: ['Secure Boot on', 'TPM 2.0 present', 'Secure Boot on and TPM 2.0'],
+    },
+  },
+  {
+    id: 'security-patch', category: 'Security', name: 'Android security patch',
+    purpose: 'How recently the handset installed a security patch. A version floor lets a device sit on an old patch for years; this asks how long it has been.',
+    priority: 'Medium', weight: 10, phase: 2,
+    config: {
+      kind: 'choice',
+      label: 'Patched within',
+      value: '90 days',
+      options: ['30 days', '60 days', '90 days'],
+    },
+  },
+
   /* --- Client: the miniOrange software, by version ---------------------------
 
      Two rows, not one, and the reason is the reason there are four OS rows.
@@ -937,7 +985,7 @@ export const countLabel = (mode: ProfileMode, n: number) =>
    nothing to decide — see `offeredAttributes`. It still carries the field, and
    carries `'agentless'`, because that is what the five OS attributes actually
    need: they arrive with the request. Nothing reads it on an OS profile. */
-export type ProfileReach = 'agentless' | 'agent'
+export type ProfileReach = 'agentless' | 'agent' | 'authenticator'
 
 export interface ReachMeta {
   id: ProfileReach
@@ -969,6 +1017,15 @@ export const REACHES: ReachMeta[] = [
     blurb:
       'An installed agent adds hardware identifiers — TPM, motherboard, disk — for high-assurance access.',
     note: 'Users without the agent cannot sign in.',
+  },
+  /* V1 (owner, 10 Nov 2026): added as an option only. What the app reads and
+     enforces for a trusted device is still to be specified, so for now it
+     offers what the agentless reach offers. */
+  {
+    id: 'authenticator',
+    label: 'Authenticator app',
+    summary: 'Signals read by the miniOrange Authenticator on the handset',
+    blurb: 'The miniOrange Authenticator app on the user’s phone establishes device identity.',
   },
 ]
 
@@ -1072,9 +1129,67 @@ export interface FingerprintProfile {
      support. */
   restrictionSet: boolean
 
+  /** Device health only: what a denied user is told, and any time to fix it. Absent reads as the defaults. */
+  remediation?: Remediation
+
   usedIn: number
   /** Made by a move from an old device limit: `waiting` until a policy using it is approved, then `added`. */
   fromOld?: 'waiting' | 'added'
+}
+
+/* --- Remediation: the step after a health check fails ---------------------------
+   Device health only (owner, 10 Nov 2026). A device that fails a check is denied;
+   remediation says whether the sign-in page shows the user how to fix it, and
+   whether they get time to do so first. Words follow the console reference:
+   "Hide / Display remediation instructions", then a Grace period of No, a due
+   date, or a number of days counted from the first failed attempt. */
+export type GraceKind = 'none' | 'date' | 'days'
+
+export interface Remediation {
+  /** Show remediation instructions to a user who fails a check. */
+  show: boolean
+  grace: GraceKind
+  /** yyyy-mm-dd, when grace is 'date'. */
+  dueDate: string
+  /** Whole days, when grace is 'days'. A string while typing. */
+  days: string
+}
+
+export const DEFAULT_REMEDIATION: Remediation = { show: false, grace: 'none', dueDate: '', days: '' }
+
+export const GRACE_LABEL: Record<GraceKind, string> = {
+  none: 'No',
+  date: 'Yes, by a due date',
+  days: 'Yes, after a number of days',
+}
+
+export const remediationOf = (p: Pick<FingerprintProfile, 'remediation'>): Remediation => p.remediation ?? DEFAULT_REMEDIATION
+
+/* A grace period only exists while instructions are shown, and only the field
+   for the chosen kind is kept. */
+export const tidyRemediation = (r: Remediation): Remediation =>
+  !r.show
+    ? DEFAULT_REMEDIATION
+    : { show: true, grace: r.grace, dueDate: r.grace === 'date' ? r.dueDate : '', days: r.grace === 'days' ? r.days : '' }
+
+export const isWholeDays = (v: string) => /^[1-9]\d{0,3}$/.test(v.trim())
+
+/** Why the remediation answers cannot be saved, or null. */
+export function remediationIssue(p: Pick<FingerprintProfile, 'mode' | 'remediation'>): string | null {
+  if (p.mode !== 'os') return null
+  const r = remediationOf(p)
+  if (!r.show) return null
+  if (r.grace === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(r.dueDate)) return 'Select a due date.'
+  if (r.grace === 'days' && !isWholeDays(r.days)) return 'Enter the number of days.'
+  return null
+}
+
+/** The remediation as a review cell reads it: "Hidden", "Shown", "Shown, 14 days to fix". */
+export function remediationLabel(r: Remediation): string {
+  if (!r.show) return 'Hidden'
+  if (r.grace === 'date') return r.dueDate ? `Shown, fix by ${r.dueDate}` : 'Shown'
+  if (r.grace === 'days') return r.days ? `Shown, ${r.days} ${r.days.trim() === '1' ? 'day' : 'days'} to fix` : 'Shown'
+  return 'Shown'
 }
 
 /* --- Coherence, as functions rather than as care -------------------------------
@@ -1098,7 +1213,8 @@ export function pruneValues<P extends FingerprintProfile>(p: P): P {
   const live = new Set(p.enabled)
   const keep = <T,>(rec: Record<string, T>) =>
     Object.fromEntries(Object.entries(rec).filter(([id]) => live.has(id)))
-  return { ...p, config: keep(p.config), weights: keep(p.weights) }
+  const pruned = { ...p, config: keep(p.config), weights: keep(p.weights) }
+  return p.remediation ? { ...pruned, remediation: tidyRemediation(p.remediation) } : pruned
 }
 
 /* The one writer for reach, wherever it is written.
@@ -1117,9 +1233,9 @@ export function withReach(p: FingerprintProfile, reach: ProfileReach): Fingerpri
     ...p,
     reach,
     enabled: p.enabled.filter((id) => offered.some((a) => a.id === id)),
-    registration: reach === 'agentless' ? 'self' : p.registration,
-    maxDevices: reach === 'agentless' ? (p.maxDevices ?? DEFAULT_MAX_DEVICES) : p.maxDevices,
-    roster: reach === 'agentless' ? null : p.roster,
+    registration: reach !== 'agent' ? 'self' : p.registration,
+    maxDevices: reach !== 'agent' ? (p.maxDevices ?? DEFAULT_MAX_DEVICES) : p.maxDevices,
+    roster: reach !== 'agent' ? null : p.roster,
   })
 }
 
@@ -1216,6 +1332,8 @@ export function profileIssue(p: FingerprintProfile, otherNames: Iterable<string>
   if (chosenAttributes(p).length === 0) return p.mode === 'os' ? 'Add at least one check.' : 'Add at least one signal.'
   const bad = invalidVersion(p)
   if (bad?.config?.kind === 'version') return `Enter a version for ${bad.config.platform}.`
+  const fix = remediationIssue(p)
+  if (fix) return fix
   if (p.registration === 'pre-approved') {
     if (!p.roster) return 'Upload a device roster.'
     if (rosterNeedsMac(p)) return 'Add MAC address to match the roster.'
@@ -1328,6 +1446,13 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
   push('Mobile device restriction', onOff(before.restrictMobile), onOff(after.restrictMobile), setup)
   push('Device auto-registration', onOff(before.autoRegister), onOff(after.autoRegister), setup)
 
+  if (after.mode === 'os') {
+    push('Remediation instructions', remediationLabel(remediationOf(before)), remediationLabel(remediationOf(after)), {
+      group: 'Remediation',
+      kind: 'changed',
+    })
+  }
+
   /* The section is the same noun the label leads with, so "Signals: added TPM
      ID" files as "TPM ID" under Signals. */
   const noun = capital(ITEM_NOUN[after.mode].many)
@@ -1357,7 +1482,7 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
 /** The save bar's short list: what kinds of thing changed. */
 /** An agent-only signal that stops being read because the reach moved to agentless: it goes with the switch, not on its own. */
 const goneWithReach = (before: FingerprintProfile, after: FingerprintProfile, a: Attribute): boolean =>
-  before.reach !== after.reach && after.reach === 'agentless' && !!a.needsAgent
+  before.reach !== after.reach && after.reach !== 'agent' && !!a.needsAgent
 
 export function profileChangeParts(before: FingerprintProfile, after: FingerprintProfile): string[] {
   const parts: string[] = []
@@ -1369,6 +1494,7 @@ export function profileChangeParts(before: FingerprintProfile, after: Fingerprin
      beside "Basic details" says one change twice in a two-item footer. */
   const basicNamed = parts.includes('Device restriction type') || parts.includes('Device registration')
   if (asksReach(after.mode) && before.restrictionSet !== after.restrictionSet && !basicNamed) parts.push('Basic details')
+  if (after.mode === 'os' && JSON.stringify(remediationOf(before)) !== JSON.stringify(remediationOf(after))) parts.push('Remediation')
   const was = chosenAttributes(before).filter((a) => !goneWithReach(before, after, a)).map((a) => a.id)
   const now = chosenAttributes(after)
   const added = now.filter((a) => !was.includes(a.id)).length
@@ -1404,12 +1530,12 @@ export function profileChangeParts(before: FingerprintProfile, after: Fingerprin
    roster needs MAC, MAC needs an agent — and an OS profile answers it from the
    detail page's one Edit instead. `restrictionSet` records the difference
    honestly: false on a new OS profile, because nobody asked. */
-export const stepsFor = (mode: ProfileMode): string[] => {
+export const stepsFor = (mode: ProfileMode, v1 = false): string[] => {
   /* The last step is named by the kind's own noun on BOTH shapes. The device
      shape spelled "Attributes" out by hand, which was right only until the noun
      changed. */
   const items = ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase())
-  return asksReach(mode) ? ['Profile', 'Devices', items] : ['Profile', items]
+  return asksReach(mode) ? ['Profile', 'Devices', items] : v1 ? ['Profile', items, 'Remediation'] : ['Profile', items]
 }
 
 /* --- The three weights a risk profile can give an attribute ---------------------
@@ -1973,6 +2099,8 @@ export interface ProfileMatch {
   checks: ProfileCheck[]
   /** The facts that would settle an 'unknown'; [] when decided. */
   missing: FactKey[]
+  /** A failed health check on a profile that shows remediation: what the user is told, e.g. "Shown, 14 days to fix". */
+  remediation?: string
 }
 
 /* Which rows a laptop is asked, and which a phone is.
@@ -2211,7 +2339,9 @@ function settle(graded: Graded[]): ProfileMatch {
    stated, every row is undecided. */
 export function healthMatches(p: FingerprintProfile, d: SignInDevice | undefined, o: MatchOptions = DEFAULT_MATCH): ProfileMatch {
   const device: SignInDevice = d ?? { source: 'stated' }
-  return settle(OS_ATTRIBUTES.filter((a) => p.enabled.includes(a.id)).map((a) => gradeHealthRow(p, a, device, o)))
+  const m = settle(OS_ATTRIBUTES.filter((a) => p.enabled.includes(a.id)).map((a) => gradeHealthRow(p, a, device, o)))
+  const r = remediationOf(p)
+  return m.status === 'fail' && r.show ? { ...m, remediation: remediationLabel(r) } : m
 }
 
 /* A device against a trusted-device profile.

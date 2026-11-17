@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { MoveVersions, StepList } from './move-versions'
-import { ArrowRight, CheckCircle2, Globe, Layers, Lock, MapPin, MonitorSmartphone, Power, ShieldCheck } from 'lucide-react'
+import { MoveVersions } from './move-versions'
+import { useMovePlan } from './use-move-plan'
+import { SceneOneWay } from './intro-scenes'
+import { IntroWidget } from './intro-widgets'
+import { NewBuilderButton } from './new-builder-button'
+import './intro-simple.css'
+import './old-policies.css'
+import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, FileInput, Plus, Send, Layers, Power, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { Button, Modal } from '../kit'
 import { useBrand } from '../store'
-import { blockedReason, mergeOffers, planMove, type MoveContext, type MovePlan } from './plan'
+import { type MovePlan } from './plan'
 import './move-dialog.css'
 
 /* -----------------------------------------------------------------------------
@@ -20,23 +26,6 @@ import './move-dialog.css'
    nothing left to move, it says so.
    -------------------------------------------------------------------------- */
 
-/** What a move would do now: the old policies that can move and the plan for them. */
-function useMovePlan(pick?: string[]) {
-  const store = useBrand()
-  const { legacy, movedLegacy, moveApps: apps, groups, zones, policies, users, methods, staged, fingerprints } = store
-  const ctx = useMemo<MoveContext>(
-    () => ({ apps, groups, users, zones, policies, staged, methods: methods.map((m) => m.name), fingerprints }),
-    [apps, groups, users, zones, policies, staged, methods, fingerprints],
-  )
-  const pending = legacy.policies.filter((lp) => !movedLegacy[lp.id])
-  const movable = pending.filter((lp) => !blockedReason(lp, ctx))
-  const selected = useMemo(() => movable.filter((lp) => !pick || pick.includes(lp.id)), [movable, pick])
-  const offers = useMemo(() => mergeOffers(selected, ctx), [selected, ctx])
-  const plan = useMemo(() => planMove(selected, legacy, ctx, offers.map((o) => o.key)), [selected, legacy, ctx, offers])
-  const count = selected.length
-  const newCount = plan.policies.filter((pp) => !pp.into).length
-  return { plan, count, newCount }
-}
 
 /* What moves, counted once (owner, 6 Nov 2026: "show how many policies are actually moving"). */
 function MoveSum({ plan, count, newCount }: ReturnType<typeof useMovePlan>) {
@@ -93,7 +82,7 @@ export function MigratePopup() {
   }
   return (
     <>
-      {store.moveDialog && <MigrateBody pick={store.moveDialog.pick} onMigrate={migrate} />}
+      {store.moveDialog && <MigrateBody pick={store.moveDialog.pick} consented={!!store.moveDialog.consented} onMigrate={migrate} />}
       {typeof document !== 'undefined' &&
         createPortal(
           <AnimatePresence>
@@ -130,94 +119,246 @@ export function MigratePopup() {
 
 const DOOR_EASE = [0.22, 1, 0.36, 1] as const
 
-function MigrateBody({ pick, onMigrate }: { pick?: string[]; onMigrate: (plan: MovePlan, from: HTMLElement | null) => void }) {
+function MigrateBody({ pick, consented, onMigrate }: { pick?: string[]; consented: boolean; onMigrate: (plan: MovePlan, from: HTMLElement | null) => void }) {
   const store = useBrand()
+  const reduce = useReducedMotion() === true
   const plan = useMovePlan(pick)
   const foot = useRef<HTMLDivElement | null>(null)
-  return (
-    <Modal
-      open
-      onClose={store.closeMoveDialog}
-      title="Migrate to the new Policy builder"
-      width={920}
-      footer={
-        <div className="bmpk__foot is-popup" ref={foot}>
-          <span className="bmpk__safe">
-            <Power size={14} strokeWidth={2} aria-hidden />
-            Sign-ins keep working. Old policies stay in effect until you publish each new one.
-          </span>
-          <Button variant="secondary" onClick={store.closeMoveDialog}>
-            Cancel
-          </Button>
-          <Button variant="brand" iconRight={ArrowRight} disabled={plan.count === 0} onClick={() => onMigrate(plan.plan, foot.current?.querySelector<HTMLElement>('.bx-btn--brand') ?? null)}>
-            Migrate
-          </Button>
+  /* The intro's frame (owner, 9 Nov 2026: "the same left and right side as the promotion"): words, count, steps and the
+     buttons on the left; the picture on the right. Migrate swaps the words for the consent and the picture for the
+     warning drawing; its tick arms Start migration. From the intro, which already asked, Start migration goes straight. */
+  /* From the intro, which already showed the numbers, the popup opens on the consent (owner, 9 Nov 2026: one step). */
+  const [confirming, setConfirming] = useState(consented)
+  const [ack, setAck] = useState(false)
+  const start = () => onMigrate(plan.plan, foot.current?.querySelector<HTMLElement>('.bnbb') ?? null)
+  const t = { duration: reduce ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as const }
+  /* The consent as the basic confirm, the same as Publish all's (owner, 10 Nov 2026: "after pressing Continue give me a
+     basic popup like this"): the warning hero, one sentence, the tick, Start migration. */
+  if (confirming)
+    return (
+      <Modal open onClose={() => (consented ? store.closeMoveDialog() : setConfirming(false))} title="Start the migration?" width={460} padded={false} bare>
+        <div className="bsm">
+          <h2>Start the migration?</h2>
+          <div className="bsm__count" aria-label={`${plan.count} old policies become ${plan.newCount} new policies`}>
+            <span>
+              <b>{plan.count}</b>
+              old {plan.count === 1 ? 'policy' : 'policies'}
+            </span>
+            <ArrowRight size={20} strokeWidth={1.8} aria-hidden />
+            <span className="is-new">
+              <b>{plan.newCount}</b>
+              new {plan.newCount === 1 ? 'draft' : 'drafts'}
+            </span>
+          </div>
+          <ul className="bsm__steps">
+            <li>
+              <Layers size={16} strokeWidth={1.9} aria-hidden />
+              <span>
+                <b>What happens</b>
+                Each application's App Login and Adaptive Access policies become one draft policy.
+              </span>
+            </li>
+            <li>
+              <ShieldCheck size={16} strokeWidth={1.9} aria-hidden />
+              <span>
+                <b>What to expect</b>
+                Sign-ins don't change until you approve and publish a draft.
+              </span>
+            </li>
+            <li>
+              <FileInput size={16} strokeWidth={1.9} aria-hidden />
+              <span>
+                <b>Where to find them</b>
+                Drafts are under review in New policies. The old ones stay readable in Old policies.
+              </span>
+            </li>
+          </ul>
+          <label className="bsm__ack">
+            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+            I understand the old pages won't come back
+          </label>
+          <footer className="bsm__foot" ref={foot}>
+            <Button variant="secondary" onClick={() => (consented ? store.closeMoveDialog() : setConfirming(false))}>
+              Cancel
+            </Button>
+            <NewBuilderButton label="Start migration" door={false} disabled={!ack} onOpen={start} />
+          </footer>
         </div>
-      }
-    >
-      <MigrateLayout {...plan} />
+      </Modal>
+    )
+  return (
+    <Modal open onClose={store.closeMoveDialog} title="Migrate your old policies" width={960} padded={false} bare>
+      <div className="bis">
+        <div className="bis__side">
+          <AnimatePresence mode="wait" initial={false}>
+            {confirming ? (
+              <motion.div key="ask" className="bis__copy" initial={{ opacity: 0, x: reduce ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduce ? 0 : -12 }} transition={t}>
+                <span className="bis__kind is-warn">
+                  <TriangleAlert size={13} strokeWidth={2.2} aria-hidden />
+                  Before you start
+                </span>
+                <h2>Start the migration?</h2>
+                <p>{`Your ${plan.count} old ${plan.count === 1 ? 'policy becomes' : 'policies become'} ${plan.newCount} new ${plan.newCount === 1 ? 'policy' : 'policies'}, as drafts. You can't switch back to the old pages; every old policy stays readable in the Old policies tab.`}</p>
+                <label className="bis__ack">
+                  <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+                  I understand the old pages are replaced.
+                </label>
+              </motion.div>
+            ) : (
+              <motion.div key="sum" className="bis__copy" initial={{ opacity: 0, x: reduce ? 0 : -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduce ? 0 : -12 }} transition={t}>
+                <span className="bis__kind">Migration</span>
+                <h2>Migrate your old policies</h2>
+                <p>Each application's old policies become one new policy, as a draft. Nothing changes for sign-ins until you publish.</p>
+                <MoveCount count={plan.count} newCount={plan.newCount} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <footer className="bis__foot" ref={foot}>
+            <span className="bis__gap" />
+            {confirming ? (
+              <>
+                <Button
+                  variant="secondary"
+                  icon={ArrowLeft}
+                  onClick={() => {
+                    if (consented) return store.closeMoveDialog()
+                    setConfirming(false)
+                    setAck(false)
+                  }}
+                >
+                  Back
+                </Button>
+                <NewBuilderButton label="Start migration" door={false} disabled={!ack} onOpen={start} />
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={store.closeMoveDialog}>
+                  Cancel
+                </Button>
+                <NewBuilderButton label="Continue" door={false} disabled={plan.count === 0} onOpen={() => setConfirming(true)} />
+              </>
+            )}
+          </footer>
+        </div>
+        <div className="bis__stage">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={confirming ? 'ask' : 'sum'} aria-hidden className="bis__art" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={t}>
+              {confirming ? (
+                <SceneOneWay reduce={reduce} />
+              ) : (
+                <div className="bis__circle">
+                  <IntroWidget id="move" reduce={reduce} />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
     </Modal>
   )
 }
 
-/* The popup's body, redone (owner, 6 Nov 2026: "redo the whole layout based on the current content"). Two columns:
-   what moves as one before-and-after picture, every number said once in it; how the move works as four short steps. */
-function MigrateLayout({ plan, count, newCount }: ReturnType<typeof useMovePlan>) {
-  const zones = plan.zones.length
-  const profiles = plan.profiles.length
+/* How it works, basic (owner, 9 Nov 2026: "this feels too complex"): three steps, a word and a line each. */
+const BASIC_STEPS = [
+  { icon: FileInput, title: 'Migrate', line: 'Each old policy arrives as a draft.' },
+  { icon: ClipboardCheck, title: 'Review', line: 'Compare it with the old one and approve.' },
+  { icon: Send, title: 'Publish', line: 'The new policy starts deciding sign-ins.' },
+]
+
+export function MigrateEmpty({ onNew }: { /** Two tabs: New policy sits beside Migrate. */ onNew?: () => void } = {}) {
+  const store = useBrand()
+  const reduce = useReducedMotion() === true
+  const plan = useMovePlan()
+  /* The consent is part of this page, not a second popup (owner, 9 Nov 2026): Migrate swaps the summary for it, in place. */
+  const [confirming, setConfirming] = useState(false)
+  const [ack, setAck] = useState(false)
+  const back = () => {
+    setConfirming(false)
+    setAck(false)
+  }
+  const go = () => {
+    back()
+    store.startMove(plan.plan)
+    store.showToast('Moving your policies in the background')
+  }
+  const swap = reduce ? { duration: 0 } : { duration: 0.22 }
   return (
-    <div className="bmg2">
-      <section className="bmg2__what" aria-label="What moves">
-        <div className="bmg2__side">
-          <span className="bmg2__tag">Today</span>
-          <div className="bmg2__stack">
-            <span className="bmg2__big">{count}</span>
-            <span className="bmg2__what1">{count === 1 ? 'old policy' : 'old policies'}</span>
-            <span className="bmg2__pages">
-              <span className="bmg2__page">
-                <Lock size={13} strokeWidth={2} aria-hidden />
-                App Login
-              </span>
-              <span className="bmg2__page">
-                <Globe size={13} strokeWidth={2} aria-hidden />
-                Adaptive Access
+    <section className="bmge" aria-label="Migrate your old policies">
+      <AnimatePresence mode="wait" initial={false}>
+        {confirming ? (
+          <motion.div key="confirm" className="bmge__confirm" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={swap}>
+            <span className="bmge__hero" aria-hidden>
+              <i />
+              <i />
+              <i />
+              <span className="bmge__badge">
+                <TriangleAlert size={26} strokeWidth={1.75} />
               </span>
             </span>
-          </div>
-        </div>
-        <svg className="bmg2__flow" viewBox="0 0 120 44" aria-hidden>
-          <path d="M20 2 C20 22, 60 18, 60 40 M100 2 C100 22, 60 18, 60 40 M60 2 V40" />
-          <path d="M54 34 L60 41 L66 34" className="is-head" />
-        </svg>
-        <div className="bmg2__side">
-          <span className="bmg2__tag is-new">After you migrate</span>
-          <div className="bmg2__newcard">
-            <span className="bmg2__shield" aria-hidden>
-              <ShieldCheck size={20} strokeWidth={2} />
-            </span>
-            <span className="bmg2__newtext">
-              <span className="bmg2__big is-new">{newCount}</span>
-              <span className="bmg2__what1">{newCount === 1 ? 'new policy' : 'new policies'}</span>
-              <span className="bmg2__note">One per application, or shared. They arrive as drafts.</span>
-            </span>
-          </div>
-          <div className="bmg2__parts">
-            <span className="bmg2__part">
-              <MapPin size={15} strokeWidth={2} aria-hidden />
-              <b>{zones}</b> {zones === 1 ? 'zone' : 'zones'}
-            </span>
-            <span className="bmg2__part">
-              <MonitorSmartphone size={15} strokeWidth={2} aria-hidden />
-              <b>{profiles}</b> {profiles === 1 ? 'device profile' : 'device profiles'}
-            </span>
-          </div>
-        </div>
-      </section>
-      <section className="bmg2__how" aria-label="How the move works">
-        <span className="bmg2__label">How it works</span>
-        <StepList />
-      </section>
-    </div>
+            <h2>Start moving your old policies?</h2>
+            <p>
+              {`Your ${plan.count} old ${plan.count === 1 ? 'policy becomes' : 'policies become'} ${plan.newCount} new ${plan.newCount === 1 ? 'policy' : 'policies'}, as drafts. This is one way: you can't switch back to the old pages. You can still read every old policy in the Old policies tab, and nothing changes for sign-ins until you publish.`}
+            </p>
+            <label className="bmge__ack">
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+              I understand I can't switch back to the old pages.
+            </label>
+            <div className="bmge__actions">
+              <Button variant="secondary" onClick={back}>
+                Back
+              </Button>
+              <Button variant="brand" iconRight={ArrowRight} disabled={!ack} onClick={go}>
+                Migrate
+              </Button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div key="summary" className="bmge__summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={swap}>
+            {/* Two columns across the page (owner, 9 Nov 2026: "utilize the space wisely"): what happens and the way in on the
+                left, the count highlighted; the three steps on the right. */}
+            <div className="bmge__lead">
+              <h2>Migrate your old policies</h2>
+              <p className="bmge__count">
+                <span>
+                  <b>{plan.count}</b> old {plan.count === 1 ? 'policy' : 'policies'}
+                </span>
+                <ArrowRight size={16} strokeWidth={2.2} aria-hidden />
+                <span>
+                  <b>{plan.newCount}</b> new {plan.newCount === 1 ? 'policy' : 'policies'}
+                </span>
+              </p>
+              <span className="bmpk__safe">
+                <Power size={14} strokeWidth={2} aria-hidden />
+                Sign-ins keep working. Old policies stay in effect until you publish each new one.
+              </span>
+              <span className="bmge__go">
+                <Button variant="brand" iconRight={ArrowRight} disabled={plan.count === 0} onClick={() => setConfirming(true)}>
+                  Migrate
+                </Button>
+                {onNew && (
+                  <Button variant="secondary" icon={Plus} onClick={onNew}>
+                    New policy
+                  </Button>
+                )}
+              </span>
+            </div>
+            <ol className="bmge__steps" aria-label="How it works">
+              {BASIC_STEPS.map((st, n) => (
+                <li key={st.title}>
+                  <span className="bmge__stepicon" aria-hidden>
+                    <st.icon size={18} strokeWidth={2} />
+                  </span>
+                  <span className="bmge__steptext">
+                    <b>{`${n + 1}. ${st.title}`}</b>
+                    <span>{st.line}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   )
 }
 
@@ -262,6 +403,25 @@ export function MovePick({ pick, onDone }: { pick?: string[]; onDone: () => void
           Start migration
         </Button>
       </footer>
+    </div>
+  )
+}
+
+/** The conversion, said once and big (owner, 9 Nov 2026): old policies in grey, new ones in blue. */
+export function MoveCount({ count, newCount }: { count: number; newCount: number }) {
+  return (
+    <div className="bmgc" aria-label={`${count} old policies become ${newCount} new policies`}>
+      <span className="bmgc__tile is-old">
+        <b>{count}</b>
+        <i>Old {count === 1 ? 'policy' : 'policies'}</i>
+      </span>
+      <span className="bmgc__to" aria-hidden>
+        <ArrowRight size={18} strokeWidth={2.2} />
+      </span>
+      <span className="bmgc__tile is-new">
+        <b>{newCount}</b>
+        <i>New {newCount === 1 ? 'policy' : 'policies'}</i>
+      </span>
     </div>
   )
 }

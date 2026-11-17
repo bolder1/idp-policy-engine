@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { ENROL_OPTIONS } from './device-profile-phase'
 import {
   Activity,
   AlertTriangle,
@@ -15,6 +16,7 @@ import {
   ShieldCheck,
   ShieldOff,
   Smartphone,
+  Terminal,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -23,6 +25,7 @@ import { Badge, Button, IconButton, MenuButton, Note, NumberStepper, SearchBox, 
 import { AgentPrerequisites } from './agent-download'
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
+import { useShows } from './board/builder-version'
 import {
   DEFAULT_MAX_DEVICES,
   REGISTRATION_LABEL,
@@ -52,7 +55,7 @@ import { EmptyState, NoMatches } from '../empty'
 import { BrandMark } from '../logos/BrandMark'
 import { CHECK_BRAND } from '../logos/check-brands'
 import type { ProfileNote } from './profile-notes'
-import { LIST_COLUMNS, checkName, versionError, type Choice } from './device-profile-choices'
+import { DEVICE_GROUPS, LIST_COLUMNS, deviceGroupsOf, inDeviceGroup, checkName, versionError, type Choice, type DeviceGroup } from './device-profile-choices'
 import {
   CATEGORY_FILTER_MIN,
   agentNote,
@@ -182,6 +185,8 @@ export function AttrStep({
      "Selected only" did NOT come back: it rode in the same control and hid the
      rows a press was about to make. */
   const [cats, setCats] = useState<AttrCategory[]>([])
+  /* V1: the device type chosen in the rail; null is all of them. */
+  const [group, setGroup] = useState<DeviceGroup | null>(null)
 
   /* Where the last press landed, so the next one can shift-select a run.
 
@@ -193,9 +198,11 @@ export function AttrStep({
   const anchor = useRef<string | null>(null)
 
   const offered = offeredAttributes(mode, reach)
+  /* V1: a health list is filed in a rail on the left, so the dropdown steps aside. */
+  const rail = useShows('deviceUpdate') && mode === 'os'
   /* The families this catalogue holds, not the whole enum, and only where the
      list is long enough to need narrowing. */
-  const categories = offered.length >= CATEGORY_FILTER_MIN ? categoriesOf(offered) : []
+  const categories = !rail && offered.length >= CATEGORY_FILTER_MIN ? categoriesOf(offered) : []
 
   /* Counted against what is OFFERED, never against the whole catalogue. "6 of
      38 selected" on an agentless profile names a denominator eighteen of whose
@@ -207,7 +214,7 @@ export function AttrStep({
      row says which one it is. The always-collected rows are lifted to the
      front (see `filterAttributes`): a locked row between two tickable ones
      reads as one you failed to untick. */
-  const ordered = filterAttributes(offered, q, cats)
+  const ordered = filterAttributes(offered, q, cats).filter((a) => !rail || !group || inDeviceGroup(a.id, group))
 
   /* The rows an agent would unlock, under the same search as the list, so the
      note below never names signals the search has nothing to do with. */
@@ -223,7 +230,8 @@ export function AttrStep({
   }
 
   return (
-    <div className="bfp2__pick">
+    <div className={`bfp2__pick${rail ? ' has-rail' : ''}`}>
+      {rail && <CategoryRail groups={deviceGroupsOf(offered.map((a) => a.id))} group={group} onGroup={setGroup} />}
       <PickBar
         mode={mode}
         q={q}
@@ -398,6 +406,50 @@ export function PickBar({
         <span className="u-sr-only">, {chosen} selected</span>
       </button>
     </div>
+  )
+}
+
+/* The categories of a health list, down the left (V1; owner, 10 Nov 2026: "categories on the left side").
+   One at a time, with All first. Selection is the blue-grey of the pick tiles, never orange. */
+const GROUP_MARK: Record<DeviceGroup, ReactNode> = {
+  windows: <BrandMark brand="windows" size={14} />,
+  macos: <BrandMark brand="apple" size={14} />,
+  linux: <Terminal size={14} strokeWidth={1.8} aria-hidden />,
+  ios: <BrandMark brand="apple" size={14} />,
+  android: <BrandMark brand="android" size={14} />,
+  any: <Monitor size={14} strokeWidth={1.8} aria-hidden />,
+}
+
+/** The device types down the left of a health list. `group` is null for All. */
+export function CategoryRail({
+  groups,
+  group,
+  onGroup,
+}: {
+  groups: DeviceGroup[]
+  group: DeviceGroup | null
+  onGroup: (next: DeviceGroup | null) => void
+}) {
+  const items: { id: string; label: string; mark: ReactNode }[] = [
+    { id: ALL_CATS, label: 'All', mark: <ShieldCheck size={14} strokeWidth={1.8} aria-hidden /> },
+    ...DEVICE_GROUPS.filter((g) => groups.includes(g.id)).map((g) => ({ id: g.id, label: g.label, mark: GROUP_MARK[g.id] })),
+  ]
+  const current = group ?? ALL_CATS
+  return (
+    <nav className="bfp2__rail" aria-label="Device types">
+      {items.map((i) => (
+        <button
+          key={i.id}
+          type="button"
+          className={`bfp2__railitem${current === i.id ? ' is-on' : ''}`}
+          aria-pressed={current === i.id}
+          onClick={() => onGroup(i.id === ALL_CATS ? null : (i.id as DeviceGroup))}
+        >
+          {i.mark}
+          <span>{i.label}</span>
+        </button>
+      ))}
+    </nav>
   )
 }
 
@@ -1434,6 +1486,12 @@ export function EnrolmentFields({
           not rendered at all (owner, 21 Sep 2026: "remove this from agentless,
           no need") — it used to be the same dropdown, disabled. `withReach`
           already holds an agentless profile to self registration. */}
+      {!rosterPossible && mode === 'device' && (
+        /* One method, so it is read, not picked (owner, 10 Nov 2026): a roster needs the Device Agent, which is hidden. */
+        <EnrolField label="Device registration method" tip={REGISTRATION_HELP.self}>
+          <span className="bfp2__enrolfixed">{REGISTRATION_LABEL.self}</span>
+        </EnrolField>
+      )}
       {rosterPossible && (
         <EnrolField label="Device registration method" tip={REGISTRATION_HELP[registration]}>
           <Picker
@@ -1530,19 +1588,24 @@ export function EnrolmentFields({
         </p>
       )}
 
-      <EnrolCheck
-        label="Enable mobile device restriction"
-        hint="Restrict users from signing in on mobile devices."
-        checked={restrictMobile}
-        onChange={(next) => onChange({ restrictMobile: next })}
-      />
-
-      <EnrolCheck
-        label="Enable device auto-registration"
-        hint="Silently register the browser during sign-in."
-        checked={autoRegister}
-        onChange={(next) => onChange({ autoRegister: next })}
-      />
+      {/* The two switches are hidden in this version (device-profile-phase.ts). */}
+      {ENROL_OPTIONS && (
+        <>
+          <EnrolCheck
+            label="Enable mobile device restriction"
+            hint="Restrict users from signing in on mobile devices."
+            checked={restrictMobile}
+            onChange={(next) => onChange({ restrictMobile: next })}
+          />
+    
+          <EnrolCheck
+            label="Enable device auto-registration"
+            hint="Silently register the browser during sign-in."
+            checked={autoRegister}
+            onChange={(next) => onChange({ autoRegister: next })}
+          />
+        </>
+      )}
     </div>
   )
 }

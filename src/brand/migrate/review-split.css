@@ -104,10 +104,12 @@
 .brs__card { padding: 0; gap: 0; overflow: hidden; border-color: var(--border-default); background: var(--surface-raised); }
 .brs__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--surface-sunken); border-bottom: var(--bw-thin) solid var(--border-subtle); }
 .brs__no { font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-secondary); }
-.brs__name { display: block; padding: var(--space-3) var(--space-4) var(--space-2); font-size: var(--fs-base); font-weight: var(--fw-semibold); line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
-.brs__rows { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
-.brs__row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-secondary); }
-.brs__row > i { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.brs__card .brs__name { display: block; padding: var(--space-3) var(--space-4) var(--space-2); font-size: var(--fs-base); font-weight: var(--fw-semibold); line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+/* Scoped to the card: risk-signals.css owns a .brs__row / .brs__rows table of its own, and the builder loads that sheet too. */
+.brs__card .brs__rows { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0 var(--space-4) var(--space-3); }
+.brs__card .brs__row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: var(--space-3); padding: 0; border-top: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.brs__card .brs__row:hover { background: none; }
+.brs__card .brs__row > i { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
 .brs__flow { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .brs__muted { font-size: 12px; color: var(--text-tertiary); }
 .brs__card .brs__adaptive { margin: 0 var(--space-4) var(--space-3); padding: var(--space-3); border: var(--bw-thin) solid var(--fb-info-border); border-radius: var(--radius-md); background: var(--fb-info-bg); }
@@ -116,3 +118,12 @@
 .brs__card .brs__why { padding: var(--space-2) var(--space-4) var(--space-3); }
 .bmvp__list .brs__card, .bold-tab__grid .brs__card, .brs__split.is-canvas-right .brs__card { gap: 0; padding: 0; }
 .bmvp__list { gap: var(--space-4); }
+
+/* What moves and what stays, in the publish popup (owner, 10 Nov 2026). */
+.bpub__rows { display: flex; flex-direction: column; margin-top: var(--space-4); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg, 12px); background: var(--surface-sunken); text-align: left; }
+.bpub__row { display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-4); color: var(--text-tertiary); }
+.bpub__row + .bpub__row { border-top: var(--bw-thin) solid var(--border-subtle); }
+.bpub__row > svg { flex: none; margin-top: 1px; }
+.bpub__row.is-moves > svg { color: var(--fb-positive-fg); }
+.bpub__row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bpub__row > span > b { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }

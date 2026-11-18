@@ -3,6 +3,7 @@ import { AppWindow, ArrowRight, Check, ListChecks, ScanSearch, ShieldCheck, Shap
 import { PageHead } from '../Shell'
 import { Button } from '../kit'
 import { useBrand } from '../store'
+import { TESTER } from '../tester'
 import { IntroWidget } from './intro-widgets'
 import './intro.css'
 import { useSetupSteps } from './setup-steps'
@@ -116,8 +117,8 @@ export function HomeHub() {
         <ul className="bmd__places">
           <Shortcut icon={AppWindow} name="Applications" line="Connect apps and give each its sign-in policy" onOpen={() => store.go({ name: 'applications' })} />
           <Shortcut icon={ShieldCheck} name="Policies" line="Who signs in to what, and how" onOpen={() => store.go({ name: 'policies' })} />
-          <Shortcut icon={ScanSearch} name="Access checks" line="Test a sign-in against your policies" onOpen={() => store.go({ name: 'sign-in-tests' })} />
-          <Shortcut icon={ListChecks} name="Sign-in activity" line="Recent sign-ins and what decided them" onOpen={() => store.go({ name: 'sign-in-activity' })} />
+          {!TESTER && <Shortcut icon={ScanSearch} name="Access checks" line="Test a sign-in against your policies" onOpen={() => store.go({ name: 'sign-in-tests' })} />}
+          {!TESTER && <Shortcut icon={ListChecks} name="Sign-in activity" line="Recent sign-ins and what decided them" onOpen={() => store.go({ name: 'sign-in-activity' })} />}
         </ul>
       </section>
     </div>

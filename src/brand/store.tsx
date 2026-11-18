@@ -46,8 +46,9 @@ import { normaliseHook, type Hook } from './hooks'
    application, a post sign-in one with a rule or "Nothing else matched"
    left without an action — and `refusesStatus` refuses switching either on
    before that, and a post sign-in one to Monitoring ever. */
-import { refusesStatus, settled, showcaseTenant, tenantAt, type Tenant } from './fixtures'
+import { refusesStatus, settled, showcaseTenant, tenantAt, testerTenant, type Tenant } from './fixtures'
 import { SHOWCASE } from './showcase'
+import { TESTER, testerFeatures } from './tester'
 import { EMPTY_LEGACY, MIGRATE_SCALE, showcaseLegacy, type DeadlineView, type LegacyEstate } from './migrate/legacy'
 import { scaleApps, scaleLegacy } from './migrate/scale-seed'
 
@@ -785,7 +786,7 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
      tenant (showcase-seed.ts); every other build loads the Security IT
      Manager's, which is the default persona below. Chosen once, lazily, and
      read by every initialiser that follows. */
-  const [seed] = useState<Tenant>(() => (SHOWCASE ? showcaseTenant() : tenantAt('medium')))
+  const [seed] = useState<Tenant>(() => (TESTER ? testerTenant() : SHOWCASE ? showcaseTenant() : tenantAt('medium')))
   /* `fresh` (the app passes it, tests do not): the new builder as a tenant first meets it, with no sign-in policies
      of its own yet, so the move from the old builder starts on an empty page (owner, 3 Nov 2026). */
   const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)
@@ -818,7 +819,7 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
   const [zones, setZones, zonesRef] = useCollection<Zone>(() => seed.zones)
   const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => seed.scenarios)
   const [savedSignIns, setSavedSignIns, savedSignInsRef] = useCollection<SavedSignIn>(() => seed.savedSignIns)
-  const [legacy, setLegacy] = useState<LegacyEstate>(() => (SHOWCASE ? (MIGRATE_SCALE ? scaleLegacy : showcaseLegacy) : EMPTY_LEGACY))
+  const [legacy, setLegacy] = useState<LegacyEstate>(() => (SHOWCASE && !TESTER ? (MIGRATE_SCALE ? scaleLegacy : showcaseLegacy) : EMPTY_LEGACY))
   const [movedLegacy, setMovedLegacy] = useState<Record<string, string>>({})
   const movedLegacyRef = useRef(movedLegacy)
   movedLegacyRef.current = movedLegacy
@@ -1790,8 +1791,11 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
     return () => window.clearInterval(t)
   }, [moveJob?.status, policiesRef, appsRef, setApps, showToast, go])
 
+  /* The phase 1 tester build (tester.ts) withholds Check access, Access checks and Sign-in activity. */
+  const testerView = useMemo<BrandStore>(() => (TESTER ? { ...value, features: testerFeatures(value.features) } : value), [value])
+
   return (
-    <Ctx.Provider value={value}>
+    <Ctx.Provider value={testerView}>
       <ToastCtx.Provider value={toast}>{children}</ToastCtx.Provider>
     </Ctx.Provider>
   )

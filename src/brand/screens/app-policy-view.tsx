@@ -34,6 +34,7 @@ import { Badge, Button, Chip, Drawer, Note, RowMenu, SplitButton, type MenuItem 
 import { linkedTo } from '../post-sign-in'
 import { normaliseWho } from '../rule-who'
 import { useBrand, useNameLookup, type AppTab } from '../store'
+import { TESTER } from '../tester'
 import { AppPolicyFocusOverride } from './app-policy-focus'
 import { AppActivity, AppBreakIn, GlanceActivity } from './app-activity'
 import { HEAD_REPLACE_ON_HOLD, HEAD_SPLIT_EDIT, HEAD_THREE_BUTTONS, rulesLabel } from './app-policies'
@@ -79,6 +80,7 @@ import { useTestingSession } from './testing/session-state'
 import { todayIn } from './testing/sign-in-form'
 import { formatCount } from './testing/test-dock'
 import { PolicyStatus } from '../migrate/moved-status'
+import { MARK_LABEL } from '../tester'
 
 /* -----------------------------------------------------------------------------
    An application's Policies tab (docs/specs/APP-POLICY-TAB.md, 15 Oct 2026):
@@ -1255,7 +1257,7 @@ export function AppPolicyView({
   const withTemplateRow = (items: MenuItem[]): MenuItem[] => {
     if (!canSaveAsTemplate(policy)) return items
     const at = items.findIndex((i) => i.id === 'remove' || i.id === 'delete')
-    const row: MenuItem = { id: 'template', label: 'Mark as template', icon: TemplateIcon, ...(at !== 0 ? { divide: true } : null) }
+    const row: MenuItem = { id: 'template', label: MARK_LABEL, icon: TemplateIcon, ...(at !== 0 ? { divide: true } : null) }
     return at === -1 ? [...items, row] : [...items.slice(0, at), row, ...items.slice(at)]
   }
 
@@ -1447,7 +1449,7 @@ export function AppPolicyView({
             editable
             everyoneElseCount={coverage.everyoneElse}
           />
-          <AppActivity app={app} policy={policy} globalDefault={globalDefault} onRule={chain.show} reduced={chain.reduced} />
+          {!TESTER && <AppActivity app={app} policy={policy} globalDefault={globalDefault} onRule={chain.show} reduced={chain.reduced} />}
         </div>
       )}
 
@@ -1576,7 +1578,7 @@ export function AppNoPolicyView({
           />
 
           <div className={`apol__band${hasRail ? '' : ' is-solo'}`}>
-            <AppActivity app={app} policy={null} globalDefault={globalDefault} onRule={chain.show} reduced={chain.reduced} />
+            {!TESTER && <AppActivity app={app} policy={null} globalDefault={globalDefault} onRule={chain.show} reduced={chain.reduced} />}
             {hasRail && (
               <div className="apol__rail">
                 <PostSignInLinks app={app} onTab={onTab} />

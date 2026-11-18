@@ -246,6 +246,7 @@ export function RuleCard({
   openPart,
   state,
   stateNote,
+  unsaved,
   unreachable = false,
   route,
   shadowed,
@@ -284,6 +285,8 @@ export function RuleCard({
   state: RuleState
   /** Why the pill says what it does — the first finding's title. Shown on hover. */
   stateNote?: string
+  /** Not stored by Save rule yet, or being stored now (tester.ts RULE_SAVE): said in place of Complete. */
+  unsaved?: 'unsaved' | 'saving'
   /** Another rule always matches first, so this one never runs. */
   unreachable?: boolean
   /** Try a sign-in's reading of this card, while the board is in test mode. */
@@ -499,6 +502,8 @@ export function RuleCard({
               /* An untouched rule is not Complete: it says so in grey (19 Oct 2026), beside its "Nothing set yet". */
               rule.enabled && state === 'ready' && isPristine(rule) ? (
                 <span className="bb__state is-off">Not set up</span>
+              ) : unsaved ? (
+                <span className="bb__state is-setup">{unsaved === 'saving' ? 'Saving…' : 'Unsaved'}</span>
               ) : (
                 <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`} title={rule.enabled ? stateNote : undefined}>
                   {stateLabel(state, rule.enabled, unreachable, stateNote)}

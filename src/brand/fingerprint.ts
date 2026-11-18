@@ -1425,7 +1425,8 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
     if (b !== a) rows.push({ label, before: b, after: a, ...more })
   }
   const setup = { group: 'Basic details', kind: 'changed' } as const
-  push('Name', before.name, after.name)
+  /* No Name row (owner, 18 Nov 2026): the name is given in the create flow and a rename saves itself (rename-now.ts),
+     so the review never files it under Basic details. */
   /* Setting up basic details is a change of its own (15 Sep 2026). A press on the
      Basic details tab can confirm every default as it stands — the one way a profile nobody
      answered becomes one somebody did — and with no row for it the page would

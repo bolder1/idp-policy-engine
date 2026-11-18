@@ -300,12 +300,9 @@ const many = (values: string[]) => (values.length > 1 ? { count: values.length }
    reads as one removed and one added, which is what it is to a rule. */
 export function zoneReviewRows(before: Zone, after: Zone): ZoneReviewRow[] {
   const rows: ZoneReviewRow[] = []
-  /* A new zone is reviewed against itself with no name (ZonesFinal), so its
-     name is added; a saved zone's name can only change. Said outright, so a
-     name cleared in the draft does not read as removed. */
-  if (before.name !== after.name) {
-    rows.push({ label: 'Name', before: before.name, after: after.name, kind: before.name === '' ? 'added' : 'changed' })
-  }
+  /* No Name row (owner, 18 Nov 2026: "remove the Basic details, it changes outside only, like rename, no need to
+     capture"): a new zone's name is given in its naming popup, and a saved zone's rename saves itself (rename-now.ts),
+     so the review holds what the page's form changes and nothing else. */
 
   const nb = netEntries(before)
   const na = netEntries(after)

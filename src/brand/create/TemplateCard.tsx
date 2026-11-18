@@ -31,6 +31,7 @@ import { CardPicture } from './CardPicture'
 import { AppLogo } from '../logos/AppLogo'
 import { TEMPLATE_CATEGORIES } from '../template-phase'
 import { usePills } from '../source-pills'
+import { MARK_LABEL, UNMARK_LABEL } from '../tester'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -691,5 +692,5 @@ export function scenarioCard(s: Scenario, directory?: WhoDirectory, library?: Te
 /* Save as template on a policy's card and row, as one icon (owner, 10 Nov 2026; the template stamp since 18 Nov, template-icon.ts): it adds it to your templates
    under the policy's name, pressed again it takes it away. Blue while saved, the selection colour. */
 export function SaveToggle({ saved }: { saved: { on: boolean; toggle: () => void } }) {
-  return <IconButton icon={TemplateIcon} label={saved.on ? 'Remove from templates' : 'Mark as template'} pressed={saved.on} tone="ghost" onClick={saved.toggle} />
+  return <IconButton icon={TemplateIcon} label={saved.on ? UNMARK_LABEL : MARK_LABEL} pressed={saved.on} tone="ghost" onClick={saved.toggle} />
 }

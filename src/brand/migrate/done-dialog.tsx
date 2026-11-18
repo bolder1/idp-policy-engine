@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Check } from 'lucide-react'
 import { Button, Modal } from '../kit'
 import { useBrand } from '../store'
+import { TESTER } from '../tester'
 import './done-dialog.css'
 
 /* -----------------------------------------------------------------------------
@@ -33,14 +34,22 @@ export function MoveDoneDialog({ open, onClose }: { open: boolean; onClose: () =
         <h2>{waiting === 0 ? 'Your policies are in the new builder' : 'Review is done for now'}</h2>
         <p>
           {waiting === 0
-            ? 'They are drafts. Check access before you make them active.'
+            ? TESTER
+              ? 'They are drafts until you make them active.'
+              : 'They are drafts. Check access before you make them active.'
             : `${waiting === 1 ? '1 moved policy still waits' : `${waiting} moved policies still wait`} for approval.`}
         </p>
         <footer className="bwn__foot">
-          <Button variant="secondary" onClick={skip}>
-            Skip for now
-          </Button>
-          {waiting === 0 ? (
+          {!(waiting === 0 && TESTER) && (
+            <Button variant="secondary" onClick={skip}>
+              Skip for now
+            </Button>
+          )}
+          {waiting === 0 && TESTER ? (
+            <Button variant="brand" onClick={skip}>
+              Open policies
+            </Button>
+          ) : waiting === 0 ? (
             <Button variant="brand" iconRight={ArrowRight} onClick={check}>
               Check access
             </Button>

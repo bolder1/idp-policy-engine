@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "dev:tester": "vite --mode tester",
+    "build:tester": "tsc -b && vite build --mode tester",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",

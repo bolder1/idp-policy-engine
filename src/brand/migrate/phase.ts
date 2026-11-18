@@ -1,3 +1,5 @@
+import { TESTER } from '../tester'
+
 /* -----------------------------------------------------------------------------
    Migration first (owner, 6 Nov 2026: "first we only show the old policies ... from the
    old policy, Start migration with the intro ... when we click Start migration, show
@@ -13,7 +15,8 @@
        sign-in are hidden.
    Off: the rail and the Policies tabs are as they were before 6 Nov 2026.
    -------------------------------------------------------------------------- */
-export const MIGRATION_FIRST: boolean = true
+/* The phase 1 tester build (tester.ts) has no migration at all (owner, 18 Nov 2026). */
+export const MIGRATION_FIRST: boolean = !TESTER
 
 /* The Policies head's review pickers, Start, Experience and Banner (owner, 18 Nov 2026: "everything is fixed now, the
    current version is perfect, no more dropdowns"). Off: the pickers are hidden and the values pinned to With policies,

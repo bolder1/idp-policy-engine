@@ -30,6 +30,7 @@ import { usePagedList } from './paged-list'
 import { PolicyDetailsDrawer } from './policy-details-drawer'
 import { PEOPLE_ROW_H, groupFilterOptions, type GroupFilter } from './sign-in-tests/library'
 import { ACCESS_CHECK } from './sign-in-tests/names'
+import { TESTER } from '../tester'
 import { useTestingSession } from './testing/session-state'
 import { formOf } from './testing/sign-in-form'
 import { UserDrawer } from './UserDrawer'
@@ -60,7 +61,7 @@ import { UserDrawer } from './UserDrawer'
 
 const USER_ACTIONS: MenuItem[] = [
   { id: 'view', label: 'View details', icon: PanelRight },
-  { id: 'check', label: ACCESS_CHECK, icon: LogIn },
+  ...(TESTER ? [] : [{ id: 'check', label: ACCESS_CHECK, icon: LogIn }]),
 ]
 
 /* A sortable column head, Applications.tsx's `head`, for either tab. */

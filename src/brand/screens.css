@@ -851,10 +851,13 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
   background: none; color: var(--text-tertiary); cursor: pointer;
   opacity: 0; transition: opacity var(--dur-fast) ease, color var(--dur-fast) ease, background var(--dur-fast) ease;
 }
+/* Hover only, marked or not, and at the far end of the name cell after its tags (owner, 18 Nov 2026: "move this into a
+   better position … only show on hover, not every time"). The ⋯ menu says the same thing in words at rest. */
+.btable__primary .btable__marks { flex: 1; }
+.btable__marks .bpol__template-mark { order: 2; margin-left: auto; }
 tr:hover .bpol__template-mark,
 .blist__row:hover .bpol__template-mark,
-.bpol__template-mark:focus-visible,
-.bpol__template-mark.is-on { opacity: 1; }
+.bpol__template-mark:focus-visible { opacity: 1; }
 .bpol__template-mark:hover { background: var(--int-ghost-bg-hover); color: var(--text-secondary); }
 .bpol__template-mark.is-on,
 .bpol__template-mark.is-on:hover { color: var(--blue); }

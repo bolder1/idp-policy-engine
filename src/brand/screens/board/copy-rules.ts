@@ -7,6 +7,7 @@ import type { WhoDirectory } from '../../rule-who'
 import { diagnose } from '../diagnostics'
 import { buildTemplate, type TemplateLibrary } from './apply-template'
 import { copyName } from './parts'
+import { YOURS_LABEL } from '../../tester'
 
 /* -----------------------------------------------------------------------------
    Copy rules from a policy (owner, 2 Nov 2026). The team cannot give Save as template and asked for "inherit from
@@ -94,7 +95,7 @@ export function templateSources(scenarios: readonly Scenario[], directory: WhoDi
     .filter((x) => x.rules.length > 0)
   const as = (group: string) => (x: { s: Scenario; rules: Rule[] }): PickSource => ({ id: x.s.id, name: x.s.name, sub: x.s.category, detail: x.s.description || undefined, group, rules: x.rules, scenario: x.s })
   /* Your templates only while the tenant manages templates (template-phase.ts). */
-  const yours = TEMPLATES_MANAGED ? usable.filter((x) => !x.s.provided).map(as('Your templates')) : []
+  const yours = TEMPLATES_MANAGED ? usable.filter((x) => !x.s.provided).map(as(YOURS_LABEL)) : []
   return [...yours, ...usable.filter((x) => x.s.provided).map(as('Xecurify templates'))]
 }
 

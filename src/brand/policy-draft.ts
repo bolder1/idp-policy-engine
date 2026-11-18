@@ -161,6 +161,6 @@ export function commitToast(before: Policy, after: Policy): string {
   const name = after.name
   if (after.status === 'draft') return `${name} saved as a draft`
   if (after.status === before.status) return `${name} saved`
-  if (after.status === 'inactive') return `${name} saved. It is off.`
+  if (after.status === 'inactive') return `${name} saved. It is inactive.`
   return `${name} saved and turned on`
 }

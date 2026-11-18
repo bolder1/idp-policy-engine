@@ -183,7 +183,6 @@ describe('what changed, for the save bar', () => {
     const before = zone({ ip: ['10.0.0.1'], location: { ...emptyLocation(), countries: ['India'] } })
     const after = zone({ name: 'HQ', ip: ['10.0.0.0/8'], location: emptyLocation() })
     expect(zoneReviewRows(before, after)).toEqual([
-      { label: 'Name', before: 'Office', after: 'HQ', kind: 'changed' },
       { label: 'IP networks: added', before: '', after: '10.0.0.0/8', group: 'IP networks', kind: 'added' },
       { label: 'IP networks: removed', before: '10.0.0.1', after: '', group: 'IP networks', kind: 'removed' },
       { label: 'Locations: removed', before: 'India', after: '', group: 'Locations', kind: 'removed' },
@@ -198,20 +197,17 @@ describe('what changed, for the save bar', () => {
     const before = zone({ ip: ['10.0.0.1'] })
     const after = zone({ name: 'HQ', ip: ['10.0.0.1', '10.0.0.2', '10.0.0.3'] })
     const rows = zoneReviewRows(before, after)
-    const [name, net] = rows
-    expect(rows).toHaveLength(2)
-    expect(name.group).toBeUndefined()
-    expect(name.kind).toBe('changed')
+    const [net] = rows
+    expect(rows).toHaveLength(1)
     expect(net).toMatchObject({ group: 'IP networks', kind: 'added', after: '10.0.0.2, 10.0.0.3', count: 2 })
     expect(net.item).toBeUndefined()
     expect(rows.some((r) => r.effect)).toBe(false)
   })
 
-  /* A new zone is reviewed against itself with no name, so its name is added
-     rather than changed. */
-  it('marks the name of a new zone as added', () => {
-    const [name] = zoneReviewRows(zone({ name: '' }), zone({ name: 'HQ' }))
-    expect(name).toEqual({ label: 'Name', before: '', after: 'HQ', kind: 'added' })
+  /* The name never reaches the review (owner, 18 Nov 2026): it is given in the naming popup or renamed in place. */
+  it('leaves a name, new or changed, out of the review', () => {
+    expect(zoneReviewRows(zone({ name: '' }), zone({ name: 'HQ' }))).toEqual([])
+    expect(zoneReviewRows(zone(), zone({ name: 'HQ' }))).toEqual([])
   })
 
   it('counts the rest of a long paste rather than listing it', () => {
@@ -467,8 +463,8 @@ describe('renaming a stored zone', () => {
     expect(zoneChanges(saved, { ...saved, name: 'Head office' })).toEqual([])
   })
 
-  /* A new zone is not stored: its name is in the draft, and the review. */
-  it('keeps a new zone’s name in the review', () => {
-    expect(zoneReviewRows(zone({ name: '' }), zone({ name: 'Head office' }))[0]).toMatchObject({ label: 'Name', kind: 'added' })
+  /* A new zone's name is given in its naming popup, so it is not in the review either (owner, 18 Nov 2026). */
+  it('keeps a new zone’s name out of the review', () => {
+    expect(zoneReviewRows(zone({ name: '' }), zone({ name: 'Head office' }))).toEqual([])
   })
 })

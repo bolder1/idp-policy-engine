@@ -77,6 +77,8 @@ import { PageBar, WidthSwitch } from './page-bar'
 import { compactClass, usePageWidth } from '../page-width'
 import { libRowHeight, useLibView, type LibView } from './library-view-state'
 import { SHOWCASE } from '../showcase'
+import { TESTER } from '../tester'
+import { ZonesArt } from '../empty-art'
 
 /* -----------------------------------------------------------------------------
    Zones.
@@ -178,7 +180,8 @@ export function ZonesFinal() {
     /* A zone with both halves is in both filters: it IS a network zone, and a
        location zone. */
     /* A move's zones wait out of the list until a policy using them is approved; arrived, they lead it. */
-    const listed = [...store.zones.filter((z) => z.fromOld === 'added'), ...store.zones.filter((z) => !z.fromOld)]
+    /* The phase 1 tester build (tester.ts) lists only the zones the admin makes: a move's zones stay out (owner, 18 Nov 2026). */
+    const listed = [...store.zones.filter((z) => z.fromOld === 'added' && !TESTER), ...store.zones.filter((z) => !z.fromOld)]
     const byShape = shape === 'all' ? listed : listed.filter((z) => SHAPE_FILTER[shape].includes(shapeOf(z)))
     if (!needle) return byShape
     const hit = (v: string | undefined) => !!v && v.toLowerCase().includes(needle)
@@ -337,6 +340,7 @@ export function ZonesFinal() {
           {store.zones.length === 0 ? (
             <EmptyState
               icon={Network}
+              art={<ZonesArt />}
               title="No zones yet"
               blurb="A zone names IP networks and locations for use in policy rules."
               action={

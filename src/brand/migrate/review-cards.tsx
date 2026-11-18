@@ -2,6 +2,7 @@ import { CheckCheck, ClipboardCheck, Eye, Headset, Rocket, XCircle } from 'lucid
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button, SplitButton } from '../kit'
+import { TESTER } from '../tester'
 import './review-cards.css'
 
 /* -----------------------------------------------------------------------------
@@ -38,17 +39,24 @@ export function ReviewApproveCards({
         </Button>
       </Card>
       <Card tone="approve" icon={CheckCheck} title="Approve" label="Approved" value={approved}>
-        <SplitButton
-          label="Publish approved"
-          icon={Rocket}
-          variant="secondary"
-          size="sm"
-          onPress={onPublishApproved}
-          disabled={approved === 0}
-          menuLabel="More ways to publish"
-          items={[{ id: 'all', label: 'Publish all' }]}
-          onSelect={onPublishAll}
-        />
+        {/* The phase 1 tester build (tester.ts) has no Publish all (owner, 18 Nov 2026: "we don't have publish all"). */}
+        {TESTER ? (
+          <Button variant="secondary" size="sm" icon={Rocket} onClick={onPublishApproved} disabled={approved === 0}>
+            Publish approved
+          </Button>
+        ) : (
+          <SplitButton
+            label="Publish approved"
+            icon={Rocket}
+            variant="secondary"
+            size="sm"
+            onPress={onPublishApproved}
+            disabled={approved === 0}
+            menuLabel="More ways to publish"
+            items={[{ id: 'all', label: 'Publish all' }]}
+            onSelect={onPublishAll}
+          />
+        )}
       </Card>
       {showReject && (
         <Card tone="reject" icon={XCircle} title="Reject" label="Rejected" value={rejected}>

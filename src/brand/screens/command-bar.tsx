@@ -21,6 +21,7 @@ import { TemplateIcon } from '../template-icon'
 
 import type { Rule } from '../data'
 import { NoMatches } from '../empty'
+import { MARK_LABEL } from '../tester'
 
 /* -----------------------------------------------------------------------------
    The command bar.
@@ -60,7 +61,7 @@ export function baseCommands(rules: Rule[], opts: { canUndo: boolean; canRedo: b
   out.push({ id: 'test', label: 'Test one person', icon: Search })
   out.push({ id: 'log', label: 'Decision log', icon: ScrollText })
   out.push({ id: 'apps', label: 'Assign applications', icon: AppWindow })
-  out.push({ id: 'template', label: 'Mark as template', icon: TemplateIcon })
+  out.push({ id: 'template', label: MARK_LABEL, icon: TemplateIcon })
   out.push({ id: 'publish', label: 'Review and publish', icon: Check })
   if (opts.canUndo) out.push({ id: 'undo', label: 'Undo', icon: Undo2 })
   if (opts.canRedo) out.push({ id: 'redo', label: 'Redo', icon: Redo2 })

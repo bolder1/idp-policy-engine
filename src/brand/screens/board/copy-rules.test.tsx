@@ -135,6 +135,7 @@ describe('the doors', () => {
   it('reads as a row in the bar’s ⋯ beside Mark as template', () => {
     const src = BoardBarActions.toString()
     expect(src).toContain('Copy rules from a policy')
-    expect(src).toContain('Mark as template')
+    /* The label is MARK_LABEL (tester.ts): Mark as template, or Mark as favorite in the tester build. */
+    expect(src).toContain('MARK_LABEL')
   })
 })

@@ -94,6 +94,8 @@ import { useShows } from './board/builder-version'
 import { NewProfileDialog } from './new-profile-dialog'
 import { CREATE_VERSIONS, readCreateVersion, writeCreateVersion, type CreateVersion } from './device-profile-version'
 import { SHOWCASE } from '../showcase'
+import { TESTER } from '../tester'
+import { DevicesArt } from '../empty-art'
 
 /* -----------------------------------------------------------------------------
    Device fingerprint · profiles.
@@ -335,7 +337,8 @@ export function DeviceFingerprintV2() {
       ) : (
         <>
           <ProfileList
-            profiles={store.fingerprints}
+            /* The phase 1 tester build (tester.ts) lists only the profiles the admin makes: a move's stay out. */
+            profiles={TESTER ? store.fingerprints.filter((f) => !f.fromOld) : store.fingerprints}
             q={q}
             setQ={setQ}
             mode={modeFilter}
@@ -641,6 +644,7 @@ function ProfileList({
       {profiles.length === 0 ? (
         <EmptyState
           icon={MonitorSmartphone}
+          art={<DevicesArt />}
           title="No device profiles yet"
           blurb="Create a profile to check device health or recognise trusted devices."
           action={

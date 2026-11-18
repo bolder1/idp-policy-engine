@@ -12,6 +12,7 @@ import {
 import { listNames } from '../rule-who'
 import type { AppTab } from '../store'
 import type { ProfileNote } from './profile-notes'
+import { TESTER } from '../tester'
 
 /* -----------------------------------------------------------------------------
    What the application page decides, apart from drawing it (ApplicationPage.tsx,
@@ -54,7 +55,8 @@ export const TAB_LABEL: Record<AppTab, string> = {
    POST-SIGN-IN-POLICIES.md §Screens 3): a link names the application by its
    id, and one not stored yet has none to name. */
 export function appTabs(protocol: App['protocol'], mode: PageMode): AppTab[] {
-  const saved: AppTab[] = mode === 'saved' ? ['post-sign-in', 'users', 'groups'] : []
+  /* The phase 1 tester build (tester.ts) has no post sign-in policies, so no Post sign-in tab. */
+  const saved: AppTab[] = mode === 'saved' ? [...(TESTER ? [] : (['post-sign-in'] as AppTab[])), 'users', 'groups'] : []
   return ['basic', 'advanced', 'sign-in', 'attributes', 'policies', ...saved, protocol === 'OIDC' ? 'endpoints' : 'metadata']
 }
 

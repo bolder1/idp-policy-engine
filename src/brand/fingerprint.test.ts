@@ -609,7 +609,6 @@ describe('what changed, for the save bar and Review changes', () => {
       config: { 'device-type': 'Laptop', 'browser-chrome': { op: 'gte', value: '120' } },
     }
     expect(profileReview(corp, next)).toEqual([
-      { label: 'Name', before: 'Corporate managed', after: 'Corporate laptops' },
       { label: 'Checks: added Chrome version', before: '', after: '≥ 120', group: 'Checks', kind: 'added', item: 'Chrome version' },
       { label: 'Checks: removed Windows OS version', before: '≥ 10', after: '', group: 'Checks', kind: 'removed', item: 'Windows OS version' },
     ])
@@ -625,20 +624,15 @@ describe('what changed, for the save bar and Review changes', () => {
   /* Review changes files each row under the page's own sections (17 Sep 2026). */
   it('files each row under its section and says what kind of change it is', () => {
     const next: FingerprintProfile = { ...corp, name: 'Corporate laptops', enabled: ['device-type', 'browser-chrome'] }
-    const [name, added] = profileReview(corp, next)
-    /* The name files nowhere, so it leads under Basic details (GENERAL_GROUP);
-       it is not an effect. */
-    expect(name.group).toBeUndefined()
-    expect(name.effect).toBeUndefined()
+    /* No Name row (owner, 18 Nov 2026): a rename saves itself, so the review starts at the checks. */
+    const [added] = profileReview(corp, next)
     expect(added).toMatchObject({ group: 'Checks', kind: 'added', item: 'Chrome version' })
     expect(added.effect).toBeUndefined()
   })
 
-  /* A new trusted device lists its name as added beside its setup, as the page
-     does (`shownReview`, against a copy with no name). The general heading is
-     "Basic details" (1 Oct 2026) and so is the setup's section, so the two are
-     one section in Review changes, never two of the same name. */
-  it("files a new profile's name with its setup, under one Basic details", () => {
+  /* A new trusted device's setup files under Basic details, its tab; its name never reaches the review (owner,
+     18 Nov 2026: it is given in the create flow). */
+  it("files a new profile's setup under Basic details, without its name", () => {
     const fresh: FingerprintProfile = { ...blankProfile('Kiosks', 'device'), id: 'fp-new' }
     const draft: FingerprintProfile = { ...fresh, restrictionSet: true, autoRegister: true }
     const rows = profileReview({ ...fresh, name: '' }, draft)
@@ -646,7 +640,6 @@ describe('what changed, for the save bar and Review changes', () => {
     expect(GENERAL_GROUP).toBe('Basic details')
     expect(sections.map((x) => x.title)).toEqual([GENERAL_GROUP])
     expect(sections[0].blocks.map((b) => [b.kind, b.rows.map((r) => r.label)])).toEqual([
-      ['added', ['Name']],
       ['changed', ['Basic details', 'Device auto-registration']],
     ])
   })

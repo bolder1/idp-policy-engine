@@ -54,10 +54,11 @@ import { decidesFor, deleteFacts, ownerOf } from './app-policies'
 import { AppFacts, DeleteFactsLine, PolicyFact } from './app-facts'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
-import { canSaveAsTemplate, rowMenu, statusOptions, type RowMenuId, monitorOffered } from './status-options'
+import { canSaveAsTemplate, rowMenu, statusOptions, type RowMenuId, monitorOffered, MONITOR_MODE } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { BulkBar } from '../bulk-bar'
 import { SHOWCASE } from '../showcase'
+import { TESTER } from '../tester'
 import { screenOffered } from '../edition-screens'
 import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
 import { ACCESS_CHECK } from './sign-in-tests/names'
@@ -77,6 +78,7 @@ import { PublishMovedConfirm } from '../migrate/moved-panel'
 import './policies-types.css'
 import { FirstVisit } from '../migrate/first-visit'
 import { PolicyStatus } from '../migrate/moved-status'
+import { MARK_LABEL, UNMARK_LABEL } from '../tester'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -163,7 +165,9 @@ function exposureOf(r: GauntletResult) {
 const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
-  { value: 'monitor', label: 'Monitoring' },
+  /* Monitoring is not a status the product has (owner, 18 Nov 2026: "monitoring is not a concept at all, remove
+     completely"); it stays only behind MONITOR_MODE, with the rest of that work. */
+  ...(MONITOR_MODE ? [{ value: 'monitor' as StatusFilter, label: 'Monitoring' }] : []),
   { value: 'draft', label: 'Draft' },
   { value: 'inactive', label: 'Inactive' },
 ]
@@ -238,6 +242,18 @@ export function Policies() {
       setSub('moved')
     }
   }, [running])
+
+  /* The phase 1 tester build (tester.ts): the sign-in policies alone, no tabs, no migration (owner, 18 Nov 2026: "remove
+     new policy, old policy, all those … just give me the fresh version of the policy builder"). */
+  if (TESTER)
+    return (
+      <div className="bpage">
+        <PageHead title="Policies" caption="Every sign-in is checked against these policies." docs />
+        <div className="bpol__main">
+          <SignInPolicies key="new" origin="new" />
+        </div>
+      </div>
+    )
 
   /* One head over both tabs, so its caption names both types rather than
      only the sign-in check it said before 13 Oct 2026. */
@@ -435,7 +451,8 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
          and a monitoring policy, which decides none, is not. */
       if (status === 'active' && !enforces(p)) return false
       if ((status === 'draft' || status === 'monitor' || status === 'inactive') && p.status !== status) return false
-      if (q && !p.name.toLowerCase().includes(q)) return false
+      /* By the policy's name or by an application it covers (owner, 18 Nov 2026: "search by policy or application"). */
+      if (q && !p.name.toLowerCase().includes(q) && !p.appIds.some((id) => store.apps.find((a) => a.id === id)?.name.toLowerCase().includes(q))) return false
       return true
     })
     list = [...list].sort((a, b) => {
@@ -464,7 +481,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
     })
     // System policy is pinned regardless of sort — it always evaluates.
     return [...list.filter((p) => p.isSystem), ...list.filter((p) => !p.isSystem)]
-  }, [signIn, status, q, sort, grades, store.activity])
+  }, [signIn, status, q, sort, grades, store.activity, store.apps])
 
   const deciding = useMemo(() => signIn.filter(enforces).length, [signIn])
 
@@ -477,7 +494,9 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
      sense that matters, though the pinned row is there. */
   /* Two tabs, empty (owner, 9 Nov 2026: "a dedicated banner for migration and an empty state for new policies"): the page
      is laid out as it is with policies, the migration banner on top and New policies' own empty state under it. */
-  const noPolicies = origin !== 'moved' && !q && !filtered && signIn.every((p) => p.isSystem)
+  /* The phase 1 tester build (tester.ts) never shows Policies empty: the Global Default is a policy, so it is listed
+     (owner, 18 Nov 2026: "policy can't be empty, showcase the Global only"). */
+  const noPolicies = !TESTER && origin !== 'moved' && !q && !filtered && signIn.every((p) => p.isSystem)
   /* Two tabs: with nothing of its own, the one list starts at the migrate card, New policy beside Migrate. */
   const nothingMoved = origin === 'moved' && !q && !filtered && signIn.length === 0
   /* Old policies that can still move: with nothing moved yet, the empty state below is the one way in (owner, 9 Nov
@@ -729,7 +748,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                 value={query}
                 onChange={setQuery}
                 inputRef={searchRef}
-                placeholder="Search policies…"
+                placeholder="Search policies or applications…"
                 label="Search policies"
               />
               <span className={`btoolbar__filter bbar__filter ${status !== 'all' ? 'is-set' : ''}`}>
@@ -1286,7 +1305,7 @@ function policyMenu(policy: Policy, { monitor, trySignIn, marked = false }: { mo
 function reviewMenu(review: 'review' | 'approved' | 'rejected'): MenuItem[] {
   return [
     { id: 'review', label: 'Review', icon: Eye },
-    { id: 'test', label: 'Check access', icon: LogIn },
+    ...(TESTER ? [] : [{ id: 'test', label: 'Check access', icon: LogIn }]),
     ...(review === 'approved' ? [{ id: 'unapprove', label: 'Take back approval', icon: Undo2, divide: true }] : [{ id: 'approve', label: 'Approve', icon: Check, divide: true }]),
     ...(review === 'rejected' ? [] : [{ id: 'reject', label: 'Reject', icon: X }]),
   ]
@@ -1386,7 +1405,7 @@ function TemplateMark({ policy }: { policy: Policy }) {
   const mark = useSaveAsTemplate()
   /* A migrated draft is in review, and its menu has no template item (owner, 17 Nov 2026), so no star either. */
   if (!marked && (!canSaveAsTemplate(policy) || waitingMoved(policy))) return null
-  const label = marked ? 'Remove from templates' : 'Mark as template'
+  const label = marked ? UNMARK_LABEL : MARK_LABEL
   return (
     <Tip text={marked ? 'Marked as template' : label}>
       <button

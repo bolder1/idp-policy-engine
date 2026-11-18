@@ -591,6 +591,19 @@ export function showcaseTenant(): Tenant {
   }
 }
 
+/* The phase 1 tester build's tenant (tester.ts): the showcase's applications, people, groups and methods, and none of
+   what a tenant authors. Its policies are a new tenant's day one, the system Global Default alone ("Baseline access");
+   no zones, no device profiles, no post sign-in policies, no saved sign-ins. Migration still adds what it moves. */
+export function testerTenant(): Tenant {
+  return {
+    ...showcaseTenant(),
+    policies: tenantAt('none').policies,
+    zones: [],
+    fingerprints: [],
+    savedSignIns: [],
+  }
+}
+
 /* The showcase tenant once "HRMS access from corporate offices" is turned on:
    where the pitch ends, and the tenant the scenes that need HRMS enforcing are
    pinned on — a save guarded on a live policy, a Live column, a zone save that

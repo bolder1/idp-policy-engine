@@ -16,6 +16,7 @@ import { StatusControl } from '../status-control'
 import { BAR_DEMO, BAR_READ, BAR_TOUR } from './bar-tools'
 import { BuilderVersionSwitch } from './BuilderVersionSwitch'
 import { useShows } from './builder-version'
+import { MARK_LABEL } from '../../tester'
 
 /* -----------------------------------------------------------------------------
    The board's top row.
@@ -548,7 +549,7 @@ export function BoardBarActions({
           size="sm"
           items={[
             ...(onCopyRules ? [{ id: 'copy', label: 'Copy rules from a policy', icon: CopyPlus }] : []),
-            ...(onSaveTemplate ? [{ id: 'template', label: 'Mark as template', icon: TemplateIcon }] : []),
+            ...(onSaveTemplate ? [{ id: 'template', label: MARK_LABEL, icon: TemplateIcon }] : []),
             ...(onRollBack ? [{ id: 'rollback', label: 'Roll back to old policy', icon: Undo2, divide: !!(onSaveTemplate || onCopyRules) }] : []),
             ...(onContactSupport ? [{ id: 'support', label: 'Contact support', icon: Headset, divide: !onRollBack && !!(onSaveTemplate || onCopyRules) }] : []),
           ]}

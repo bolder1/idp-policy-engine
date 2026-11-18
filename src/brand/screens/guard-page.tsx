@@ -1,10 +1,15 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from 'motion/react'
-import { RefreshCw } from 'lucide-react'
+import { ChevronDown, RefreshCw, ShieldAlert } from 'lucide-react'
 
 import { ChangeList, ChangeSection, type ChangeBlock, type ChangeItem } from '../change-list'
 import { DECISION_WORDS } from '../decision-words'
-import { Badge, Button, Callout, Drawer, Field, TipDot } from '../kit'
+import { Badge, Button, Callout, Drawer, Field, Modal, TipDot } from '../kit'
+import { listNames } from '../rule-who'
+import { TESTER } from '../tester'
+
+/** Before saving, turning on or off: a critical popup, details on click (tester.ts). */
+const CRITICAL_GUARD = TESTER
 import { reviewKind, reviewItemName, type ReviewLine } from '../review-rows'
 import { REASON_MAX, BREAK_IN_TIP } from './break-in-model'
 import { Seg } from './board/Section'
@@ -64,6 +69,15 @@ const TITLE: Record<GuardKind, string> = {
   'turn-on': 'Before turning on',
   'turn-off': 'Before turning off',
   'to-monitor': 'Before switching to monitoring',
+}
+
+/* The critical popup's titles (CRITICAL_GUARD): the question it asks, in active / inactive words (owner, 5 Nov 2026). */
+const POPUP_TITLE: Record<GuardKind, string> = {
+  save: 'Save your edits?',
+  apps: 'Save the applications?',
+  'turn-on': 'Make this policy active?',
+  'turn-off': 'Make this policy inactive?',
+  'to-monitor': 'Switch to monitoring?',
 }
 
 /** The banner's heading, for the kinds that can be stopped. */
@@ -381,6 +395,11 @@ export function GuardDrawer({
   const r = result === 'error' ? null : result
   const first = r?.blocking[0] ?? null
   const [expecting, setExpecting] = useState(false)
+  /* The critical popup's Show details (CRITICAL_GUARD): closed each time it opens. */
+  const [details, setDetails] = useState(false)
+  useEffect(() => {
+    if (open) setDetails(false)
+  }, [open])
   /* A new blocker is a new question: a reason half-typed for the last one is not an answer to it. */
   const firstId = first?.signIn.id ?? null
   const [expectingFor, setExpectingFor] = useState<string | null>(firstId)
@@ -500,8 +519,11 @@ export function GuardDrawer({
         </Fade>,
       )
     }
-    savedSection('saved', 'Saved sign-ins', r.saved)
-    savedSection('protected', 'Your own and protected sign-ins', r.protectedOwn)
+    /* Not in the phase 1 tester build (tester.ts), which has no Check access to save a sign-in with. */
+    if (!TESTER) {
+      savedSection('saved', 'Saved sign-ins', r.saved)
+      savedSection('protected', 'Your own and protected sign-ins', r.protectedOwn)
+    }
 
     const wc = whatChangesSaid(r.whatChanges)
     const apps = r.whatChanges.appNames.join(', ') || 'this application'
@@ -594,6 +616,108 @@ export function GuardDrawer({
 
   const bannerExit = reduced ? { opacity: 0, transition: { duration: 0 } } : { height: 0, opacity: 0, transition: { duration: 0.2, ease: [0.2, 0, 0, 1] as const } }
 
+  const actions = (
+    <>
+      {/* Two buttons at most (owner, 23 Oct 2026). With Monitor instead on offer the cancel is the × and Escape. */}
+      {!onMonitorInstead && (
+        <Button variant="ghost" onClick={onClose}>
+          {cancelWord}
+        </Button>
+      )}
+      {onMonitorInstead && (
+        <Button variant="secondary" onClick={onMonitorInstead}>
+          Monitor instead
+        </Button>
+      )}
+      <Button variant="brand" disabled={!primaryOn} title={disabledWhy} onClick={onConfirm}>
+        {primaryLabel}
+      </Button>
+    </>
+  )
+
+  /* The phase 1 tester build (tester.ts): a critical confirm in the middle of the screen, its consequence said in one
+     line, and the full breakdown behind Show details (owner, 18 Nov 2026: "turn this into a popup, a critical one, with
+     a detailed view on click"). Blockers and the version choice stay above the fold. */
+  if (CRITICAL_GUARD) {
+    const starts = r ? r.deciding.filter((d) => d.kind === 'starts').map((d) => d.appName) : []
+    const stopsFor = r ? r.deciding.filter((d) => d.kind === 'stops').map((d) => d.appName) : []
+    const lead = !r
+      ? 'Checks could not run.'
+      : stops
+        ? stopsFor.length
+          ? `It stops deciding sign-ins for ${listNames(stopsFor, 3)}. They go back to the policy below it.`
+          : 'It stops deciding sign-ins.'
+        : starts.length
+          ? `It starts deciding sign-ins for ${listNames(starts, 3)} as soon as you confirm.`
+          : decidingSummary(r.deciding)
+    return (
+      <Modal open={open} onClose={onClose} title={POPUP_TITLE[kind]} width={560} footer={actions}>
+        <div className="bgd bgd--popup">
+          <div className="bgd__lead">
+            <span className="bgd__leadmark" aria-hidden>
+              <ShieldAlert size={20} strokeWidth={1.9} />
+            </span>
+            <div className="bgd__leadtext">
+              <p className="bgd__leadname">{policyName}</p>
+              <p className="bgd__leadline">{lead}</p>
+            </div>
+          </div>
+          {stale && (
+            <div className="bgd__stale">
+              <RefreshCw size={14} strokeWidth={2} aria-hidden />
+              <span>Changed since you opened this.</span>
+              {onRerun && (
+                <Button variant="link" size="sm" onClick={onRerun}>
+                  Run the checks again
+                </Button>
+              )}
+            </div>
+          )}
+          {(first || blockedReason) && (
+            <div className="bgd__block">
+              <div className="bgd__blockin">
+                <p className="bgd__blockhead">{CANT[kind] ?? "Can't turn on"}</p>
+                <p className="bgd__blockline">{first ? blockLine(first) : blockedReason}</p>
+                {first && r?.fix && (
+                  <div className="bgd__acts">
+                    <Button variant="neutral" size="sm" onClick={() => onApplyFix(r.fix!)}>
+                      {r.fix.label}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {rows.length > 0 && (
+            <>
+              <button type="button" className="bgd__more" aria-expanded={details} onClick={() => setDetails((d) => !d)}>
+                {details ? 'Hide details' : 'Show details'}
+                <ChevronDown size={14} strokeWidth={2} aria-hidden className={details ? 'is-up' : undefined} />
+              </button>
+              <AnimatePresence initial={false}>
+                {details && (
+                  <motion.div
+                    key="details"
+                    className="bgd__details"
+                    initial={reduced ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                    animate={reduced ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+                    exit={reduced ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                    transition={{ duration: reduced ? 0 : 0.2, ease: [0.2, 0, 0, 1] }}
+                  >
+                    <ChangeList layout="list">{rows}</ChangeList>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>
+          )}
+          <p className="u-sr-only" aria-live="polite">
+            {spoken}
+          </p>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
     <Drawer
       open={open}
@@ -601,24 +725,7 @@ export function GuardDrawer({
       title={TITLE[kind]}
       caption={policyName}
       width={680}
-      actions={
-        <>
-          {/* Two buttons at most (owner, 23 Oct 2026). With Monitor instead on offer the cancel is the × and Escape. */}
-          {!onMonitorInstead && (
-            <Button variant="ghost" onClick={onClose}>
-              {cancelWord}
-            </Button>
-          )}
-          {onMonitorInstead && (
-            <Button variant="secondary" onClick={onMonitorInstead}>
-              Monitor instead
-            </Button>
-          )}
-          <Button variant="brand" disabled={!primaryOn} title={disabledWhy} onClick={onConfirm}>
-            {primaryLabel}
-          </Button>
-        </>
-      }
+      actions={actions}
     >
       <div className="bgd">
         {stale && (

@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Check, Compass, Globe, MonitorSmartphone, ScanSearch, ShieldCheck } from 'lucide-react'
 import { Button } from '../kit'
 import { useBrand } from '../store'
+import { TESTER } from '../tester'
 import { useSetupSteps } from './setup-steps'
 
 /* -----------------------------------------------------------------------------
@@ -88,7 +89,7 @@ export function DoneStage({ onPreview }: { onPreview?: () => void }) {
           <Place icon={ShieldCheck} name="Policies" line={drafts === 1 ? '1 moved policy, in draft' : `${drafts} moved policies, in draft`} onOpen={() => store.go({ name: 'policies' })} />
           <Place icon={Globe} name="Zones" line={zones === 1 ? '1 zone from your old checks' : `${zones} zones from your old checks`} onOpen={() => store.go({ name: 'zones' })} />
           <Place icon={MonitorSmartphone} name="Device profiles" line="New: check the device in any rule" isNew onOpen={() => store.go({ name: 'fingerprint' })} />
-          <Place icon={ScanSearch} name="Access checks" line="Test a sign-in before it decides" onOpen={() => store.go({ name: 'sign-in-tests' })} />
+          {!TESTER && <Place icon={ScanSearch} name="Access checks" line="Test a sign-in before it decides" onOpen={() => store.go({ name: 'sign-in-tests' })} />}
         </ul>
       </section>
     </div>

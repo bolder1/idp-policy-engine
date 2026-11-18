@@ -26,6 +26,7 @@ import { Button } from './kit'
 
 export function EmptyState({
   icon: Icon,
+  art,
   title,
   blurb,
   action,
@@ -34,6 +35,8 @@ export function EmptyState({
   id,
 }: {
   icon: LucideIcon
+  /** An animated drawing (empty-art.tsx) in place of the icon circle, on a page whose whole content this is. */
+  art?: ReactNode
   title: string
   /* One line, or none. A title that names the state and an action that gets
      out of it usually need nothing between them (owner, 25 Sep 2026: labels,
@@ -53,9 +56,15 @@ export function EmptyState({
 }) {
   return (
     <div id={id} className={`bempty ${compact ? 'is-compact' : ''}`} role={live ? 'status' : undefined}>
-      <span className="bempty__icon" aria-hidden>
-        <Icon size={26} strokeWidth={1.5} />
-      </span>
+      {art ? (
+        <span className="bempty__art" aria-hidden>
+          {art}
+        </span>
+      ) : (
+        <span className="bempty__icon" aria-hidden>
+          <Icon size={26} strokeWidth={1.5} />
+        </span>
+      )}
       <h2 className="bempty__title">{title}</h2>
       {blurb && <p className="bempty__blurb">{blurb}</p>}
       {action && <div className="bempty__action">{action}</div>}

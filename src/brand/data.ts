@@ -12,6 +12,7 @@
 import type { DraftCheck } from './draft-checks'
 import type { AppSetup } from './app-setup'
 import type { PostAction, PostSetup } from './post-sign-in'
+import { TESTER, TESTER_WITHHELD_CONDITIONS } from './tester'
 
 export type PolicyType = 'App Access' | 'Session' | 'Account Management'
 
@@ -449,7 +450,9 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
    and it is short enough to be the whole answer. */
 /* A sign-in policy's: the post sign-in conditions are never offered on one
    (and the trail builder, which only builds sign-in policies, reads this). */
-export const WHEN_CONDITIONS = CONDITION_CATALOGUE.filter((c) => !c.who && c.phase !== 'post')
+export const WHEN_CONDITIONS = CONDITION_CATALOGUE.filter(
+  (c) => !c.who && c.phase !== 'post' && !(TESTER && TESTER_WITHHELD_CONDITIONS.includes(c.id)),
+)
 
 /* A post sign-in policy's If (post-sign-in.ts, 13 Oct 2026): its own
    conditions and the shared ones, never the sign-in-only risk scores. */

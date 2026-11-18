@@ -144,7 +144,8 @@ describe('where it is offered', () => {
 
   it('an application’s Policies tab has it in its ⋯, between the switches and the red Remove', () => {
     const src = code(appViewSrc)
-    expect(src).toContain("label: 'Mark as template', icon: TemplateIcon")
+    /* The label is MARK_LABEL (tester.ts): Mark as template, or Mark as favorite in the tester build. */
+    expect(src).toContain('label: MARK_LABEL, icon: TemplateIcon')
     expect(src).toContain('items={withTemplateRow([')
     expect(src).toContain("if (id === 'template') saveTemplate.open(policy)")
     /* Remove or Delete draft is found by id, and the row goes in before it. */

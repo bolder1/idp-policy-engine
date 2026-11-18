@@ -2,6 +2,7 @@ import { enforces, type Policy, type PolicyStatus, type PolicyType } from '../da
 import { TEMPLATES_MANAGED } from '../template-phase'
 import { monitorBlocker, openForEditing } from '../policy-draft'
 import { ACCESS_CHECK } from './sign-in-tests/names'
+import { MARK_LABEL, UNMARK_LABEL } from '../tester'
 
 /* What a published policy can be switched to, where its menu and dialog
    portal, and which switches ask first. Plain functions, kept apart from the
@@ -132,9 +133,9 @@ export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boo
     ...(opts.trail && signIn ? [{ id: 'trail' as const, label: 'Open in trail' }] : []),
     ...(signIn ? [{ id: 'text' as const, label: 'Read as text' }] : []),
     ...(opts.marked
-      ? [{ id: 'template' as const, label: 'Remove from templates' }]
+      ? [{ id: 'template' as const, label: UNMARK_LABEL }]
       : canSaveAsTemplate(policy)
-        ? [{ id: 'template' as const, label: 'Mark as template' }]
+        ? [{ id: 'template' as const, label: MARK_LABEL }]
         : []),
     ...(policy.isSystem
       ? []

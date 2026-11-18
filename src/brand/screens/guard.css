@@ -85,3 +85,25 @@
 .blg__stop { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .blg__line { font-weight: var(--fw-regular); color: var(--fb-negative-fg); }
 .blg .bgd__expect { font-weight: var(--fw-regular); }
+
+/* The critical popup (guard-page.tsx CRITICAL_GUARD; owner, 18 Nov 2026): a lead with the consequence in one line,
+   and the breakdown behind Show details. */
+.bgd--popup { gap: var(--space-5); }
+.bgd__lead { display: flex; align-items: flex-start; gap: var(--space-4); }
+.bgd__leadmark {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-full);
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+}
+.bgd__leadtext { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.bgd__leadname { margin: 0; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bgd__leadline { margin: 0; color: var(--text-secondary); }
+.bgd__more {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--blue);
+}
+.bgd__more:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: var(--radius-sm); }
+.bgd__more svg { transition: rotate var(--dur-fast) ease; }
+.bgd__more svg.is-up { rotate: 180deg; }
+.bgd__details { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .bgd__more svg { transition: none; } }

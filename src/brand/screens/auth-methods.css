@@ -1152,4 +1152,6 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    Held to a column: the rows put the label at one end and the control at the other, and on a full-width page that is a
    switch half a screen from the words it answers. The measure is the blurb's, so the tab's text column lines up with
    the page's own. */
-.bm8__genpane { max-width: 68ch; }
+/* Full width (owner, 18 Nov 2026: "push the options to the right, take the full space"): the rows run the page's width
+   with each switch at the far end, as the Methods and Recovery tabs do. Was held to 68ch (21 Oct 2026). */
+.bm8__genpane { max-width: none; }

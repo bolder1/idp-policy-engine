@@ -1377,6 +1377,9 @@
 .bmarket__hero:has(.bdetail__head) { display: block; padding: var(--space-4) 64px var(--space-5) var(--space-6); }
 .bmarket__hero .bdetail__head { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); padding: 0; border: 0; }
 .bmarket__work.is-detail { overflow: hidden; padding: 0; gap: 0; display: block; }
+/* The preview takes the whole sheet, its back arrow the way out: the shelf rail would stack above it and push the
+   footer off the popup (owner, 18 Nov 2026: "this is broken, the preview part"). */
+.bmarket__work.is-detail > .bmarket__rail { display: none; }
 .bmarket__body.is-detail { height: 100%; }
 .bmarket__body.is-detail .bdetail { height: 100%; border: 0; border-radius: 0; }
 .bmarket__body.is-detail .bdetail__canvas { padding: var(--space-5) var(--space-6); }

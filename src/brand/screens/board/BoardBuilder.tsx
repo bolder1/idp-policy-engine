@@ -16,6 +16,7 @@ import { ReviewDialog } from '../builder-dialogs'
 import { CommandBar, type Cmd } from '../command-bar'
 import { BoardBar, BoardBarActions } from './BoardBar'
 import { SHOWCASE } from '../../showcase'
+import { RULE_SAVE, RULE_SAVE_MS } from '../../tester'
 import { BoardEmpty } from './BoardEmpty'
 import { buildTemplate, productNamed, templateBlocker, templateGaps, templateName } from './apply-template'
 import { arrivalKey, firstArrival, landFix, type ArriveFix } from './arrive-fix'
@@ -621,6 +622,26 @@ export function BoardBuilder({
      the reason stands under that card's Then until it is answered, and moves
      to the next one left (post-board.ts `issueTarget`). */
   const [attempted, setAttempted] = useState(false)
+  /* Save rule (owner, 18 Nov 2026, phase 1 tester build: "keep the rules unsaved until I press Save rule, that will
+     call the API and then call the rule complete"). Each rule as last saved, by id; a rule with no entry, or one that
+     differs from it, is Unsaved on its card. The rules the builder opens with count as saved. */
+  const [savedRules, setSavedRules] = useState<Record<string, string>>(() => Object.fromEntries(draft.rules.map((r) => [r.id, JSON.stringify(r)])))
+  const [savingRule, setSavingRule] = useState<string | null>(null)
+  const unsavedIds = useMemo(
+    () => (RULE_SAVE ? draft.rules.filter((r) => savedRules[r.id] !== JSON.stringify(r)).map((r) => r.id) : []),
+    [draft.rules, savedRules],
+  )
+  const saveRule = (id: string) => {
+    const r = draft.rules.find((x) => x.id === id)
+    if (!r || savingRule) return
+    setSavingRule(id)
+    /* The call to the API: a short wait the admin can see, then the rule is stored as it is now. */
+    window.setTimeout(() => {
+      setSavedRules((all) => ({ ...all, [id]: JSON.stringify(r) }))
+      setSavingRule(null)
+      store.showToast(`${r.name.trim() || 'Rule'} saved`)
+    }, RULE_SAVE_MS)
+  }
   const issue = useMemo(() => (post ? issueTarget(draft) : null), [post, draft])
   const refusal: Refusal | null = attempted ? issue : null
   useEffect(() => {
@@ -2222,7 +2243,8 @@ export function BoardBuilder({
           }
         : canTurnOn
           ? {
-              label: 'Turn on',
+              /* Active / inactive, never turn on (owner, 5 Nov 2026). */
+              label: 'Make active',
               run: () => {
                 turnOnOffered.current = 0
                 setTurnOnAsk((n) => n + 1)
@@ -2541,6 +2563,8 @@ export function BoardBuilder({
       ) : (
       <Board
         policy={draft}
+        unsaved={unsavedIds}
+        saving={savingRule}
         /* The one lookup the stage would otherwise need a store for.
 
            `appById` resolves an unknown id to the first application rather than
@@ -2799,16 +2823,21 @@ export function BoardBuilder({
           onRemoved={offerUndo}
           /* The panel's own save — the bar's act, at the foot of the form,
              in the bar's other words and a quieter weight. */
-          canSave={toPublish && !saveBlocked}
-          saveLabel="Save rule"
-          saveTitle={
-            !toPublish
-              ? 'Nothing to save'
-              : saveBlocked
-                ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first`
-                : undefined
-          }
-          onSave={saveNow}
+          {...(RULE_SAVE && selection.kind === 'rule'
+            ? /* Save rule stores this rule only (tester.ts RULE_SAVE): off while it is saved, busy while it saves. */
+              {
+                canSave: unsavedIds.includes(selection.id) && !savingRule,
+                saveLabel: savingRule === selection.id ? 'Saving rule…' : 'Save rule',
+                saveBusy: savingRule === selection.id,
+                saveTitle: unsavedIds.includes(selection.id) ? undefined : 'Saved',
+                onSave: () => saveRule(selection.id),
+              }
+            : {
+                canSave: toPublish && !saveBlocked,
+                saveLabel: 'Save rule',
+                saveTitle: !toPublish ? 'Nothing to save' : saveBlocked ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined,
+                onSave: saveNow,
+              })}
           onAppsSaved={() => {
             setInspOpen(false)
             setSelection({ kind: 'none' })

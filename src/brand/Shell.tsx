@@ -63,6 +63,7 @@ import { ProfileMenu } from './ProfileMenu'
 import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
+import { TESTER } from './tester'
 import { GlobalSearch } from './GlobalSearch'
 import { GLOBAL_SEARCH, type SearchSources } from './global-search'
 import { ACCESS_CHECKS } from './screens/sign-in-tests/names'
@@ -429,8 +430,10 @@ export function Shell({ children }: { children: ReactNode }) {
             .map((c) => ({ label: c.label, meta: item.label, screen: c.screen! })),
         ]),
       ),
-      { label: ACCESS_CHECKS, meta: 'Policies', screen: { name: 'sign-in-tests' } },
-      { label: 'Sign-in activity', meta: 'Policies', screen: { name: 'sign-in-activity' } },
+      ...[
+        { label: ACCESS_CHECKS, meta: 'Policies', screen: { name: 'sign-in-tests' } as BrandScreen },
+        { label: 'Sign-in activity', meta: 'Policies', screen: { name: 'sign-in-activity' } as BrandScreen },
+      ].filter((p) => screenOffered(p.screen, features)),
       { label: 'Display tokens', meta: 'Authentication methods', screen: { name: 'display-tokens' } },
       { label: 'Add application', meta: 'Apps', screen: { name: 'application-new' } },
     ],
@@ -589,7 +592,8 @@ export function Shell({ children }: { children: ReactNode }) {
           {/* While policies move in the background (migrate/move-job-pill.tsx); nothing while none do. */}
           <MoveJobPill />
           {/* At the right with the other tools (owner, 4 Nov 2026), first in the group. */}
-          {GLOBAL_SEARCH && <GlobalSearch pages={searchPages} />}
+          {/* The phase 1 tester build (tester.ts) has no search, theme switch, sound switch or Customize sidebar. */}
+          {GLOBAL_SEARCH && !TESTER && <GlobalSearch pages={searchPages} />}
           {/* The edition switch belongs on the shell, not on a screen: the flag
               it flips spans the list, the create flow and the builder. */}
           {/* Two prototype controls, side by side and both labelled as such.
@@ -616,7 +620,7 @@ export function Shell({ children }: { children: ReactNode }) {
               keyboard. */}
           {/* The Mode button, in the showcase build too (owner, 4 Oct 2026: "bring the old Mode button at the
               top"); the Access checks canvas follows it (canvas-shelf.ts `useStageFollowsTheme`). */}
-          <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+          {!TESTER && <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
             <button
               type="button"
               className="bshell__icon"
@@ -625,12 +629,12 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
             </button>
-          </Tip>
+          </Tip>}
           {/* Sound (owner, 10 Oct 2026: short sounds with toasts and at the important steps; sound.ts). On unless
               turned off here, and remembered. Named by what a press does, as the Mode button is — a changing name
               with aria-pressed as well would read "Turn sound off, pressed". Turning it on plays the switch's tick,
               so the admin hears that it works. */}
-          <Tip text={sound ? 'Turn sound off' : 'Turn sound on'}>
+          {!TESTER && <Tip text={sound ? 'Turn sound off' : 'Turn sound on'}>
             <button
               type="button"
               className="bshell__icon"
@@ -642,7 +646,7 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               {sound ? <Volume2 size={20} strokeWidth={1.7} /> : <VolumeX size={20} strokeWidth={1.7} />}
             </button>
-          </Tip>
+          </Tip>}
           <Tip text={`Documentation. ${NOT_BUILT}`}>
             <button type="button" className="bshell__icon is-inert" aria-label="Documentation" aria-disabled="true">
               <BookOpen size={20} strokeWidth={1.7} />
@@ -684,7 +688,7 @@ export function Shell({ children }: { children: ReactNode }) {
             /* Migration first (migrate/phase.ts): Old policy until Start migration, then Policies in its place. */
             const items = sec.items
               .filter((l) => !prefs.removed.includes(l))
-              .filter((l) => !(l === 'Policies' && !migrationStarted) && !(l === 'Old policy' && MIGRATION_FIRST && migrationStarted))
+              .filter((l) => !(l === 'Policies' && !migrationStarted) && !(l === 'Old policy' && ((MIGRATION_FIRST && migrationStarted) || TESTER)))
               .map((l) => ITEM[l])
             /* A section with every row taken out loses its heading too. */
             if (!items.length) return null
@@ -699,7 +703,15 @@ export function Shell({ children }: { children: ReactNode }) {
                 const Ico = item.icon
                 /* Collapsed, the label and the badge are hidden, so the row takes
                    its name from aria-label and shows it in a Tip. */
-                const badge = item.label === 'Policies' && migrating ? 'New' : item.badge
+                /* The phase 1 tester build (tester.ts) marks Authentication methods New and not Devices (owner, 18 Nov 2026). */
+                const badge =
+                  item.label === 'Policies' && migrating
+                    ? 'New'
+                    : TESTER && item.label === 'Authentication methods'
+                      ? 'New'
+                      : TESTER && item.label === 'Devices'
+                        ? undefined
+                        : item.badge
                 const name = badge ? `${item.label}, ${badge}` : item.label
                 /* A group with one built page in it is not "not built". */
                 const caveat = item.screen || item.children?.some((c) => c.screen) ? null : NOT_BUILT
@@ -785,7 +797,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
 
         {!collapsed && <RailReminder />}
-        {CUSTOMIZE_SIDEBAR && (
+        {CUSTOMIZE_SIDEBAR && !TESTER && (
           <div className="bshell__foot">
             <p className="u-sr-only" role="status" aria-live="polite">
               {said}

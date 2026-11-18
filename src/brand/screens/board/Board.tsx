@@ -162,6 +162,8 @@ export function Board({
   selection,
   diagnostics,
   shadowed,
+  unsaved = [],
+  saving = null,
   test = null,
   fitKey,
   fitFloor,
@@ -219,6 +221,9 @@ export function Board({
   diagnostics: Diagnostic[]
   /** Rules dimmed because the hovered rule puts them out of reach. */
   shadowed: number[]
+  /** Rules with changes Save rule has not stored yet (tester.ts RULE_SAVE), and the one saving now. */
+  unsaved?: readonly string[]
+  saving?: string | null
   /** Try a sign-in's route, while the board is in test mode. */
   test?: TestChain | null
   /* Refit when this changes — test mode narrows the chain's column and its
@@ -1192,6 +1197,7 @@ export function Board({
                          part. */
                       openPart={selection.kind === 'rule' && selection.id === r.id ? selection.part : null}
                       state={stateOf(r, ri)}
+                      unsaved={saving === r.id ? 'saving' : unsaved.includes(r.id) ? 'unsaved' : undefined}
                       /* The pill says what; its tooltip says why, which is the
                          only place Lite says it on the canvas. */
                       stateNote={noteOf(r, ri)}

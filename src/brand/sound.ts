@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 
 import type { AccessDecision } from './data'
 import type { ToastTone } from './toast-tone'
+import { TESTER } from './tester'
 
 /* -----------------------------------------------------------------------------
    The console's sounds.
@@ -248,7 +249,8 @@ export function writeSound(on: boolean, set: (value: string) => void = (v) => wi
   }
 }
 
-let soundOn = readSound()
+/* The phase 1 tester build (tester.ts) hides the sound switch, so it starts silent. */
+let soundOn = TESTER ? false : readSound()
 const listeners = new Set<() => void>()
 
 /** Sounds on or off for the page, remembered, and told to every control showing it. */

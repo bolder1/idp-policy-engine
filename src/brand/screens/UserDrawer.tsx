@@ -11,6 +11,7 @@ import { groupNamesOf, userApps } from './app-people-tabs-model'
 import { checkAccessFrom, followLink } from './guarded-moves'
 import { Block, Hero, KindMark } from './sign-in-tests/PeekViews'
 import { ACCESS_CHECK } from './sign-in-tests/names'
+import { TESTER } from '../tester'
 import { useTestingSession } from './testing/session-state'
 import { formOf } from './testing/sign-in-form'
 
@@ -62,7 +63,7 @@ export function UserDrawer({
       title="User details"
       width={680}
       actions={
-        user && (
+        user && !TESTER && (
           <Button variant="secondary" icon={LogIn} onClick={check}>
             {ACCESS_CHECK}
           </Button>

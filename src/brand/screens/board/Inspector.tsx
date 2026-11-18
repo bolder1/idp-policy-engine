@@ -73,6 +73,7 @@ export function Inspector({
   canSave = false,
   saveLabel = 'Save rule',
   saveTitle,
+  saveBusy = false,
   onSave,
 }: {
   draft: Policy
@@ -108,6 +109,8 @@ export function Inspector({
   saveLabel?: string
   /** Why it is off, when it is off. */
   saveTitle?: string
+  /** The save is running (Save rule's call to the API, tester.ts RULE_SAVE). */
+  saveBusy?: boolean
   /** Stores the policy. The same call the bar's Save makes. */
   onSave?: () => void
 }) {
@@ -316,7 +319,8 @@ export function Inspector({
           too, so the word holds there as well. */}
       {selection.kind !== 'apps' && onSave && (
         <div className="bb__inspfoot">
-          <Button variant="secondary" size="sm" disabled={!canSave} title={saveTitle} onClick={onSave}>
+          <Button variant="secondary" size="sm" disabled={!canSave && !saveBusy} busy={saveBusy} title={saveTitle} onClick={saveBusy ? undefined : onSave}>
+            {saveBusy && <span className="bb__tspin" aria-hidden />}
             {saveLabel}
           </Button>
         </div>

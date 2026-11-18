@@ -22,6 +22,9 @@ import type { WhoDirectory } from '../rule-who'
 import { TEMPLATE_CATEGORIES } from '../template-phase'
 import { SaveToggle, TemplateCard, TemplatePreview, UsedBy, scenarioCard, type CardModel } from './TemplateCard'
 import { DetailHead, TemplateDetail } from './TemplateDetail'
+import { YOURS_LABEL, YOURS_LINE } from '../tester'
+import { FavoritesArt } from '../empty-art'
+import { TESTER } from '../tester'
 
 /* -----------------------------------------------------------------------------
    The template picker.
@@ -177,7 +180,7 @@ export function TemplateSheet({
         ...(!TEMPLATES_MANAGED ? (['xecurify'] as const) : yoursFirst ? (['mine', 'xecurify'] as const) : (['xecurify', 'mine'] as const)),
         ...(withPolicies && offered.length > 0 ? (['policies'] as const) : []),
       ]
-  const SHELF_NAME: Record<Shelf, string> = { mine: 'Your templates', xecurify: 'Xecurify templates', policies: 'Your policies' }
+  const SHELF_NAME: Record<Shelf, string> = { mine: YOURS_LABEL, xecurify: 'Xecurify templates', policies: 'Your policies' }
 
   /* The preview in the popup (TemplateDetail): a template's, or a policy's in the reuse picker. Back closes it. */
   const detailOpen = !slider && (preview !== null || policyPreview !== null)
@@ -204,7 +207,7 @@ export function TemplateSheet({
 
   /** The same search and category on the OTHER shelf — where the rest are. */
   const otherShelf: Shelf = shelf === 'mine' ? 'xecurify' : 'mine'
-  const otherName = otherShelf === 'mine' ? 'Your templates' : 'Xecurify templates'
+  const otherName = otherShelf === 'mine' ? YOURS_LABEL : 'Xecurify templates'
   const elsewhere = useMemo(
     () => (shelf === 'policies' ? 0 : (shelf === 'mine' ? shipped : tenantOwn).filter((s) => (cat === 'All' || s.category === cat) && hit(s, q)).length),
     [shelf, shipped, tenantOwn, cat, q],
@@ -482,7 +485,7 @@ export function TemplateSheet({
                 <div className="bmarket__shelf">
                   <h3 className="bgal__section">
                     {storeLook ? (cat === 'All' ? 'All templates' : cat) : SHELF_NAME[shelf]}
-                    {!storeLook && shelf !== 'policies' && <span>{shelf === 'mine' ? 'Built by your team' : 'By miniOrange'}</span>}
+                    {!storeLook && shelf !== 'policies' && <span>{shelf === 'mine' ? YOURS_LINE : 'By miniOrange'}</span>}
                   </h3>
                   {shelf === 'policies' && (
                     <div className="bmarket__tools">
@@ -586,8 +589,9 @@ export function TemplateSheet({
                     <EmptyState
                       compact
                       icon={TemplateIcon}
-                      title="No templates yet"
-                      blurb="Save a policy as a template from its menu."
+                      art={TESTER ? <FavoritesArt /> : undefined}
+                      title={TESTER ? 'No favorites yet' : 'No templates yet'}
+                      blurb={TESTER ? 'Mark a policy as favorite from its menu.' : 'Save a policy as a template from its menu.'}
                       action={<Button onClick={showOther}>Show Xecurify templates</Button>}
                     />
                   ) : (
@@ -596,7 +600,7 @@ export function TemplateSheet({
                       icon={TemplateIcon}
                       title="No Xecurify templates"
                       blurb="Templates from miniOrange show here."
-                      action={<Button onClick={showOther}>Show your templates</Button>}
+                      action={<Button onClick={showOther}>{TESTER ? 'Show your favorites' : 'Show your templates'}</Button>}
                     />
                   ))}
                 </>

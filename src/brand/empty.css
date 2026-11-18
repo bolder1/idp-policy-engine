@@ -84,6 +84,11 @@
      for the remainder. */
   flex: 1;
 }
+/* The same room for the Policies list's empty state, which sits one wrapper down (owner, 18 Nov 2026: "fix this like
+   other empty states, use the full space"). */
+.bpage:has(> .bpol__main > .bempty:not(.is-compact)) { display: flex; flex-direction: column; flex: 1; }
+.bpage > .bpol__main:has(> .bempty:not(.is-compact)) { flex: 1; display: flex; flex-direction: column; }
+.bpol__main > .bempty:not(.is-compact) { flex: 1; align-content: center; }
 .bpage:has(> .bempty:not(.is-compact)) > .bempty {
   flex: 1;
   /* The grid already centres across; this centres down. */
@@ -151,3 +156,7 @@
 @media (max-width: 600px) {
   .bempty { padding: 44px 18px 48px; }
 }
+
+/* An animated drawing in place of the icon circle (empty-art.tsx; owner, 18 Nov 2026). */
+.bempty__art { display: block; margin: 0 auto 16px; }
+.bempty__art > svg { display: block; }

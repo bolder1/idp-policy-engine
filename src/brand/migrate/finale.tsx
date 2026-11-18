@@ -172,8 +172,8 @@ export function AutoAdd() {
   useEffect(() => {
     if (!key || reveal.current === key || store.held.length === 0 || fired.current !== key) return
     reveal.current = key
-    store.revealHeld()
-  }, [key, store.held.length, store])
+    store.revealHeld(job?.quiet)
+  }, [key, store.held.length, store, job?.quiet])
   /* Every row in: the tour starts, once a move (owner, 6 Nov 2026). Only on the Policies page: the tour opens by
      going to its first stop, so starting it while the admin is in a builder they opened mid-move would pull them out.
      Elsewhere it waits until they come back to Policies. Marked toured when it fires, so a cancelled timer re-arms. */
@@ -183,13 +183,14 @@ export function AutoAdd() {
   /* Assisted and Self-serve: no tour by itself (owner, 16 Nov 2026); the results are the first thing to see. */
   const experience = useExperience()
   useEffect(() => {
-    if (!key || !settled || toured.current === key || !onPolicies || !isBuilt(experience)) return
+    /* The showcase's move on load is already done when the console opens: no tour (migrate/phase.ts). */
+    if (!key || !settled || toured.current === key || !onPolicies || !isBuilt(experience) || job?.quiet) return
     const t = window.setTimeout(() => {
       toured.current = key
       store.setMoveTour(true)
     }, 900)
     return () => window.clearTimeout(t)
-  }, [key, settled, onPolicies, experience, store])
+  }, [key, settled, onPolicies, experience, store, job?.quiet])
   return null
 }
 

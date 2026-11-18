@@ -38,6 +38,7 @@ import './theme-mode'
 
 const Templates = lazy(() => import('./screens/Library').then((m) => ({ default: m.Templates })))
 import { AutoAdd } from './migrate/finale'
+import { StartAfterMigration } from './migrate/start-after'
 import { MigratePopup } from './migrate/MoveDialog'
 const ReviewMoved = lazy(() => import('./migrate/ReviewPage').then((m) => ({ default: m.ReviewPage })))
 const MovePolicies = lazy(() => import('./migrate/MovePolicies').then((m) => ({ default: m.MovePolicies })))
@@ -245,6 +246,7 @@ function Chrome() {
       <LeaveDialog />
       {role !== 'user' && <IntroCarousel />}
       {role !== 'user' && <MoveTour />}
+      <StartAfterMigration />
       {role !== 'user' && <AutoAdd />}
       {role !== 'user' && <MigratePopup />}
     </TestingSessionProvider>

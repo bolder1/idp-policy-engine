@@ -12,7 +12,7 @@ import {
   type SetStateAction,
 } from 'react'
 
-import { MIGRATION_FIRST } from './migrate/phase'
+import { MIGRATION_FIRST, OPENS_AFTER_MIGRATION } from './migrate/phase'
 import type { ActivityKind, ActivityLog } from './policy-activity'
 import {
   addedToday,
@@ -61,6 +61,9 @@ export interface MoveJob {
   /** The new policies' ids, in the order they were saved. */
   ids: string[]
   status: 'running' | 'done' | 'stopped'
+  /** Made at once on load for the showcase (migrate/phase.ts OPENS_AFTER_MIGRATION): the rows go straight in, no arrival
+      animation and no tour. */
+  quiet?: boolean
   /** Every policy the move makes, in order, with the old rows it takes: what the Moving screen draws still to come. */
   queue: { key: string; name: string; appIds: string[]; sourceIds: string[]; joins: boolean }[]
   /** Zones the move makes: the Move story counts them. */
@@ -625,6 +628,8 @@ export interface BrandStore {
   migrationStarted: boolean
   /** The Migrate popup's Migrate: the move starts, the rail swaps, and the console lands on New policies. */
   beginMigration: (plan: MovePlan) => void
+  /** The whole move at once, with no stage, toast or tour: how the showcase opens after the migration (migrate/phase.ts). */
+  migrateAtOnce: (plan: MovePlan) => void
   /** Approve in the builder, without publishing; false takes it back. */
   reviewMoved: (policyId: string, reviewed: boolean) => void
   closeMoveDialog: () => void
@@ -664,7 +669,8 @@ export interface BrandStore {
   /** Rows lighting up right now (being added, or being made active). */
   landing: readonly string[]
   /** Lays the held policies into the list, one row at a time. */
-  revealHeld: () => void
+  /** `instant`: in place at once, no row-by-row arrival (the showcase's move on load). */
+  revealHeld: (instant?: boolean) => void
   /** True while Make all active runs. */
   activating: boolean
   /** Makes every moved draft active, one row at a time. The old policies they came from stay in the Old policies tab. */
@@ -837,11 +843,12 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
   const moveRef = useRef<{ plan: MovePlan; at: number; ids: string[] } | null>(null)
   /* The Migrate popup's press starts the move the same way Move policies does. */
   const startMoveRef = useRef<(plan: MovePlan) => void>(() => {})
+  const stepMoveRef = useRef<() => boolean>(() => true)
   const touch = useCallback((ids: string[], kind: ActivityKind) => {
     const at = Date.now()
     setActivity((a) => ({ ...a, ...Object.fromEntries(ids.map((id) => [id, { kind, at }])) }))
   }, [])
-  const [screen, setScreenState] = useState<BrandScreen>(MIGRATION_FIRST ? { name: 'old-login' } : { name: 'policies' })
+  const [screen, setScreenState] = useState<BrandScreen>(MIGRATION_FIRST && !OPENS_AFTER_MIGRATION ? { name: 'old-login' } : { name: 'policies' })
   const [migrationStarted, setMigrationStarted] = useState(!MIGRATION_FIRST)
   /* The screen as of the last navigation, for `go` to compare against without
      waiting for a render. */
@@ -1275,6 +1282,22 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
         go({ name: 'policies' })
         startMoveRef.current(plan)
       },
+      migrateAtOnce: (plan) => {
+        if (moveRef.current) return
+        setMigrationStarted(true)
+        setZones((all) => [...all, ...plan.zones.filter((z) => !all.some((x) => x.id === z.id))])
+        if (plan.profiles?.length) setFingerprints((all) => [...all, ...plan.profiles.filter((p) => !all.some((x) => x.id === p.id))])
+        setImported([])
+        const run = { plan, at: 0, ids: [] as string[] }
+        moveRef.current = run
+        /* Every policy now, in the clock's own step, so the result is the move Migrate makes. */
+        while (!stepMoveRef.current()) {
+          /* next policy */
+        }
+        const queue = plan.policies.map((p) => ({ key: p.key, name: p.policy.name, appIds: p.appIds, sourceIds: p.sourceIds, joins: !!p.into }))
+        const total = plan.policies.length
+        setMoveJob({ total, done: total, ids: [...run.ids], status: 'done', queue, zones: plan.zones.length, quiet: true })
+      },
       reviewMoved: (policyId, reviewed) =>
         setMoved((m) => {
           const info = m[policyId]
@@ -1346,10 +1369,14 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
       clearImported: () => setImported([]),
       held,
       landing,
-      revealHeld: () => {
+      revealHeld: (instant) => {
         const ids = [...heldRef.current]
         if (!ids.length) return
         setImported([])
+        if (instant) {
+          setHeld([])
+          return
+        }
         ids.forEach((id, n) => {
           finaleTimers.current.push(
             window.setTimeout(() => {
@@ -1697,15 +1724,13 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
   )
   startMoveRef.current = value.startMove
 
-  /* The move's clock: one policy per tick, on a timer rather than animation frames, so it carries on while the pane is
-     hidden or the admin is on another page. The last tick says so with a toast that opens Review. */
-  useEffect(() => {
-    if (moveJob?.status !== 'running') return
-    const t = window.setInterval(() => {
+  /* One policy of the move: the clock below runs it on a timer, `migrateAtOnce` runs it to the end at once. Returns
+     whether the move has finished. Refs only, so it is safe to call in a loop within one event. */
+  stepMoveRef.current = () => {
       const run = moveRef.current
-      if (!run) return
+      if (!run) return true
       const pp = run.plan.policies[run.at]
-      if (!pp) return
+      if (!pp) return true
       /* One application, one policy: rows for an application that already has one join it as rules after its own —
          straight into a policy still in draft or monitoring, into the saved draft of one that decides sign-ins. */
       /* Nothing a move makes reaches the policy list before it is reviewed (owner, 4 Nov 2026): a new policy waits in
@@ -1747,12 +1772,20 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
       if (!run.ids.includes(id)) run.ids.push(id)
       const finished = run.at >= run.plan.policies.length
       setMoveJob((j) => (j ? { ...j, done: run.at, ids: [...run.ids], status: finished ? 'done' : 'running' } : j))
-      if (finished) {
-        moveRef.current = null
-        const n = run.ids.length
-        /* No review step (owner, 6 Nov 2026): every moved policy goes straight into Policies as a draft (AutoAdd, finale.tsx). */
-        showToast(n === 1 ? '1 policy added to Policies as a draft' : `${n} policies added to Policies as drafts`, { label: 'View', run: () => go({ name: 'policies' }) })
-      }
+      if (finished) moveRef.current = null
+      return finished
+  }
+
+  /* The move's clock: one policy per tick, on a timer rather than animation frames, so it carries on while the pane is
+     hidden or the admin is on another page. The last tick says so with a toast that opens Review. */
+  useEffect(() => {
+    if (moveJob?.status !== 'running') return
+    const t = window.setInterval(() => {
+      const run = moveRef.current
+      if (!run || !stepMoveRef.current()) return
+      const n = run.ids.length
+      /* No review step (owner, 6 Nov 2026): every moved policy goes straight into Policies as a draft (AutoAdd, finale.tsx). */
+      showToast(n === 1 ? '1 policy added to Policies as a draft' : `${n} policies added to Policies as drafts`, { label: 'View', run: () => go({ name: 'policies' }) })
     }, MOVE_TICK_MS)
     return () => window.clearInterval(t)
   }, [moveJob?.status, policiesRef, appsRef, setApps, showToast, go])

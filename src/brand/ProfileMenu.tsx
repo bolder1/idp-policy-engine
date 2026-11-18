@@ -1,9 +1,10 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { LayoutGrid, Lock, LogOut, UserRound } from 'lucide-react'
+import { History, LayoutGrid, Lock, LogOut, UserRound } from 'lucide-react'
 
 import { Tip } from './kit'
+import { MIGRATION_FIRST, START_AFTER_MIGRATION, bringBackOldPolicies } from './migrate/phase'
 import { useBrand } from './store'
 import { SHOWCASE } from './showcase'
 
@@ -39,7 +40,7 @@ const NOT_BUILT = SHOWCASE ? 'Coming soon.' : 'Not built in this prototype.'
 let focusAvatarOnMount = false
 
 export function ProfileMenu() {
-  const { role, setRole, account } = useBrand()
+  const { role, setRole, account, migrationStarted } = useBrand()
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -179,6 +180,25 @@ export function ProfileMenu() {
               )}
               {goingTo === 'user' ? 'User Dashboard' : 'Admin Dashboard'}
             </button>
+
+            {/* Bring back old policies (owner, 18 Nov 2026): the showcase opens after the migration, so this is the way
+                back to before it, where the migration flow starts. Reloads the console once (migrate/phase.ts). */}
+            {MIGRATION_FIRST && START_AFTER_MIGRATION && migrationStarted && (
+              <>
+                <span className="bmenu__rule" />
+                <button
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    close(false)
+                    bringBackOldPolicies()
+                  }}
+                >
+                  <History size={14} strokeWidth={1.9} aria-hidden />
+                  Bring back old policies
+                </button>
+              </>
+            )}
 
             <span className="bmenu__rule" />
             {unbuilt('Sign out', LogOut)}

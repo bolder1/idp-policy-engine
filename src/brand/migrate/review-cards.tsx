@@ -2,7 +2,7 @@ import { CheckCheck, ClipboardCheck, Eye, Headset, Rocket, XCircle } from 'lucid
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button, SplitButton } from '../kit'
-import { TESTER } from '../tester'
+import { NO_PUBLISH_ALL } from '../tester'
 import './review-cards.css'
 
 /* -----------------------------------------------------------------------------
@@ -39,8 +39,8 @@ export function ReviewApproveCards({
         </Button>
       </Card>
       <Card tone="approve" icon={CheckCheck} title="Approve" label="Approved" value={approved}>
-        {/* The phase 1 tester build (tester.ts) has no Publish all (owner, 18 Nov 2026: "we don't have publish all"). */}
-        {TESTER ? (
+        {/* No Publish all (tester.ts NO_PUBLISH_ALL) (owner, 18 Nov 2026: "we don't have publish all"). */}
+        {NO_PUBLISH_ALL ? (
           <Button variant="secondary" size="sm" icon={Rocket} onClick={onPublishApproved} disabled={approved === 0}>
             Publish approved
           </Button>

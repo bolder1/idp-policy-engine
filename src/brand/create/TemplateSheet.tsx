@@ -24,7 +24,7 @@ import { SaveToggle, TemplateCard, TemplatePreview, UsedBy, scenarioCard, type C
 import { DetailHead, TemplateDetail } from './TemplateDetail'
 import { YOURS_LABEL, YOURS_LINE } from '../tester'
 import { FavoritesArt } from '../empty-art'
-import { TESTER } from '../tester'
+import { FAVORITES } from '../tester'
 
 /* -----------------------------------------------------------------------------
    The template picker.
@@ -589,9 +589,9 @@ export function TemplateSheet({
                     <EmptyState
                       compact
                       icon={TemplateIcon}
-                      art={TESTER ? <FavoritesArt /> : undefined}
-                      title={TESTER ? 'No favorites yet' : 'No templates yet'}
-                      blurb={TESTER ? 'Mark a policy as favorite from its menu.' : 'Save a policy as a template from its menu.'}
+                      art={FAVORITES ? <FavoritesArt /> : undefined}
+                      title={FAVORITES ? 'No favorites yet' : 'No templates yet'}
+                      blurb={FAVORITES ? 'Mark a policy as favorite from its menu.' : 'Save a policy as a template from its menu.'}
                       action={<Button onClick={showOther}>Show Xecurify templates</Button>}
                     />
                   ) : (
@@ -600,7 +600,7 @@ export function TemplateSheet({
                       icon={TemplateIcon}
                       title="No Xecurify templates"
                       blurb="Templates from miniOrange show here."
-                      action={<Button onClick={showOther}>{TESTER ? 'Show your favorites' : 'Show your templates'}</Button>}
+                      action={<Button onClick={showOther}>{FAVORITES ? 'Show your favorites' : 'Show your templates'}</Button>}
                     />
                   ))}
                 </>

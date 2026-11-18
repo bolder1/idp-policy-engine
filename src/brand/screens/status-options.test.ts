@@ -304,38 +304,38 @@ describe('rowMenu', () => {
   const showcase = { monitor: true, trySignIn: true, trail: false }
   const labels = (p: Policy, opts: Parameters<typeof rowMenu>[1] = showcase) => rowMenu(p, opts).map((i) => i.label)
   /* Save as template, while the tenant manages templates (template-phase.ts); on hold, it is not offered. */
-  const tpl = (xs: string[]) => (TEMPLATES_MANAGED ? xs : xs.filter((x) => x !== 'Mark as template' && x !== 'template'))
+  const tpl = (xs: string[]) => (TEMPLATES_MANAGED ? xs : xs.filter((x) => x !== 'Mark as favorite' && x !== 'template'))
 
   it('reads Edit policy, Check access, Monitor, Turn off, … for an active policy (check 3)', () => {
-    expect(labels(as('active'))).toEqual(tpl(['Edit policy', 'Check access', 'Monitoring', 'Inactive', 'Read as text', 'Mark as template', 'Duplicate', 'Delete policy']))
+    expect(labels(as('active'))).toEqual(tpl(['Edit policy', 'Check access', 'Monitoring', 'Inactive', 'Read as text', 'Mark as favorite', 'Duplicate', 'Delete policy']))
   })
 
   it('reads Turn on, Turn off, View monitoring for a monitoring policy (check 4)', () => {
     expect(rowMenu(as('monitor'), showcase).map((i) => i.id)).toEqual(tpl(['edit', 'test', 'active', 'inactive', 'monitoring', 'text', 'template', 'duplicate', 'delete']))
-    expect(labels(as('monitor'))).toEqual(tpl(['Edit policy', 'Check access', 'Active', 'Inactive', 'View monitoring', 'Read as text', 'Mark as template', 'Duplicate', 'Delete policy']))
+    expect(labels(as('monitor'))).toEqual(tpl(['Edit policy', 'Check access', 'Active', 'Inactive', 'View monitoring', 'Read as text', 'Mark as favorite', 'Duplicate', 'Delete policy']))
   })
 
   it('offers View monitoring for no other status, and nowhere the edition has no Monitoring status', () => {
     for (const status of ['draft', 'active', 'inactive'] as const) expect(labels(as(status))).not.toContain('View monitoring')
-    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(tpl(['Edit policy', 'Check access', 'Active', 'Inactive', 'Read as text', 'Mark as template', 'Duplicate', 'Delete policy']))
+    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(tpl(['Edit policy', 'Check access', 'Active', 'Inactive', 'Read as text', 'Mark as favorite', 'Duplicate', 'Delete policy']))
   })
 
   it('offers the trail builder outside the showcase, after the switches', () => {
     expect(labels(as('inactive'), { ...showcase, trail: true })).toEqual(
-      tpl(['Edit policy', 'Check access', 'Active', 'Monitoring', 'Open in trail', 'Read as text', 'Mark as template', 'Duplicate', 'Delete policy']),
+      tpl(['Edit policy', 'Check access', 'Active', 'Monitoring', 'Open in trail', 'Read as text', 'Mark as favorite', 'Duplicate', 'Delete policy']),
     )
   })
 
-  it('offers Remove from templates in the same place once a policy is marked (owner, 18 Nov 2026)', () => {
+  it('offers Remove from favorites in the same place once a policy is marked (owner, 18 Nov 2026)', () => {
     const marked = labels(as('active'), { ...showcase, marked: true })
-    expect(marked).toContain('Remove from templates')
-    expect(marked).not.toContain('Mark as template')
-    expect(marked.indexOf('Remove from templates')).toBe(labels(as('active')).indexOf('Mark as template'))
+    expect(marked).toContain('Remove from favorites')
+    expect(marked).not.toContain('Mark as favorite')
+    expect(marked.indexOf('Remove from favorites')).toBe(labels(as('active')).indexOf('Mark as favorite'))
   })
 
   it('leaves out what a policy cannot do: Try without the edition, a template of no rules, Duplicate and Delete of the system policy', () => {
     expect(labels(as('active'), { ...showcase, trySignIn: false })).not.toContain('Check access')
-    expect(labels({ ...as('active'), rules: [] })).not.toContain('Mark as template')
+    expect(labels({ ...as('active'), rules: [] })).not.toContain('Mark as favorite')
     const system = t.policies.find((p) => p.isSystem)!
     expect(labels(system)).not.toContain('Duplicate')
     expect(labels(system)).not.toContain('Delete policy')

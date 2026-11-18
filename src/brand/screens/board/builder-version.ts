@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { TESTER } from '../../tester'
+import { ARRANGE_TOOLS } from '../../tester'
 
 /* -----------------------------------------------------------------------------
    BUILDER VERSIONS (owner, 23 Oct 2026: "create a V0 version … the main goal is
@@ -158,10 +158,10 @@ export const useBuilderVersion = (): BuilderVersion => useSyncExternalStore(subs
 
 export const useBuilderUnlocked = (): boolean => useSyncExternalStore(subscribe, () => unlocked, () => true)
 
-/* The phase 1 tester build (tester.ts) adds three pieces to whatever version is on screen (owner, 18 Nov 2026: "add
+/* tester.ts ARRANGE_TOOLS adds three pieces to whatever version is on screen (owner, 18 Nov 2026: "add
    the up-down here as of now", "add the full tool set"): Move up and Move down, fit and zoom, undo and redo. */
-const TESTER_SHOWS: readonly BuilderFeature[] = ['arrange', 'zoom', 'history']
+const ALWAYS_SHOWN: readonly BuilderFeature[] = ['arrange', 'zoom', 'history']
 
 /** Whether the version on screen shows this piece. */
 export const useShows = (feature: BuilderFeature): boolean =>
-  ORDER.indexOf(useBuilderVersion()) >= ORDER.indexOf(SINCE[feature]) || (TESTER && TESTER_SHOWS.includes(feature))
+  ORDER.indexOf(useBuilderVersion()) >= ORDER.indexOf(SINCE[feature]) || (ARRANGE_TOOLS && ALWAYS_SHOWN.includes(feature))

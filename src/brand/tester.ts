@@ -16,15 +16,33 @@ import type { BrandScreen } from './store'
    -------------------------------------------------------------------------- */
 export const TESTER: boolean = import.meta.env.MODE === 'tester'
 
-/* Favorites, not templates (owner, 18 Nov 2026: "don't call it Mark as template, call it Mark as favorite"; "Your
-   templates … Your favorites or something"). The words only: the star, the flag and the shelf are the same. */
-export const MARK_LABEL = TESTER ? 'Mark as favorite' : 'Mark as template'
-export const UNMARK_LABEL = TESTER ? 'Remove from favorites' : 'Remove from templates'
-export const YOURS_LABEL = TESTER ? 'Your favorites' : 'Your templates'
-export const YOURS_LINE = TESTER ? 'Marked by your team' : 'Built by your team'
+/* -----------------------------------------------------------------------------
+   Promoted from the tester build to every build (owner, 18 Nov 2026: "we made some necessary changes in the testing
+   part … make sure those changes are reflected on our dev server as well"). Each was born behind TESTER; the owner
+   picked these six for dev and the handoff too. Each keeps its own switch, so one can be taken back alone.
+   -------------------------------------------------------------------------- */
 
-/** Save rule (owner, 18 Nov 2026): a rule stays Unsaved on its card until the rule panel's Save rule stores it. */
-export const RULE_SAVE: boolean = TESTER
+/** Favorites, not templates ("call it Mark as favorite"). The words only: the star, the flag and the shelf are the same. */
+export const FAVORITES = true
+export const MARK_LABEL = FAVORITES ? 'Mark as favorite' : 'Mark as template'
+export const UNMARK_LABEL = FAVORITES ? 'Remove from favorites' : 'Remove from templates'
+export const YOURS_LABEL = FAVORITES ? 'Your favorites' : 'Your templates'
+export const YOURS_LINE = FAVORITES ? 'Marked by your team' : 'Built by your team'
+
+/** Save rule: a rule stays Unsaved on its card until the rule panel's Save rule stores it. */
+export const RULE_SAVE = true
+
+/** Before saving, turning on or off as a critical popup with details on click, not the side drawer (guard-page.tsx). */
+export const CRITICAL_GUARD = true
+
+/** Move up and Move down, fit and zoom, undo and redo, whatever builder version is on screen (builder-version.ts). */
+export const ARRANGE_TOOLS = true
+
+/** The migration Approve card publishes the approved drafts only; there is no Publish all. */
+export const NO_PUBLISH_ALL = true
+
+/** The rail marks Authentication methods New, and Devices no longer (Shell.tsx). */
+export const METHODS_NEW = true
 
 /** How long Save rule's call to the API takes, so the admin sees it work. */
 export const RULE_SAVE_MS = 900

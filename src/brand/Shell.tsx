@@ -63,7 +63,7 @@ import { ProfileMenu } from './ProfileMenu'
 import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
-import { TESTER } from './tester'
+import { METHODS_NEW, TESTER } from './tester'
 import { GlobalSearch } from './GlobalSearch'
 import { GLOBAL_SEARCH, type SearchSources } from './global-search'
 import { ACCESS_CHECKS } from './screens/sign-in-tests/names'
@@ -707,9 +707,9 @@ export function Shell({ children }: { children: ReactNode }) {
                 const badge =
                   item.label === 'Policies' && migrating
                     ? 'New'
-                    : TESTER && item.label === 'Authentication methods'
+                    : METHODS_NEW && item.label === 'Authentication methods'
                       ? 'New'
-                      : TESTER && item.label === 'Devices'
+                      : METHODS_NEW && item.label === 'Devices'
                         ? undefined
                         : item.badge
                 const name = badge ? `${item.label}, ${badge}` : item.label

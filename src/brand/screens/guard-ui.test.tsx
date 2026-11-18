@@ -1,7 +1,10 @@
 /// <reference types="vite/client" />
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+/* These cases read the side-drawer variant, kept behind CRITICAL_GUARD (tester.ts); the build draws the critical popup. */
+vi.mock('../tester', async (original) => ({ ...(await original<typeof import('../tester')>()), CRITICAL_GUARD: false }))
 
 import { blankRule, type Policy, type Rule } from '../data'
 import { showcaseTenantHrmsOn } from '../fixtures'

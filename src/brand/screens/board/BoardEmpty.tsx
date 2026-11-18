@@ -7,7 +7,7 @@ import { usePills } from '../../source-pills'
 import type { AccessDecision } from '../../data'
 import { DECISION_NAME } from './model'
 import { StartPicture } from './StartArt'
-import { TESTER } from '../../tester'
+import { FAVORITES } from '../../tester'
 
 /* -----------------------------------------------------------------------------
    The empty policy — a screen, not a canvas.
@@ -133,7 +133,7 @@ export function BoardEmpty({
                 <span className="bb__start2__text">
                   {/* One name for both kinds (owner, 18 Nov 2026): Xecurify's ready-made templates and the ones you saved. */}
                   <strong>Use a template</strong>
-                  <span>{TESTER ? 'Ready-made by Xecurify, or your favorites' : 'Ready-made by Xecurify, or saved by you'}</span>
+                  <span>{FAVORITES ? 'Ready-made by Xecurify, or your favorites' : 'Ready-made by Xecurify, or saved by you'}</span>
                 </span>
               </span>
             </button>

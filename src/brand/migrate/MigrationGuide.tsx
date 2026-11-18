@@ -6,7 +6,7 @@ import { OLD_CLOSES } from './legacy'
 import { FindDiagram, Shot } from './guide-diagrams'
 import { ConvertWalk, NewWalk, OldWalk, ProcessWalk } from './guide-walkthroughs'
 import './migration-guide.css'
-import { TESTER } from '../tester'
+import { NO_PUBLISH_ALL } from '../tester'
 
 /* -----------------------------------------------------------------------------
    How migration works, a page of its own (owner, 10 Nov 2026): opened in a new tab by "See how it works" on the old
@@ -196,7 +196,7 @@ export function MigrationGuide() {
             </li>
             <li>
               <b>Publish.</b> Publish the approved drafts. A published policy starts deciding sign-ins straight away.
-              {!TESTER && ' Publish all can skip approval, and then asks you to take responsibility for the drafts nobody reviewed.'}
+              {!NO_PUBLISH_ALL && ' Publish all can skip approval, and then asks you to take responsibility for the drafts nobody reviewed.'}
             </li>
           </ol>
           <Shot src="/guide/migrate-confirm.png" alt="The Start the migration confirm" caption="Before it starts, the move asks you to confirm." />

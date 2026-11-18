@@ -6,10 +6,7 @@ import { ChangeList, ChangeSection, type ChangeBlock, type ChangeItem } from '..
 import { DECISION_WORDS } from '../decision-words'
 import { Badge, Button, Callout, Drawer, Field, Modal, TipDot } from '../kit'
 import { listNames } from '../rule-who'
-import { TESTER } from '../tester'
-
-/** Before saving, turning on or off: a critical popup, details on click (tester.ts). */
-const CRITICAL_GUARD = TESTER
+import { CRITICAL_GUARD, TESTER } from '../tester'
 import { reviewKind, reviewItemName, type ReviewLine } from '../review-rows'
 import { REASON_MAX, BREAK_IN_TIP } from './break-in-model'
 import { Seg } from './board/Section'

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, animate, useReducedMotion, Reorder, useDragControls } from 'motion/react'
-import { TEMPLATES_MANAGED } from './template-phase'
+import { TEMPLATES_IN_RAIL, TEMPLATES_MANAGED } from './template-phase'
 import { MIGRATION_FIRST } from './migrate/phase'
 import { MoveJobPill } from './migrate/move-job-pill'
 import { clearWalkPublished } from './migrate/walk-published'
@@ -139,7 +139,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              the brand-filled badge "New" gets: one is an announcement and the
              other is a caveat, and they must not read alike. */
           /* On hold with the rest of template management (template-phase.ts): the tenant only picks Xecurify's. */
-          ...(TEMPLATES_MANAGED ? [{ label: 'Templates', screen: { name: 'templates' } as const, tag: SHOWCASE ? undefined : 'In progress' }] : []),
+          ...(TEMPLATES_MANAGED && TEMPLATES_IN_RAIL ? [{ label: 'Templates', screen: { name: 'templates' } as const, tag: SHOWCASE ? undefined : 'In progress' }] : []),
           { label: 'Zones', screen: { name: 'zones' } },
           /* The page calls itself "Device fingerprint"; so does the screen id
              and every sentence on it. The rail was the only place still saying

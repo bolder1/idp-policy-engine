@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useState } from 'react'
 
 import { FALLBACK_NAME, enforces, fallbackRule, nameTaken, type Policy, type Rule } from '../data'
 import { EmptyState } from '../empty'
-import { Badge, Button, DecisionChip, Field, Modal, StatusPill, TipDot, TipMark } from '../kit'
+import { Badge, Button, DecisionChip, Field, Modal, TipDot, TipMark } from '../kit'
 import { lastSaved, type CommitIntent } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
 import { narrowToAudience } from './board/apply-template'
@@ -34,6 +34,7 @@ import './builder-dialogs.css'
 
 export { ruleSentence, type NameLookup, type RuleProse } from './predicate-prose'
 import { ruleLabel, ruleSentence } from './predicate-prose'
+import { PolicyStatus } from '../migrate/moved-status'
 
 /* `AssignAppsDialog` is gone.
 
@@ -150,7 +151,7 @@ export function ReviewDialog({
         <header className="bdlg-rev__head">
           <h3>{policy.name}</h3>
           <Badge tone="neutral">{policy.type}</Badge>
-          <StatusPill status={saved.status} />
+          <PolicyStatus policy={saved} />
         </header>
 
         <AnimatePresence initial={false}>
@@ -596,7 +597,7 @@ export function CopyRuleDialog({
                   <span className="bdlg-copy__main">
                     <span className="bdlg-copy__name">
                       {t.policy.name}
-                      <StatusPill status={t.policy.status} />
+                      <PolicyStatus policy={t.policy} />
                       <span className="u-sr-only">Added as rule {t.at + 1}.</span>
                       <TipMark text={`Added last, as rule ${t.at + 1}.`} />
                     </span>

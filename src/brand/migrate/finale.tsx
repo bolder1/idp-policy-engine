@@ -270,7 +270,6 @@ export function MoveFinale({ origin = 'moved', place = 'top' }: { origin?: 'new'
     <ReviewApproveCards
       toReview={unreviewed}
       approved={approvedIds.length}
-      published={store.policies.filter((p) => p.movedFrom?.length && p.status !== 'draft').length}
       rejected={rejectedList.length}
       showReject={experience !== 'yesterday'}
       onReview={() => openList[0] && store.go({ name: 'board', policyId: openList[0].id })}

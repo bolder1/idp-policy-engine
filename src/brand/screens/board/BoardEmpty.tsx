@@ -130,8 +130,9 @@ export function BoardEmpty({
               </span>
               <span className="bb__start2__foot">
                 <span className="bb__start2__text">
-                  <strong>Use a Xecurify template</strong>
-                  <span>Ready-made rules for common setups</span>
+                  {/* One name for both kinds (owner, 18 Nov 2026): Xecurify's ready-made templates and the ones you saved. */}
+                  <strong>Use a template</strong>
+                  <span>Ready-made by Xecurify, or saved by you</span>
                 </span>
               </span>
             </button>
@@ -199,7 +200,7 @@ export function BoardEmpty({
    box every picture is drawn in, centred in its stage, so the three line up across the row whatever each one draws.
 
    On hover only colour changes, and reuse's rules fade in (owner, same day: "subtle and silent"):
-   · Use a Xecurify template: a template, drawn as its icon draws one, on a second sheet; its header takes the colour.
+   · Use a template: a template, drawn as its icon draws one, on a second sheet; its header takes the colour.
    · Reuse an existing policy: the tenant's policy on the left, an arrow, the new one on the right; the rules slide
      into its empty places (owner: "the reuse one is perfect").
    · Start from scratch: an empty policy with a place for its first rule; the place fills and its plus turns solid.

@@ -383,6 +383,18 @@
 /* The tick sits in the icons' column and its words start where theirs do. */
 .bsm__ack { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: var(--space-3); align-items: center; }
 .bsm__ack input { width: 16px; height: 16px; margin: 0; }
+/* The acknowledgement, set apart from the explanation above it (owner, 18 Nov 2026: "not highlighted enough, easily
+   missed under so much text"): a notice box of its own, right above the buttons it unlocks. Once ticked it settles to
+   the quiet inset, so the box reads as the thing still to do. */
+.bsm__ack {
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--fb-notice-border); border-radius: var(--radius-md);
+  background: var(--fb-notice-bg);
+  font-weight: var(--fw-semibold); white-space: normal;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.bsm__ack:has(input:checked) { background: var(--surface-inset); border-color: var(--border-subtle); }
+.bsm__ack:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 .bsm__head { display: flex; flex-direction: column; gap: var(--space-2); }
 .bsm__head p { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-secondary); }

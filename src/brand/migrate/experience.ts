@@ -1,4 +1,7 @@
 import { useSyncExternalStore } from 'react'
+import { MIGRATION_PICKERS } from './phase'
+import type { Policy } from '../data'
+import { useBrand } from '../store'
 
 /* -----------------------------------------------------------------------------
    Which migration experience the prototype plays (owner, 16 Nov 2026: "a dropdown where we can change the experience
@@ -62,7 +65,8 @@ export function setExperience(next: MigrationExperience) {
 }
 
 export function useExperience(): MigrationExperience {
-  return useSyncExternalStore(subscribe, () => current, () => 'today')
+  const picked = useSyncExternalStore(subscribe, () => current, () => 'today' as MigrationExperience)
+  return MIGRATION_PICKERS ? picked : 'today'
 }
 
 /* --- Review facts the store does not keep ------------------------------------------------ */
@@ -114,4 +118,18 @@ export function markChecked(ids: readonly string[]) {
 const EMPTY: Record<string, ReviewFact> = {}
 export function useReviewFacts(): Record<string, ReviewFact> {
   return useSyncExternalStore(subscribe, () => facts, () => EMPTY)
+}
+
+/* --- A migrated policy's state, for its status everywhere (moved-status.tsx, 18 Nov 2026) --------------------- */
+
+export type MovedReview = 'review' | 'approved' | 'rejected'
+
+export function useMovedState(policy: Policy | undefined) {
+  const { moved } = useBrand()
+  const facts = useReviewFacts()
+  const old = useExperience() === 'yesterday'
+  if (!policy || old || !policy.movedFrom?.length) return { migrated: false, review: null as MovedReview | null, rolledBack: false }
+  const review: MovedReview | null =
+    policy.status !== 'draft' ? null : facts[policy.id]?.rejected ? 'rejected' : moved[policy.id]?.reviewed ? 'approved' : 'review'
+  return { migrated: true, review, rolledBack: policy.status === 'inactive' && !!facts[policy.id]?.rolledBack }
 }

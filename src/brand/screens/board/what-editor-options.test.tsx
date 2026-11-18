@@ -146,13 +146,15 @@ describe('the options as checks with a sentence', () => {
     expect(html).not.toContain('role="switch"')
   })
 
-  it('says what each one does, in a line under its label, and keeps no info dot for it', () => {
+  it('says what each one does, in a line under its label; only the three after-sign-in options carry an info tip', () => {
     expect(count(html, 'class="bx-checkrow__hint"')).toBe(ALL.length)
     expect(html).toContain('The tap has to be confirmed with a fingerprint or face.')
     expect(html).toContain('The user picks the number shown, so no push is approved by reflex.')
     expect(html).toContain('When enabled, users can open the magic link from a different IP address than where it was requested.')
     expect(html).toContain('Ask for the second factor at every sign-in, even on a device that is remembered.')
-    expect(html).not.toContain('bx-tipdot')
+    /* 18 Nov 2026 (owner: "add a tooltip and a detailed version, for all 3 options"): Remember MFA, Force MFA on each
+       login and Allow end users to disable 2FA carry the longer story; the method checks keep their line alone. */
+    expect(count(html, 'bx-tipdot')).toBe(3)
   })
 
   it('names each check by its label and describes it by its sentence, so the sentence is not part of the name', () => {
@@ -185,7 +187,7 @@ describe('Remember MFA and Force MFA', () => {
     expect(indented).toContain('Days to remember')
     expect(indented).not.toContain('Force MFA')
     expect(html.indexOf('Remember MFA')).toBeLessThan(html.indexOf('Days to remember'))
-    expect(html.indexOf('Days to remember')).toBeLessThan(html.indexOf('Force MFA on each login'))
+    expect(html.indexOf('Days to remember')).toBeLessThan(html.indexOf('bx-checkrow__label">Force MFA on each login'))
   })
 
   it('keep the days field under Remember MFA only', () => {

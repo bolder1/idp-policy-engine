@@ -1,0 +1,5 @@
+/* The rolled-back note above the builder bar (moved-status.tsx). Tokens only. */
+.bmroll { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); background: var(--fb-notice-bg); border-bottom: var(--bw-thin) solid var(--fb-notice-border); color: var(--text-primary); }
+.bmroll__mark { flex: none; color: var(--fb-notice-fg); }
+.bmroll__words { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-sm); }
+.bmroll__words b { font-weight: var(--fw-semibold); }

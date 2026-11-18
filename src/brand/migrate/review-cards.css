@@ -1,10 +1,19 @@
-/* The migration numbers (review-cards.tsx): one panel, a column per state, rules between. Tokens only. */
-.brc { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); margin-bottom: var(--space-4); border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); overflow: hidden; }
-.brc__cell { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; padding: var(--space-4) var(--space-5); box-shadow: calc(-1 * var(--bw-thin)) 0 0 var(--border-default); }
-.brc__label { font-size: var(--fs-sm); color: var(--text-secondary); }
-.brc__num { font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--text-primary); }
-.brc__cell.is-review .brc__num { color: var(--fb-info-fg); }
-.brc__cell.is-approved .brc__num { color: var(--fb-positive-fg); }
-.brc__cell.is-rejected .brc__num { color: var(--fb-negative-fg); }
-/* Every action on the same line across the panel, whatever the label's length. */
-.brc__act { display: flex; min-height: 32px; margin-top: var(--space-2); max-width: 100%; }
+/* The migration cards (review-cards.tsx): one-row cards, mark + title + number + action. Tokens only. */
+.brc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
+.brc.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.brc__card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4); min-width: 0; padding: var(--space-4) var(--space-5); border-radius: var(--radius-lg); background: var(--surface-raised); border: var(--bw-thin) solid var(--border-default); }
+.brc__mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-md); }
+.brc__mark.is-review { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.brc__mark.is-approve { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.brc__mark.is-reject { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.brc__body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.brc__body h2 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.brc__stats { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-6); margin: 0; }
+.brc__stat { display: flex; align-items: baseline; gap: var(--space-2); }
+.brc__stat dd { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.brc__stat dt { font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; }
+.brc__stat.is-review dd { color: var(--fb-info-fg); }
+.brc__stat.is-approve dd { color: var(--fb-positive-fg); }
+.brc__stat.is-reject dd { color: var(--fb-negative-fg); }
+.brc__act { display: flex; justify-content: flex-end; }
+@media (max-width: 1120px) { .brc, .brc.is-two { grid-template-columns: minmax(0, 1fr); } }

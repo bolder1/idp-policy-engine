@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { MIGRATION_PICKERS } from './phase'
 
 /* -----------------------------------------------------------------------------
    Which migration banner the Policies page shows while drafts wait (owner, 12 Nov 2026: "a version for the current one
@@ -37,12 +38,13 @@ export function setBannerVariant(next: BannerVariant) {
 }
 
 export function useBannerVariant(): BannerVariant {
-  return useSyncExternalStore(
+  const picked = useSyncExternalStore(
     (f) => {
       subs.add(f)
       return () => subs.delete(f)
     },
     () => variant,
-    () => 'cards',
+    () => 'cards' as BannerVariant,
   )
+  return MIGRATION_PICKERS ? picked : 'cards'
 }

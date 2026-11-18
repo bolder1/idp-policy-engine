@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useMemo } from 'react'
-import { LayoutTemplate, Store } from 'lucide-react'
+import { Store } from 'lucide-react'
+import { TEMPLATE_CATEGORIES, TEMPLATE_STORE } from '../template-phase'
 
 import { PageHead } from '../Shell'
 import { TemplateCard, TemplatePreview, scenarioCard } from '../create/TemplateCard'
 import { TemplateStore } from '../create/TemplateStore'
-import { EmptyState, NoMatches } from '../empty'
+import { NoMatches } from '../empty'
 import { Button, SearchBox } from '../kit'
 import { Picker } from '../picker'
 import { freeName } from '../policy-name'
@@ -36,6 +37,11 @@ import { ConfirmDelete } from './confirm-delete'
 
 const CATS: Scenario['category'][] = ['Quick Protection', 'Device-based', 'Risk-based', 'Compliance', 'Uncategorized']
 
+/* Whose a template is: Xecurify ships it, or the tenant saved it (from a policy, or a copy from the store). */
+type Source = 'All' | 'xecurify' | 'custom'
+const SOURCE_LABEL = { xecurify: 'Xecurify', custom: 'Custom' } as const
+const sourceOf = (s: Scenario): Exclude<Source, 'All'> => (s.provided ? 'xecurify' : 'custom')
+
 function matches(s: Scenario, q: string) {
   if (!q) return true
   const t = q.toLowerCase()
@@ -47,6 +53,7 @@ export function Templates() {
   const { scenarios, users, zones, fingerprints } = store
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string>('All')
+  const [source, setSource] = useState<Source>('All')
   const [preview, setPreview] = useState<Scenario | null>(null)
   /* The tenant's own template the admin is about to take away. */
   const [deleting, setDeleting] = useState<Scenario | null>(null)
@@ -60,19 +67,30 @@ export function Templates() {
   )
   const cardOf = (s: Scenario) => cards.get(s.id) ?? scenarioCard(s, users, library)
 
-  /* The tenant's own. The page is their shelf (owner, 30 Oct 2026); Xecurify's are in the store. */
-  const own = useMemo(() => scenarios.filter((s) => !s.provided), [scenarios])
-  /* Only categories something is filed under, so no option leads to nothing. */
-  const cats = CATS.filter((c) => own.some((s) => s.category === c))
+  /* Every template, Xecurify's and the tenant's own, on one page (owner, 18 Nov 2026: "by default, all the Xecurify
+     templates will be shown here, and whenever the user adds custom templates … those will also be shown here"). The
+     tenant's own first, newest saves where they will look; then Xecurify's. A pill on each card says whose it is. */
+  const all = useMemo(
+    () => [...scenarios.filter((s) => !s.provided), ...scenarios.filter((s) => s.provided)],
+    [scenarios],
+  )
+  /* Only sources and categories something is filed under, so no option leads to nothing. */
+  const hasCustom = all.some((s) => !s.provided)
+  const src: Source = source === 'custom' && !hasCustom ? 'All' : source
+  const cats = TEMPLATE_CATEGORIES ? CATS.filter((c) => all.some((s) => s.category === c)) : []
   const active = cat !== 'All' && cats.some((c) => c === cat) ? cat : 'All'
   const query = q.trim()
-  const shown = own.filter((s) => (active === 'All' || s.category === active) && matches(s, query))
+  const shown = all.filter(
+    (s) => (src === 'All' || sourceOf(s) === src) && (active === 'All' || s.category === active) && matches(s, query),
+  )
+  const filtered = src !== 'All' || active !== 'All'
   /* The Xecurify store, open over the page. */
   const [shopping, setShopping] = useState(false)
 
   const clear = () => {
     setQ('')
     setCat('All')
+    setSource('All')
   }
 
   const usable = (s: Scenario) => s.rules.length > 0
@@ -102,12 +120,10 @@ export function Templates() {
     })
   }
 
-  const toPolicies = () => store.go({ name: 'policies' })
-
   const card = (s: Scenario) => (
     <TemplateCard
       key={s.id}
-      m={cardOf(s)}
+      m={{ ...cardOf(s), source: { label: SOURCE_LABEL[sourceOf(s)], tone: s.provided ? 'info' : 'neutral' } }}
       onUse={usable(s) ? () => startUse(s) : undefined}
       onPreview={() => setPreview(s)}
       onDelete={s.provided ? undefined : () => setDeleting(s)}
@@ -125,63 +141,58 @@ export function Templates() {
     <div className="bpage blib-templates">
       <PageHead title="Policy templates" caption="Start a policy from a set of rules." />
 
-      {/* The tenant's own templates, and nothing else (owner, 30 Oct 2026). With none, the whole page says so and
-          offers the two ways to get one: add from the store, or save a policy as one (from its ⋯, on the Policies
-          page). With some, the toolbar ends in the way into the store. */}
-      {own.length === 0 ? (
-        <EmptyState
-          icon={LayoutTemplate}
-          title="No templates yet"
-          blurb="Add one from Xecurify templates, or save a policy as a template."
-          action={
-            <>
-              {browse}
-              <Button variant="secondary" onClick={toPolicies}>
-                Go to policies
-              </Button>
-            </>
-          }
-        />
-      ) : (
-        <>
-          <div className="btoolbar">
-            <div className="btoolbar__left">
-              <SearchBox value={q} onChange={setQ} placeholder="Search templates…" label="Search templates" />
-            </div>
-            <div className="btoolbar__right">
-              {/* The filter only where it has work to do: one category needs no taxonomy. */}
-              {cats.length > 1 && (
-                <div className="btoolbar__filters">
-                  <span className={`btoolbar__filter ${active !== 'All' ? 'is-set' : ''}`}>
-                    <Picker
-                      label="Filter by category"
-                      value={active}
-                      width="fill"
-                      size="md"
-                      options={[{ value: 'All', label: 'All categories' }, ...cats.map((c) => ({ value: c, label: c }))]}
-                      onChange={setCat}
-                    />
-                  </span>
-                  {active !== 'All' && (
-                    <button type="button" className="btoolbar__clear" onClick={() => setCat('All')}>
-                      Clear filters
-                    </button>
-                  )}
-                </div>
-              )}
-              {browse}
-            </div>
+      {/* Search, then the one filter: whose the templates are (owner, 18 Nov 2026: "search, pills to distinguish, and a
+          filter. That's it."). No empty state: Xecurify's are always here. */}
+      <div className="btoolbar">
+        <div className="btoolbar__left">
+          <SearchBox value={q} onChange={setQ} placeholder="Search templates…" label="Search templates" />
+        </div>
+        <div className="btoolbar__right">
+          <div className="btoolbar__filters">
+            <span className={`btoolbar__filter ${src !== 'All' ? 'is-set' : ''}`}>
+              <Picker
+                label="Filter by source"
+                value={src}
+                width="fill"
+                size="md"
+                options={[
+                  { value: 'All', label: 'All templates' },
+                  { value: 'xecurify', label: SOURCE_LABEL.xecurify },
+                  ...(hasCustom ? [{ value: 'custom', label: SOURCE_LABEL.custom }] : []),
+                ]}
+                onChange={(v) => setSource(v as Source)}
+              />
+            </span>
+            {/* Categories, only while they are shown at all (TEMPLATE_CATEGORIES). */}
+            {cats.length > 1 && (
+              <span className={`btoolbar__filter ${active !== 'All' ? 'is-set' : ''}`}>
+                <Picker
+                  label="Filter by category"
+                  value={active}
+                  width="fill"
+                  size="md"
+                  options={[{ value: 'All', label: 'All categories' }, ...cats.map((c) => ({ value: c, label: c }))]}
+                  onChange={setCat}
+                />
+              </span>
+            )}
+            {filtered && (
+              <button type="button" className="btoolbar__clear" onClick={() => { setSource('All'); setCat('All') }}>
+                Clear filters
+              </button>
+            )}
           </div>
+          {TEMPLATE_STORE && browse}
+        </div>
+      </div>
 
-          {shown.length === 0 ? (
-            <NoMatches noun="templates" query={query} filtered={active !== 'All'} onClear={clear} />
-          ) : (
-            <div className="bgal__grid">{shown.map(card)}</div>
-          )}
-        </>
+      {shown.length === 0 ? (
+        <NoMatches noun="templates" query={query} filtered={filtered} onClear={clear} />
+      ) : (
+        <div className="bgal__grid">{shown.map(card)}</div>
       )}
 
-      <TemplateStore open={shopping} onClose={() => setShopping(false)} />
+      {TEMPLATE_STORE && <TemplateStore open={shopping} onClose={() => setShopping(false)} />}
       {newOne.dialog}
 
       <TemplatePreview

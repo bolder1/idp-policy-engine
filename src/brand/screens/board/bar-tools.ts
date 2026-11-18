@@ -68,3 +68,7 @@ export const RULE_ON_OFF: boolean = false
    brings the button back, stepping between those two ends (`NARROW` in
    BoardBuilder.tsx). */
 export const PANEL_WIDTH_BUTTON: boolean = false
+
+/* The empty policy's "Inherit from an existing policy" card (owner, 18 Nov 2026: "hide this option completely, no use
+   any more"). Off: the start shows the template and scratch cards only. Kept, not deleted. */
+export const INHERIT_START: boolean = false

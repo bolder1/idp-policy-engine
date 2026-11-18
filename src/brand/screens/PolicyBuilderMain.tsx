@@ -13,7 +13,6 @@ import {
   Filter,
   GraduationCap,
   Info,
-  LayoutTemplate,
   ListX,
   PanelLeftOpen,
   Plus,
@@ -21,6 +20,7 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react'
+import { TemplateIcon } from '../template-icon'
 
 import { Badge, Button, Confirm, DecisionChip, IconButton, MenuButton, Tabs, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { blankRule, fallbackRule, reidRule, uniqueName, type Audience, type Policy, type Rule } from '../data'
@@ -483,7 +483,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   const tools: { id: string; label: string; icon: typeof ScrollText }[] = [
     { id: 'log', label: 'Decision log', icon: ScrollText },
     { id: 'overview', label: 'Read it end to end', icon: FileText },
-    { id: 'template', label: 'Save as template', icon: LayoutTemplate },
+    { id: 'template', label: 'Save as template', icon: TemplateIcon },
     /* No Review & Save tool here. Lite's primary button already opens it. */
   ]
 

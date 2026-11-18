@@ -193,6 +193,8 @@
   .btable__next .bx-btn:focus-visible svg { transform: translate(2px, -2px) rotate(-8deg); }
   .btable__next .bx-btn:active svg { transform: translate(4px, -4px) rotate(-8deg); }
 }
+/* A rejected row says what comes next in words (Policies.tsx): support is on the Reject card above the list. */
+.btable__hint { display: inline-block; max-width: 180px; font-size: var(--fs-sm); line-height: 1.35; color: var(--text-secondary); }
 /* A row arriving from Move policies: it lights and settles, one after another (`--arrive` is its place). */
 @keyframes btable-arrive {
   0% { background-color: var(--fb-info-bg); }
@@ -841,6 +843,23 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
    card views behind `POLICY_VIEW`), and the table's footer line as a caption
    under a list. */
 .bpol__tile { background: var(--surface-inset); color: var(--text-tertiary); }
+/* The template star beside a policy's name (owner, 18 Nov 2026): shown while the row is hovered, kept and filled blue
+   (the selection colour, never orange) once marked. Touch screens have no hover, so there it always shows. */
+.bpol__template-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--text-tertiary); cursor: pointer;
+  opacity: 0; transition: opacity var(--dur-fast) ease, color var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+tr:hover .bpol__template-mark,
+.blist__row:hover .bpol__template-mark,
+.bpol__template-mark:focus-visible,
+.bpol__template-mark.is-on { opacity: 1; }
+.bpol__template-mark:hover { background: var(--int-ghost-bg-hover); color: var(--text-secondary); }
+.bpol__template-mark.is-on,
+.bpol__template-mark.is-on:hover { color: var(--blue); }
+@media (hover: none) { .bpol__template-mark { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bpol__template-mark { transition: none; } }
 .bpol__foot { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
 .bpol__foot .btable__leaking { margin-left: 0; }
 

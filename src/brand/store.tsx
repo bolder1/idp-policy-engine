@@ -112,7 +112,8 @@ import { toastDuration, toastTone, type ToastTone } from './toast-tone'
 export type Role = 'admin' | 'user'
 
 export type BrandScreen =
-  | { name: 'policies' }
+  /** `sub`: open New policies on that list, Live or Under review (the move tour, 18 Nov 2026). */
+  | { name: 'policies'; sub?: 'new' | 'moved' }
   /** The Dashboard: the Policy builder's What's new hub, then the move's next steps (migrate/HomeHub.tsx). */
   | { name: 'home' }
   /* `open` lets a caller hand off INTO a surface rather than merely near it.

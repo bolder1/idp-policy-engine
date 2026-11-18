@@ -174,7 +174,7 @@ describe('inside, three ways to start', () => {
     expect(empty.match(/\{pills && \(\s*<span className="bb__start2__tab">/g)?.length).toBe(2)
     expect(empty.match(/bb__start2__tab/g)?.length).toBe(2)
     expect(empty).not.toContain('<Note')
-    expect(empty).toContain('<strong>Use a Xecurify template</strong>')
+    expect(empty).toContain('<strong>Use a template</strong>')
     expect(empty).toContain('<strong>Inherit from an existing policy</strong>')
     expect(empty).toContain('<span className="bb__start2__stage">')
     expect(empty).toContain('<strong>Start from scratch</strong>')
@@ -186,7 +186,7 @@ describe('inside, three ways to start', () => {
   it('opens both pickers as the store’s centred popup of cards, taken whole, the categories as chips', () => {
     expect(PICKER_LOOK).toBe('sheet')
     expect(boardBuilderSrc).toContain("onUseTemplate={() => (TEMPLATE_PICKER || cardLook ? openPicker('template') : setPicking(true))}")
-    expect(boardBuilderSrc).toContain("onCopyRules={copyOffered ? () => openPicker('policy') : undefined}")
+    expect(boardBuilderSrc).toContain("onCopyRules={INHERIT_START && copyOffered ? () => openPicker('policy') : undefined}")
     expect(boardBuilderSrc).toContain("slider={PICKER_LOOK === 'slider'}")
     expect(boardBuilderSrc).toContain('policiesOnly={cardLook && galleryPolicies}')
     expect(boardBuilderSrc).toContain('onChoosePolicy={(p) => copyRules(p, copyableRules(p))}')

@@ -30,12 +30,13 @@ interface Stop {
 }
 
 const STOPS: Stop[] = [
-  { id: 'policies', screen: { name: 'policies' }, sel: 'tr[data-from-old]', fallback: '.btable-wrap', heading: 'Your migrated policies', body: 'One per application, as drafts. Open one to compare it with the old policy, approve it, then publish.' },
+  { id: 'policies', screen: { name: 'policies', sub: 'moved' }, sel: 'tr[data-from-old]', fallback: '.btable-wrap', heading: 'Your migrated policies', body: 'One per application, each under review. The old policy keeps deciding sign-ins until you publish its new one.' },
   { id: 'zones', screen: { name: 'zones' }, sel: '[data-from-old]', fallback: '.bpage > :nth-child(3)', heading: 'Zones', body: 'Old IP and location checks are zones now. Change one here and every rule using it follows.' },
   { id: 'devices', screen: { name: 'fingerprint' }, sel: '.bpage .blist, .bpage .btable-wrap, .bpage .bcards', fallback: '.bpage__head', heading: 'Device profiles', body: 'Device limits are device profiles now: the device, its OS and health, in any rule.' },
   /* The tour ends where the work is (owner, 10 Nov 2026: "this should end in the policy tab … start review"): back on
-     Policies, the review banner lit, and the last button starts the review rather than only closing. */
-  { id: 'review', screen: { name: 'policies' }, sel: '.bann', fallback: '.btable-wrap', heading: 'Review and publish', body: 'Start review opens the first draft in the builder. Compare, approve, then publish. Back and Next walk the rest.' },
+     Policies, the migration cards lit (18 Nov 2026: the flow as it is now, Review / Approve / Reject), and the last
+     button starts the review rather than only closing. */
+  { id: 'review', screen: { name: 'policies', sub: 'moved' }, sel: '.brc', fallback: '.bann, .btable-wrap', heading: 'Review, approve, publish', body: 'Review opens each policy beside its old one to approve or reject. Publish approved makes them active. Rejected ones go to support.' },
 ]
 
 const CARD = { w: 360, h: 196 }

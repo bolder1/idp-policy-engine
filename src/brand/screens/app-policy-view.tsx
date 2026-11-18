@@ -13,7 +13,6 @@ import {
   CornerDownRight,
   Eye,
   Layers,
-  LayoutTemplate,
   ListChecks,
   ListPlus,
   Pencil,
@@ -26,11 +25,12 @@ import {
   Unlink,
   type LucideIcon,
 } from 'lucide-react'
+import { TemplateIcon } from '../template-icon'
 
 import { appsOf, enforces, memberGroupIds, ruleExpired, type App, type Policy } from '../data'
 import { DecisionBadge } from '../decision-badge'
 import { Face, FaceStack, type FaceItem } from '../faces'
-import { Badge, Button, Chip, Drawer, Note, RowMenu, SplitButton, StatusPill, type MenuItem } from '../kit'
+import { Badge, Button, Chip, Drawer, Note, RowMenu, SplitButton, type MenuItem } from '../kit'
 import { linkedTo } from '../post-sign-in'
 import { normaliseWho } from '../rule-who'
 import { useBrand, useNameLookup, type AppTab } from '../store'
@@ -78,6 +78,7 @@ import { GRANT_ENDED } from './sign-in-tests/temp-access'
 import { useTestingSession } from './testing/session-state'
 import { todayIn } from './testing/sign-in-form'
 import { formatCount } from './testing/test-dock'
+import { PolicyStatus } from '../migrate/moved-status'
 
 /* -----------------------------------------------------------------------------
    An application's Policies tab (docs/specs/APP-POLICY-TAB.md, 15 Oct 2026):
@@ -140,7 +141,7 @@ const ease = (reduced: boolean) => ({ duration: reduced ? 0 : 0.18, ease: [0.2, 
 export function StatusChip({ policy }: { policy: Policy }) {
   return (
     <span className="apol__status">
-      <StatusPill status={policy.status} />
+      <PolicyStatus policy={policy} />
     </span>
   )
 }
@@ -1254,7 +1255,7 @@ export function AppPolicyView({
   const withTemplateRow = (items: MenuItem[]): MenuItem[] => {
     if (!canSaveAsTemplate(policy)) return items
     const at = items.findIndex((i) => i.id === 'remove' || i.id === 'delete')
-    const row: MenuItem = { id: 'template', label: 'Save as template', icon: LayoutTemplate, ...(at !== 0 ? { divide: true } : null) }
+    const row: MenuItem = { id: 'template', label: 'Mark as template', icon: TemplateIcon, ...(at !== 0 ? { divide: true } : null) }
     return at === -1 ? [...items, row] : [...items.slice(0, at), row, ...items.slice(at)]
   }
 

@@ -388,7 +388,7 @@ export function RejectDialog({ policy, onClose, onSent, variant = 'assisted' }: 
             Cancel
           </Button>
           {/* Red inside the confirm, never the brand orange (owner, 17 Nov 2026). */}
-          <Button variant={today ? 'danger' : 'brand'} icon={today ? X : Send} disabled={!reason.trim()} onClick={send}>
+          <Button variant={today ? 'danger' : 'brand'} icon={today ? undefined : Send} disabled={!reason.trim()} onClick={send}>
             {today ? 'Reject' : 'Send to miniOrange'}
           </Button>
         </>

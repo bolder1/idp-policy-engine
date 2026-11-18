@@ -132,9 +132,9 @@ describe('the doors', () => {
     expect(dialogSrc.replace(/\/\*[\s\S]*?\*\//g, '').toLowerCase()).not.toContain('inherit')
   })
 
-  it('reads as a row in the bar’s ⋯ beside Save as template', () => {
+  it('reads as a row in the bar’s ⋯ beside Mark as template', () => {
     const src = BoardBarActions.toString()
     expect(src).toContain('Copy rules from a policy')
-    expect(src).toContain('Save as template')
+    expect(src).toContain('Mark as template')
   })
 })

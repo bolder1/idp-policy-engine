@@ -1,11 +1,12 @@
 import { ChevronRight, Unlink } from 'lucide-react'
 
-import { DecisionChip, StatusPill } from '../kit'
+import { DecisionChip } from '../kit'
 import { EmptyState } from '../empty'
 import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
 import type { PolicyUse } from './usage'
 import { DockPanel } from './dock-panel'
+import { PolicyStatus } from '../migrate/moved-status'
 
 /* -----------------------------------------------------------------------------
    What depends on this object, drawn.
@@ -53,7 +54,7 @@ export function UsedByList({ users }: { users: PolicyUse[] }) {
             title={`Open ${u.policy.name}`}
           >
             <strong>{u.policy.name}</strong>
-            <StatusPill status={u.policy.status} />
+            <PolicyStatus policy={u.policy} />
             {/* Only the saved draft names it: the live rules do not, yet. */}
             {u.draft && <ChangeState unsaved={false} draft />}
             <ChevronRight size={15} strokeWidth={2} aria-hidden />

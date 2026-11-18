@@ -120,7 +120,7 @@ export function canSaveAsTemplate(policy: Policy): boolean {
   return TEMPLATES_MANAGED && policy.type !== 'Session' && openForEditing(policy).rules.length > 0
 }
 
-export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean }): { id: RowMenuId; label: string }[] {
+export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean; /** Already a template: the item takes it off again. */ marked?: boolean }): { id: RowMenuId; label: string }[] {
   const { monitor } = opts
   const signIn = policy.type !== 'Session'
   return [
@@ -131,7 +131,11 @@ export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boo
     ...(offersMonitoringView(policy, { monitor }) ? [{ id: 'monitoring' as const, label: 'View monitoring' }] : []),
     ...(opts.trail && signIn ? [{ id: 'trail' as const, label: 'Open in trail' }] : []),
     ...(signIn ? [{ id: 'text' as const, label: 'Read as text' }] : []),
-    ...(canSaveAsTemplate(policy) ? [{ id: 'template' as const, label: 'Save as template' }] : []),
+    ...(opts.marked
+      ? [{ id: 'template' as const, label: 'Remove from templates' }]
+      : canSaveAsTemplate(policy)
+        ? [{ id: 'template' as const, label: 'Mark as template' }]
+        : []),
     ...(policy.isSystem
       ? []
       : [...(signIn ? [{ id: 'duplicate' as const, label: 'Duplicate' }] : []), { id: 'delete' as const, label: 'Delete policy' }]),

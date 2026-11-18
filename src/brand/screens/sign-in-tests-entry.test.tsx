@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Shell } from '../Shell'
 import { BrandProvider } from '../store'
-import { TEMPLATES_MANAGED } from '../template-phase'
+import { TEMPLATES_IN_RAIL, TEMPLATES_MANAGED } from '../template-phase'
 import { MIGRATION_FIRST } from '../migrate/phase'
 import { Policies } from './Policies'
 import { SignInTests } from './SignInTests'
@@ -67,7 +67,7 @@ describe('Sign-in tests — out of the rail', () => {
     if (MIGRATION_FIRST) return
     expect(sub[0]).toBe('All Policies')
     /* Templates is on hold (template-phase.ts): in the rail only while the tenant manages templates. */
-    if (TEMPLATES_MANAGED) expect(sub).toContain('Templates')
+    if (TEMPLATES_MANAGED && TEMPLATES_IN_RAIL) expect(sub).toContain('Templates')
     else expect(sub).not.toContain('Templates')
   })
 })

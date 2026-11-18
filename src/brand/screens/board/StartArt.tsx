@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { CopyPlus, LayoutTemplate, Plus, type LucideIcon } from 'lucide-react'
+import { CopyPlus, Plus, type LucideIcon } from 'lucide-react'
+import { TemplateIcon } from '../../template-icon'
 import { motion, useReducedMotion, type Variants } from 'motion/react'
 
 /* -----------------------------------------------------------------------------
@@ -7,7 +8,7 @@ import { motion, useReducedMotion, type Variants } from 'motion/react'
    "make it single … simple"). One sheet of paper each, in the card's own colour (board.css `--start-hover`), with no words
    in it; the card's icon, below, says which it is.
 
-   · Use a Xecurify template: the sheet behind eases out.
+   · Use a template: the sheet behind eases out.
    · Reuse an existing policy: a second, dashed sheet slides out from behind.
    · Start from scratch: the sheet's lines are written in.
 
@@ -98,7 +99,7 @@ function TemplateArt({ hot }: { hot: boolean }) {
       <rect className="bb__ill__block" x="74" y="70" width="56" height="66" rx="4" />
       <rect className="bb__ill__block" x="138" y="70" width="52" height="29" rx="4" />
       <rect className="bb__ill__block" x="138" y="107" width="52" height="29" rx="4" />
-      <Badge icon={LayoutTemplate} x={198} y={144} />
+      <Badge icon={TemplateIcon} x={198} y={144} />
     </ArtFrame>
   )
 }

@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
-import { LayoutTemplate, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { ShieldCheck, type LucideIcon } from 'lucide-react'
+import { TemplateIcon } from '../template-icon'
 
 import { AppLogo } from '../logos/AppLogo'
 import type { DeleteFacts } from './app-policies'
@@ -64,7 +65,7 @@ export function PolicyFact({ name }: { name: string }) {
 
 /* A template named in a popup, the same tag with the template's own icon and word (the delete-template confirm). */
 export function TemplateFact({ name }: { name: string }) {
-  return <KindFact kind="template" icon={LayoutTemplate} name={name} />
+  return <KindFact kind="template" icon={TemplateIcon} name={name} />
 }
 
 /* Several policies, said as `AppFacts` says applications: "A, B and C". */

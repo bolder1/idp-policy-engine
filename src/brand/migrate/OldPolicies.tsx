@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowRight, Check, Minus, Plus } from 'lucide-react'
 import { PageHead } from '../Shell'
-import { Button, SearchBox, StatusPill } from '../kit'
+import { Button, SearchBox } from '../kit'
 import { blankPolicy } from '../data'
 import { useBrand } from '../store'
 import { newPolicy } from '../policy-draft'
@@ -10,6 +10,7 @@ import { DEADLINE_VIEWS, type DeadlineView, type LegacyAdaptive, type LegacyPoli
 import { Picker } from '../picker'
 import { MoveBanner } from './move-banner'
 import { MIGRATION_FIRST } from './phase'
+import { PolicyStatus } from './moved-status'
 import '../screens.css'
 import './old-policies.css'
 
@@ -138,7 +139,7 @@ export function OldLoginTable({ rows: shown, viewOnly = false }: { rows: LegacyP
                   <td>
                     <div className="btable__primary">
                       <span className="bold__name">{lp.name}</span>
-                      {moved && !viewOnly && <StatusPill status={moved.status} />}
+                      {moved && !viewOnly && <PolicyStatus policy={moved} />}
                     </div>
                   </td>
                   <td>{groupName(lp.groupId, ctx)}</td>

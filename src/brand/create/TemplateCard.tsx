@@ -2,8 +2,6 @@ import {
   Check,
   ClipboardCheck,
   Clock,
-  BookmarkCheck,
-  BookmarkPlus,
   CopyPlus,
   Fingerprint,
   Gauge,
@@ -18,6 +16,7 @@ import {
   Users,
   Webhook,
 } from 'lucide-react'
+import { TemplateIcon } from '../template-icon'
 import { useState } from 'react'
 
 import { Badge, Button, DecisionChip, IconButton, Modal, RowMenu } from '../kit'
@@ -97,6 +96,8 @@ export interface CardModel {
   needs?: TemplateNeed[]
   /** Where a tenant's own copy came from: "Xecurify templates", on one added from the store. */
   from?: string
+  /** Whose the template is, as a pill beside its name, on the Templates page where both kinds sit together. */
+  source?: { label: string; tone: 'info' | 'neutral' }
 }
 
 const NEED_LABEL: Record<TemplateNeed, string> = { zone: 'Needs a network zone', fingerprint: 'Needs a device profile' }
@@ -439,6 +440,8 @@ export function TemplateCard({
           <h3 className="bgcard__h" title={m.name}>
             {m.name}
           </h3>
+          {/* Whose it is (owner, 18 Nov 2026: Xecurify's and your own on one page, told apart by a pill). */}
+          {m.source && <Badge tone={m.source.tone}>{m.source.label}</Badge>}
           {/* The template's own door to being taken away (owner, 27 Oct 2026: the template audit). A tenant could save
               one and never remove it. Only its own; the confirm is the shared one. */}
           {onDelete && (
@@ -685,8 +688,8 @@ export function scenarioCard(s: Scenario, directory?: WhoDirectory, library?: Te
   }
 }
 
-/* Save as template on a policy's card and row, as one icon (owner, 10 Nov 2026): the bookmark adds it to your templates
+/* Save as template on a policy's card and row, as one icon (owner, 10 Nov 2026; the template stamp since 18 Nov, template-icon.ts): it adds it to your templates
    under the policy's name, pressed again it takes it away. Blue while saved, the selection colour. */
 export function SaveToggle({ saved }: { saved: { on: boolean; toggle: () => void } }) {
-  return <IconButton icon={saved.on ? BookmarkCheck : BookmarkPlus} label={saved.on ? 'Remove from templates' : 'Save as template'} pressed={saved.on} tone="ghost" onClick={saved.toggle} />
+  return <IconButton icon={TemplateIcon} label={saved.on ? 'Remove from templates' : 'Mark as template'} pressed={saved.on} tone="ghost" onClick={saved.toggle} />
 }

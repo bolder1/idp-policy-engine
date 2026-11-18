@@ -144,7 +144,7 @@ describe('where it is offered', () => {
 
   it('an application’s Policies tab has it in its ⋯, between the switches and the red Remove', () => {
     const src = code(appViewSrc)
-    expect(src).toContain("label: 'Save as template', icon: LayoutTemplate")
+    expect(src).toContain("label: 'Mark as template', icon: TemplateIcon")
     expect(src).toContain('items={withTemplateRow([')
     expect(src).toContain("if (id === 'template') saveTemplate.open(policy)")
     /* Remove or Delete draft is found by id, and the row goes in before it. */
@@ -184,7 +184,7 @@ describe('taking one of the tenant’s own templates away', () => {
     expect(src).toContain("noun === 'template' ? <TemplateFact name={name} /> : <PolicyFact name={name} />")
     const out = renderToStaticMarkup(<TemplateFact name="Regulated data access" />)
     expect(out).toContain('bx-confirm__fact--template')
-    expect(out).toMatch(/<span class="bx-confirm__kind"><svg[^>]*lucide-layout-template[^>]*>[\s\S]*?<\/svg>Template<\/span>/)
+    expect(out).toMatch(/<span class="bx-confirm__kind"><svg[^>]*lucide-star[^>]*>[\s\S]*?<\/svg>Template<\/span>/)
     expect(count(out, 'title="Regulated data access"')).toBe(1)
   })
 })
@@ -304,29 +304,25 @@ describe('the Xecurify store', () => {
   describe('the Templates page', () => {
     const page = () => renderToStaticMarkup(<BrandProvider><Templates /></BrandProvider>)
 
-    it('with none of the tenant’s own, is one empty state with two ways to get one, and no Xecurify cards', () => {
+    /* Owner, 18 Nov 2026: no empty state; Xecurify's templates and the tenant's own on one page, told apart by a pill,
+       with search and one filter. The store popup is held off (TEMPLATE_STORE). */
+    it('lists every Xecurify template from the start, each with its pill, and no empty state', () => {
       const html = page()
-      expect(html).toContain('No templates yet')
-      expect(html).toContain('Browse Xecurify templates')
-      expect(html).toContain('Go to policies')
-      expect(html).not.toContain('class="bgcard ')
-      expect(html).not.toContain('btoolbar')
-      expect(html).not.toContain('bgal__section')
+      expect(html).not.toContain('No templates yet')
+      expect(count(html, 'class="bgcard ')).toBeGreaterThan(0)
+      expect(count(html, '>Xecurify<')).toBe(count(html, 'class="bgcard '))
+      expect(html).toContain('btoolbar')
+      expect(html).toContain('Search templates')
     })
 
-    it('has one orange button, the way into the store, before the other', () => {
+    it('has search and one source filter, and no store button while the store is held', () => {
       const html = page()
-      expect(count(html, 'bx-btn--brand')).toBe(1)
-      expect(html.indexOf('bx-btn--brand')).toBeLessThan(html.indexOf('Browse Xecurify templates'))
-      expect(html.indexOf('Browse Xecurify templates')).toBeLessThan(html.indexOf('Go to policies'))
-    })
-
-    it('lists only the tenant’s own, and ends its toolbar in the way into the store', () => {
+      expect(html).toContain('aria-label="Filter by source"')
+      expect(html).not.toContain('Browse Xecurify templates')
+      expect(count(html, 'bx-btn--brand')).toBe(0)
       const src = code(libraryScreenSrc)
-      expect(src).toContain('scenarios.filter((s) => !s.provided)')
-      expect(src).toContain('const shown = own.filter(')
-      expect(src).toContain('<TemplateStore open={shopping}')
-      expect(src).not.toContain('bgal__none')
+      expect(src).toContain('{TEMPLATE_STORE && browse}')
+      expect(src).toContain("{ value: 'custom', label: SOURCE_LABEL.custom }")
     })
   })
 })

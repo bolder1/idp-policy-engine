@@ -8,6 +8,8 @@ import type { RuleSet } from '../policy-draft'
 import { useBrand } from '../store'
 import { offersMonitoringView, portalRoot, statusOptions, monitorOffered } from './status-options'
 import { useStatusChange } from './use-status-change'
+import { ReviewBadge, RolledBackBadge } from '../migrate/moved-status'
+import { useMovedState } from '../migrate/experience'
 
 import './status-control.css'
 
@@ -42,6 +44,8 @@ export function StatusControl({
 }) {
   const store = useBrand()
   const policy = store.policyById(policyId)
+  /* A migrated draft is in review, not a Draft (owner, 18 Nov 2026): its badge, no switch; it goes live from Review. */
+  const movedState = useMovedState(policy)
   const { request, viewMonitoring, dialog } = useStatusChange({ unsaved: edits !== undefined, edits, onEditsFix, onRevealRule, onOpenBreakIn })
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -107,6 +111,7 @@ export function StatusControl({
   }, [turnOnAsk])
 
   if (!policy) return null
+  if (movedState.review) return <ReviewBadge review={movedState.review} />
   if (options.length === 0) return <StatusPill status={policy.status} />
 
   const onMenuKey = (e: React.KeyboardEvent) => {
@@ -167,6 +172,7 @@ export function StatusControl({
         <StatusPill status={policy.status} />
         <ChevronDown size={12} strokeWidth={2.2} className="bxsc__chev" aria-hidden />
       </button>
+      {movedState.rolledBack && <RolledBackBadge />}
 
       {createPortal(
         <AnimatePresence>

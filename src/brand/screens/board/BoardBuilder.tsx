@@ -34,7 +34,7 @@ import { DOCK_TAB_LABEL } from '../testing/test-dock'
 import { ACCESS_CHECK } from '../sign-in-tests/names'
 import type { SignInFacts } from '../sign-in-facts'
 import { Board } from './Board'
-import { BAR_COPY_RULES, BAR_DEMO, BAR_TEMPLATE, BAR_TOUR, COPY_RULES, PICKER_LOOK, RULE_ON_OFF, TEMPLATE_PICKER } from './bar-tools'
+import { BAR_COPY_RULES, BAR_DEMO, BAR_TEMPLATE, BAR_TOUR, COPY_RULES, INHERIT_START, PICKER_LOOK, RULE_ON_OFF, TEMPLATE_PICKER } from './bar-tools'
 import { copiedRules, copyableRules, copySources, rulesSaid } from './copy-rules'
 import { RulePickerSlider } from './RulePicker'
 import type { PickFrom } from './use-rule-picker'
@@ -90,6 +90,7 @@ import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
 import { MovedPanel, MovedWalk, PublishMoved } from '../../migrate/moved-panel'
 import { CondTagsContext } from './cond-tags'
 import { markRolledBack, useExperience } from '../../migrate/experience'
+import { RolledBackNote } from '../../migrate/moved-status'
 import { useWalkPublished } from '../../migrate/walk-published'
 
 /* Lazy, the way the trail loads its own.
@@ -806,6 +807,7 @@ export function BoardBuilder({
   const pagesAllowed = boardPagesAllowed(features.policyTesting, features.breakInTest, draft)
   const experience = useExperience()
   const [rollAsk, setRollAsk] = useState(false)
+  const contactSupport = () => store.showToast('Contact support: this flow is planned next')
   /* A migrated draft has never decided a sign-in, so it has no past sign-ins to show (owner, 17 Nov 2026). */
   const views = checkViews({ policyTesting: features.policyTesting, breakIn: pagesAllowed.breakIn }).filter((v) => !(movedDraft && experience !== 'yesterday' && v === 'past'))
   /* A post sign-in policy keeps the structural findings only: the rest read a
@@ -2347,6 +2349,7 @@ export function BoardBuilder({
           than the page above it. */}
       {/* The bar's status control reads the store itself, so the draft's copy of
           the status is never shown. */}
+      {saved && <RolledBackNote policy={saved} onContactSupport={contactSupport} />}
       <BoardBar
         policy={draft}
         unsaved={unsaved}
@@ -2388,6 +2391,7 @@ export function BoardBuilder({
             onSaveTemplate={templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
             onCopyRules={BAR_COPY_RULES && copyOffered ? () => openPicker('policy') : undefined}
             onRollBack={experience === 'today' && !!saved?.movedFrom?.length && saved.status === 'active' ? () => setRollAsk(true) : undefined}
+            onContactSupport={experience === 'today' && !!saved?.movedFrom?.length && saved.status !== 'draft' ? contactSupport : undefined}
             publish={movedLocked ? <PublishMoved policy={saved} onEdit={walkPublished.has(saved.id) ? undefined : () => setMovedEditing(true)} /> : undefined}
           />
         }
@@ -2526,7 +2530,7 @@ export function BoardBuilder({
              the policy, and a direct write to one that decides sign-ins would
              skip the checks before saving (describe spec, §2). */
           onDescribe={DESCRIBE_CARD && describeOffered(features.describePolicy, saved) ? openDescribe : undefined}
-          onCopyRules={copyOffered ? () => openPicker('policy') : undefined}
+          onCopyRules={INHERIT_START && copyOffered ? () => openPicker('policy') : undefined}
           onScratch={() => {
             /* The chooser goes and the empty chain comes up; focus lands on
                the one control on it that adds a rule. */

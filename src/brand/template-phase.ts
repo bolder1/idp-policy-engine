@@ -17,6 +17,11 @@
    -------------------------------------------------------------------------- */
 export const TEMPLATES_MANAGED: boolean = true
 
+/* The Templates page's place in the rail (owner, 18 Nov 2026: "template page should remove from the left tab. we are going
+   to remove that"). Only the rail item goes: Save as template and the template picker stay with TEMPLATES_MANAGED, and
+   the page itself still renders if something routes to it. Hidden, not deleted: on, the rail item comes back. */
+export const TEMPLATES_IN_RAIL: boolean = false
+
 /* A template card's face (owner, 2 Nov 2026: "real-time showcase might be a problem … based on the template, add custom
    SVGs"): on, a picture of what the template is about (create/CardPicture.tsx); off, the live rule stack it drew
    before, its rules numbered with their outcomes. Kept for when the product can draw a template's rules on its card. */
@@ -28,3 +33,10 @@ export const CARD_PICTURES: boolean = true
 export const TEMPLATE_CATEGORIES: boolean = false
 
 /* The pills (the start cards' source tabs, the template cards' category tab) are hidden until Alt+T: source-pills.ts. */
+
+/* The Xecurify template store as its own popup (owner, 30 Oct 2026), reached from the Templates page's one orange button.
+   Off since 18 Nov 2026 (owner: "we are not going to come up with the empty state. By default, all the Xecurify templates
+   will be shown here … custom templates … also shown here … distinguished by filter"): the page lists both kinds, with a
+   pill on each card and a filter, so there is nothing to go and get. Hidden, not deleted: on, the button and the popup
+   come back. */
+export const TEMPLATE_STORE: boolean = false

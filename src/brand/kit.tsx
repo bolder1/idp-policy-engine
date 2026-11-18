@@ -919,10 +919,13 @@ export function CheckRow({
   checked,
   onChange,
   disabled,
+  more,
 }: {
   label: string
   /** What ticking it does, in a sentence. */
   hint: string
+  /** The longer story, in an info tip beside the label (owner, 18 Nov 2026); also read out with the hint. */
+  more?: string
   checked: boolean
   onChange: (next: boolean) => void
   disabled?: boolean
@@ -944,9 +947,11 @@ export function CheckRow({
       </span>
       <b id={`${id}-label`} className="bx-checkrow__label">
         {label}
+        {more && <TipMark text={more} />}
       </b>
       <span id={`${id}-hint`} className="bx-checkrow__hint">
         {hint}
+        {more && <span className="u-sr-only"> {more}</span>}
       </span>
     </button>
   )

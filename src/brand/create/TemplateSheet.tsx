@@ -2,7 +2,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, BookmarkPlus, Building2, ChevronRight, LayoutGrid, LayoutTemplate, List, Store, X } from 'lucide-react'
+import { ArrowLeft, Building2, ChevronRight, LayoutGrid, List, Store, X } from 'lucide-react'
+import { TemplateIcon } from '../template-icon'
 
 import { Button, Chip, Drawer, SearchBox } from '../kit'
 import { FilterTabs } from '../screens/page-bar'
@@ -584,7 +585,7 @@ export function TemplateSheet({
                   ) : shelf === 'mine' ? (
                     <EmptyState
                       compact
-                      icon={BookmarkPlus}
+                      icon={TemplateIcon}
                       title="No templates yet"
                       blurb="Save a policy as a template from its menu."
                       action={<Button onClick={showOther}>Show Xecurify templates</Button>}
@@ -592,7 +593,7 @@ export function TemplateSheet({
                   ) : (
                     <EmptyState
                       compact
-                      icon={LayoutTemplate}
+                      icon={TemplateIcon}
                       title="No Xecurify templates"
                       blurb="Templates from miniOrange show here."
                       action={<Button onClick={showOther}>Show your templates</Button>}

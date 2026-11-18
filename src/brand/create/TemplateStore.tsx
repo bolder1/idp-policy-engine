@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { LayoutTemplate, Store, X } from 'lucide-react'
+import { Store, X } from 'lucide-react'
+import { TemplateIcon } from '../template-icon'
 
 import { SearchBox } from '../kit'
 import { useDialogChrome } from '../dialog-chrome'
@@ -160,7 +161,7 @@ export function TemplateStore({ open, onClose }: { open: boolean; onClose: () =>
                     }}
                   />
                 ) : (
-                  <EmptyState compact icon={LayoutTemplate} title="No Xecurify templates" />
+                  <EmptyState compact icon={TemplateIcon} title="No Xecurify templates" />
                 )}
               </div>
             </div>

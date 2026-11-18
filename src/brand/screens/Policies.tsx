@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { MIGRATION_FIRST } from '../migrate/phase'
+import { MIGRATION_FIRST, MIGRATION_PICKERS } from '../migrate/phase'
 import { OldPoliciesTab } from '../migrate/old-tab'
 import { BANNER_VARIANTS, setBannerVariant, useBannerVariant, type BannerVariant } from '../migrate/banner-variant'
 import { RejectDialog } from '../migrate/migration-results'
@@ -11,7 +11,6 @@ import {
   CopyPlus,
   Eye,
   Grid3x3,
-  LayoutTemplate,
   ListFilter,
   ListChecks,
   LogIn,
@@ -32,30 +31,30 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
+import { TemplateIcon } from '../template-icon'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppsPeek } from './apps-peek'
-import { Badge, Button, Confirm, Modal, RowMenu, SearchBox, StatusPill, Tabs, type MenuItem } from '../kit'
+import { Badge, Button, Confirm, Modal, RowMenu, SearchBox, StatusPill, Tabs, Tip, type MenuItem } from '../kit'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import type { LibView, ViewOption } from './library-view-state'
 import { PageBar } from './page-bar'
 import { Picker } from '../picker'
 import { appsOf, blankPolicy, enforces, type Policy } from '../data'
-import { useBrand, useNameLookup } from '../store'
+import { useBrand } from '../store'
 import { ChangeState } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
-import { newPolicy, openForEditing } from '../policy-draft'
+import { newPolicy } from '../policy-draft'
 import { useNewPolicy } from '../create/use-new-policy'
-import { scenarioFromPolicy } from '../template-from-policy'
-import { SaveTemplateDialog } from './builder-dialogs'
+import { useMarkedAsTemplate, useSaveAsTemplate } from './save-template'
 import { ConfirmDelete } from './confirm-delete'
 import { AppTransfer } from './app-transfer'
 import { decidesFor, deleteFacts, ownerOf } from './app-policies'
 import { AppFacts, DeleteFactsLine, PolicyFact } from './app-facts'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
-import { rowMenu, statusOptions, type RowMenuId, monitorOffered } from './status-options'
+import { canSaveAsTemplate, rowMenu, statusOptions, type RowMenuId, monitorOffered } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { BulkBar } from '../bulk-bar'
 import { SHOWCASE } from '../showcase'
@@ -77,6 +76,7 @@ import { PublishMovedConfirm } from '../migrate/moved-panel'
    landing before kit.css (Policies is eager) leaves source order nothing to decide. */
 import './policies-types.css'
 import { FirstVisit } from '../migrate/first-visit'
+import { PolicyStatus } from '../migrate/moved-status'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -219,6 +219,13 @@ export function Policies() {
     setKind(k)
     keepKind(k)
   }
+  /* Asked for a list by the route (the move tour): New policies, on that list. */
+  const askedSub = store.screen.name === 'policies' ? store.screen.sub : undefined
+  useEffect(() => {
+    if (!askedSub) return
+    setKind('sign-in')
+    setSub(askedSub)
+  }, [askedSub, store.screen])
   /* A move starting opens the Migrated list: the policies it makes land there, drafts first. */
   const running = store.moveJob?.status === 'running'
   const bannerVariant = useBannerVariant()
@@ -241,6 +248,7 @@ export function Policies() {
         caption="Every sign-in, and the session after it, is checked against these policies."
         docs
         preview={
+          MIGRATION_PICKERS && (
           <>
           <Picker
             label="Start"
@@ -256,6 +264,7 @@ export function Policies() {
           {/* The migration banner while drafts wait: two cards, or the one it was (owner, 12 Nov 2026). Today only. */}
           {isBuilt(experience) && <Picker label="Banner" size="md" prefix="Banner" value={bannerVariant} options={BANNER_VARIANTS} onChange={(v) => setBannerVariant(v as BannerVariant)} />}
           </>
+          )
         }
       />
       {/* The migration banner sits above the tabs (owner, 10 Nov 2026), and steps aside while a move runs full page. */}
@@ -300,7 +309,8 @@ const waitingMoved = (p: Policy) => !!p.movedFrom?.length && p.status === 'draft
    fifty of them can do five a weekend and come back. */
 function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved' | 'all'; /** New policies in two sections: the migrated drafts to review, then the policies made here. */ sectioned?: boolean }) {
   const store = useBrand()
-  const resolveName = useNameLookup()
+  /* Mark as template: one click, no dialog (owner, 18 Nov 2026). */
+  const markTemplate = useSaveAsTemplate()
   const libView = POLICY_VIEW
   const [coverageOn, setCoverageOn] = useState(false)
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -524,9 +534,13 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
         store.go({ name: 'board', policyId: id })
         break
       }
+      /* One item, both ways: marked, it takes the policy off again (owner, 18 Nov 2026). */
+      case 'template':
+        if (markTemplate.marked(policy.id)) markTemplate.unmark(policy)
+        else markTemplate.open(policy)
+        break
       case 'delete':
       case 'assign':
-      case 'template':
       case 'text':
         openDialog(action, policy)
         break
@@ -862,7 +876,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   onOpen: () => setDetails({ id: p.id, open: true }),
                   facts: [
                     { label: 'Apps', value: <PolicyApps policy={p} onAssign={() => act(p, 'assign')} /> },
-                    { label: 'Status', value: <StatusPill status={p.status} /> },
+                    { label: 'Status', value: <span className="btable__marks"><PolicyStatus policy={p} /></span> },
                     { label: 'Last activity', value: activityLabel(lastActivity(p, store.activity, now), now) },
                     ...(showExposure
                       ? [{ label: 'Exposure', value: <PolicyExposure policy={p} gauntlet={grades.get(p.id)} /> }]
@@ -871,7 +885,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   menu: (
                     <RowMenu
                       label={`Actions for ${p.name}`}
-                      items={policyMenu(p, { monitor: monitorOffered(store.features), trySignIn: store.features.trySignIn })}
+                      items={policyMenu(p, { monitor: monitorOffered(store.features), trySignIn: store.features.trySignIn, marked: markTemplate.marked(p.id) })}
                       onSelect={(id) => act(p, id as RowAction)}
                     />
                   ),
@@ -911,18 +925,6 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
           policy={current}
           onClose={closeDialog}
           onCommit={() => markLeaving(current.id)}
-        />
-      )}
-      {dialog && current && dialog.kind === 'template' && (
-        <SaveTemplateDialog
-          open={dialogOpen}
-          policy={openForEditing(current)}
-          onClose={closeDialog}
-          onSave={(t) => {
-            store.addScenario(scenarioFromPolicy(current, t, Date.now(), resolveName))
-            closeDialog()
-            store.showToast(`${t.name.trim()} saved as a template`)
-          }}
         />
       )}
       {/* Read as text: the whole policy as numbered sentences, in a drawer —
@@ -1262,7 +1264,7 @@ const ROW_ICON: Record<RowMenuId, LucideIcon> = {
   monitoring: Eye,
   trail: Waypoints,
   text: AlignLeft,
-  template: LayoutTemplate,
+  template: TemplateIcon,
   duplicate: CopyPlus,
   delete: Trash2,
 }
@@ -1271,8 +1273,8 @@ const ROW_ICON: Record<RowMenuId, LucideIcon> = {
    `rowMenu`'s, where a test pins them. Try a sign-in is the one testing item,
    directly under Edit policy (final spec, E3); the older trail builder is not
    in the showcase build, where the board is the one builder (see showcase.ts). */
-function policyMenu(policy: Policy, { monitor, trySignIn }: { monitor: boolean; trySignIn: boolean }): MenuItem[] {
-  return rowMenu(policy, { monitor, trySignIn, trail: !SHOWCASE }).map((item) => ({
+function policyMenu(policy: Policy, { monitor, trySignIn, marked = false }: { monitor: boolean; trySignIn: boolean; marked?: boolean }): MenuItem[] {
+  return rowMenu(policy, { monitor, trySignIn, trail: !SHOWCASE, marked }).map((item) => ({
     ...item,
     icon: ROW_ICON[item.id],
     ...(item.id === 'delete' ? { danger: true, divide: true } : {}),
@@ -1280,13 +1282,13 @@ function policyMenu(policy: Policy, { monitor, trySignIn }: { monitor: boolean; 
 }
 
 /* A migrated draft's menu (owner, 17 Nov 2026): it is in review, so only review actions. No edit, read as text,
-   template, duplicate or delete; a rejected one goes to support. */
+   template, duplicate or delete. Contact support is on the migration card only (18 Nov 2026). */
 function reviewMenu(review: 'review' | 'approved' | 'rejected'): MenuItem[] {
   return [
     { id: 'review', label: 'Review', icon: Eye },
     { id: 'test', label: 'Check access', icon: LogIn },
     ...(review === 'approved' ? [{ id: 'unapprove', label: 'Take back approval', icon: Undo2, divide: true }] : [{ id: 'approve', label: 'Approve', icon: Check, divide: true }]),
-    ...(review === 'rejected' ? [{ id: 'support', label: 'Contact support', icon: Headset }] : [{ id: 'reject', label: 'Reject', icon: X }]),
+    ...(review === 'rejected' ? [] : [{ id: 'reject', label: 'Reject', icon: X }]),
   ]
 }
 
@@ -1375,12 +1377,37 @@ function MoveNote() {
 }
 
 /* The marks beside a policy's name: System, and a live policy's unpublished edits. */
+/* The template mark beside a policy's name (owner, 18 Nov 2026: "show this icon while hover on the row"). A star that
+   toggles in place, the way a mail list stars a message: on a marked policy it stays, filled; on any other policy that
+   could be a template it shows while the row is hovered or the star has focus, outline, and a press marks it. Pressed
+   again it takes the policy off, with Undo in the toast. The row's ⋯ says the same thing in words. */
+function TemplateMark({ policy }: { policy: Policy }) {
+  const marked = useMarkedAsTemplate(policy.id)
+  const mark = useSaveAsTemplate()
+  /* A migrated draft is in review, and its menu has no template item (owner, 17 Nov 2026), so no star either. */
+  if (!marked && (!canSaveAsTemplate(policy) || waitingMoved(policy))) return null
+  const label = marked ? 'Remove from templates' : 'Mark as template'
+  return (
+    <Tip text={marked ? 'Marked as template' : label}>
+      <button
+        type="button"
+        className={`bpol__template-mark${marked ? ' is-on' : ''}`}
+        aria-label={label}
+        aria-pressed={marked}
+        onClick={() => (marked ? mark.unmark(policy) : mark.open(policy))}
+      >
+        <TemplateIcon size={14} strokeWidth={1.9} fill={marked ? 'currentColor' : 'none'} aria-hidden />
+      </button>
+    </Tip>
+  )
+}
+
 function PolicyMarks({ policy }: { policy: Policy }) {
   /* "From old policy" is gone, and Approved moved to the Status column (owner, 10 Nov 2026). */
   /* Published, it graduates to New policies and keeps a tag saying where it came from (owner, 10 Nov 2026). */
-  if (!policy.isSystem && !policy.pendingDraft) return null
   return (
     <span className="btable__marks">
+      <TemplateMark policy={policy} />
       {policy.isSystem && <Badge tone="system">System</Badge>}
       {policy.pendingDraft && <ChangeState unsaved={false} draft />}
     </span>
@@ -1438,6 +1465,7 @@ function PolicyRow({
   const publishable = !!policy.movedFrom?.length && policy.status === 'draft' && policy.appIds.length > 0
   /* Laid in by Add to Policies, or just made active: one light sweep (finale.css). */
   const lands = landing.includes(policy.id)
+  const asTemplate = useMarkedAsTemplate(policy.id)
   return (
     <tr data-from-old={policy.movedFrom ? 'true' : undefined} className={`${policy.isSystem ? 'is-system' : ''}${at >= 0 && !lands ? ' is-arrived' : ''}${lands ? ' is-landing' : ''}`} style={at >= 0 ? { ['--arrive' as string]: Math.min(at, 12) } : undefined}>
       {/* The row's layout lives on a wrapper INSIDE the cell. `.btable__primary`
@@ -1473,30 +1501,16 @@ function PolicyRow({
       <td className="btable__activity">{activity}</td>
       <td>
         <span className="btable__marks">
-          {old && !!policy.movedFrom?.length && policy.status === 'draft' ? (
-            <>
-              <StatusPill status={policy.status} />
-              {!!movedInfo[policy.id]?.reviewed && <Badge tone="positive">Approved</Badge>}
-            </>
-          ) : review === 'review' ? (
-            <Badge tone="info">Under review</Badge>
-          ) : review === 'approved' ? (
-            <Badge tone="positive">Approved</Badge>
-          ) : review === 'rejected' ? (
-            <Badge tone="negative">Rejected</Badge>
-          ) : (
-            <StatusPill status={policy.status} />
-          )}
-          {migrated && policy.status === 'inactive' && !!facts[policy.id]?.rolledBack && <Badge tone="notice">Rolled back</Badge>}
+          <PolicyStatus policy={policy} />
         </span>
       </td>
       {nextStep && (
         <td className="btable__next">
-          {/* Rejected cannot be published until it is approved again inside (owner, 17 Nov 2026): support instead. */}
+          {/* Rejected cannot be published until it is approved again inside (owner, 17 Nov 2026); Contact support lives
+              on the migration card only, never on the row (owner, 18 Nov 2026). */}
           {review === 'rejected' ? (
-            <Button variant="secondary" size="sm" icon={Headset} onClick={() => showToast('Contact support: this flow is planned next')}>
-              Contact support
-            </Button>
+            /* What happens next, in words (owner, 18 Nov 2026): support is on the Reject card above the list. */
+            <span className="btable__hint">Contact support from the Reject card</span>
           ) : review === 'review' ? (
             /* Not reviewed yet: Review first; Publish comes once it is approved (owner, 17 Nov 2026). */
             <Button variant="secondary" size="sm" icon={Eye} onClick={onOpen}>
@@ -1516,11 +1530,15 @@ function PolicyRow({
         <RowMenu
           label={`Actions for ${policy.name}`}
           items={review ? reviewMenu(review) : [
-            ...policyMenu(policy, { monitor, trySignIn }),
+            ...policyMenu(policy, { monitor, trySignIn, marked: asTemplate }),
             ...(migrated && policy.status === 'active' && onRollBack ? [{ id: 'rollback', label: 'Roll back to old policy', icon: Undo2, divide: true }] : []),
+            /* A migrated policy once live or rolled back (owner, 18 Nov 2026): help from miniOrange. Drafts in review reach
+               support from the migration card only. */
+            ...(migrated ? [{ id: 'support', label: 'Contact support', icon: Headset, divide: !(policy.status === 'active' && onRollBack) }] : []),
           ]}
           onSelect={(id) => {
             if (id === 'rollback') return onRollBack?.()
+            if (id === 'support') return showToast('Contact support: this flow is planned next')
             if (id === 'review') return onOpen()
             if (id === 'approve') {
               reviewMoved(policy.id, true)
@@ -1529,7 +1547,6 @@ function PolicyRow({
             }
             if (id === 'unapprove') return reviewMoved(policy.id, false)
             if (id === 'reject') return setRejecting(true)
-            if (id === 'support') return showToast('Contact support: this flow is planned next')
             onAction(id as RowAction)
           }}
         />

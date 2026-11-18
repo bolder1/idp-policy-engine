@@ -25,6 +25,7 @@ import { GuardDrawer } from './guard-page'
 import { policyOption } from './policy-option'
 import { fallbackOf } from './simulate'
 import { portalRoot } from './status-options'
+import { PolicyStatus } from '../migrate/moved-status'
 
 /* -----------------------------------------------------------------------------
    What protects one application, and the form for adding to it.
@@ -463,7 +464,7 @@ export function PolicyRow({
           <span className="u-muted">
             {who} · {rulesLabel(p)} · Nothing else matched: {DECISION_WORDS[fallbackOf(p)]}
           </span>
-          <StatusPill status={p.status} />
+          <PolicyStatus policy={p} />
         </span>
       </div>
       {/* No "Turn on" here. Publishing belongs to the builder, with the rules

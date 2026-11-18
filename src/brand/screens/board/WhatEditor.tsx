@@ -550,6 +550,7 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
       <CheckRow
         label="Remember MFA"
         hint="Don't ask for the second factor again on the same device for a number of days."
+        more="After someone passes the second factor, that browser on that device is trusted for the number of days you set. Until then they sign in with the first factor only. A new device, another browser or cleared cookies asks again. Force MFA on each login overrides this."
         checked={rule.rememberMfa}
         onChange={(rememberMfa) => onPatch({ rememberMfa })}
       />
@@ -599,12 +600,14 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
       <CheckRow
         label="Force MFA on each login"
         hint="Ask for the second factor at every sign-in, even on a device that is remembered."
+        more="Every sign-in this rule matches asks for the second factor, with no trusted devices and no days off. It works whether Remember MFA is on or not, and wins when both are ticked. Use it for sensitive applications."
         checked={rule.forceMfaEachLogin ?? false}
         onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })}
       />
       <CheckRow
         label="Allow end users to disable 2FA"
         hint="People can turn off two-step verification for their own account."
+        more="People get a switch in their own account settings to turn off the second factor. Once they turn it off, this rule signs them in with the first factor only, until they turn it back on. Leave it unticked where a second factor is required."
         checked={rule.allowDisable2fa}
         onChange={(allowDisable2fa) => onPatch({ allowDisable2fa })}
       />

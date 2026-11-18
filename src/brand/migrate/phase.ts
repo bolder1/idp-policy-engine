@@ -14,3 +14,8 @@
    Off: the rail and the Policies tabs are as they were before 6 Nov 2026.
    -------------------------------------------------------------------------- */
 export const MIGRATION_FIRST: boolean = true
+
+/* The Policies head's review pickers, Start, Experience and Banner (owner, 18 Nov 2026: "everything is fixed now, the
+   current version is perfect, no more dropdowns"). Off: the pickers are hidden and the values pinned to With policies,
+   Today and the cards. Kept, not deleted: turning it on brings the comparison back. */
+export const MIGRATION_PICKERS: boolean = false

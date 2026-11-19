@@ -796,13 +796,13 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                 check access button"): the week's sign-ins and why any were refused. */}
             {/* None of the three in Under review (owner, 12 Nov 2026: "can remove"): that list is for reviewing, not for testing. */}
             {origin !== 'moved' && DENIAL_REASONS && screenOffered({ name: 'sign-in-tests' }, store.features) && (
-              <Button variant="secondary" icon={ListChecks} onClick={() => store.go({ name: 'sign-in-activity' })}>
-                Sign-in activity
+              <Button variant="secondary" icon={ListChecks} title="Sign-in activity" onClick={() => store.go({ name: 'sign-in-activity' })}>
+                <span className="bbar__label">Sign-in activity</span>
               </Button>
             )}
             {origin !== 'moved' && screenOffered({ name: 'sign-in-tests' }, store.features) && (
-              <Button variant="secondary" icon={LogIn} onClick={() => store.go({ name: 'sign-in-tests' })}>
-                {ACCESS_CHECK}
+              <Button variant="secondary" icon={LogIn} title={ACCESS_CHECK} onClick={() => store.go({ name: 'sign-in-tests' })}>
+                <span className="bbar__label">{ACCESS_CHECK}</span>
               </Button>
             )}
             {origin !== 'moved' && (

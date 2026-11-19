@@ -95,17 +95,19 @@ export function MoreFilters({
         className={`bmf__trigger ${anySet(value) ? 'is-set' : ''}`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        title="More filters"
         onClick={() => setOpen((o) => !o)}
       >
         <SlidersHorizontal size={14} strokeWidth={2} aria-hidden />
-        More filters
+        <span className="bmf__label">More filters</span>
       </button>
 
       {/* One chip for everything applied (owner, 19 Nov 2026: "merge all into one"): its × clears them all, a click
           reopens the dropdown on the first applied attribute. */}
       {anySet(value) && (
         <Chip active onClick={() => openAt(FILTER_ORDER.find((k) => isSet(value, k)) ?? 'app')} removable onRemove={() => onChange(NO_FILTERS)}>
-          <b>{chipText()}</b>
+          {/* The chip cuts off with an ellipsis when the bar is short of room; the title keeps the whole list. */}
+          <b title={chipText()}>{chipText()}</b>
         </Chip>
       )}
 

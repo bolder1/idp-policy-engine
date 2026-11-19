@@ -22,6 +22,9 @@ export const ROLLOUT = {
   /** The customizable Dashboard and its Classic / New switch (18-19 Nov, dashboard/phase.ts). Design only (owner,
    *  19 Nov: "the dashboard is for design only"). Dev handoff and Tester keep Classic until he has checked it. */
   dashboardV2: ['design'],
+  /** All Policies → More filters, its one chip and its button (19 Nov: 25b0bd7, 7c29103, c76c28a). Pushed to every
+   *  line before the Design-only rule; taken back to Design on the owner's word ("Move to Design only"). */
+  moreFilters: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

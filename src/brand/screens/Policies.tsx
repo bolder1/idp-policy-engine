@@ -41,6 +41,7 @@ import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import type { LibView, ViewOption } from './library-view-state'
 import { PageBar } from './page-bar'
 import { MoreFilters } from './more-filters'
+import { shows } from '../rollout'
 import { NO_FILTERS, anySet, policyMatches, type PolicyFilters } from './more-filters-model'
 import { Picker } from '../picker'
 import { appsOf, blankPolicy, enforces, type Policy } from '../data'
@@ -116,6 +117,9 @@ const POLICY_KINDS: { value: PolicyKind; label: string }[] = MIGRATION_FIRST
    Post sign-in again. A convenience only. Storage is read first; where it is
    blocked or empty, the module copy still holds the tab for this visit, and
    with neither the page opens on Sign-in. */
+/* All Policies' More filters (19 Nov): Design only until the owner has checked it (rollout.ts `moreFilters`). */
+const MORE_FILTERS: boolean = shows('moreFilters')
+
 const KIND_KEY = 'brand-policies-type'
 let lastKind: PolicyKind | null = null
 
@@ -767,7 +771,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   onChange={(v) => setStatus(v as StatusFilter)}
                 />
               </span>
-              <MoreFilters value={more} onChange={setMore} apps={store.apps} users={store.users} groups={store.groups} />
+              {MORE_FILTERS && <MoreFilters value={more} onChange={setMore} apps={store.apps} users={store.users} groups={store.groups} />}
             </>
           )
         }

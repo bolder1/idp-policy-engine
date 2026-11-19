@@ -1,3 +1,5 @@
+import { shows } from '../rollout'
+
 /* The tenant's general rules for two-step verification (owner, 21 Oct 2026): who must use it, and the rules around it. */
 export interface AuthGeneral {
   /** Two-step verification is required of: this admin, every user, the other admins. */
@@ -33,8 +35,11 @@ export const AUTH_GENERAL_SEED: AuthGeneral = {
   mobileIssuer: 'miniOrange',
 }
 
-/* The Users row of "Two-step verification is required for". Off (owner, 19 Nov 2026: "Hide this"). Kept, not deleted. */
-export const USERS_2FA_ROW: boolean = false
+/* The Users row of "Two-step verification is required for" goes, and Mobile issuer name comes in after Additional
+   admins (owner, 19 Nov 2026: "Hide this and add mobile issuer name"). Both follow the rollout table's `mobileIssuer`
+   entry; a line without it keeps the Users row and has no issuer field. Kept, not deleted. */
+export const MOBILE_ISSUER: boolean = shows('mobileIssuer')
+export const USERS_2FA_ROW: boolean = !MOBILE_ISSUER
 
 /* The Verification rules slide-over: the button beside the page's heading and the panel it opens
    (auth-general-settings.tsx). Off (owner, 21 Oct 2026: "hide this for now"). The same rows are on the page's own

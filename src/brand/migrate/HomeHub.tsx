@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useReducedMotion } from 'motion/react'
 import { AppWindow, ArrowRight, Check, ListChecks, ScanSearch, ShieldCheck, Shapes } from 'lucide-react'
 import { PageHead } from '../Shell'
@@ -24,7 +25,7 @@ import './home-hub.css'
    Under it, the places an admin opens most.
    -------------------------------------------------------------------------- */
 
-export function HomeHub() {
+export function HomeHub({ preview }: { preview?: ReactNode } = {}) {
   const store = useBrand()
   const reduce = useReducedMotion() === true
   const setup = useSetupSteps()
@@ -33,7 +34,7 @@ export function HomeHub() {
 
   return (
     <div className="bpage bhome">
-      <PageHead title="Dashboard" caption="Your tenant, and what is new in it." />
+      <PageHead title="Dashboard" caption="Your tenant, and what is new in it." preview={preview} />
 
       {setup.any && setup.next && !reviewing ? (
         <section className="bhub bhub--steps" aria-label="Finish moving to the new builder">

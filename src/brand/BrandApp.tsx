@@ -14,6 +14,8 @@ import { FRESH_BUILDER } from './migrate/legacy'
 import { IntroCarousel } from './migrate/IntroCarousel'
 import { MoveTour } from './migrate/MoveTour'
 import { HomeHub } from './migrate/HomeHub'
+import { DashboardHome } from './dashboard/DashboardHome'
+import { DASHBOARD_V2 } from './dashboard/phase'
 import { MigrationGuide } from './migrate/MigrationGuide'
 import { guideRequested } from './migrate/guide-link'
 import './theme-mode'
@@ -157,7 +159,7 @@ function ScreenBody() {
     case 'apps':
       return <UserApps />
     case 'home':
-      return <HomeHub />
+      return DASHBOARD_V2 ? <DashboardHome /> : <HomeHub />
     case 'policies':
       return <Policies />
     case 'builder':

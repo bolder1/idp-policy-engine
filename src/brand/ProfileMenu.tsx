@@ -1,9 +1,13 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { History, LayoutGrid, Lock, LogOut, UserRound } from 'lucide-react'
+import { Check, History, LayoutGrid, Lock, LogOut, ScrollText, UserRound } from 'lucide-react'
 
 import { Tip } from './kit'
+import { DesignLock } from './DesignLock'
+import { AccessLog } from './AccessLog'
+import { FORCED_TESTER, HOME_LINE, LINE, LINE_EMAIL, LINE_NAMES, linesFor, needsLock, signOut, switchLine } from './lines'
+import type { Line } from './lines'
 import { MIGRATION_FIRST, START_AFTER_MIGRATION, bringBackOldPolicies } from './migrate/phase'
 import { useBrand } from './store'
 import { SHOWCASE } from './showcase'
@@ -42,6 +46,17 @@ let focusAvatarOnMount = false
 export function ProfileMenu() {
   const { role, setRole, account, migrationStarted } = useBrand()
   const [open, setOpen] = useState(false)
+  /* Roles (owner, 19 Nov 2026): the views this sign-in may open, decided by who signed in (HOME_LINE), not by the
+     view open now. A designer sees all three and comes back to Design freely; anyone else asks for the passphrase. */
+  const [locking, setLocking] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
+  const roles: Line[] = LINE && HOME_LINE && !FORCED_TESTER ? linesFor(HOME_LINE) : []
+  const pickLine = (l: Line) => {
+    close(false)
+    if (l === LINE) return
+    if (needsLock(HOME_LINE, l)) setLocking(true)
+    else switchLine(l)
+  }
   const wrap = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const pop = useRef<HTMLDivElement>(null)
@@ -81,7 +96,7 @@ export function ProfileMenu() {
     }
   }, [open])
 
-  const items = () => [...(pop.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])]
+  const items = () => [...(pop.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"], [role="menuitemradio"]') ?? [])]
 
   /* Focus the first item once the menu is in the page. */
   useEffect(() => {
@@ -200,11 +215,69 @@ export function ProfileMenu() {
               </>
             )}
 
+            {roles.length > 1 && (
+              <>
+                <span className="bmenu__rule" />
+                <span className="bpm__group" role="presentation">
+                  Role
+                </span>
+                {roles.map((l) => (
+                  <button
+                    key={l}
+                    role="menuitemradio"
+                    aria-checked={l === LINE}
+                    type="button"
+                    className="bpm__role"
+                    onClick={() => pickLine(l)}
+                  >
+                    {needsLock(HOME_LINE, l) && l !== LINE ? (
+                      <Lock size={14} strokeWidth={1.9} aria-hidden />
+                    ) : (
+                      <Check size={14} strokeWidth={1.9} aria-hidden style={{ visibility: l === LINE ? 'visible' : 'hidden' }} />
+                    )}
+                    {LINE_NAMES[l]}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* The owner's log: a designer's sign-in, whatever view is open. */}
+            {HOME_LINE === 'design' && (
+              <button
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  close(false)
+                  setLogOpen(true)
+                }}
+              >
+                <ScrollText size={14} strokeWidth={1.9} aria-hidden />
+                Access log
+              </button>
+            )}
+
             <span className="bmenu__rule" />
-            {unbuilt('Sign out', LogOut)}
+            {LINE && !FORCED_TESTER ? (
+              <button role="menuitem" type="button" onClick={signOut}>
+                <LogOut size={14} strokeWidth={1.9} aria-hidden />
+                Sign out
+              </button>
+            ) : (
+              unbuilt('Sign out', LogOut)
+            )}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {locking && (
+        <DesignLock
+          email={LINE_EMAIL}
+          from={LINE ?? 'sign-in'}
+          onClose={() => setLocking(false)}
+          onUnlocked={() => switchLine('design')}
+        />
+      )}
+      {logOpen && <AccessLog onClose={() => setLogOpen(false)} />}
     </div>
   )
 }

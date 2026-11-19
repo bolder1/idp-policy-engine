@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { BrandApp } from './brand/BrandApp'
+import { SignIn } from './brand/SignIn'
+import { LINE } from './brand/lines'
 
 // Brand revamp (default) — tokens generated from the design-system repo.
 import './brand/tokens.css'
@@ -93,6 +95,8 @@ import './brand/tour/tour.css'
 // After tour.css, which owns the card, scrim, ring and beak this one extends.
 import './brand/tour/board-tour.css'
 import './brand/tour/demo-player.css'
+// The new Dashboard: the board, its widgets and charts, Add widgets and the template gallery.
+import './brand/dashboard/dashboard.css'
 // Last — it overrides both the token values and a handful of shell rules to
 // match the console in production. See above for what depends on that.
 import './brand/console-theme.css'
@@ -121,6 +125,6 @@ else applyBrand(readBrand())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrandApp />
+    {LINE ? <BrandApp /> : <SignIn />}
   </StrictMode>,
 )

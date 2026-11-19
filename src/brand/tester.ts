@@ -1,5 +1,6 @@
 import type { Features } from './edition'
 import type { BrandScreen } from './store'
+import { LINE } from './lines'
 
 /* -----------------------------------------------------------------------------
    The phase 1 tester build (owner, 18 Nov 2026: "provide a link for our testers ... with a completely empty
@@ -14,7 +15,8 @@ import type { BrandScreen } from './store'
        them (Device risk score, External hook).
    Finished work, hidden for this build, not deleted.
    -------------------------------------------------------------------------- */
-export const TESTER: boolean = import.meta.env.MODE === 'tester'
+/* 19 Nov 2026: the line the sign-in chose (lines.ts); the tester deploy is always this line. */
+export const TESTER: boolean = LINE === 'tester'
 
 /* -----------------------------------------------------------------------------
    Promoted from the tester build to every build (owner, 18 Nov 2026: "we made some necessary changes in the testing

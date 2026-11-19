@@ -16,6 +16,8 @@ export interface AuthGeneral {
   notify: boolean
   /** Failed attempts in a row before the person is locked out for a while. */
   lockAfter: string
+  /** The name authenticator apps show above the code. */
+  mobileIssuer: string
 }
 
 export const AUTH_GENERAL_SEED: AuthGeneral = {
@@ -28,7 +30,11 @@ export const AUTH_GENERAL_SEED: AuthGeneral = {
   reauth: true,
   notify: true,
   lockAfter: '5',
+  mobileIssuer: 'miniOrange',
 }
+
+/* The Users row of "Two-step verification is required for". Off (owner, 19 Nov 2026: "Hide this"). Kept, not deleted. */
+export const USERS_2FA_ROW: boolean = false
 
 /* The Verification rules slide-over: the button beside the page's heading and the panel it opens
    (auth-general-settings.tsx). Off (owner, 21 Oct 2026: "hide this for now"). The same rows are on the page's own

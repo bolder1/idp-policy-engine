@@ -40,6 +40,8 @@ import { Badge, Button, Confirm, Modal, RowMenu, SearchBox, StatusPill, Tabs, Ti
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import type { LibView, ViewOption } from './library-view-state'
 import { PageBar } from './page-bar'
+import { MoreFilters } from './more-filters'
+import { NO_FILTERS, anySet, policyMatches, type PolicyFilters } from './more-filters-model'
 import { Picker } from '../picker'
 import { appsOf, blankPolicy, enforces, type Policy } from '../data'
 import { useBrand } from '../store'
@@ -331,6 +333,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
   const [coverageOn, setCoverageOn] = useState(false)
   const [status, setStatus] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
+  const [more, setMore] = useState<PolicyFilters>(NO_FILTERS)
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
   /* The row dialogs. `dialog` keeps the policy while the dialog animates out,
      including after a delete has removed it from the store. */
@@ -453,6 +456,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
       if ((status === 'draft' || status === 'monitor' || status === 'inactive') && p.status !== status) return false
       /* By the policy's name or by an application it covers (owner, 18 Nov 2026: "search by policy or application"). */
       if (q && !p.name.toLowerCase().includes(q) && !p.appIds.some((id) => store.apps.find((a) => a.id === id)?.name.toLowerCase().includes(q))) return false
+      if (!policyMatches(p, more, { users: store.users, now: Date.now(), lastChanged: (x) => lastActivity(x, store.activity, Date.now())?.at })) return false
       return true
     })
     list = [...list].sort((a, b) => {
@@ -481,14 +485,14 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
     })
     // System policy is pinned regardless of sort — it always evaluates.
     return [...list.filter((p) => p.isSystem), ...list.filter((p) => !p.isSystem)]
-  }, [signIn, status, q, sort, grades, store.activity, store.apps])
+  }, [signIn, status, q, sort, grades, store.activity, store.apps, store.users, more])
 
   const deciding = useMemo(() => signIn.filter(enforces).length, [signIn])
 
   /* Counted across everything graded, not just the filtered rows. */
   const leaking = [...grades.values()].filter((r) => r.breaches > 0).length
 
-  const filtered = status !== 'all'
+  const filtered = status !== 'all' || anySet(more)
   const systemPolicy = signIn.find((p) => p.isSystem)
   /* A tenant with nothing but the system policy: the list is empty in every
      sense that matters, though the pinned row is there. */
@@ -592,6 +596,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
           onClear={() => {
             setStatus('all')
             setQuery('')
+            setMore(NO_FILTERS)
           }}
         />
       )}
@@ -762,6 +767,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   onChange={(v) => setStatus(v as StatusFilter)}
                 />
               </span>
+              <MoreFilters value={more} onChange={setMore} apps={store.apps} users={store.users} groups={store.groups} />
             </>
           )
         }

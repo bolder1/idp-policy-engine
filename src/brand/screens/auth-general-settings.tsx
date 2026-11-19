@@ -2,7 +2,7 @@ import { useId } from 'react'
 
 import { Drawer, Toggle } from '../kit'
 import { Picker } from '../picker'
-import { MORE_GENERAL_SETTINGS, type AuthGeneral } from './auth-general'
+import { MORE_GENERAL_SETTINGS, USERS_2FA_ROW, type AuthGeneral } from './auth-general'
 
 /* -----------------------------------------------------------------------------
    GENERAL SETTINGS of Authentication methods (owner, 21 Oct 2026: "a general settings for authentication methods, so the
@@ -69,11 +69,24 @@ export function GeneralSettings({ value, onChange }: { value: AuthGeneral; onCha
             <Toggle checked={value.forMe} onChange={(v) => set('forMe', v)} label="Require two-step verification for me" />
           </Row>
         )}
-        <Row title="Users" hint="Everyone who signs in to an application.">
-          <Toggle checked={value.forUsers} onChange={(v) => set('forUsers', v)} label="Require two-step verification for users" />
-        </Row>
+        {USERS_2FA_ROW && (
+          <Row title="Users" hint="Everyone who signs in to an application.">
+            <Toggle checked={value.forUsers} onChange={(v) => set('forUsers', v)} label="Require two-step verification for users" />
+          </Row>
+        )}
         <Row title="Additional admins" hint="Every other administrator of this tenant.">
           <Toggle checked={value.forAdmins} onChange={(v) => set('forAdmins', v)} label="Require two-step verification for additional admins" />
+        </Row>
+        {/* Owner, 19 Nov 2026: "add mobile issuer name after additional admin". */}
+        <Row title="Mobile issuer name" hint="Shown above the code in authenticator apps.">
+          <input
+            className="bm8__gtext-input"
+            type="text"
+            value={value.mobileIssuer}
+            onChange={(e) => set('mobileIssuer', e.target.value)}
+            aria-label="Mobile issuer name"
+            spellCheck={false}
+          />
         </Row>
       </section>
 

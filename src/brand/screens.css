@@ -762,37 +762,38 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
      ≤ 1080px      Sign-in activity and Check access drop their words to their icons (the title names them)
      ≤ 820px       More filters drops its words too, and Status its prefix
    New policy keeps its words: it is the page's one orange button. The bar is a size container, which makes it its
-   own stacking context, so it sits above the table for the More filters dropdown to open over the rows. */
-.bpol__main > .bbar {
+   own stacking context, so it sits above the table for the More filters dropdown to open over the rows.
+   Design only: Policies.tsx adds .is-one-line where rollout.ts `oneLineBar` shows. */
+.bpol__main.is-one-line > .bbar {
   flex-wrap: nowrap;
   container: bpolbar / inline-size;
   position: relative;
   z-index: 2;
 }
-.bpol__main > .bbar .bbar__left { flex-wrap: nowrap; }
-.bpol__main > .bbar .bx-search { flex: 0 1 300px; min-width: 160px; }
-.bpol__main > .bbar :is(.bbar__filter, .bmf__trigger, .bbar__right .bx-btn) { flex: none; white-space: nowrap; }
-.bpol__main > .bbar .bmf { flex-wrap: nowrap; flex: 0 1 auto; }
-.bpol__main > .bbar .bmf .bx-chip { flex: 0 1 auto; min-width: 96px; }
-.bpol__main > .bbar .bmf .bx-chip__main { min-width: 0; }
-.bpol__main > .bbar .bmf .bx-chip__main b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bpol__main > .bbar .bmf .bx-chip__x { flex: none; }
+.bpol__main.is-one-line > .bbar .bbar__left { flex-wrap: nowrap; }
+.bpol__main.is-one-line > .bbar .bx-search { flex: 0 1 300px; min-width: 160px; }
+.bpol__main.is-one-line > .bbar :is(.bbar__filter, .bmf__trigger, .bbar__right .bx-btn) { flex: none; white-space: nowrap; }
+.bpol__main.is-one-line > .bbar .bmf { flex-wrap: nowrap; flex: 0 1 auto; }
+.bpol__main.is-one-line > .bbar .bmf .bx-chip { flex: 0 1 auto; min-width: 96px; }
+.bpol__main.is-one-line > .bbar .bmf .bx-chip__main { min-width: 0; }
+.bpol__main.is-one-line > .bbar .bmf .bx-chip__main b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bpol__main.is-one-line > .bbar .bmf .bx-chip__x { flex: none; }
 
 /* The steps repeat the base rules' selectors, so they win on order rather than lose on specificity. */
 @container bpolbar (max-width: 1080px) {
-  .bpol__main > .bbar .bbar__right .bbar__label { display: none; }
+  .bpol__main.is-one-line > .bbar .bbar__right .bbar__label { display: none; }
 }
 @container bpolbar (max-width: 820px) {
-  .bpol__main > .bbar .bmf .bmf__label,
-  .bpol__main > .bbar .bbar__filter .bx-picker__prefix { display: none; }
-  .bpol__main > .bbar .bx-search { min-width: 104px; }
-  .bpol__main > .bbar .bmf .bx-chip { min-width: 72px; }
+  .bpol__main.is-one-line > .bbar .bmf .bmf__label,
+  .bpol__main.is-one-line > .bbar .bbar__filter .bx-picker__prefix { display: none; }
+  .bpol__main.is-one-line > .bbar .bx-search { min-width: 104px; }
+  .bpol__main.is-one-line > .bbar .bmf .bx-chip { min-width: 72px; }
 }
 /* A phone is the one exception: under ~680px nothing fits on one line short of dropping controls, so the bar wraps
    rather than lay one control over another. */
 @media (max-width: 680px) {
-  .bpol__main > .bbar { flex-wrap: wrap; row-gap: var(--space-4); }
-  .bpol__main > .bbar .bbar__left { flex-wrap: wrap; row-gap: var(--space-4); }
+  .bpol__main.is-one-line > .bbar { flex-wrap: wrap; row-gap: var(--space-4); }
+  .bpol__main.is-one-line > .bbar .bbar__left { flex-wrap: wrap; row-gap: var(--space-4); }
 }
 
 /* --- The same library as a table, and as cards (`library-view.tsx`) ------------

@@ -119,6 +119,8 @@ const POLICY_KINDS: { value: PolicyKind; label: string }[] = MIGRATION_FIRST
    with neither the page opens on Sign-in. */
 /* All Policies' More filters (19 Nov): Design only until the owner has checked it (rollout.ts `moreFilters`). */
 const MORE_FILTERS: boolean = shows('moreFilters')
+/* The bar on one line, its buttons dropping to icons as it narrows (19 Nov): Design only (rollout.ts `oneLineBar`). */
+const ONE_LINE_BAR: boolean = shows('oneLineBar')
 
 const KIND_KEY = 'brand-policies-type'
 let lastKind: PolicyKind | null = null
@@ -255,7 +257,7 @@ export function Policies() {
     return (
       <div className="bpage">
         <PageHead title="Policies" caption="Every sign-in is checked against these policies." docs />
-        <div className="bpol__main">
+        <div className={ONE_LINE_BAR ? 'bpol__main is-one-line' : 'bpol__main'}>
           <SignInPolicies key="new" origin="new" />
         </div>
       </div>
@@ -296,7 +298,7 @@ export function Policies() {
       {/* Each tab brings its own bar and list; a fragment, so they stay rows of
           the page grid as they were before the tabs. */}
       {shown === 'sign-in' ? (
-        <div className="bpol__main">
+        <div className={ONE_LINE_BAR ? 'bpol__main is-one-line' : 'bpol__main'}>
           {/* Live and In review (owner, 12 Nov 2026: "segregate both types of policies inside the new policy"): a segment
               control over two lists. It appears once something has migrated; before that there is one list. */}
           {hasMoved && <Tabs<NewSub> className="bpol__sub" name="Policies by state" value={sub} onChange={setSub} options={isBuilt(experience) ? NEW_SUBS : NEW_SUBS_REVIEW} />}
@@ -796,12 +798,12 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                 check access button"): the week's sign-ins and why any were refused. */}
             {/* None of the three in Under review (owner, 12 Nov 2026: "can remove"): that list is for reviewing, not for testing. */}
             {origin !== 'moved' && DENIAL_REASONS && screenOffered({ name: 'sign-in-tests' }, store.features) && (
-              <Button variant="secondary" icon={ListChecks} title="Sign-in activity" onClick={() => store.go({ name: 'sign-in-activity' })}>
+              <Button variant="secondary" icon={ListChecks} title={ONE_LINE_BAR ? 'Sign-in activity' : undefined} onClick={() => store.go({ name: 'sign-in-activity' })}>
                 <span className="bbar__label">Sign-in activity</span>
               </Button>
             )}
             {origin !== 'moved' && screenOffered({ name: 'sign-in-tests' }, store.features) && (
-              <Button variant="secondary" icon={LogIn} title={ACCESS_CHECK} onClick={() => store.go({ name: 'sign-in-tests' })}>
+              <Button variant="secondary" icon={LogIn} title={ONE_LINE_BAR ? ACCESS_CHECK : undefined} onClick={() => store.go({ name: 'sign-in-tests' })}>
                 <span className="bbar__label">{ACCESS_CHECK}</span>
               </Button>
             )}

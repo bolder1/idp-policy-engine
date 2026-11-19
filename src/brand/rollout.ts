@@ -25,6 +25,8 @@ export const ROLLOUT = {
   /** All Policies → More filters, its one chip and its button (19 Nov: 25b0bd7, 7c29103, c76c28a). Pushed to every
    *  line before the Design-only rule; taken back to Design on the owner's word ("Move to Design only"). */
   moreFilters: ['design'],
+  /** All Policies' bar on one line: its buttons drop to icons as it narrows (19 Nov). Design only. */
+  oneLineBar: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

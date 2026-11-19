@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { lineForEmail, linesFor, needsLock, resolveLine } from './lines'
 
 /* Who may open which view (owner, 19 Nov 2026): the designer sees all three; developers never see Tester; testers
-   never see Dev handoff; Design is offered to everyone behind the passphrase. */
+   never see Dev handoff; neither is offered Design (19 Nov 2026). */
 
 describe('the views each sign-in may open', () => {
   it('gives the designer all three', () => {
@@ -20,8 +20,12 @@ describe('the views each sign-in may open', () => {
     expect(linesFor('tester')[0]).toBe('tester')
   })
 
-  it('offers Design to everyone, locked for all but the designer', () => {
-    for (const home of ['design', 'handoff', 'tester'] as const) expect(linesFor(home)).toContain('design')
+  it('never offers Design to a developer or a tester (19 Nov 2026)', () => {
+    expect(linesFor('handoff')).toEqual(['handoff'])
+    expect(linesFor('tester')).toEqual(['tester'])
+  })
+
+  it('locks Design for all but the designer', () => {
     expect(needsLock('handoff', 'design')).toBe(true)
     expect(needsLock('tester', 'design')).toBe(true)
     expect(needsLock(null, 'design')).toBe(true)
@@ -33,7 +37,12 @@ describe('the views each sign-in may open', () => {
 describe('the view a load opens', () => {
   it('keeps a stored view this sign-in may open', () => {
     expect(resolveLine('design', 'tester')).toBe('tester')
-    expect(resolveLine('handoff', 'design')).toBe('design')
+    expect(resolveLine('design', 'handoff')).toBe('handoff')
+  })
+
+  it('sends a developer or tester who had Design stored back to their own view', () => {
+    expect(resolveLine('handoff', 'design')).toBe('handoff')
+    expect(resolveLine('tester', 'design')).toBe('tester')
   })
 
   it('falls back to its own view when the stored one is off limits', () => {

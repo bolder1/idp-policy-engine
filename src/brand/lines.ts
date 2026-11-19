@@ -54,13 +54,13 @@ function lineForDomain(clean: string): Line | null {
 
 /**
  * The views a sign-in may open, its own first (owner, 19 Nov 2026: "the developers cannot see the tester view, only
- * the designer can; the tester can't see the dev view"). Design is offered to everyone, behind the passphrase.
+ * the designer can; the tester can't see the dev view"). Design is not offered to Dev handoff or Tester at all (owner,
+ * 19 Nov 2026: "don't showcase design ... in both dev and tester"): they see their own line and no Role menu.
  * `home` is who signed in (the email's line), not the view open now.
  */
 export function linesFor(home: Line): Line[] {
   if (home === 'design') return ['design', 'handoff', 'tester']
-  if (home === 'handoff') return ['handoff', 'design']
-  return ['tester', 'design']
+  return [home]
 }
 
 /** Whether opening `to` asks for the passphrase: Design does, unless a designer signed in. */
@@ -128,22 +128,16 @@ export function signOut() {
 }
 
 /* ---- The Design lock --------------------------------------------------------------------------------------------
-   The passphrase is never in the code. The owner sets it in .env.local (gitignored), and a Vite env var carries only
-   its SHA-256 hex: VITE_DESIGN_HASH. With no hash set, Design cannot be unlocked at all. */
+   A plain passphrase in the code (owner, 19 Nov 2026: "just store a password into the code itself ... just a gimmick, I
+   don't need any actual security"). The repo is public, so anyone reading it can find this: it keeps Design out of
+   casual sight, nothing more. Exact match, case sensitive. */
 
-const DESIGN_HASH: string = (import.meta.env.VITE_DESIGN_HASH ?? '').trim().toLowerCase()
+const DESIGN_PASSPHRASE = 'Forgotpass@1'
 
-export const DESIGN_LOCK_SET = DESIGN_HASH.length === 64
-
-async function sha256(text: string): Promise<string> {
-  const bytes = new TextEncoder().encode(text)
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+export const DESIGN_LOCK_SET = true
 
 export async function passphraseMatches(phrase: string): Promise<boolean> {
-  if (!DESIGN_LOCK_SET) return false
-  return (await sha256(phrase)) === DESIGN_HASH
+  return phrase === DESIGN_PASSPHRASE
 }
 
 /* ---- The access log --------------------------------------------------------------------------------------------- */

@@ -116,6 +116,13 @@
   font-weight: 500;
 }
 .bshell__item.is-inert { color: var(--shell-text); }
+/* Locked outside Design (rail-lock.ts): dimmed, not hoverable, a lock at the end. */
+.bshell__item.is-locked,
+.bshell__subitem.is-locked { opacity: 0.5; cursor: not-allowed; }
+.bshell__item.is-locked:hover,
+.bshell__subitem.is-locked:hover { background: transparent; }
+.bshell__lock { flex: none; margin-left: auto; }
+.bshell__subitem.is-locked { display: flex; align-items: center; }
 
 .bshell__ico { flex: none; }
 .bshell__item-label { flex: 1; min-width: 0; }

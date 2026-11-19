@@ -39,6 +39,7 @@ import {
   IdCard,
   KeyRound,
   LayoutGrid,
+  Lock,
   type LucideIcon,
   MonitorSmartphone,
   Moon,
@@ -64,6 +65,7 @@ import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
 import { METHODS_NEW, TESTER } from './tester'
+import { LOCK_EMPTY_TABS, LOCKED_TIP } from './rail-lock'
 import { GlobalSearch } from './GlobalSearch'
 import { GLOBAL_SEARCH, type SearchSources } from './global-search'
 import { ACCESS_CHECKS } from './screens/sign-in-tests/names'
@@ -714,25 +716,30 @@ export function Shell({ children }: { children: ReactNode }) {
                         : item.badge
                 const name = badge ? `${item.label}, ${badge}` : item.label
                 /* A group with one built page in it is not "not built". */
-                const caveat = item.screen || item.children?.some((c) => c.screen) ? null : NOT_BUILT
+                const empty = !(item.screen || item.children?.some((c) => c.screen))
+                /* Outside Design, an item with no page is locked (rail-lock.ts). */
+                const locked = LOCK_EMPTY_TABS && empty
+                const caveat = locked ? LOCKED_TIP : empty ? NOT_BUILT : null
                 const collapsedTip = caveat ? `${name}. ${caveat}` : name
                 const tip = collapsed ? collapsedTip : caveat
                 const row = (
                   <button
                     type="button"
-                    className={`bshell__item ${active ? 'is-active' : ''} ${caveat ? 'is-inert' : ''}`}
+                    className={`bshell__item ${active ? 'is-active' : ''} ${caveat ? 'is-inert' : ''} ${locked ? 'is-locked' : ''}`}
                     data-rail-item={item.label}
                     /* What moved (tour/methods-tour.ts) starts on the methods item. */
                     data-tour={item.screen ? `rail-${item.screen.name}` : undefined}
-                    onClick={() => toggle(item)}
+                    onClick={() => !locked && toggle(item)}
+                    aria-disabled={locked || undefined}
                     aria-current={active ? 'page' : undefined}
-                    aria-expanded={item.children ? expanded : undefined}
+                    aria-expanded={item.children && !locked ? expanded : undefined}
                     aria-label={collapsed ? name : undefined}
                   >
                     <Ico className="bshell__ico" size={20} strokeWidth={1.6} aria-hidden />
                     <span className="bshell__item-label">{railName(item.label)}</span>
-                    {badge && <span className="bshell__badge">{badge}</span>}
-                    {item.children && (
+                    {badge && !locked && <span className="bshell__badge">{badge}</span>}
+                    {locked && <Lock className="bshell__lock" size={14} strokeWidth={1.8} aria-label="Locked" />}
+                    {item.children && !locked && (
                       <ChevronRight
                         className={`bshell__chev ${expanded ? 'is-open' : ''}`}
                         size={16}
@@ -763,17 +770,20 @@ export function Shell({ children }: { children: ReactNode }) {
                                 c.screen &&
                                 c.lights !== false &&
                                 (screen.name === c.screen.name || !!UNDER_ITEM[c.screen.name]?.includes(screen.name))
-                              const tip = c.tag ? WIP_TIP : c.screen ? null : NOT_BUILT
+                              const subLocked = LOCK_EMPTY_TABS && !c.screen
+                              const tip = c.tag ? WIP_TIP : c.screen ? null : subLocked ? LOCKED_TIP : NOT_BUILT
                               const row = (
                                 <button
                                   key={c.label}
                                   type="button"
-                                  className={`bshell__subitem ${on ? 'is-active' : ''} ${c.screen ? '' : 'is-inert'}`}
+                                  className={`bshell__subitem ${on ? 'is-active' : ''} ${c.screen ? '' : 'is-inert'} ${subLocked ? 'is-locked' : ''}`}
                                   onClick={() => c.screen && go(c.screen)}
+                                  aria-disabled={subLocked || undefined}
                                   aria-current={on ? 'page' : undefined}
                                 >
                                   {c.label}
                                   {c.tag && <span className="bshell__wip">{c.tag}</span>}
+                                  {subLocked && <Lock className="bshell__lock" size={13} strokeWidth={1.8} aria-label="Locked" />}
                                 </button>
                               )
                               return tip ? (

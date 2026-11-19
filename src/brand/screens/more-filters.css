@@ -7,7 +7,7 @@
   gap: var(--space-4);
   min-width: 0;
 }
-.bmf__trigger {
+.bmf .bmf__trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -20,10 +20,10 @@
   font: inherit;
   cursor: pointer;
 }
-.bmf__trigger:hover { border-color: var(--border-strong); }
-.bmf__trigger.is-set { border-color: var(--accent); }
-.bmf__clear,
-.bmf__reset {
+.bmf .bmf__trigger:hover { border-color: var(--border-strong); }
+.bmf .bmf__trigger.is-set { border-color: var(--accent); }
+.bmf .bmf__clear,
+.bmf .bmf__reset {
   border: 0;
   background: none;
   padding: var(--space-2) var(--space-3);
@@ -32,8 +32,8 @@
   font-size: var(--fs-sm);
   cursor: pointer;
 }
-.bmf__clear:hover,
-.bmf__reset:hover { color: var(--text-primary); text-decoration: underline; }
+.bmf .bmf__clear:hover,
+.bmf .bmf__reset:hover { color: var(--text-primary); text-decoration: underline; }
 .bmf .bx-chip b { font-weight: var(--fw-medium); }
 
 .bmf__pop {
@@ -58,7 +58,7 @@
   border-right: 1px solid var(--border-subtle);
   background: var(--surface-sunken);
 }
-.bmf__key {
+.bmf .bmf__key {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -72,9 +72,9 @@
   text-align: left;
   cursor: pointer;
 }
-.bmf__key:hover { color: var(--text-primary); }
-.bmf__key.is-on { background: var(--surface-raised); color: var(--text-primary); font-weight: var(--fw-medium); }
-.bmf__key svg { color: var(--accent-strong); }
+.bmf .bmf__key:hover { color: var(--text-primary); }
+.bmf .bmf__key.is-on { background: var(--surface-raised); color: var(--text-primary); font-weight: var(--fw-medium); }
+.bmf .bmf__key svg { color: var(--accent-strong); }
 .bmf__pane {
   display: flex;
   flex-direction: column;
@@ -105,4 +105,4 @@
 .bmf__opt span { display: flex; flex-direction: column; }
 .bmf__opt small { font-size: var(--fs-xs); color: var(--text-tertiary); }
 .bmf__none { margin: 0; color: var(--text-tertiary); font-size: var(--fs-sm); }
-.bmf__reset { align-self: flex-start; padding-left: 0; }
+.bmf .bmf__reset { align-self: flex-start; padding-left: 0; }

@@ -74,11 +74,13 @@ export function MoreFilters({
         ? (CHANGED.find((o) => o.value === v)?.label ?? v)
         : (options[k].find((o) => o.value === v)?.label ?? '(deleted)')
 
-  const chipText = (k: PolicyFilterKey) => {
-    const vals: string[] = k === 'changed' ? [value.changed] : value[k]
-    const names = vals.map((v) => nameOf(k, v))
-    const shown = names.slice(0, 2).join(', ')
-    return names.length > 2 ? `${shown} +${names.length - 2} more` : shown
+  /* Every applied value, attribute by attribute, in one line: the first three, then how many more. */
+  const chipText = () => {
+    const names = FILTER_ORDER.filter((k) => isSet(value, k)).flatMap((k) =>
+      (k === 'changed' ? [value.changed] : (value[k] as string[])).map((v) => nameOf(k, v)),
+    )
+    const shown = names.slice(0, 3).join(', ')
+    return names.length > 3 ? `${shown} +${names.length - 3} more` : shown
   }
 
   const openAt = (k: PolicyFilterKey) => {
@@ -99,15 +101,12 @@ export function MoreFilters({
         More filters
       </button>
 
-      {FILTER_ORDER.filter((k) => isSet(value, k)).map((k) => (
-        <Chip key={k} active onClick={() => openAt(k)} removable onRemove={() => onChange({ ...value, [k]: NO_FILTERS[k] })}>
-          {FILTER_LABEL[k]}: <b>{chipText(k)}</b>
-        </Chip>
-      ))}
+      {/* One chip for everything applied (owner, 19 Nov 2026: "merge all into one"): its × clears them all, a click
+          reopens the dropdown on the first applied attribute. */}
       {anySet(value) && (
-        <button type="button" className="bmf__clear" onClick={() => onChange(NO_FILTERS)}>
-          Clear all
-        </button>
+        <Chip active onClick={() => openAt(FILTER_ORDER.find((k) => isSet(value, k)) ?? 'app')} removable onRemove={() => onChange(NO_FILTERS)}>
+          <b>{chipText()}</b>
+        </Chip>
       )}
 
       <AnimatePresence>

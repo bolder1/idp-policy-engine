@@ -16,6 +16,7 @@ import { MoveTour } from './migrate/MoveTour'
 import { HomeHub } from './migrate/HomeHub'
 import { DashboardHome } from './dashboard/DashboardHome'
 import { DASHBOARD_V2 } from './dashboard/phase'
+import { shows } from './rollout'
 import { MigrationGuide } from './migrate/MigrationGuide'
 import { guideRequested } from './migrate/guide-link'
 import './theme-mode'
@@ -159,7 +160,8 @@ function ScreenBody() {
     case 'apps':
       return <UserApps />
     case 'home':
-      return DASHBOARD_V2 ? <DashboardHome /> : <HomeHub />
+      /* The new Dashboard reaches only the lines in its rollout entry (Design for now); the rest get Classic. */
+      return DASHBOARD_V2 && shows('dashboardV2') ? <DashboardHome /> : <HomeHub />
     case 'policies':
       return <Policies />
     case 'builder':

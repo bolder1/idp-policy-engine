@@ -19,6 +19,9 @@ export const ROLLOUT = {
   mobileIssuer: ALL,
   /** Rail items with no page are locked (19 Nov). Design keeps every row open. */
   railLock: ['handoff', 'tester'],
+  /** The customizable Dashboard and its Classic / New switch (18-19 Nov, dashboard/phase.ts). Design only (owner,
+   *  19 Nov: "the dashboard is for design only"). Dev handoff and Tester keep Classic until he has checked it. */
+  dashboardV2: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

@@ -417,6 +417,10 @@ These are the owner's rulings, and the details are in `docs/memory/`.
 - **Motion:** animate with Motion props only. Never set a CSS `transform` on a `motion.*` element, because Motion overwrites it. Honour reduced motion.
 - **Product parity** means the live console's fields, words and order, never its control types.
 - **Hide, don't delete.** New A/B or preview controls are gated on `SHOWCASE`. Later phases go behind a named flag.
+- **Design only by default** (19 Nov 2026).
+  - The sign-in's line (`lines.ts`) decides what shows, and `rollout.ts` lists which lines see each change.
+  - A new change ships with `['design']` only. That covers fixes to screens the other lines already see.
+  - Adding `'handoff'` or `'tester'`, or changing anything those two lines see, waits for the owner's check.
 
 ## How the owner works
 
@@ -492,6 +496,8 @@ The owner agreed a four-phase plan for the use side of templates: one way in, te
 
 A second Dashboard behind the head switch **Dashboard: Classic / New**. Classic (`migrate/HomeHub.tsx`) stays the default. Everything is in `src/brand/dashboard/`, and the flags are in its `phase.ts`.
 
+**Design only.** The rollout entry `dashboardV2` (`rollout.ts`) is `['design']`, and BrandApp's `home` route reads it. Dev handoff and Tester get Classic with no switch until the owner has checked it (19 Nov: "the dashboard is for design only").
+
 - **What it is.**
   - Several named dashboards, as line tabs, with a time range every widget follows.
   - 39 widgets in five needs (`catalog.ts`), drawn from seed data (`seed.ts`, `sources.ts`).
@@ -539,8 +545,9 @@ A second Dashboard behind the head switch **Dashboard: Classic / New**. Classic 
 - Worktrees on disk (`git worktree list`): `okta-device-policy-walkthrough-cea5b7` (above), `sweet-blackwell-b5bb79` (at 306f64e on `claude/created-videos-list-eefb36`), `classic-mode-v2-551abb` (38dfd7e), `charming-banach-5e7569` and `unruffled-haslett-aca2da` (both e76b901), and `keen-goldwasser-ce39db` (at 90828b2 on `claude/background-tasks-account-switch-3e5f28`, with its own uncommitted copy of the 7 to 9 Oct work, which `main` supersedes). Before removing ANY worktree: `git -C <tree> status`, and check that no session or dev server is working in it. A clean status at an earlier survey is not enough.
 - **Both remotes are public** (`gh repo view`, 1 Oct). So the internal material is **local only — on this disk, never in git** (owner's choice, 1 Oct 2026): `docs/memory/`, `docs/research/`, `docs/artifacts/` and `tools/rigs/walkthroughs/` are in `.gitignore`. They hold tenant identifiers (the Okta integrator org and its admin URL, the Entra test user, a miniOrange test address, the Vercel project and team ids) and internal material (the manager's scenario sheet, the audits, the team deck, the memory notes). Everything else in the repo carries none of these; there are no passwords, tokens or cookies anywhere. Back the four folders up yourself if this disk is ever replaced.
 - The owner's convention when he does push: push `main`, plus a `YYYY-MM-DD-<topic>` tracking branch for the day's work.
-- **19 Nov 2026.** One commit carries the 18-19 Nov Dashboard (section above), built in the worktree `suspicious-cray-61588b` on `claude/suspicious-cray-61588b`.
-  - It sits on top of 8a25ebd (sign-in by line), which had committed an older copy of `src/brand/dashboard/` from the main checkout. This commit replaces that copy with the latest and drops the @dnd-kit packages that came with it; nothing uses them.
+- **19 Nov 2026.** Two commits carry the 18-19 Nov Dashboard (section above), built in the worktree `suspicious-cray-61588b` on `claude/suspicious-cray-61588b`.
+  - The first sits on top of 8a25ebd (sign-in by line), which had committed an older copy of `src/brand/dashboard/` from the main checkout. It replaces that copy with the latest and drops the @dnd-kit packages that came with it; nothing uses them.
+  - The second makes the Dashboard Design only (`dashboardV2`) and writes the Design-only rule into CLAUDE.md and House rules. Until it, the switch to the older copy showed on every line.
   - The day branch is `2026-11-19-dashboard-flat-board-dock`.
 
 ## Known gaps

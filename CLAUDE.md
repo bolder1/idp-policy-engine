@@ -14,6 +14,13 @@ This repo is the IdP Policy Engine prototype: the Policies section of the miniOr
 - Never copy `src/` from an old worktree branch. They are archive backups, and `main` supersedes them.
 - Commit or push only when the owner asks. Both remotes are public: `docs/memory/`, `docs/research/`, `docs/artifacts/` and `tools/rigs/walkthroughs/` are local only (gitignored) — never force-add them, and never copy tenant identifiers or internal research into a tracked file (see `docs/HANDOFF.md`, Git).
 
+## Design only until the owner checks
+
+- The sign-in's line decides what shows: Design, Dev handoff or Tester (`src/brand/lines.ts`). `src/brand/rollout.ts` maps each change to the lines that see it.
+- Every change ships to Design only. Add a `ROLLOUT` entry set to `['design']`, and gate the change with `shows('<entry>')`, read once as a module constant (see `rail-lock.ts`). A fix to a screen the other lines already see counts.
+- Never add `'handoff'` or `'tester'` to an entry, or change anything those two lines see, until the owner has checked it and said so (19 Nov 2026).
+- Stylesheets load for every line (`main.tsx`), so scope new rules to the feature's own classes. If a change can't be gated by line, ask him before you push.
+
 ## The dev server is the owner's
 
 - `npm run dev` serves http://localhost:5173 (`.claude/launch.json` `policy-prototype`). Vite listens on `::1`, so `127.0.0.1` refuses.

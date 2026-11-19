@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
-import { Check, LayoutDashboard, LayoutTemplate, Plus, Redo2, RotateCcw, Settings2, Undo2 } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { Check, LayoutDashboard, LayoutGrid, Plus, Redo2, RotateCcw, Rows3, Settings2, Shapes, Store, Undo2, type LucideIcon } from 'lucide-react'
 import { PageHead } from '../Shell'
 import { EmptyState } from '../empty'
 import { Button, IconButton, Modal, RowMenu, Tabs, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { PageBar } from '../screens/page-bar'
+import { primeSound } from '../sound'
 import { useBrand } from '../store'
 import { Board, type BoardHandle } from './Board'
 import { Gallery, type GalleryMode } from './Gallery'
 import { Library } from './Library'
-import { ArrangeMenu, ThemePicker } from './ThemeMenus'
+import { ThemePicker } from './ThemeMenus'
+import { DASHBOARD_THEMES } from './phase'
 import { useMigrationOpen } from './format'
-import { addWidget, arrange, findCell, fromSpecs, hasWidget, removeCell, removeRow, type ArrangeMode, type Cell, type Row } from './layout'
+import { addWidget, allCells, arrange, findCell, fromSpecs, hasWidget, removeCell, removeRow, type ArrangeMode, type Cell, type Row } from './layout'
 import {
   RANGES,
   WIDGETS,
@@ -39,14 +41,25 @@ import { THEMES, type ThemeId } from './themes'
 
    The page is the console's own shape: the head, the admin's dashboards as
    line tabs under it, then one bar. Out of Customize the bar holds the time
-   range every widget follows; in it, the bar holds what Customize does:
-   · Add widgets opens the library beside the board;
-   · Arrange lays the widgets out again by a rule;
-   · Theme recolours them;
-   · Layouts swaps the whole layout for a template;
-   · every change holds at once and can be undone (Ctrl+Z, the bar's arrows,
-     a toast's Undo); Cancel puts the dashboard back as Customize found it,
-     Reset puts it back as its template made it, and Done leaves the mode.
+   range every widget follows; in it, few controls (owner, 19 Nov 2026: "there
+   are a lot of buttons … Add Widget will be the main button"):
+   · they sit together in a dock at the foot of the window, always in reach
+     however far down the board you are (owner, the same day: "when I go down
+     I have to jump back way up … move all into an always visible place");
+   · Add widgets, a soft orange button, opens the library over the board
+     (Library.tsx), where widgets are added and removed;
+   · Arrange is three icon buttons in a row, as Figma lays out its tidy-up and
+     align: Tidy up, Group by type, Group by need, each one press with Undo;
+   · Layouts has a button of its own beside Add widgets, the way into its
+     gallery as Browse Xecurify templates is into the template store;
+   · Undo, Redo and Reset sit on the dock itself (owner: "Undo, Redo and
+     reset can come outside");
+   · Cancel puts the dashboard back as Customize found it, and Done, the
+     solid button, leaves.
+   The page bar keeps the time range in Customize too, so nothing above the
+   board moves when the mode changes.
+   Every change holds at once and can be undone (Ctrl+Z, the menu, a toast's
+   Undo). Themes are behind DASHBOARD_THEMES (phase.ts), off for now.
    -------------------------------------------------------------------------- */
 
 type Naming = { kind: 'rename' | 'template'; value: string }
@@ -56,6 +69,7 @@ const ARRANGED: Record<ArrangeMode, string> = { tidy: 'Tidied up', type: 'Arrang
 
 export function Dashboard({ switches }: { switches?: ReactNode }) {
   const store = useBrand()
+  const still = useReducedMotion() === true
   const [prefs, set] = useDash()
   const board = activeBoard(prefs)
   const rows = board.rows
@@ -129,7 +143,14 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
     redraw((n) => n + 1)
   }, [snap, restore])
 
+  /* Sounds are made ready at a quiet moment after the press that opened Customize or the library, so the first toast does
+     not stall the glide it arrives with (sound.ts primeSound). */
+  const openLibrary = () => {
+    primeSound()
+    setLibrary(true)
+  }
   const enter = (withLibrary = false) => {
+    primeSound()
     entered.current = snap()
     past.current = []
     future.current = []
@@ -139,7 +160,6 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   }
   const leave = () => {
     setEditing(false)
-    setLibrary(false)
     entered.current = null
   }
   const cancel = () => {
@@ -178,11 +198,19 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
     commit(removeRow(rows, r.id), 'Row removed')
     store.showToast(r.columns.length === 1 && r.columns[0].cells.length === 1 ? `${cellName(r.columns[0].cells[0])} removed` : 'Row removed', { label: 'Undo', run: undo })
   }
+  /* The widget last added from the library, brought into view when the library closes. */
+  const added = useRef<string | null>(null)
   const add = (w: WidgetId) => {
     const r = addWidget(rows, w)
     commit(r.rows, `${WIDGETS[w].name} added`)
-    /* Bring the new widget into view once it is on the page. */
-    window.setTimeout(() => page.current?.querySelector(`[data-cell="${r.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80)
+    added.current = r.id
+    store.showToast(`${WIDGETS[w].name} added`, { label: 'Undo', run: undo })
+  }
+  const closeLibrary = () => {
+    setLibrary(false)
+    const id = added.current
+    added.current = null
+    if (id) window.setTimeout(() => page.current?.querySelector(`[data-cell="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 220)
   }
   const patch = (id: string, p: Partial<Pick<Cell, 'view' | 'pick'>>) => {
     const at = findCell(rows, id)
@@ -202,6 +230,11 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   const doArrange = (mode: ArrangeMode) => {
     commit(arrange(rows, mode, pinnedRow ? 'migration' : undefined), ARRANGED[mode])
     store.showToast(ARRANGED[mode], { label: 'Undo', run: undo })
+  }
+  /* Taken off from the library: the first place it is on the board. */
+  const removeWidget = (w: WidgetId) => {
+    const cell = allCells(rows).find((c) => c.widget === w)
+    if (cell) remove(cell)
   }
 
   /* ---- dashboards and templates ---- */
@@ -241,7 +274,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
         past.current = []
         future.current = []
         setEditing(true)
-        setLibrary(true)
+        openLibrary()
       }, 0)
     } else if (!before.hinted && !editing) {
       set((p) => ({ ...p, hinted: true }))
@@ -293,6 +326,15 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
     setNaming(null)
   }
 
+  const resetTo = [...prefs.own, ...XECURIFY_TEMPLATES].find((x) => x.id === board.from) ?? OVERVIEW
+  /* Arrange as three icon buttons in a row, the way Figma lays out its tidy-up and align (owner, same day: "something
+     like how Figma … three icon buttons to tidy up properly"). Each is one press with Undo; its name is its tooltip. */
+  const ARRANGE: { mode: ArrangeMode; label: string; icon: LucideIcon }[] = [
+    { mode: 'tidy', label: 'Tidy up', icon: LayoutGrid },
+    { mode: 'type', label: 'Group by type', icon: Shapes },
+    { mode: 'need', label: 'Group by need', icon: Rows3 },
+  ]
+
   const empty = rows.length === 0
 
   return (
@@ -308,40 +350,9 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
       </div>
 
       <PageBar
-        left={
-          editing ? (
-            <>
-              <Button variant="neutral" icon={Plus} pressed={library} onClick={() => setLibrary((v) => !v)}>
-                Add widgets
-              </Button>
-              <ArrangeMenu rows={rows} pinned={pinnedRow ? 'migration' : undefined} onArrange={doArrange} />
-              <ThemePicker value={theme} brand={prefs.brand} onTheme={setTheme} onBrand={(c) => set((p) => ({ ...p, brand: c }))} />
-              <Button variant="neutral" icon={LayoutTemplate} onClick={() => setGallery('layout')}>
-                Layouts
-              </Button>
-              <span className="bdash-bar__undo">
-                <IconButton icon={Undo2} label="Undo" tone="ghost" disabled={past.current.length === 0} onClick={undo} />
-                <IconButton icon={Redo2} label="Redo" tone="ghost" disabled={future.current.length === 0} onClick={redo} />
-              </span>
-            </>
-          ) : (
-            <Picker label="Time range" prefix="Range" size="md" value={range} options={RANGES} onChange={(v) => set((p) => ({ ...p, range: v as Range }))} />
-          )
-        }
+        left={<Picker label="Time range" prefix="Range" size="md" value={range} options={RANGES} onChange={(v) => set((p) => ({ ...p, range: v as Range }))} />}
         right={
-          editing ? (
-            <>
-              <Button variant="ghost" icon={RotateCcw} onClick={reset}>
-                Reset
-              </Button>
-              <Button variant="neutral" onClick={cancel}>
-                Cancel
-              </Button>
-              <Button variant="brand" icon={Check} onClick={leave}>
-                Done
-              </Button>
-            </>
-          ) : (
+          editing ? null : (
             <>
               <AnimatePresence>
                 {hint && (
@@ -358,13 +369,13 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
         }
       />
 
-      <div className={`bdash-layout${library && editing ? ' has-library' : ''}`} data-dash-theme={theme}>
+      <div className="bdash-layout" data-dash-theme={DASHBOARD_THEMES ? theme : 'mono'}>
         {empty && !editing ? (
           <EmptyState
             icon={LayoutDashboard}
             title="This dashboard is empty"
             action={
-              <Button variant="brand" icon={Plus} onClick={() => enter(true)}>
+              <Button variant="brand" icon={Plus} onClick={openLibrary}>
                 Add widgets
               </Button>
             }
@@ -392,18 +403,65 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
             onSay={setSaid}
           />
         )}
-        <AnimatePresence>
-          {library && editing && (
-            <Library key="library" empty={empty} has={(w) => hasWidget(rows, w)} onAdd={add} onGrab={(w, e) => (empty ? undefined : boardRef.current?.startNew(w, e))} onClose={() => setLibrary(false)} />
-          )}
-        </AnimatePresence>
       </div>
+
+      {/* Customize's controls, together and always in reach. The dock is sticky, not fixed: it rides the foot of the window
+          while the board scrolls under it and comes to rest under the board at the end, so it never covers a widget. */}
+      <AnimatePresence>
+        {editing && (
+          <div className="bdash-dock" key="dock">
+            <motion.div
+              className="bdash-dock__bar"
+              role="toolbar"
+              aria-label="Customize"
+              initial={still ? false : { y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={still ? { opacity: 0, transition: { duration: 0 } } : { y: 16, opacity: 0, transition: { duration: 0.14 } }}
+              transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+            >
+              <span className="bdash-dock__add">
+                <Button variant="neutral" icon={Plus} onClick={openLibrary}>
+                  Add widgets
+                </Button>
+              </span>
+              {/* Layouts has a button of its own, the way into a store, as the policy templates page has Browse Xecurify
+                  templates (owner, 19 Nov 2026: "a dedicated button for layout, as a dedicated marketplace or template
+                  like button"). */}
+              <Button variant="neutral" icon={Store} onClick={() => setGallery('layout')}>
+                Layouts
+              </Button>
+              {DASHBOARD_THEMES && <ThemePicker value={theme} brand={prefs.brand} onTheme={setTheme} onBrand={(c) => set((p) => ({ ...p, brand: c }))} />}
+              <span className="bdash-dock__sep" aria-hidden />
+              <span className="bdash-dock__tidy" role="group" aria-label="Arrange">
+                {ARRANGE.map((a) => (
+                  <IconButton key={a.mode} icon={a.icon} label={a.label} tone="ghost" disabled={empty} onClick={() => doArrange(a.mode)} />
+                ))}
+              </span>
+              <span className="bdash-dock__sep" aria-hidden />
+              <IconButton icon={Undo2} label="Undo (Ctrl+Z)" tone="ghost" disabled={past.current.length === 0} onClick={undo} />
+              <IconButton icon={Redo2} label="Redo (Ctrl+Y)" tone="ghost" disabled={future.current.length === 0} onClick={redo} />
+              <Button variant="ghost" icon={RotateCcw} title={`Reset to ${resetTo.name}`} onClick={reset}>
+                Reset
+              </Button>
+              <span className="bdash-dock__sep" aria-hidden />
+              <Button variant="ghost" onClick={cancel}>
+                Cancel
+              </Button>
+              <Button variant="brand" icon={Check} onClick={leave}>
+                Done
+              </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <Library open={library} empty={empty} has={(w) => hasWidget(rows, w)} onAdd={add} onRemove={removeWidget} onClose={closeLibrary} />
 
       <p className="u-sr-only" aria-live="polite">
         {said}
       </p>
 
-      {gallery && <Gallery mode={gallery} own={prefs.own} onUse={applyLayout} onClose={closeGallery} onRemoveOwn={removeOwn} />}
+      <Gallery mode={gallery} own={prefs.own} onUse={applyLayout} onClose={closeGallery} onRemoveOwn={removeOwn} />
 
       <NameDialog naming={naming} onChange={(value) => setNaming((n) => (n ? { ...n, value } : n))} onClose={() => setNaming(null)} onSave={saveName} />
     </div>

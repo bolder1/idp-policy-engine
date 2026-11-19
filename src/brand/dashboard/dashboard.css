@@ -142,10 +142,6 @@
   align-items: center;
   gap: var(--space-1);
 }
-.bdash-bar__undo {
-  display: inline-flex;
-  gap: var(--space-1);
-}
 .bdash-anchor {
   display: inline-flex;
 }
@@ -159,9 +155,6 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   align-items: start;
-}
-.bdash-layout.has-library {
-  grid-template-columns: minmax(0, 1fr) 344px;
 }
 .bdash-empty {
   display: flex;
@@ -177,49 +170,80 @@
   font-size: var(--fs-base);
 }
 
-/* ---- the board: rows, columns, stacks ------------------------------------------------------------------------- */
+/* ---- Customize: the dock ------------------------------------------------------------------------------------------
+   Always in reach (owner, 19 Nov 2026: "when I go down I have to jump back way up … move all into an always visible
+   place"): it rides the foot of the window while the board scrolls under it, and comes to rest under the board at the
+   end, so it never hides a widget. Add widgets is the soft orange, Done the solid one ("for the Done, a solid button;
+   for the widgets, a secondary orange button"). */
+.bdash-dock {
+  position: sticky;
+  bottom: var(--space-6);
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-8);
+  pointer-events: none;
+}
+.bdash-dock__bar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  padding: var(--space-3);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--el-high);
+  pointer-events: auto;
+}
+.bdash-dock__sep {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  margin: 0 var(--space-1);
+  background: var(--border-subtle);
+}
+.bdash-dock .bdash-dock__add .bx-btn {
+  border-color: var(--brand-subtle-border);
+  background: var(--brand-subtle-bg);
+  color: var(--brand-active);
+}
+.bdash-dock .bdash-dock__add .bx-btn:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--brand) 38%, var(--surface-raised));
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface-raised));
+}
+.bdash-dock .bdash-dock__add .bx-btn:not(:disabled):active {
+  background: color-mix(in srgb, var(--brand) 18%, var(--surface-raised));
+}
+/* The rebrand restyles neutral buttons after this sheet loads (rebrand.css), so these say `.bdash-dock` too. */
+/* Arrange: three icon buttons on one quiet tray, as Figma groups its tidy-up and align. */
+.bdash-dock__tidy {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.bdash-dock__tidy .bx-iconbtn:not(:disabled):hover {
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+
+/* ---- the board: one flat layer ------------------------------------------------------------------------------------
+   Every widget, bar and row grip is placed by a transform (geometry.ts, Board.tsx). Nothing here animates the layout:
+   a move is a transform animation the board plays, so it runs on the compositor and nothing fights it (owner,
+   19 Nov 2026: "laggy … jittery"). */
 .bdash-board {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   min-width: 0;
-}
-.bdash-board.is-editing {
-  padding-bottom: 16px;
-}
-.bdash-row {
-  position: relative;
-  min-width: 0;
-}
-/* Twelve tracks in every row, so a column three twelfths wide lines up with every other one down the board. */
-.bdash-row__cols {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 16px;
-  height: var(--row-h);
-  transition: height 260ms var(--ease-standard);
-}
-.bdash-col {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-  min-height: 0;
 }
 .bdash-tile {
-  position: relative;
-  flex-shrink: 1;
-  flex-basis: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
   min-width: 0;
   min-height: 0;
-  transition: flex-grow 260ms var(--ease-standard);
-}
-.bdash-board.is-sizing .bdash-row__cols,
-.bdash-board.is-sizing .bdash-tile {
-  transition: none;
 }
 .bdash-tile__card {
   height: 100%;
@@ -234,8 +258,16 @@
 .bdash-lift.is-stat .bdash-tile__card {
   background-image: linear-gradient(to top, var(--dash-wash), var(--surface-raised) 70%);
 }
-.bdash-row.is-moving {
+/* A row being moved: its widgets step back. */
+.bdash-tile.is-dim {
   opacity: 0.4;
+}
+/* In Customize the dock's Done is the view's one solid orange button, so a widget's own (Quick actions' New policy)
+   steps down to neutral there. The card is inert anyway. */
+.bdash-board.is-editing .bdash-tile__card .bx-btn--brand {
+  border-color: var(--int-neutral-border);
+  background: var(--int-neutral-bg);
+  color: var(--int-neutral-text);
 }
 
 /* ---- Customize: a widget's own controls ----------------------------------------------------------------------- */
@@ -254,6 +286,9 @@
 .bdash-tile.is-slot > :not(.bdash-tile__card),
 .bdash-tile.is-hidden {
   visibility: hidden;
+}
+.bdash-tile.is-picked {
+  z-index: 2;
 }
 .bdash-tile.is-picked .bdash-tile__card {
   border-color: var(--accent);
@@ -278,11 +313,25 @@
   top: -9px;
   left: -9px;
 }
+/* The colour badge (themes on, phase.ts) shows on the widget under the pointer or in focus, and stays once the widget
+   has a colour of its own, so the gaps between widgets hold one badge, not two. */
 .bdash-tile__colour {
   position: absolute;
   z-index: 5;
   top: -9px;
   right: -9px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bdash-tile:hover > .bdash-tile__colour,
+.bdash-tile:focus-within > .bdash-tile__colour,
+.bdash-tile__colour:has(.is-set, [aria-expanded='true']) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .bdash-tile__colour {
+    opacity: 1;
+  }
 }
 .bdash-tile__remove:hover,
 .bdash-tile__colour button:hover {
@@ -324,25 +373,23 @@
 .bdash-bar {
   position: absolute;
   z-index: 3;
+  top: 0;
+  left: 0;
   display: grid;
   place-items: center;
   outline: none;
   touch-action: none;
 }
 .bdash-bar.is-v {
-  top: 0;
-  bottom: 0;
   width: 16px;
   cursor: col-resize;
 }
 .bdash-bar.is-h {
-  right: 0;
-  left: 0;
   height: 16px;
   cursor: row-resize;
 }
 .bdash-bar.is-row {
-  bottom: -16px;
+  right: 0;
 }
 .bdash-bar::before {
   content: '';
@@ -397,7 +444,17 @@
   opacity: 0.35;
 }
 
-/* ---- Customize: a row's grip ------------------------------------------------------------------------------------ */
+/* ---- Customize: a row's grip ------------------------------------------------------------------------------------
+   A band the size of the row, which takes no pointer itself: its grip sits in the margin beside the row, and pointing
+   at the grip outlines the row it moves. */
+.bdash-band {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+}
 .bdash-row__grip {
   position: absolute;
   z-index: 5;
@@ -405,6 +462,7 @@
   left: -34px;
   display: inline-flex;
   touch-action: none;
+  pointer-events: auto;
 }
 .bdash-row__grip .bx-rowmenu {
   width: 24px;
@@ -417,9 +475,9 @@
 .bdash-row__grip .bx-rowmenu.is-open {
   color: var(--text-primary);
 }
-/* Pointing at a row's grip outlines the row it moves. */
-.bdash-row:has(> .bdash-row__grip:hover) > .bdash-row__cols::after,
-.bdash-row:has(> .bdash-row__grip .is-open) > .bdash-row__cols::after {
+.bdash-band:has(> .bdash-row__grip:hover)::after,
+.bdash-band:has(> .bdash-row__grip .is-open)::after,
+.bdash-band.is-moving::after {
   content: '';
   position: absolute;
   inset: -6px;
@@ -429,14 +487,25 @@
   pointer-events: none;
 }
 
-/* ---- dragging -------------------------------------------------------------------------------------------------- */
+/* ---- dragging ---------------------------------------------------------------------------------------------------
+   The drop line, the guide, the tip, the lifted copy and the chip are moved by hand on each animation frame. The line
+   glides from target to target, quickly, once it is showing. */
 .bdash-drop {
   position: absolute;
   z-index: 7;
+  top: 0;
+  left: 0;
   border-radius: var(--radius-pill);
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--focus-halo);
   pointer-events: none;
+  transition:
+    transform 90ms var(--ease-standard),
+    width 90ms var(--ease-standard),
+    height 90ms var(--ease-standard);
+}
+.bdash-drop.is-fresh {
+  transition: none;
 }
 .bdash-drop.is-box {
   border: var(--bw-default) solid var(--accent);
@@ -449,6 +518,7 @@
   z-index: 6;
   top: 0;
   bottom: 16px;
+  left: 0;
   width: 1px;
   margin-left: -0.5px;
   background: var(--accent);
@@ -458,6 +528,8 @@
 .bdash-tip {
   position: fixed;
   z-index: var(--z-tooltip);
+  top: 0;
+  left: 0;
   translate: 14px -38px;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
@@ -469,29 +541,30 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/* The lifted copy of a dragged widget. Not a motion element: its tilt is plain CSS. */
+.bdash-drop[hidden],
+.bdash-guide[hidden],
+.bdash-tip[hidden] {
+  display: none;
+}
+/* The lifted copy of a dragged widget, tilted a little. */
 .bdash-lift {
   position: fixed;
   z-index: var(--z-overlay);
+  top: 0;
+  left: 0;
   rotate: 1.2deg;
   pointer-events: none;
+  will-change: transform;
 }
 .bdash-lift .bdash-tile__card {
   border-color: var(--border-strong);
   box-shadow: var(--el-high);
 }
-.bdash-lift.is-settling {
-  rotate: 0deg;
-  transition:
-    left 190ms var(--ease-standard),
-    top 190ms var(--ease-standard),
-    width 190ms var(--ease-standard),
-    height 190ms var(--ease-standard),
-    rotate 190ms var(--ease-standard);
-}
 .bdash-chip {
   position: fixed;
   z-index: var(--z-overlay);
+  top: 0;
+  left: 0;
   translate: 14px 14px;
   padding: var(--space-3) var(--space-5);
   border: var(--bw-thin) solid var(--border-strong);
@@ -508,11 +581,7 @@
   .bdash-lift {
     rotate: none;
   }
-  .bdash-lift.is-settling {
-    transition: none;
-  }
-  .bdash-row__cols,
-  .bdash-tile {
+  .bdash-drop {
     transition: none;
   }
 }
@@ -520,24 +589,6 @@
 .bdash-dragging * {
   cursor: grabbing !important;
   user-select: none !important;
-}
-
-/* A narrow page: one column in reading order, numbers two across; nothing to drag or pull. */
-.bdash-board.is-stacked .bdash-row__cols {
-  display: flex;
-  flex-direction: column;
-  height: auto;
-}
-.bdash-board.is-stacked .bdash-row__cols:has(> .bdash-col > .bdash-tile.is-stat):not(:has(> .bdash-col > .bdash-tile:not(.is-stat))) {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-.bdash-board.is-stacked .bdash-col {
-  flex: none;
-}
-.bdash-board.is-stacked .bdash-tile {
-  flex: none;
-  height: var(--cell-h);
 }
 
 /* ---- the Theme, Arrange and colour panels --------------------------------------------------------------------- */
@@ -606,6 +657,9 @@
   display: block;
   flex: none;
   width: 136px;
+}
+.bdash-option.is-arrange .bdash-option__text span {
+  white-space: normal;
 }
 .bdash-swatch {
   display: block;
@@ -1313,6 +1367,19 @@ button.bdw-bar__row:hover .bdw-bar {
   display: block;
   overflow: visible;
 }
+/* A plot fills its box exactly. While its tile is changing size it stretches with it, strokes keeping their width,
+   and it is drawn again once the tile settles (charts.tsx). */
+.bdc-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.bdc-svg line,
+.bdc-svg path,
+.bdc-svg circle {
+  vector-effect: non-scaling-stroke;
+}
 .bdc--wave,
 .bdc--bars {
   cursor: crosshair;
@@ -2002,214 +2069,695 @@ button.bdw-bar__row:hover .bdw-bar {
   -webkit-line-clamp: 2;
 }
 
-/* ---- Add widgets ---------------------------------------------------------------------------------------------- */
-.bdash-lib {
-  position: sticky;
-  top: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - var(--nav-topbar-h) - var(--space-9));
-  overflow: hidden;
-  border: var(--bw-thin) solid var(--border-default);
-  border-radius: var(--radius-xl);
-  background: var(--surface-raised);
-  box-shadow: var(--el-mid);
+/* ---- Add widgets and Layouts: the popups (Market.tsx) ----------------------------------------------------------
+   The template store's popup and cards (create.css `.bmarket`, `.bgcard`, `.bgviz`), so the two look and move alike.
+   Only what is the Dashboard's own is here: no rail, a row of chips with Not now beside it, a heading per need. */
+.bdash-market .bmarket__work {
+  display: block;
 }
-.bdash-lib__head {
+.bdash-market__top {
   display: flex;
-  flex: none;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: var(--space-5) var(--space-4) 0 var(--space-7);
-}
-.bdash-vars .bdash-lib .bdash-lib__head h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0;
-}
-.bdash-lib__find {
-  display: grid;
-  flex: none;
-  gap: var(--space-5);
-  padding: var(--space-5) var(--space-7);
-}
-.bdash-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-.bdash-lib__list {
-  display: grid;
-  align-content: start;
   gap: var(--space-6);
-  padding: 0 var(--space-5) var(--space-6);
-  overflow-y: auto;
-  scrollbar-width: thin;
 }
-.bdash-lib__list ul {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.bdash-market__top .bmarket__chips {
+  flex: 1;
+  min-width: 0;
 }
-.bdash-vars .bdash-lib .bdash-lib__list h3 {
-  margin: 0 0 var(--space-3);
-  padding: 0 var(--space-4);
-  color: var(--text-tertiary);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  letter-spacing: 0;
+/* A shelf out of view is not laid out until it scrolls near: forty cards cost the popup only the ones you see. */
+.bdash-market__shelf {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
 }
-.bdash-lib__none {
-  padding: var(--space-8) var(--space-4);
+.bdash-market__shelf + .bdash-market__shelf {
+  margin-top: var(--space-10);
+}
+.bdash-market__none {
+  padding: var(--space-10) 0;
   color: var(--text-tertiary);
   font-size: var(--fs-sm);
   text-align: center;
-}
-.bdash-pick {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-4);
-  border: var(--bw-thin) solid transparent;
-  border-radius: var(--radius-lg);
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-.bdash-pick:hover {
-  border-color: var(--border-default);
-  background: var(--surface-sunken);
-}
-.bdash-pick.is-added {
-  cursor: default;
-}
-.bdash-pick__art {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 72px;
-  height: 50px;
-  border: var(--bw-thin) solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  color: var(--text-primary);
-}
-.bdash-pick.is-added .bdash-pick__art {
-  color: var(--text-tertiary);
 }
 .bdash-thumb {
   display: block;
   width: 100%;
   height: 100%;
 }
-.bdash-pick__text {
-  display: grid;
-  flex: 1;
-  gap: 1px;
-  min-width: 0;
+
+/* ---- pictures: a widget's own panel, and a layout in miniature --------------------------------------------------
+   Finished at rest. Pointed at (or its card in focus) the panel lifts a little and plays its use, each part
+   `--i` steps in: lines draw, bars grow, rings sweep, rows arrive, ticks land (owner, 19 Nov 2026: the template
+   store's cards, "that kind of experience for each and every one of the cards"). Marks take the card's need colour
+   (`--tpl`); good, warning and bad keep theirs. Reduced motion: still. */
+.wpic,
+.bdash-lpic {
+  --wpic-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --wpic-soft: color-mix(in srgb, var(--tpl) 16%, var(--surface-raised));
+  --wpic-mid: color-mix(in srgb, var(--tpl) 48%, var(--surface-raised));
+  transition:
+    border-color 0.24s var(--ease-standard),
+    box-shadow 0.24s var(--ease-standard),
+    translate 0.3s var(--wpic-ease);
 }
-.bdash-pick__text b {
-  color: var(--text-primary);
-  font-size: var(--fs-base);
-  font-weight: var(--fw-medium);
-  line-height: 1.3;
+.bgcard:is(:hover, :has(:focus-visible)) :is(.wpic, .bdash-lpic) {
+  translate: 0 -3px;
 }
-.bdash-pick__text span {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--text-tertiary);
+.wpic .bgviz__title {
   font-size: var(--fs-sm);
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
-.bdash-pick__done {
-  display: inline-flex;
+
+@keyframes wpic-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes wpic-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes wpic-rise {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+@keyframes wpic-slide {
+  from {
+    opacity: 0;
+    translate: -8px 0;
+  }
+}
+@keyframes wpic-pop {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+@keyframes wpic-grow-x {
+  from {
+    scale: 0 1;
+  }
+}
+@keyframes wpic-grow-y {
+  from {
+    scale: 1 0;
+  }
+}
+@keyframes wpic-sweep {
+  from {
+    stroke-dasharray: 0 100;
+  }
+}
+@keyframes wpic-fill {
+  from {
+    stroke-dasharray: 0 1;
+  }
+}
+
+/* A number, its trend, and a line under it. */
+.wpic__stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.wpic__num {
+  color: var(--text-primary);
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.wpic__num small {
+  margin-left: 1px;
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+}
+.wpic__chip,
+.wpic__tag {
   flex: none;
-  align-items: center;
-  gap: var(--space-2);
+  padding: var(--pill-py) var(--pill-px);
+  border-radius: var(--pill-radius);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+  white-space: nowrap;
+}
+:is(.wpic__chip, .wpic__tag).is-good {
+  background: color-mix(in srgb, var(--fb-positive-dot) 14%, var(--surface-raised));
+  color: var(--fb-positive-fg);
+}
+:is(.wpic__chip, .wpic__tag).is-bad {
+  background: color-mix(in srgb, var(--fb-negative-dot) 14%, var(--surface-raised));
+  color: var(--fb-negative-fg);
+}
+:is(.wpic__chip, .wpic__tag).is-warn {
+  background: color-mix(in srgb, var(--fb-notice-dot) 18%, var(--surface-raised));
+  color: var(--fb-notice-fg);
+}
+.wpic__spark,
+.wpic__plot {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+.wpic__spark {
+  height: 30px;
+}
+.wpic__plot {
+  height: 58px;
+}
+.wpic__line {
+  fill: none;
+  stroke: var(--tpl);
+  stroke-dasharray: 1;
+  stroke-linecap: round;
+  stroke-width: 1.75;
+  vector-effect: non-scaling-stroke;
+}
+.wpic__area {
+  fill: var(--wpic-soft);
+}
+.wpic__axis {
+  display: flex;
+  justify-content: space-between;
   color: var(--text-tertiary);
   font-size: var(--fs-sm);
 }
 
-/* ---- the template gallery ------------------------------------------------------------------------------------ */
-.bdash-gal {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: min(640px, 72vh);
-}
-.bdash-gal__find {
+/* Upright bars. */
+.wpic__bars {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-5) var(--space-6);
-  padding: var(--space-5) var(--space-8) var(--space-6);
+  align-items: flex-end;
+  gap: 6px;
+  height: 72px;
 }
-.bdash-gal__grid {
+.wpic__bars i {
+  flex: 1;
+  border-radius: 3px 3px 1px 1px;
+  background: var(--wpic-mid);
+  transform-origin: bottom;
+}
+.wpic__bars i:nth-child(6) {
+  background: var(--tpl);
+}
+
+/* Bars lying down, the label on the bar. */
+.wpic__barlist {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  align-content: start;
-  gap: var(--space-6);
-  margin: 0;
-  padding: var(--space-1) var(--space-8) var(--space-8);
-  overflow-y: auto;
-  list-style: none;
+  gap: 5px;
 }
-.bdash-gal__grid li {
+.wpic__brow {
   position: relative;
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
 }
-.bdash-gal__grid li > .bx-iconbtn {
+.wpic__brow > i {
   position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: inherit;
+  background: var(--wpic-soft);
+  transform-origin: left;
 }
-.bdash-gal__none {
-  grid-column: 1 / -1;
-  justify-content: center;
-  padding: var(--space-10) 0;
-  color: var(--text-tertiary);
-  font-size: var(--fs-sm);
+.wpic__brow:first-child > i {
+  background: color-mix(in srgb, var(--tpl) 26%, var(--surface-raised));
 }
-.bdash-gal .bdash-gal__card {
-  display: grid;
-  align-content: start;
-  gap: var(--space-2);
-  width: 100%;
-  height: 100%;
-  padding: var(--space-4) var(--space-4) var(--space-5);
-  border: var(--bw-thin) solid var(--border-default);
-  border-radius: var(--radius-xl);
-  background: var(--surface-raised);
-  color: var(--text-tertiary);
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  text-align: left;
-}
-.bdash-gal .bdash-gal__card:hover {
-  border-color: var(--border-strong);
-}
-.bdash-gal .bdash-gal__card.is-on {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.bdash-gal .bdash-gal__card:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--focus-halo);
-}
-.bdash-gal .bdash-gal__card b {
-  margin-top: var(--space-4);
-  padding: 0 var(--space-2);
+.wpic__brow > span {
+  position: relative;
+  overflow: hidden;
   color: var(--text-primary);
-  font-size: var(--fs-base);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A ring of parts, its total in the middle. */
+.wpic__ringwrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 108px;
+}
+.wpic__ring {
+  width: 106px;
+  height: 106px;
+  rotate: -90deg;
+}
+.wpic__ring .wpic__track,
+.wpic__seg {
+  fill: none;
+  stroke-width: 6;
+}
+.wpic__ring .wpic__track {
+  stroke: var(--surface-sunken);
+}
+.wpic__seg.is-s1 {
+  stroke: var(--tpl);
+}
+.wpic__seg.is-s2 {
+  stroke: color-mix(in srgb, var(--tpl) 62%, var(--surface-raised));
+}
+.wpic__seg.is-q3 {
+  stroke: color-mix(in srgb, var(--tpl) 40%, var(--surface-raised));
+}
+.wpic__seg.is-q2 {
+  stroke: color-mix(in srgb, var(--tpl) 24%, var(--surface-raised));
+}
+.wpic__ringmid {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+}
+.wpic__ringmid b {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.wpic__ringmid span {
+  color: var(--text-tertiary);
+}
+
+/* A share as part of an arc. */
+.wpic__gauge {
+  display: grid;
+  justify-items: center;
+}
+.wpic__gauge svg {
+  width: 140px;
+  height: 82px;
+}
+.wpic__gauge .wpic__track,
+.wpic__arc {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 10;
+}
+.wpic__gauge .wpic__track {
+  stroke: var(--surface-sunken);
+}
+.wpic__arc {
+  stroke: var(--tpl);
+}
+.wpic__gaugenum {
+  margin-top: -30px;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One bar in parts, and what each part is. */
+.wpic__catbar {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+}
+.wpic__catbar i {
+  height: 100%;
+  border-radius: 3px;
+  transform-origin: left;
+}
+.wpic__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  color: var(--text-secondary);
+}
+.wpic__legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-2);
+  border-radius: 2px;
+}
+.wpic__legend b {
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
+}
+:is(.wpic__catbar, .wpic__legend) i.is-good,
+.wpic__strip i {
+  background: var(--fb-positive-dot);
+}
+:is(.wpic__catbar, .wpic__legend) i.is-warn {
+  background: var(--fb-notice-dot);
+}
+:is(.wpic__catbar, .wpic__legend) i.is-q2 {
+  background: var(--border-strong);
+}
+:is(.wpic__catbar, .wpic__legend) i.is-s1 {
+  background: var(--tpl);
+}
+:is(.wpic__catbar, .wpic__legend) i.is-s2 {
+  background: var(--wpic-mid);
+}
+
+/* A week of hours, in shades. */
+.wpic__heat {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+}
+.wpic__heat i {
+  aspect-ratio: 1;
+  border-radius: 2px;
+}
+.wpic__heat .is-q1 {
+  background: color-mix(in srgb, var(--tpl) 10%, var(--surface-raised));
+}
+.wpic__heat .is-q2 {
+  background: color-mix(in srgb, var(--tpl) 28%, var(--surface-raised));
+}
+.wpic__heat .is-q3 {
+  background: color-mix(in srgb, var(--tpl) 52%, var(--surface-raised));
+}
+.wpic__heat .is-q4 {
+  background: color-mix(in srgb, var(--tpl) 82%, var(--surface-raised));
+}
+
+/* A day of checks, one segment an hour. */
+.wpic__track-row {
+  display: flex;
+  gap: 2px;
+  height: 26px;
+}
+.wpic__track-row i {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--fb-positive-dot);
+  transform-origin: bottom;
+}
+.wpic__track-row i.is-warn {
+  background: var(--fb-notice-dot);
+}
+.wpic__track-row i.is-bad {
+  background: var(--fb-negative-dot);
+}
+.wpic__note {
+  color: var(--text-tertiary);
+}
+
+/* Rows: people, things, events. */
+.wpic__rows,
+.wpic__feed {
+  display: grid;
+  gap: 6px;
+}
+.wpic__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.wpic__face {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--tpl-wash);
+  color: var(--tpl);
+  font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
 }
-.bdash-gal .bdash-gal__card > span:last-child {
-  padding: 0 var(--space-2);
+.wpic__words {
+  display: grid;
+  min-width: 0;
+}
+.wpic__words b {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wpic__words span {
+  color: var(--text-tertiary);
+}
+.wpic__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--tpl);
+  box-shadow: 0 0 0 3px var(--tpl-wash);
+}
+
+/* A small table. */
+.wpic__table {
+  display: grid;
+  gap: 3px;
+}
+.wpic__thead,
+.wpic__trow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.9fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 3px var(--space-3);
+}
+.wpic__thead {
+  color: var(--text-tertiary);
+}
+.wpic__trow {
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+.wpic__trow > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wpic__trow .wpic__tag {
+  justify-self: start;
+}
+
+/* A checklist. */
+.wpic__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-primary);
+}
+.wpic__tick {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--fb-positive-dot);
+  color: var(--surface-raised);
+}
+.wpic__tick.is-open {
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: transparent;
+}
+
+/* How much is used. */
+.wpic__meter {
+  display: grid;
+  gap: var(--space-2);
+}
+.wpic__meterwords {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+}
+.wpic__meterwords b {
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
+}
+.wpic__meterbar,
+.wpic__strip {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+}
+.wpic__meterbar i,
+.wpic__strip i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tpl);
+  transform-origin: left;
+}
+.wpic__strip {
+  height: 10px;
+}
+.wpic__strip i {
+  width: 98%;
+}
+
+/* Counts in tiles. */
+.wpic__tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.wpic__tile {
+  display: grid;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.wpic__tile b {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.wpic__tile span {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Things to press, and a small form. */
+.wpic__action,
+.wpic__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+.wpic__action {
+  font-weight: var(--fw-medium);
+}
+.wpic__action svg {
+  color: var(--tpl);
+}
+.wpic__field {
+  justify-content: space-between;
+}
+.wpic__field span {
+  color: var(--text-tertiary);
+}
+.wpic__field b {
+  font-weight: var(--fw-medium);
+}
+.wpic__button {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  height: 28px;
+  padding: 0 var(--space-4);
+  border: var(--bw-thin) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
+}
+
+/* A note. */
+.wpic__notehead {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.wpic__line-text {
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.wpic__link {
+  color: var(--text-link);
+  font-weight: var(--fw-medium);
+}
+
+/* A layout in miniature, on its card. */
+.bdash-lpic {
+  width: min(264px, 100%);
+}
+.bdash-lpic .bdash-mini {
+  padding: var(--space-3);
+}
+
+/* The play, while the card is pointed at or in focus. */
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__line {
+  animation: wpic-draw 0.8s var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__area,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__axis,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__legend,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__note,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__ringmid,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__gaugenum {
+  animation: wpic-fade 0.5s 0.2s var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__num {
+  animation: wpic-rise 0.45s var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__chip {
+  animation: wpic-pop 0.35s 0.3s var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__bars i,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__track-row i {
+  animation: wpic-grow-y 0.5s calc(var(--i) * 35ms) var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__brow > i,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__catbar i,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__meterbar i,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__strip i {
+  animation: wpic-grow-x 0.6s calc(var(--i, 0) * 70ms) var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__brow > span {
+  animation: wpic-fade 0.4s calc(var(--i) * 70ms + 0.12s) var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__seg {
+  animation: wpic-sweep 0.6s calc(var(--i) * 90ms) var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__arc {
+  animation: wpic-fill 0.9s var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__heat i,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__tile,
+.bgcard:is(:hover, :has(:focus-visible)) .bdash-mini__tile {
+  animation: wpic-pop 0.36s calc(var(--i) * 32ms) var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__row,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__trow,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__action {
+  animation: wpic-slide 0.4s calc(var(--i) * 80ms) var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__check,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__field,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__meter,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__notehead,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__line-text,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__link,
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__button {
+  animation: wpic-rise 0.4s calc(var(--i) * 90ms) var(--wpic-ease) both;
+}
+.bgcard:is(:hover, :has(:focus-visible)) .wpic__tick {
+  animation: wpic-pop 0.3s calc(var(--i) * 140ms + 0.15s) var(--wpic-ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wpic,
+  .bdash-lpic {
+    transition: none;
+  }
+  .bgcard:is(:hover, :has(:focus-visible)) :is(.wpic, .bdash-lpic) {
+    translate: none;
+  }
+  .wpic *,
+  .bdash-lpic * {
+    animation: none !important;
+  }
 }
 
 /* ---- naming ---------------------------------------------------------------------------------------------------- */
@@ -2221,21 +2769,4 @@ button.bdw-bar__row:hover .bdw-bar {
   color: var(--text-primary);
   font-size: var(--fs-base);
   font-weight: var(--fw-medium);
-}
-
-/* ---- narrower pages -------------------------------------------------------------------------------------------- */
-@media (max-width: 1180px) {
-  .bdash-layout.has-library {
-    grid-template-columns: minmax(0, 1fr) 300px;
-  }
-}
-@media (max-width: 900px) {
-  .bdash-layout.has-library {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .bdash-lib {
-    position: static;
-    max-height: 420px;
-    order: -1;
-  }
 }

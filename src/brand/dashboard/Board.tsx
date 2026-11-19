@@ -1,6 +1,6 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, useReducedMotion } from 'motion/react'
+import { useReducedMotion } from 'motion/react'
 import { GripVertical } from 'lucide-react'
 import { RowMenu, type MenuItem } from '../kit'
 import { appRoot } from '../dialog-chrome'
@@ -28,9 +28,10 @@ import {
   type Row,
   type Target,
 } from './layout'
+import { geometry, type Geometry } from './geometry'
 import { WIDGETS, type Range, type WidgetId } from './model'
 import type { ThemeId } from './themes'
-import { CellLift, CellView, type CellHandlers } from './Tile'
+import { CellLift, Tile, type CellHandlers } from './Tile'
 
 /* -----------------------------------------------------------------------------
    The board: rows of widgets, and in Customize the controls that shape them
@@ -48,12 +49,20 @@ import { CellLift, CellView, type CellHandlers } from './Tile'
      with it, its middle to change places, or in a gap between rows to start a
      row of its own. A line shows where it will go before it is let go.
 
-   Widths snap to the same twelfths in every row, so columns line up down the
-   board; a guide shows when the bar being dragged lines up with another row's.
+   Smooth by construction (owner, same day: "laggy, very heavy, and very
+   jittery … snappy … as smooth as can be"):
+   · Every widget sits in ONE flat layer, placed by a transform from
+     geometry.ts, so a widget that changes row keeps its element and its chart.
+   · A move glides: the widget is put in its new place at once and played in
+     from the old one as a transform animation, which runs on the compositor.
+     Nothing else animates the layout, so nothing fights.
+   · A pointer move does no React work: the lifted copy, the drop line, the
+     tip and the guide are moved on the next animation frame by hand, and a
+     drop is found from the geometry, not by reading the page.
    -------------------------------------------------------------------------- */
 
 export interface BoardHandle {
-  /** A widget picked up in the library: carry it to the board. */
+  /** A widget picked up outside the board: carry it to the board. */
   startNew: (widget: WidgetId, e: PointerEvent<HTMLElement>) => void
 }
 
@@ -77,6 +86,11 @@ interface Dock {
   grabY: number
   started: boolean
   drop: Drop | null
+  /** The board as it was when the drag began: the drag never changes it. */
+  rows: Row[]
+  geo: Geometry
+  /** Targets already tried, so a pointer resting on one does not lay the board out again. */
+  tried: Map<string, boolean>
   stop: () => void
 }
 
@@ -91,13 +105,10 @@ interface BarDrag {
   origin: Row[]
 }
 
-const SPRING = { type: 'spring', stiffness: 460, damping: 42, mass: 0.9 } as const
+/** The glide: quick off the mark, soft to land (owner: "snappy … smooth"). */
+const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+const GLIDE_MS = 280
 
-/** Where bar `i` sits across a row's twelve tracks: the gap after the columns before it. */
-const barLeft = (row: Row, i: number) => {
-  const s = row.columns.slice(0, i + 1).reduce((a, c) => a + c.span, 0)
-  return `calc((100% - ${GAP * (COLS - 1)}px) * ${s} / ${COLS} + ${(s - 1) * GAP}px)`
-}
 /** Where each column bar falls, in twelfths: what another row's bar lines up with. */
 const bounds = (row: Row) => row.columns.slice(0, -1).map((_, i) => row.columns.slice(0, i + 1).reduce((a, c) => a + c.span, 0))
 
@@ -122,7 +133,7 @@ function Bar({
   max: number
   style?: CSSProperties
   className?: string
-  onDrag: (phase: 'start' | 'move', dx: number, dy: number, e: PointerEvent<HTMLDivElement>) => void
+  onDrag: (phase: 'start' | 'move', dx: number, dy: number, x: number, y: number) => void
   onDone: (keep: boolean) => void
   onKey: (e: KeyboardEvent<HTMLDivElement>) => void
   onReset: () => void
@@ -146,10 +157,10 @@ function Bar({
         e.stopPropagation()
         e.currentTarget.setPointerCapture(e.pointerId)
         from.current = { x: e.clientX, y: e.clientY }
-        onDrag('start', 0, 0, e)
+        onDrag('start', 0, 0, e.clientX, e.clientY)
       }}
       onPointerMove={(e) => {
-        if (from.current) onDrag('move', e.clientX - from.current.x, e.clientY - from.current.y, e)
+        if (from.current) onDrag('move', e.clientX - from.current.x, e.clientY - from.current.y, e.clientX, e.clientY)
       }}
       onPointerUp={() => {
         if (!from.current) return
@@ -193,6 +204,7 @@ export function Board({
   brand: string
   /** The row that stays first while the move from the old policies is open: not moved, not dropped into. */
   pinnedRow: string | null
+  /** The dashboard is being built from a layout: its widgets arrive one after another. */
   building: boolean
   /** The layout changed by hand: keep it, and say what happened. */
   onCommit: (next: Row[], said: string) => void
@@ -208,26 +220,99 @@ export function Board({
   const stacked = size.w > 0 && size.w < 720
   const [draft, setDraft] = useState<Row[] | null>(null)
   const [sizing, setSizing] = useState<BarDrag['kind'] | null>(null)
-  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
-  const [guides, setGuides] = useState<number[]>([])
   const [dock, setDock] = useState<{ kind: Dock['kind']; id: string } | null>(null)
-  const [drop, setDrop] = useState<Drop | null>(null)
-  const [lift, setLift] = useState<{ cell: Cell; rect: Rect; settling: boolean } | null>(null)
-  const [chip, setChip] = useState<{ widget: WidgetId; x: number; y: number } | null>(null)
+  const [lift, setLift] = useState<{ cell: Cell; width: number; height: number } | null>(null)
+  const [chip, setChip] = useState<WidgetId | null>(null)
   const [picked, setPicked] = useState<{ id: string; origin: Row[] } | null>(null)
   const [settle, setSettle] = useState<string | null>(null)
   const bar = useRef<BarDrag | null>(null)
+  const barDraft = useRef<Row[] | null>(null)
   const session = useRef<Dock | null>(null)
   const dragged = useRef(false)
-
-  /* What the window's own listeners read: they outlive the render that added them. */
-  const live = useRef({ rows, pinnedRow, onCommit, onSay })
-  live.current = { rows, pinnedRow, onCommit, onSay }
+  const liftEl = useRef<HTMLDivElement>(null)
+  const chipEl = useRef<HTMLSpanElement>(null)
+  const dropEl = useRef<HTMLSpanElement>(null)
+  const tipEl = useRef<HTMLSpanElement>(null)
+  const guideEl = useRef<HTMLSpanElement>(null)
+  /* Where the lifted copy and the chip first appear; after that the pointer moves them by hand (begin). Their refs are
+     stable, so the copy, drawn once, is not drawn again. */
+  const liftAt = useRef({ x: 0, y: 0 })
+  const chipAt = useRef({ x: 0, y: 0 })
+  const setLiftEl = useCallback((el: HTMLDivElement | null) => {
+    liftEl.current = el
+    if (el && !el.style.transform) el.style.transform = `translate(${liftAt.current.x}px, ${liftAt.current.y}px)`
+  }, [])
+  const setChipEl = useCallback((el: HTMLSpanElement | null) => {
+    chipEl.current = el
+    if (el && !el.style.transform) el.style.transform = `translate(${chipAt.current.x}px, ${chipAt.current.y}px)`
+  }, [])
 
   const shown = draft ?? rows
+  const geo = useMemo(() => geometry(shown, size.w, stacked), [shown, size.w, stacked])
+
+  /* What the window's own listeners read: they outlive the render that added them. */
+  const live = useRef({ rows, pinnedRow, onCommit, onSay, width: size.w, stacked })
+  live.current = { rows, pinnedRow, onCommit, onSay, width: size.w, stacked }
+
   const setBoard = (el: HTMLDivElement | null) => {
     board.current = el
     sizeRef.current = el
+  }
+
+  /* ---- one piece of work per animation frame ---- */
+
+  const frame = useRef(0)
+  const pending = useRef<(() => void) | null>(null)
+  const schedule = (fn: () => void) => {
+    pending.current = fn
+    if (frame.current) return
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0
+      const f = pending.current
+      pending.current = null
+      f?.()
+    })
+  }
+  /** The frame waiting, now: a pointer let go before its last move was drawn still lands where it was let go. */
+  const flush = () => {
+    if (frame.current) cancelAnimationFrame(frame.current)
+    frame.current = 0
+    const f = pending.current
+    pending.current = null
+    f?.()
+  }
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+
+  /* ---- the line, the tip and the guide, drawn by hand ---- */
+
+  const showDrop = (d: Drop | null) => {
+    const el = dropEl.current
+    if (!el) return
+    if (!d) {
+      el.hidden = true
+      return
+    }
+    const fresh = el.hidden
+    el.hidden = false
+    /* The first time it shows it is put in place; after that it glides from target to target. */
+    el.className = `bdash-drop is-${d.shape}${fresh ? ' is-fresh' : ''}`
+    el.style.transform = `translate(${d.rect.left}px, ${d.rect.top}px)`
+    el.style.width = `${d.rect.width}px`
+    el.style.height = `${d.rect.height}px`
+  }
+  const showTip = (x: number, y: number, text: string | null) => {
+    const el = tipEl.current
+    if (!el) return
+    el.hidden = !text
+    if (!text) return
+    el.textContent = text
+    el.style.transform = `translate(${x}px, ${y}px)`
+  }
+  const showGuide = (x: number | null) => {
+    const el = guideEl.current
+    if (!el) return
+    el.hidden = x == null
+    if (x != null) el.style.transform = `translateX(${x}px)`
   }
 
   /* Leaving Customize ends anything in hand. */
@@ -236,94 +321,135 @@ export function Board({
     session.current?.stop()
     session.current = null
     bar.current = null
+    barDraft.current = null
     setDraft(null)
     setPicked(null)
     setSizing(null)
-    setTip(null)
-    setGuides([])
     setDock(null)
-    setDrop(null)
     setLift(null)
     setChip(null)
   }, [editing])
   useEffect(() => () => session.current?.stop(), [])
 
+  /* ---- the glide ----
+     Every widget whose place changed is played in from where it was, as a transform animation: it is already in its new
+     place, so a glide cut short ends there. Nothing glides while a bar is held (the board follows the pointer), when the
+     page itself changed width, or with reduced motion. Widgets that are new arrive: one by one when a layout is being
+     built, together otherwise. */
+  const before = useRef<Geometry | null>(null)
+  useLayoutEffect(() => {
+    const was = before.current
+    before.current = geo
+    const host = board.current
+    if (!host || geo.width === 0 || still) return
+    const fresh = !was || was.width === 0
+    if (!fresh && (sizing || was.width !== geo.width || was.stacked !== geo.stacked)) return
+    if (fresh && !building) return
+    let n = 0
+    host.querySelectorAll<HTMLElement>(':scope > [data-cell]').forEach((el) => {
+      const id = el.dataset.cell ?? ''
+      const box = geo.cells[id]
+      if (!box || id === settle) return
+      const old = fresh ? undefined : was.cells[id]
+      if (!old) {
+        el.animate([{ opacity: 0, translate: '0 12px' }, { opacity: 1, translate: '0 0' }], {
+          duration: building ? 340 : 220,
+          delay: building ? Math.min(900, n++ * 45) : 0,
+          easing: EASE,
+          fill: 'backwards',
+        })
+        return
+      }
+      const dx = old.x - box.x
+      const dy = old.y - box.y
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
+      el.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: GLIDE_MS, easing: EASE })
+    })
+    /* Run again for a flag alone (a bar let go, a glide landed), it finds every widget where it was, and plays nothing. */
+  }, [geo, building, still, sizing, settle])
+
   /* A dropped widget's lifted copy glides to where the widget landed, and only then is the widget shown. */
   useLayoutEffect(() => {
     if (!settle) return
-    const el = board.current?.querySelector<HTMLElement>(`[data-cell="${settle}"]`)
-    if (!el || still) {
+    const el = liftEl.current
+    const box = geo.cells[settle]
+    const host = board.current
+    if (!el || !box || !host || still) {
       setLift(null)
       setSettle(null)
       return
     }
-    const r = el.getBoundingClientRect()
-    setLift((l) => (l ? { ...l, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, settling: true } : l))
-    const t = window.setTimeout(() => {
+    const hb = host.getBoundingClientRect()
+    const glide = el.animate(
+      [
+        { transform: el.style.transform, rotate: '1.2deg', width: el.style.width, height: el.style.height },
+        { transform: `translate(${hb.left + box.x}px, ${hb.top + box.y}px)`, rotate: '0deg', width: `${box.w}px`, height: `${box.h}px` },
+      ],
+      { duration: 200, easing: EASE, fill: 'forwards' },
+    )
+    glide.onfinish = () => {
       setLift(null)
       setSettle(null)
-    }, 200)
-    return () => window.clearTimeout(t)
-  }, [settle, still])
+    }
+    return () => {
+      glide.onfinish = null
+    }
+  }, [settle, still, geo.cells])
 
   /* ---- the bars ---- */
 
-  const colsEl = (rowId: string) => board.current?.querySelector<HTMLElement>(`[data-row="${rowId}"] .bdash-row__cols`)
-
   const startBar = (kind: BarDrag['kind'], row: Row, index: number, col: number) => {
-    const el = colsEl(row.id)
-    const unit = el ? (el.getBoundingClientRect().width + GAP) / COLS : 1
+    const unit = (geo.width + GAP) / COLS
     const start = kind === 'col' ? row.columns[index].span : kind === 'row' ? row.height : stackHeights(row, row.columns[col])[index]
     bar.current = { kind, row: row.id, index, col, start, unit, origin: rows }
+    barDraft.current = null
     setSizing(kind)
   }
 
-  const dragBar = (dx: number, dy: number, e: PointerEvent<HTMLDivElement>) => {
-    const b = bar.current
-    if (!b) return
-    let changed: Row | null = null
-    const next = b.origin.map((row) => {
-      if (row.id !== b.row) return row
-      if (b.kind === 'col') changed = setBoundary(row, b.index, b.start + Math.round(dx / b.unit))
-      else if (b.kind === 'row') changed = setRowHeight(row, b.start + dy)
-      else changed = setStackSplit(row, b.col, b.index, b.start + dy)
-      return changed
+  const dragBar = (dx: number, dy: number, x: number, y: number) =>
+    schedule(() => {
+      const b = bar.current
+      if (!b) return
+      let changed: Row | null = null
+      const next = b.origin.map((row) => {
+        if (row.id !== b.row) return row
+        if (b.kind === 'col') changed = setBoundary(row, b.index, b.start + Math.round(dx / b.unit))
+        else if (b.kind === 'row') changed = setRowHeight(row, b.start + dy)
+        else changed = setStackSplit(row, b.col, b.index, b.start + dy)
+        return changed
+      })
+      barDraft.current = next
+      setDraft(next)
+      const r = changed as Row | null
+      if (!r) return
+      if (b.kind === 'col') {
+        const { lo, hi } = colRange(r, b.index)
+        const a = r.columns[b.index].span
+        const edge = a === lo || a === hi ? ` · ${a === lo ? 'narrowest' : 'widest'}` : ''
+        showTip(x, y, `${pct(a / COLS)} | ${pct(r.columns[b.index + 1].span / COLS)}${edge}`)
+        /* Another row with a bar in the same place: draw the line they share. */
+        const at = bounds(r)[b.index]
+        const match = next.some((o) => o.id !== r.id && bounds(o).includes(at))
+        showGuide(match ? Math.round(at * b.unit) - GAP / 2 : null)
+      } else {
+        const min = b.kind === 'row' ? rowMinH(r) : stackRange(r, b.col, b.index).lo
+        const max = b.kind === 'row' ? rowMaxH(r) : stackRange(r, b.col, b.index).hi
+        const now = b.kind === 'row' ? r.height : stackHeights(r, r.columns[b.col])[b.index]
+        showTip(x, y, now <= min + 0.5 ? 'Shortest' : now >= max - 0.5 ? 'Tallest' : null)
+      }
     })
-    setDraft(next)
-    const r = changed as Row | null
-    if (!r) return
-    if (b.kind === 'col') {
-      const { lo, hi } = colRange(r, b.index)
-      const a = r.columns[b.index].span
-      const edge = a === lo || a === hi ? ` · ${a === lo ? 'narrowest' : 'widest'}` : ''
-      setTip({ x: e.clientX, y: e.clientY, text: `${pct(a / COLS)} | ${pct(r.columns[b.index + 1].span / COLS)}${edge}` })
-      /* Another row with a bar in the same place: draw the line they share. */
-      const at = bounds(r)[b.index]
-      const match = next.some((o) => o.id !== r.id && bounds(o).includes(at))
-      const el = colsEl(r.id)
-      const host = board.current?.getBoundingClientRect()
-      if (match && el && host) {
-        const w = el.getBoundingClientRect()
-        const x = w.left - host.left + ((w.width - GAP * (COLS - 1)) * at) / COLS + (at - 1) * GAP + GAP / 2
-        setGuides([x])
-      } else setGuides([])
-    } else {
-      const min = b.kind === 'row' ? rowMinH(r) : stackRange(r, b.col, b.index).lo
-      const max = b.kind === 'row' ? rowMaxH(r) : stackRange(r, b.col, b.index).hi
-      const now = b.kind === 'row' ? r.height : stackHeights(r, r.columns[b.col])[b.index]
-      setTip(now <= min + 0.5 ? { x: e.clientX, y: e.clientY, text: 'Shortest' } : now >= max - 0.5 ? { x: e.clientX, y: e.clientY, text: 'Tallest' } : null)
-    }
-  }
 
   const endBar = (keep: boolean) => {
+    flush()
     const b = bar.current
+    const last = barDraft.current
     bar.current = null
+    barDraft.current = null
     setSizing(null)
-    setTip(null)
-    setGuides([])
-    if (b && keep && draft) {
-      const changed = JSON.stringify(draft) !== JSON.stringify(b.origin)
-      if (changed) onCommit(draft, b.kind === 'col' ? 'Widths changed' : b.kind === 'row' ? 'Row height changed' : 'Heights changed')
+    showTip(0, 0, null)
+    showGuide(null)
+    if (b && keep && last && JSON.stringify(last) !== JSON.stringify(b.origin)) {
+      onCommit(last, b.kind === 'col' ? 'Widths changed' : b.kind === 'row' ? 'Row height changed' : 'Heights changed')
     }
     setDraft(null)
   }
@@ -367,24 +493,34 @@ export function Board({
 
   /* ---- dragging widgets and rows ---- */
 
-  /** Where a drop would land, and the line or outline that says so. Null where nothing can go. */
+  /** Where a drop would land, and the line or outline that says so, in the board's own pixels. Null where nothing can
+      go. Read from the geometry the drag began with, so no part of the page is measured but the board's corner. */
   const hit = (x: number, y: number, d: Dock): Drop | null => {
     const host = board.current
     if (!host) return null
     const hb = host.getBoundingClientRect()
-    const now = live.current.rows
+    const px = x - hb.left
+    const py = y - hb.top
+    const now = d.rows
+    const g = d.geo
     const pinned = live.current.pinnedRow
-    const rel = (r: DOMRect): Rect => ({ left: r.left - hb.left, top: r.top - hb.top, width: r.width, height: r.height })
-    const rowRects = now.map((r) => ({ r, el: host.querySelector<HTMLElement>(`[data-row="${r.id}"] .bdash-row__cols`) })).flatMap((o) => (o.el ? [{ r: o.r, b: o.el.getBoundingClientRect() }] : []))
     const floor = pinned && now[0]?.id === pinned ? 1 : 0
 
+    const valid = (t: Target): boolean => {
+      const key = JSON.stringify(t)
+      const known = d.tried.get(key)
+      if (known !== undefined) return known
+      const ok = d.kind === 'cell' ? moveCell(now, d.id, t) !== null : d.kind === 'new' && !!d.widget && place(now, { id: 'x', widget: d.widget, weight: 1 }, t) !== null
+      d.tried.set(key, ok)
+      return ok
+    }
     /* A gap between rows (or above the first, below the last): a row of its own there. */
     const between = (index: number): Drop | null => {
       const at = Math.max(floor, index)
-      const above = rowRects[at - 1]?.b
-      const below = rowRects[at]?.b
-      const lineY = above && below ? (above.bottom + below.top) / 2 : above ? above.bottom + GAP / 2 : below ? below.top - GAP / 2 : hb.top
-      const rect = { left: 0, top: lineY - hb.top - 1.5, width: hb.width, height: 3 }
+      const above = g.rows[at - 1]
+      const below = g.rows[at]
+      const lineY = above && below ? (above.y + above.h + below.y) / 2 : above ? above.y + above.h + GAP / 2 : below ? below.y - GAP / 2 : 0
+      const rect = { left: 0, top: lineY - 1.5, width: g.width, height: 3 }
       if (d.kind === 'row') {
         const from = now.findIndex((r) => r.id === d.id)
         const to = at > from ? at - 1 : at
@@ -393,76 +529,65 @@ export function Board({
       const target: Target = { at: 'row', before: now[at]?.id ?? null }
       return valid(target) ? { target, rect, shape: 'h' } : null
     }
-    const valid = (t: Target): boolean => {
-      if (d.kind === 'cell') return moveCell(now, d.id, t) !== null
-      if (d.kind === 'new' && d.widget) return place(now, { id: 'x', widget: d.widget, weight: 1 }, t) !== null
-      return false
-    }
 
-    if (rowRects.length === 0) return between(0)
-    const inRow = rowRects.findIndex((o) => y >= o.b.top && y <= o.b.bottom)
-    if (inRow < 0 || d.kind === 'row') {
-      const index = rowRects.filter((o) => o.b.top + o.b.height / 2 < y).length
-      return between(index)
-    }
-    const { r: row, b: rb } = rowRects[inRow]
+    if (g.rows.length === 0) return between(0)
+    const inRow = g.rows.findIndex((b) => py >= b.y && py <= b.y + b.h)
+    if (inRow < 0 || d.kind === 'row') return between(g.rows.filter((b) => b.y + b.h / 2 < py).length)
+    const rb = g.rows[inRow]
+    const row = now[inRow]
     /* The first and last few pixels of a row count as the gap beside it, so a new row is easy to start. */
-    if (y < rb.top + 10) return between(inRow)
-    if (y > rb.bottom - 10) return between(inRow + 1)
+    if (py < rb.y + 10) return between(inRow)
+    if (py > rb.y + rb.h - 10) return between(inRow + 1)
     if (row.id === pinned) return null
-    const colEls = row.columns.flatMap((c) => {
-      const el = host.querySelector<HTMLElement>(`[data-col="${c.id}"]`)
-      return el ? [{ c, b: el.getBoundingClientRect() }] : []
-    })
+
+    const cols = row.columns.map((c) => ({ c, b: g.cols[c.id] }))
     const colLine = (before: string | null, xLine: number): Drop | null => {
       const target: Target = { at: 'column', row: row.id, before }
-      return valid(target) ? { target, rect: { left: xLine - hb.left - 1.5, top: rb.top - hb.top, width: 3, height: rb.height }, shape: 'v' } : null
+      return valid(target) ? { target, rect: { left: xLine - 1.5, top: rb.y, width: 3, height: rb.h }, shape: 'v' } : null
     }
-    const ci = colEls.findIndex((o) => x >= o.b.left && x <= o.b.right)
+    const ci = cols.findIndex((o) => px >= o.b.x && px <= o.b.x + o.b.w)
     if (ci < 0) {
-      const after = colEls.filter((o) => o.b.right < x).length
-      const left = colEls[after - 1]?.b
-      const right = colEls[after]?.b
-      return colLine(colEls[after]?.c.id ?? null, left && right ? (left.right + right.left) / 2 : left ? left.right + GAP / 2 : (right?.left ?? rb.left) - GAP / 2)
+      const after = cols.filter((o) => o.b.x + o.b.w < px).length
+      const left = cols[after - 1]?.b
+      const right = cols[after]?.b
+      return colLine(cols[after]?.c.id ?? null, left && right ? (left.x + left.w + right.x) / 2 : left ? left.x + left.w + GAP / 2 : (right?.x ?? 0) - GAP / 2)
     }
-    const { c: col, b: cb } = colEls[ci]
-    const cellEls = col.cells.flatMap((cell) => {
-      const el = host.querySelector<HTMLElement>(`[data-cell="${cell.id}"]`)
-      return el ? [{ cell, b: el.getBoundingClientRect() }] : []
-    })
+    const { c: col, b: cb } = cols[ci]
+    const cells = col.cells.map((cell) => ({ cell, b: g.cells[cell.id] }))
     const stackLine = (before: string | null, yLine: number): Drop | null => {
       const target: Target = { at: 'stack', column: col.id, before }
-      return valid(target) ? { target, rect: { left: cb.left - hb.left, top: yLine - hb.top - 1.5, width: cb.width, height: 3 }, shape: 'h' } : null
+      return valid(target) ? { target, rect: { left: cb.x, top: yLine - 1.5, width: cb.w, height: 3 }, shape: 'h' } : null
     }
-    const ki = cellEls.findIndex((o) => y >= o.b.top && y <= o.b.bottom)
+    const ki = cells.findIndex((o) => py >= o.b.y && py <= o.b.y + o.b.h)
     if (ki < 0) {
-      const after = cellEls.filter((o) => o.b.bottom < y).length
-      const above = cellEls[after - 1]?.b
-      const below = cellEls[after]?.b
-      return stackLine(cellEls[after]?.cell.id ?? null, above && below ? (above.bottom + below.top) / 2 : above ? above.bottom + GAP / 2 : (below?.top ?? cb.top) - GAP / 2)
+      const after = cells.filter((o) => o.b.y + o.b.h < py).length
+      const above = cells[after - 1]?.b
+      const below = cells[after]?.b
+      return stackLine(cells[after]?.cell.id ?? null, above && below ? (above.y + above.h + below.y) / 2 : above ? above.y + above.h + GAP / 2 : (below?.y ?? cb.y) - GAP / 2)
     }
-    const { cell, b: kb } = cellEls[ki]
-    const rx = (x - kb.left) / kb.width
-    const ry = (y - kb.top) / kb.height
-    const nextCol = row.columns[row.columns.indexOf(col) + 1]?.id ?? null
+    const { cell, b: kb } = cells[ki]
+    const rx = (px - kb.x) / kb.w
+    const ry = (py - kb.y) / kb.h
+    const nextCol = row.columns[ci + 1]?.id ?? null
     const nextCell = col.cells[ki + 1]?.id ?? null
-    if (rx < 0.22) return colLine(col.id, cb.left - GAP / 2)
-    if (rx > 0.78) return colLine(nextCol, cb.right + GAP / 2)
-    if (ry < 0.3) return stackLine(cell.id, kb.top - GAP / 2)
-    if (ry > 0.7) return stackLine(nextCell, kb.bottom + GAP / 2)
+    if (rx < 0.22) return colLine(col.id, cb.x - GAP / 2)
+    if (rx > 0.78) return colLine(nextCol, cb.x + cb.w + GAP / 2)
+    if (ry < 0.3) return stackLine(cell.id, kb.y - GAP / 2)
+    if (ry > 0.7) return stackLine(nextCell, kb.y + kb.h + GAP / 2)
     if (d.kind === 'cell') {
       if (cell.id === d.id) return null
       const target: Target = { at: 'swap', cell: cell.id }
-      return valid(target) ? { target, rect: rel(kb), shape: 'box' } : null
+      return valid(target) ? { target, rect: { left: kb.x, top: kb.y, width: kb.w, height: kb.h }, shape: 'box' } : null
     }
-    return stackLine(nextCell, kb.bottom + GAP / 2) ?? colLine(nextCol, cb.right + GAP / 2)
+    return stackLine(nextCell, kb.y + kb.h + GAP / 2) ?? colLine(nextCol, cb.x + cb.w + GAP / 2)
   }
 
   const finish = (d: Dock, keep: boolean) => {
+    if (session.current === d) flush()
     d.stop()
     session.current = null
     setDock(null)
-    setDrop(null)
+    showDrop(null)
     setChip(null)
     if (!d.started) return
     dragged.current = true
@@ -490,28 +615,52 @@ export function Board({
 
   const begin = (kind: Dock['kind'], id: string, e: PointerEvent<HTMLElement>, grab: { x: number; y: number }, widget?: WidgetId) => {
     session.current?.stop()
-    const d: Dock = { kind, id, widget, startX: e.clientX, startY: e.clientY, grabX: grab.x, grabY: grab.y, started: false, drop: null, stop: () => {} }
+    const { rows: now, width, stacked: narrow } = live.current
+    const d: Dock = {
+      kind,
+      id,
+      widget,
+      startX: e.clientX,
+      startY: e.clientY,
+      grabX: grab.x,
+      grabY: grab.y,
+      started: false,
+      drop: null,
+      rows: now,
+      geo: geometry(now, width, narrow),
+      tried: new Map(),
+      stop: () => {},
+    }
     const move = (ev: globalThis.PointerEvent) => {
+      const x = ev.clientX
+      const y = ev.clientY
       if (!d.started) {
-        if (Math.hypot(ev.clientX - d.startX, ev.clientY - d.startY) < 5) return
+        if (Math.hypot(x - d.startX, y - d.startY) < 5) return
         d.started = true
         document.documentElement.classList.add('bdash-dragging')
         setPicked(null)
         setDock({ kind, id })
         if (kind === 'cell') {
-          const el = board.current?.querySelector<HTMLElement>(`[data-cell="${id}"]`)
-          const at = findCell(live.current.rows, id)
-          if (el && at) {
-            const r = el.getBoundingClientRect()
-            setLift({ cell: live.current.rows[at.r].columns[at.c].cells[at.k], rect: { left: ev.clientX - d.grabX, top: ev.clientY - d.grabY, width: r.width, height: r.height }, settling: false })
+          const box = d.geo.cells[id]
+          const at = findCell(d.rows, id)
+          if (box && at) {
+            liftAt.current = { x: x - d.grabX, y: y - d.grabY }
+            setLift({ cell: d.rows[at.r].columns[at.c].cells[at.k], width: box.w, height: box.h })
           }
+        }
+        if (kind === 'new' && widget) {
+          chipAt.current = { x, y }
+          setChip(widget)
         }
       }
       ev.preventDefault()
-      if (kind === 'cell') setLift((l) => (l ? { ...l, rect: { ...l.rect, left: ev.clientX - d.grabX, top: ev.clientY - d.grabY } } : l))
-      if (kind === 'new' && widget) setChip({ widget, x: ev.clientX, y: ev.clientY })
-      d.drop = hit(ev.clientX, ev.clientY, d)
-      setDrop(d.drop)
+      schedule(() => {
+        if (session.current !== d) return
+        if (kind === 'cell' && liftEl.current) liftEl.current.style.transform = `translate(${x - d.grabX}px, ${y - d.grabY}px)`
+        if (kind === 'new' && chipEl.current) chipEl.current.style.transform = `translate(${x}px, ${y}px)`
+        d.drop = hit(x, y, d)
+        showDrop(d.drop)
+      })
     }
     const up = () => finish(d, true)
     const cancel = () => finish(d, false)
@@ -565,7 +714,10 @@ export function Board({
     return moveCell(list, id, { at: 'column', row: other.id, before: null }) ?? moveCell(list, id, { at: 'row', before: up ? other.id : (list[at.r + 2]?.id ?? null) })
   }
 
-  const handlers: CellHandlers = {
+  /* The tiles' callbacks, rebuilt every render with the render's own values, behind one object that never changes:
+     a tile is memoized, and a new set of callbacks would draw every tile again. */
+  const latest = useRef<CellHandlers | null>(null)
+  latest.current = {
     onGrab: (c, e) => {
       if (e.button !== 0 || stacked) return
       const target = e.target as Element
@@ -615,6 +767,16 @@ export function Board({
     onPatch: (c, p) => onPatch(c.id, p),
     onColour: (c, t) => onColour(c.id, t),
   }
+  const handlers = useMemo<CellHandlers>(
+    () => ({
+      onGrab: (c, e) => latest.current?.onGrab(c, e),
+      onKey: (c, e) => latest.current?.onKey(c, e),
+      onRemove: (c) => latest.current?.onRemove(c),
+      onPatch: (c, p) => latest.current?.onPatch(c, p),
+      onColour: (c, t) => latest.current?.onColour(c, t),
+    }),
+    [],
+  )
 
   /* ---- rows ---- */
 
@@ -633,140 +795,167 @@ export function Board({
     else if (id === 'remove') onRemoveRow(row)
   }
 
-  const order = (() => {
-    const out = new Map<string, number>()
-    shown.forEach((r) => r.columns.forEach((c) => c.cells.forEach((x) => out.set(x.id, out.size))))
-    return out
-  })()
   const edit = editing && !stacked
+  const byId = new Map(shown.map((r) => [r.id, r]))
+  const movingRow = dock?.kind === 'row' ? dock.id : null
+  const stateOf = (cell: Cell, row: string): 'rest' | 'slot' | 'hidden' | 'dim' =>
+    settle === cell.id ? 'hidden' : dock?.kind === 'cell' && dock.id === cell.id ? 'slot' : movingRow === row ? 'dim' : 'rest'
 
   return (
-    <div className={`bdash-board${editing ? ' is-editing' : ''}${stacked ? ' is-stacked' : ''}${sizing ? ` is-sizing is-sizing-${sizing}` : ''}${dock ? ' is-docking' : ''}`} ref={setBoard}>
-      {shown.map((row, ri) => (
-        <motion.div
-          key={row.id}
-          layout={still ? false : 'position'}
-          transition={{ layout: sizing || still ? { duration: 0 } : SPRING }}
-          data-row={row.id}
-          className={`bdash-row${row.id === pinnedRow ? ' is-pinned' : ''}${dock?.kind === 'row' && dock.id === row.id ? ' is-moving' : ''}`}
-          style={{ ['--row-h' as string]: `${row.height}px` }}
-        >
-          {edit && row.id !== pinnedRow && (
-            <span
-              className="bdash-row__grip"
-              data-chrome
-              onPointerDown={(e) => {
-                if (e.button !== 0) return
-                begin('row', row.id, e, { x: 0, y: 0 })
-              }}
-              onClickCapture={(e) => {
-                /* A grip that was dragged does not also open its menu. */
-                if (dragged.current) {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }
-              }}
+    <div
+      className={`bdash-board${editing ? ' is-editing' : ''}${stacked ? ' is-stacked' : ''}${sizing ? ` is-sizing is-sizing-${sizing}` : ''}${dock ? ' is-docking' : ''}`}
+      ref={setBoard}
+      style={{ height: geo.height + (edit ? GAP : 0) }}
+    >
+      {/* Each row's grip, in the margin beside it; pointing at it outlines the row it moves. Not while a bar is held:
+          nothing else is pressed then, and the grips would be drawn again on every frame. */}
+      {edit &&
+        !sizing &&
+        geo.rows.map((rb, ri) => {
+          const row = shown[ri]
+          return (
+            <div
+              key={row.id}
+              data-band={row.id}
+              className={`bdash-band${row.id === pinnedRow ? ' is-pinned' : ''}${movingRow === row.id ? ' is-moving' : ''}`}
+              style={{ transform: `translateY(${rb.y}px)`, height: rb.h }}
             >
-              <RowMenu label={`Row ${ri + 1}`} icon={GripVertical} items={rowMenu(row, ri)} onSelect={onRowMenu(row, ri)} align="start" />
-            </span>
-          )}
-          <div className="bdash-row__cols">
-            {row.columns.map((col, ci) => {
-              const px = stackHeights(row, col)
-              return (
-                <div key={col.id} data-col={col.id} className="bdash-col" style={{ gridColumn: `span ${col.span}` }}>
-                  {col.cells.map((cell, k) => (
-                    <CellView
-                      key={cell.id}
-                      cell={cell}
-                      order={order.get(cell.id) ?? 0}
-                      editing={editing}
-                      range={range}
-                      movable={edit && row.id !== pinnedRow}
-                      state={settle === cell.id ? 'hidden' : dock?.kind === 'cell' && dock.id === cell.id ? 'slot' : 'rest'}
-                      picked={picked?.id === cell.id}
-                      building={building}
-                      boardTheme={theme}
-                      instant={sizing !== null || settle === cell.id}
-                      style={{ ['--cell-h' as string]: `${Math.round(px[k])}px` }}
-                      handlers={handlers}
-                    />
-                  ))}
-                  {edit &&
-                    col.cells.slice(0, -1).map((cell, k) => {
-                      const r = stackRange(row, ci, k)
-                      return (
-                        <Bar
-                          key={`s${cell.id}`}
-                          orientation="horizontal"
-                          label={`Share the height of ${WIDGETS[cell.widget].name} and ${WIDGETS[col.cells[k + 1].widget].name}`}
-                          now={r.now}
-                          min={r.lo}
-                          max={r.hi}
-                          className="is-stack"
-                          style={{ top: px.slice(0, k + 1).reduce((a, b) => a + b, 0) + k * GAP }}
-                          onDrag={(phase, dx, dy, e) => (phase === 'start' ? startBar('stack', row, k, ci) : dragBar(dx, dy, e))}
-                          onDone={endBar}
-                          onKey={keyBar('stack', row, k, ci)}
-                          onReset={resetBar('stack', row, k, ci)}
-                        />
-                      )
-                    })}
-                </div>
-              )
-            })}
-            {edit &&
-              row.columns.slice(0, -1).map((col, i) => {
-                const r = colRange(row, i)
-                return (
-                  <Bar
-                    key={`v${col.id}`}
-                    orientation="vertical"
-                    label={`Share the width of ${WIDGETS[col.cells[0].widget].name} and ${WIDGETS[row.columns[i + 1].cells[0].widget].name}`}
-                    now={col.span}
-                    min={r.lo}
-                    max={r.hi}
-                    style={{ left: barLeft(row, i) }}
-                    onDrag={(phase, dx, dy, e) => (phase === 'start' ? startBar('col', row, i, 0) : dragBar(dx, dy, e))}
-                    onDone={endBar}
-                    onKey={keyBar('col', row, i, 0)}
-                    onReset={resetBar('col', row, i, 0)}
-                  />
-                )
-              })}
-          </div>
-          {edit && (
+              {row.id !== pinnedRow && (
+                <span
+                  className="bdash-row__grip"
+                  data-chrome
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return
+                    begin('row', row.id, e, { x: 0, y: 0 })
+                  }}
+                  onClickCapture={(e) => {
+                    /* A grip that was dragged does not also open its menu. */
+                    if (dragged.current) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }
+                  }}
+                >
+                  <RowMenu label={`Row ${ri + 1}`} icon={GripVertical} items={rowMenu(row, ri)} onSelect={onRowMenu(row, ri)} align="start" />
+                </span>
+              )}
+            </div>
+          )
+        })}
+
+      {/* The widgets, in reading order, each placed by its box. */}
+      {shown.flatMap((row) =>
+        row.columns.flatMap((col) =>
+          col.cells.map((cell) => {
+            const box = geo.cells[cell.id]
+            if (!box) return null
+            return (
+              <Tile
+                key={cell.id}
+                cell={cell}
+                box={box}
+                editing={editing}
+                range={range}
+                movable={edit && row.id !== pinnedRow}
+                state={stateOf(cell, row.id)}
+                picked={picked?.id === cell.id}
+                boardTheme={theme}
+                brand={brand}
+                handlers={handlers}
+              />
+            )
+          }),
+        ),
+      )}
+
+      {/* The bars: between columns, between stacked widgets, and under each row. */}
+      {edit &&
+        geo.colBars.map((b) => {
+          const row = byId.get(b.row)
+          if (!row) return null
+          const col = row.columns[b.index]
+          const r = colRange(row, b.index)
+          return (
             <Bar
+              key={`v${col.id}`}
+              orientation="vertical"
+              label={`Share the width of ${WIDGETS[col.cells[0].widget].name} and ${WIDGETS[row.columns[b.index + 1].cells[0].widget].name}`}
+              now={col.span}
+              min={r.lo}
+              max={r.hi}
+              style={{ transform: `translate(${b.x}px, ${b.y}px)`, height: b.h }}
+              onDrag={(phase, dx, dy, x, y) => (phase === 'start' ? startBar('col', row, b.index, 0) : dragBar(dx, dy, x, y))}
+              onDone={endBar}
+              onKey={keyBar('col', row, b.index, 0)}
+              onReset={resetBar('col', row, b.index, 0)}
+            />
+          )
+        })}
+      {edit &&
+        geo.stackBars.map((b) => {
+          const row = byId.get(b.row)
+          if (!row) return null
+          const col = row.columns[b.col]
+          const cell = col.cells[b.index]
+          const r = stackRange(row, b.col, b.index)
+          return (
+            <Bar
+              key={`s${cell.id}`}
+              orientation="horizontal"
+              label={`Share the height of ${WIDGETS[cell.widget].name} and ${WIDGETS[col.cells[b.index + 1].widget].name}`}
+              now={r.now}
+              min={r.lo}
+              max={r.hi}
+              className="is-stack"
+              style={{ transform: `translate(${b.x}px, ${b.y}px)`, width: b.w }}
+              onDrag={(phase, dx, dy, x, y) => (phase === 'start' ? startBar('stack', row, b.index, b.col) : dragBar(dx, dy, x, y))}
+              onDone={endBar}
+              onKey={keyBar('stack', row, b.index, b.col)}
+              onReset={resetBar('stack', row, b.index, b.col)}
+            />
+          )
+        })}
+      {edit &&
+        geo.rows.map((rb, ri) => {
+          const row = shown[ri]
+          return (
+            <Bar
+              key={`h${row.id}`}
               orientation="horizontal"
               label={`Height of row ${ri + 1}`}
               now={row.height}
               min={rowMinH(row)}
               max={rowMaxH(row)}
               className="is-row"
-              onDrag={(phase, dx, dy, e) => (phase === 'start' ? startBar('row', row, 0, 0) : dragBar(dx, dy, e))}
+              style={{ transform: `translateY(${rb.y + rb.h}px)` }}
+              onDrag={(phase, dx, dy, x, y) => (phase === 'start' ? startBar('row', row, 0, 0) : dragBar(dx, dy, x, y))}
               onDone={endBar}
               onKey={keyBar('row', row, 0, 0)}
               onReset={resetBar('row', row, 0, 0)}
             />
-          )}
-        </motion.div>
-      ))}
-      {guides.map((x) => (
-        <span key={x} className="bdash-guide" style={{ left: x }} aria-hidden />
-      ))}
-      {drop && <span className={`bdash-drop is-${drop.shape}`} style={drop.rect} aria-hidden />}
+          )
+        })}
+
+      {edit && <span ref={guideEl} className="bdash-guide" hidden aria-hidden />}
+      {edit && <span ref={dropEl} className="bdash-drop" hidden aria-hidden />}
       {typeof document !== 'undefined' &&
         createPortal(
           <>
-            {tip && (
-              <span className="bdash-tip" style={{ left: tip.x, top: tip.y }} aria-hidden>
-                {tip.text}
-              </span>
+            {edit && <span ref={tipEl} className="bdash-tip" hidden aria-hidden />}
+            {lift && (
+              <CellLift
+                ref={setLiftEl}
+                cell={lift.cell}
+                range={range}
+                width={lift.width}
+                height={lift.height}
+                theme={theme}
+                brand={brand}
+              />
             )}
-            {lift && <CellLift cell={lift.cell} range={range} rect={lift.rect} settling={lift.settling} theme={theme} brand={brand} />}
             {chip && (
-              <span className="bdash-chip bdash-vars" style={{ left: chip.x, top: chip.y }} aria-hidden>
-                {WIDGETS[chip.widget].name}
+              <span ref={setChipEl} className="bdash-chip bdash-vars" aria-hidden>
+                {WIDGETS[chip].name}
               </span>
             )}
           </>,

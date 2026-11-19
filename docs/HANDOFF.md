@@ -488,6 +488,43 @@ The owner agreed a four-phase plan for the use side of templates: one way in, te
 
 **Phase 2 dropped (owner, 29 Oct).** "Use a template" on an application's empty Policies tab is not built. Create new policy already lands on the empty board, whose first choice is Use a template or Start from scratch. Since phase 1, a template picked there names the draft and keeps it on the application, so a second door would only duplicate it. It would also have put a third button back in the head that 27 Oct cut to one split button. The cost is that the application page itself never says "template"; the admin meets the word one click later, on the board.
 
+## 18-19 Nov 2026: the customizable Dashboard (`DASHBOARD_V2`)
+
+A second Dashboard behind the head switch **Dashboard: Classic / New**. Classic (`migrate/HomeHub.tsx`) stays the default. Everything is in `src/brand/dashboard/`, and the flags are in its `phase.ts`.
+
+- **What it is.**
+  - Several named dashboards, as line tabs, with a time range every widget follows.
+  - 39 widgets in five needs (`catalog.ts`), drawn from seed data (`seed.ts`, `sources.ts`).
+  - Nine starting layouts (`templates.ts`), and your own layouts via Save as template.
+  - Storage is `localStorage` `idp.dashboard` v3. Older shapes are read and converted.
+- **The layout model** (`layout.ts`, tested).
+  - Rows, then columns in twelfths that always fill the row, then up to three stacked widgets.
+  - Every widget has a minimum and maximum width and height.
+  - Arrange (Tidy up, By type, By need) repacks the board.
+- **Drawing** (`geometry.ts`, `Board.tsx`).
+  - Every widget is placed by a transform in ONE flat layer, keyed by id, so a widget that moves never mounts again.
+  - A move is a transform glide on the compositor.
+  - A drag writes the lifted copy, the drop line and the tip to the page once per animation frame, with no React work.
+  - Charts stretch while their tile changes size and redraw once it settles.
+  - This is the owner's 19 Nov "laggy, heavy, jittery" fix. Don't bring back nested row and column markup, Motion `layout` on tiles, or CSS height transitions.
+- **Customize.**
+  - Bars sit in every gap: drag them, use the arrow keys, or press Enter to even out.
+  - A grip in the margin moves a row or opens its menu.
+  - Widgets drop beside, stacked, swapped or on a new row.
+  - Customize's controls sit in a dock stuck to the foot of the window. Left to right:
+    - Add widgets (soft orange);
+    - Layouts (the Store icon);
+    - Tidy up, Group by type and Group by need as icon buttons;
+    - Undo, Redo, Reset;
+    - Cancel, and Done (the one solid orange).
+  - Add widgets and Layouts open popups in the template store's own classes (`Market.tsx`, create.css `.bmarket`/`.bgcard`). Each widget card's picture (`pictures.tsx`) plays its use on hover.
+- **Themes** (`themes.ts`, `ThemeMenus.tsx`) are built but off (`DASHBOARD_THEMES`, owner 19 Nov: "deprioritize").
+- **`sound.ts` gained `primeSound()`.** The first toast's `new AudioContext()` froze the frame it came with, so the context is now made at idle after the press that opens Customize.
+- **Gaps.**
+  - Data is a seeded sample.
+  - Dragging a widget in from the library went away with the popup; `startNew` in `Board.tsx` is kept for it.
+  - No interaction tests: the browser checks were Playwright rigs against a local server.
+
 ## Git
 
 - `main` is the line of work. The old worktree branches (`claude/*`, the dated `2026-09-*` branches) are kept as archive backups. Don't merge them.
@@ -502,6 +539,9 @@ The owner agreed a four-phase plan for the use side of templates: one way in, te
 - Worktrees on disk (`git worktree list`): `okta-device-policy-walkthrough-cea5b7` (above), `sweet-blackwell-b5bb79` (at 306f64e on `claude/created-videos-list-eefb36`), `classic-mode-v2-551abb` (38dfd7e), `charming-banach-5e7569` and `unruffled-haslett-aca2da` (both e76b901), and `keen-goldwasser-ce39db` (at 90828b2 on `claude/background-tasks-account-switch-3e5f28`, with its own uncommitted copy of the 7 to 9 Oct work, which `main` supersedes). Before removing ANY worktree: `git -C <tree> status`, and check that no session or dev server is working in it. A clean status at an earlier survey is not enough.
 - **Both remotes are public** (`gh repo view`, 1 Oct). So the internal material is **local only — on this disk, never in git** (owner's choice, 1 Oct 2026): `docs/memory/`, `docs/research/`, `docs/artifacts/` and `tools/rigs/walkthroughs/` are in `.gitignore`. They hold tenant identifiers (the Okta integrator org and its admin URL, the Entra test user, a miniOrange test address, the Vercel project and team ids) and internal material (the manager's scenario sheet, the audits, the team deck, the memory notes). Everything else in the repo carries none of these; there are no passwords, tokens or cookies anywhere. Back the four folders up yourself if this disk is ever replaced.
 - The owner's convention when he does push: push `main`, plus a `YYYY-MM-DD-<topic>` tracking branch for the day's work.
+- **19 Nov 2026.** One commit carries the 18-19 Nov Dashboard (section above), built in the worktree `suspicious-cray-61588b` on `claude/suspicious-cray-61588b`.
+  - It sits on top of 8a25ebd (sign-in by line), which had committed an older copy of `src/brand/dashboard/` from the main checkout. This commit replaces that copy with the latest and drops the @dnd-kit packages that came with it; nothing uses them.
+  - The day branch is `2026-11-19-dashboard-flat-board-dock`.
 
 ## Known gaps
 

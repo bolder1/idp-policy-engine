@@ -311,6 +311,16 @@ function context(): { ctx: AudioContext; out: GainNode } | null {
   }
 }
 
+/** Make the context ahead of the first cue, at a quiet moment just after a press, so the first cue does not stall the
+    frame it lands in: `new AudioContext()` can take a couple of hundred milliseconds, and the Dashboard's first toast
+    froze the glide it arrived with (19 Nov 2026). Nothing plays, and with sounds off nothing is made. */
+export function primeSound(): void {
+  if (audio || typeof window === 'undefined' || !readSound()) return
+  const ask = (window as Window & { requestIdleCallback?: (run: () => void, o?: { timeout: number }) => number }).requestIdleCallback
+  if (ask) ask(() => void context(), { timeout: 3000 })
+  else window.setTimeout(() => void context(), 400)
+}
+
 /* One oscillator through its own envelope: silent, up to the peak in `attack`,
    then an exponential fall to silence at `dur`. */
 function voice(ctx: AudioContext, out: AudioNode, start: number, n: Note, mult: number, peak: number, fall: number) {

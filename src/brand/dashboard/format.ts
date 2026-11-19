@@ -110,25 +110,44 @@ export function arc(cx: number, cy: number, r: number, from: number, to: number)
 
 /* ---- hooks ------------------------------------------------------------------- */
 
-/** The element's own size, kept up as it changes: a chart is drawn at the pixels its tile gives it. */
-export function useSize<T extends HTMLElement>(): [RefObject<T | null>, { w: number; h: number }] {
+/** How long a widget's chart or list waits for its tile to stop changing size before it draws again. While a bar is
+    held or a widget glides, the chart stretches with its tile and is redrawn once, crisp, when it settles (owner,
+    19 Nov 2026: "laggy … jittery"), rather than on every frame. */
+export const SETTLE_MS = 140
+
+/** The element's own size, kept up as it changes: a chart is drawn at the pixels its tile gives it. With `settle`, a
+    change after the first waits until the size has held still that long; a size from nothing is taken at once. */
+export function useSize<T extends HTMLElement>(settle = 0): [RefObject<T | null>, { w: number; h: number }] {
   const ref = useRef<T>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   useLayoutEffect(() => {
     const el = ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
-    const read = (w: number, h: number) => setSize((s) => (Math.abs(s.w - w) < 0.5 && Math.abs(s.h - h) < 0.5 ? s : { w, h }))
-    read(el.clientWidth, el.clientHeight)
-    const ro = new ResizeObserver(([e]) => read(e.contentRect.width, e.contentRect.height))
+    let shown = { w: el.clientWidth, h: el.clientHeight }
+    const read = (w: number, h: number) => {
+      shown = { w, h }
+      setSize((s) => (Math.abs(s.w - w) < 0.5 && Math.abs(s.h - h) < 0.5 ? s : { w, h }))
+    }
+    read(shown.w, shown.h)
+    let timer = 0
+    const ro = new ResizeObserver(([e]) => {
+      const { width, height } = e.contentRect
+      window.clearTimeout(timer)
+      if (!settle || shown.w === 0 || shown.h === 0) read(width, height)
+      else timer = window.setTimeout(() => read(width, height), settle)
+    })
     ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+    return () => {
+      ro.disconnect()
+      window.clearTimeout(timer)
+    }
+  }, [settle])
   return [ref, size]
 }
 
 /** How many rows of `pitch` pixels fit the element, so a list shows whole rows and never half of one. */
 export function useRows<T extends HTMLElement>(pitch: number, least = 1): [RefObject<T | null>, number] {
-  const [ref, size] = useSize<T>()
+  const [ref, size] = useSize<T>(SETTLE_MS)
   return [ref, size.h === 0 ? least : Math.max(least, Math.floor((size.h + 1) / pitch))]
 }
 

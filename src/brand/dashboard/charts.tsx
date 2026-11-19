@@ -1,11 +1,14 @@
 import { useId, useMemo, useState, type PointerEvent, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { arc, band, curve, fmt, useSize } from './format'
+import { SETTLE_MS, arc, band, curve, fmt, useSize } from './format'
 import type { DayState } from './seed'
 
 /* -----------------------------------------------------------------------------
    The Dashboard's charts, drawn by hand in SVG at the pixels their tile gives
-   them, so a tile resized redraws its chart rather than stretching it.
+   them, so a tile resized redraws its chart rather than stretching it. Not on
+   every frame of a resize, though: while a bar is held or a widget glides the
+   drawing stretches with its tile (a viewBox, strokes kept their width), and
+   it is drawn again, crisp, once the tile has settled (format.ts SETTLE_MS).
 
    The look is the console's 60/30/10: ink and grey carry the data, with a
    soft fade under a line, and colour is kept for meaning. Lines are smooth
@@ -69,7 +72,7 @@ interface PlotProps {
 export function WaveChart({ series, labels, ticks, still = false }: PlotProps) {
   const reduce = useReducedMotion() === true || still
   const id = useId()
-  const [ref, { w, h }] = useSize<HTMLDivElement>()
+  const [ref, { w, h }] = useSize<HTMLDivElement>(SETTLE_MS)
   const [at, setAt] = useState<number | null>(null)
   const n = labels.length
   const padT = 8
@@ -105,7 +108,7 @@ export function WaveChart({ series, labels, ticks, still = false }: PlotProps) {
   return (
     <div className="bdc bdc--wave" ref={ref} onPointerMove={scrub} onPointerDown={scrub} onPointerLeave={() => setAt(null)}>
       {geo && (
-        <svg width={w} height={h} aria-hidden>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="bdc-svg" aria-hidden>
           <defs>
             {geo.shapes.map((s) => (
               <linearGradient key={s.key} id={`${id}${s.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -160,7 +163,7 @@ export function WaveChart({ series, labels, ticks, still = false }: PlotProps) {
 /** Stacked upright bars over time. */
 export function BarChart({ series, labels, ticks, still = false }: PlotProps) {
   const reduce = useReducedMotion() === true || still
-  const [ref, { w, h }] = useSize<HTMLDivElement>()
+  const [ref, { w, h }] = useSize<HTMLDivElement>(SETTLE_MS)
   const [at, setAt] = useState<number | null>(null)
   const n = labels.length
   const padT = 8
@@ -196,7 +199,7 @@ export function BarChart({ series, labels, ticks, still = false }: PlotProps) {
   return (
     <div className="bdc bdc--bars" ref={ref} onPointerMove={scrub} onPointerDown={scrub} onPointerLeave={() => setAt(null)}>
       {geo && (
-        <svg width={w} height={h} aria-hidden>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="bdc-svg" aria-hidden>
           {[0.25, 0.5, 0.75, 1].map((g) => (
             <line key={g} x1={0} x2={w} y1={padT + plotH * g} y2={padT + plotH * g} className="bdc-grid" />
           ))}
@@ -245,7 +248,7 @@ export function BarChart({ series, labels, ticks, still = false }: PlotProps) {
 export function Spark({ values, color = 'var(--dash-s1)', still = false }: { values: number[]; color?: string; still?: boolean }) {
   const reduce = useReducedMotion() === true || still
   const id = useId()
-  const [ref, { w, h }] = useSize<HTMLDivElement>()
+  const [ref, { w, h }] = useSize<HTMLDivElement>(SETTLE_MS)
   const pts = useMemo(() => {
     if (w === 0 || h === 0 || values.length < 2) return null
     const min = Math.min(...values)
@@ -255,7 +258,7 @@ export function Spark({ values, color = 'var(--dash-s1)', still = false }: { val
   return (
     <div className="bdc bdc--spark" ref={ref} aria-hidden>
       {pts && (
-        <svg width={w} height={h}>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="bdc-svg">
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.22} />
@@ -283,7 +286,7 @@ export interface Part {
 /** Parts of a whole as a ring, the total in the middle. Pointing at a part reads that part out instead. */
 export function Donut({ parts, caption, still = false }: { parts: Part[]; caption: string; still?: boolean }) {
   const reduce = useReducedMotion() === true || still
-  const [ref, { w, h }] = useSize<HTMLDivElement>()
+  const [ref, { w, h }] = useSize<HTMLDivElement>(SETTLE_MS)
   const [on, setOn] = useState<string | null>(null)
   const size = Math.min(w, h)
   const total = parts.reduce((s, p) => s + p.value, 0)
@@ -335,7 +338,7 @@ export function Donut({ parts, caption, still = false }: { parts: Part[]; captio
 /** One share as three-quarters of a ring, with a mark where the target is. */
 export function Gauge({ value, target, children, label, still = false }: { value: number; target?: number; children: ReactNode; label: string; still?: boolean }) {
   const reduce = useReducedMotion() === true || still
-  const [ref, { w, h }] = useSize<HTMLDivElement>()
+  const [ref, { w, h }] = useSize<HTMLDivElement>(SETTLE_MS)
   const size = Math.min(w, h * 1.18)
   const thick = Math.max(8, Math.min(16, size * 0.09))
   const r = size / 2 - thick / 2 - 4

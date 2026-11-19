@@ -495,8 +495,17 @@ function rowOf(cells: readonly Cell[], spans?: number[]): Row {
   return spans ? tidyRow(row) : evenRow(row)
 }
 
+/** Whether a lone widget can join a row: one of lists and charts, not yet three across, with room for its minimum. */
+function joins(row: Row | undefined, cell: Cell): boolean {
+  if (!row || row.columns.length >= 3) return false
+  if (!row.columns.every((c) => c.cells.length === 1 && (klass(c.cells[0].widget) === 'wide' || klass(c.cells[0].widget) === 'mid'))) return false
+  return sum(row.columns.map(colMinSpan)) + meta(cell.widget).minW <= COLS
+}
+
 /** Cells packed into balanced rows, in the order given: numbers four across, a wide chart beside a narrow list,
-    lists three across, tables and strips on their own. */
+    lists three across, tables and strips on their own. Nothing is left stretched across a row alone if it can sit
+    beside something: one or two numbers take a list or a chart beside them, and a lone list joins the row before it
+    or the chart after it. */
 function pack(list: readonly Cell[]): Row[] {
   const rows: Row[] = []
   const q = [...list]
@@ -508,7 +517,14 @@ function pack(list: readonly Cell[]): Row[] {
     } else if (k === 'stat') {
       const run = [c]
       while (q.length && klass(q[0].widget) === 'stat') run.push(q.shift()!)
-      for (const group of chunks(run, 4)) rows.push(rowOf(group))
+      const groups = chunks(run, 4)
+      const last = groups[groups.length - 1]
+      for (const group of groups.slice(0, -1)) rows.push(rowOf(group))
+      const next = q[0] && klass(q[0].widget)
+      if (last.length <= 2 && (next === 'mid' || next === 'wide')) {
+        const spans = last.map(() => 3)
+        rows.push(rowOf([...last, q.shift()!], [...spans, COLS - 3 * last.length]))
+      } else rows.push(rowOf(last))
     } else if (k === 'wide') {
       const partner = q.findIndex((x, i) => i < 4 && klass(x.widget) === 'mid')
       if (partner >= 0) rows.push(rowOf([c, q.splice(partner, 1)[0]], [8, 4]))
@@ -517,7 +533,11 @@ function pack(list: readonly Cell[]): Row[] {
     } else {
       const run = [c]
       while (q.length && run.length < 3 && klass(q[0].widget) === 'mid') run.push(q.shift()!)
-      rows.push(rowOf(run))
+      if (run.length === 1 && q[0] && klass(q[0].widget) === 'wide') rows.push(rowOf([c, q.shift()!], [4, 8]))
+      else if (run.length === 1 && joins(rows[rows.length - 1], c)) {
+        const prev = rows.pop()!
+        rows.push(evenRow({ ...prev, columns: [...prev.columns, { id: newId('c'), span: 0, cells: [{ ...c, weight: 1 }] }] }))
+      } else rows.push(rowOf(run))
     }
   }
   return rows
@@ -528,7 +548,7 @@ const byRank = (list: readonly Cell[]) => [...list].sort((a, b) => RANK[klass(a.
 /** The board laid out again, every widget kept with its view, filter and colour:
     · tidy   in the order it reads now, packed into balanced rows;
     · type   numbers first, then charts, lists and tables;
-    · need   grouped by what they are about, each group packed on its own.
+    · need   by what they are about (posture, sign-ins, policies, people, admin), numbers first within each.
     A pinned widget (the Migration strip while the move is open) stays first. */
 export function arrange(rows: readonly Row[], mode: ArrangeMode, pinned?: WidgetId): Row[] {
   const cells = allCells(rows)
@@ -537,6 +557,6 @@ export function arrange(rows: readonly Row[], mode: ArrangeMode, pinned?: Widget
   const top = first.map((c) => rowOf([c]))
   if (mode === 'tidy') return [...top, ...pack(rest)]
   if (mode === 'type') return [...top, ...pack(byRank(rest))]
-  const groups = CATEGORIES.map((g) => byRank(rest.filter((c) => meta(c.widget).category === g.value)))
-  return [...top, ...groups.flatMap((g) => (g.length ? pack(g) : []))]
+  const need = (c: Cell) => CATEGORIES.findIndex((g) => g.value === meta(c.widget).category)
+  return [...top, ...pack([...rest].sort((a, b) => need(a) - need(b) || RANK[klass(a.widget)] - RANK[klass(b.widget)]))]
 }

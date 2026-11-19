@@ -1,32 +1,37 @@
-import { useMemo, useState } from 'react'
-import { Trash2 } from 'lucide-react'
-import { Button, Chip, IconButton, Modal, SearchBox } from '../kit'
+import { useMemo, useRef, useState } from 'react'
+import { Store, Trash2 } from 'lucide-react'
+import { Button, Chip, RowMenu } from '../kit'
 import { allCells, fromSpecs } from './layout'
+import { Market } from './Market'
 import { MiniRows } from './mini'
 import { NEEDS, WIDGETS, type DashTemplate, type TemplateNeed } from './model'
 import { XECURIFY_TEMPLATES } from './templates'
 
 /* -----------------------------------------------------------------------------
-   The template gallery: where a dashboard starts. One look (owner, 18 Nov
-   2026: the split and the card previews read the same, so there is one).
+   Layouts: where a dashboard starts, as a gallery like the template store
+   (owner, 19 Nov 2026: "the list can easily be like a layout gallery, or
+   maybe a marketplace kind of thing"; Market.tsx).
 
-   Each card is the layout in miniature: every tile in its place and size,
-   drawn as the kind of widget it holds. Pick one, then the popup's one orange
-   button. It opens three ways:
-   · first    the first visit: Use this layout, or Not now to keep Overview.
+   Each card is a layout in miniature, every widget in its place and size,
+   that builds itself tile by tile when pointed at, as using it does. Its need
+   is in the corner tab, and its one button uses it. It opens three ways:
+   · first    the first visit: a layout, or Not now to keep Overview.
    · new      the plus beside the tabs: Create dashboard adds one.
-   · layout   Customize, Layouts: Use this layout replaces this dashboard's.
+   · layout   the board's actions in Customize: Use this layout replaces this dashboard's.
    -------------------------------------------------------------------------- */
 
 export type GalleryMode = 'first' | 'new' | 'layout'
 
-const WORDS: Record<GalleryMode, { title: string; go: string; no: string }> = {
-  first: { title: 'Choose a starting point', go: 'Use this layout', no: 'Not now' },
-  new: { title: 'New dashboard', go: 'Create dashboard', no: 'Cancel' },
-  layout: { title: 'Layouts', go: 'Use this layout', no: 'Cancel' },
+const WORDS: Record<GalleryMode, { title: string; by: string; go: string; close: string }> = {
+  first: { title: 'Choose a starting point', by: 'Every layout can be changed afterwards', go: 'Use this layout', close: 'Not now' },
+  new: { title: 'New dashboard', by: 'Start from a layout, or from nothing', go: 'Create dashboard', close: 'Close' },
+  layout: { title: 'Layouts', by: 'Replaces this dashboard’s widgets', go: 'Use this layout', close: 'Close' },
 }
 
-type Pill = TemplateNeed | 'all' | 'own'
+/** A need's colour, from the template store's set (create.css `.bgcard.is-cat-*`). */
+const HUE: Record<TemplateNeed, string> = { security: 'risk', operations: 'device', policies: 'quick', compliance: 'compliance', people: 'reuse', start: 'neutral' }
+
+type Shelf = TemplateNeed | 'all' | 'own'
 
 export function Gallery({
   mode,
@@ -35,69 +40,77 @@ export function Gallery({
   onClose,
   onRemoveOwn,
 }: {
-  mode: GalleryMode
+  mode: GalleryMode | null
   own: DashTemplate[]
   onUse: (t: DashTemplate) => void
   onClose: () => void
   onRemoveOwn: (t: DashTemplate) => void
 }) {
   const [q, setQ] = useState('')
-  const [pill, setPill] = useState<Pill>('all')
+  const [shelf, setShelf] = useState<Shelf>('all')
   const all = useMemo(() => [...own, ...XECURIFY_TEMPLATES], [own])
-  const [picked, setPicked] = useState<string>(mode === 'first' ? XECURIFY_TEMPLATES[0].id : XECURIFY_TEMPLATES[1].id)
+  /* What each layout holds, for the search: its widgets' names as well as its own words. */
+  const said = useMemo(() => new Map(all.map((t) => [t.id, `${t.name} ${t.blurb} ${allCells(fromSpecs(t.rows)).map((x) => WIDGETS[x.widget].name).join(' ')}`.toLowerCase()])), [all])
   const words = q.trim().toLowerCase()
-  const shown = all.filter((t) => {
-    const byPill = pill === 'all' || (pill === 'own' ? t.own : !t.own && t.need === pill)
-    return byPill && (!words || `${t.name} ${t.blurb} ${allCells(fromSpecs(t.rows)).map((x) => WIDGETS[x.widget].name).join(' ')}`.toLowerCase().includes(words))
-  })
-  const choice = all.find((t) => t.id === picked) ?? null
-  const pills: { value: Pill; label: string }[] = [{ value: 'all', label: 'All' }, ...NEEDS, ...(own.length ? [{ value: 'own' as const, label: 'Yours' }] : [])]
-  const w = WORDS[mode]
+  const shown = all.filter((t) => (shelf === 'all' || (shelf === 'own' ? t.own : !t.own && t.need === shelf)) && (!words || (said.get(t.id) ?? '').includes(words)))
+  const shelves: { value: Shelf; label: string }[] = [{ value: 'all', label: 'All layouts' }, ...NEEDS, ...(own.length ? [{ value: 'own' as const, label: 'Yours' }] : [])]
+  /* The words it opened with, kept while it closes. */
+  const last = useRef<GalleryMode>('layout')
+  if (mode) last.current = mode
+  const w = WORDS[mode ?? last.current]
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={w.title}
-      width={1040}
-      padded={false}
-      footer={
-        <>
-          <Button variant="neutral" onClick={onClose}>
-            {w.no}
-          </Button>
-          <Button variant="brand" disabled={!choice} onClick={() => choice && onUse(choice)}>
-            {w.go}
-          </Button>
-        </>
-      }
-    >
-      <div className="bdash-gal bdash-vars">
-        <div className="bdash-gal__find">
-          <SearchBox value={q} onChange={setQ} placeholder="Search layouts" label="Search layouts" />
-          <div className="bdash-chips" role="group" aria-label="Layouts by need">
-            {pills.map((p) => (
-              <Chip key={p.value} active={pill === p.value} onClick={() => setPill(p.value)}>
-                {p.label}
-              </Chip>
-            ))}
-          </div>
-        </div>
-        <ul className="bdash-gal__grid" role="listbox" aria-label="Layouts">
-          {shown.map((t) => (
-            <li key={t.id} role="option" aria-selected={t.id === picked}>
-              <button type="button" className={`bdash-gal__card${t.id === picked ? ' is-on' : ''}`} onClick={() => setPicked(t.id)} onDoubleClick={() => onUse(t)}>
-                <MiniRows rows={t.rows} />
-                <b>{t.name}</b>
-                <span>{t.blurb}</span>
-              </button>
-              {t.own && <IconButton icon={Trash2} label={`Remove ${t.name}`} tone="ghost" size="sm" onClick={() => onRemoveOwn(t)} />}
-            </li>
+    <Market open={mode !== null} title={w.title} by={w.by} icon={Store} query={q} onQuery={setQ} placeholder="Search layouts" closeLabel={w.close} onClose={onClose}>
+      <div className="bdash-market__top">
+        <div className="bmarket__chips" role="group" aria-label="Layouts by need">
+          {shelves.map((s) => (
+            <Chip key={s.value} active={shelf === s.value} onClick={() => setShelf(s.value)}>
+              {s.label}
+            </Chip>
           ))}
-          {shown.length === 0 && <li className="bdash-gal__none">No layout matches “{q.trim()}”</li>}
-        </ul>
+        </div>
+        {mode === 'first' && (
+          <Button variant="ghost" onClick={onClose}>
+            Not now
+          </Button>
+        )}
       </div>
-    </Modal>
+      <div className="bgal__grid">
+        {shown.map((t) => (
+          <LayoutCard key={t.id} t={t} go={w.go} onUse={onUse} onRemove={t.own ? onRemoveOwn : undefined} />
+        ))}
+      </div>
+      {shown.length === 0 && <p className="bdash-market__none">No layout matches “{q.trim()}”</p>}
+    </Market>
   )
 }
 
+function LayoutCard({ t, go, onUse, onRemove }: { t: DashTemplate; go: string; onUse: (t: DashTemplate) => void; onRemove?: (t: DashTemplate) => void }) {
+  const need = t.own ? 'Yours' : (NEEDS.find((n) => n.value === t.need)?.label ?? '')
+  return (
+    <article className={`bgcard bdash-lcard is-cat-${t.own ? 'neutral' : HUE[t.need]}`}>
+      <span className="bgcard__cat">{need}</span>
+      <div className="bgcard__in">
+        <div className="bgcard__canvas is-picture">
+          <span className="bgviz bdash-lpic">
+            <MiniRows rows={t.rows} scale={0.06} max={128} />
+          </span>
+        </div>
+        <div className="bgcard__body">
+          <div className="bgcard__head">
+            <h3 className="bgcard__h" title={t.name}>
+              {t.name}
+            </h3>
+            {onRemove && <RowMenu label={`More for ${t.name}`} items={[{ id: 'remove', label: 'Remove layout', icon: Trash2, danger: true }]} onSelect={() => onRemove(t)} />}
+          </div>
+          <p className="bgcard__sub">{t.blurb}</p>
+          <div className="bgcard__go">
+            <button type="button" className="bgcard__cta" aria-label={`${go}: ${t.name}`} onClick={() => onUse(t)}>
+              {go}
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  )
+}

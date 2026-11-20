@@ -1087,3 +1087,22 @@ tr:hover .bpol__template-mark,
 .bpol__main { min-width: 0; }
 .bpol__sub { margin: 0 0 var(--space-4); align-self: flex-start; }
 .btable__appname { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: left; }
+
+/* Policy names one width, cut with an ellipsis, and the columns fixed so they sit in the same place on every tab
+   (owner, 20 Nov 2026). Policies.tsx `NAME_FIT` adds the class; rollout.ts `policyNameFit`. The name column takes
+   what the fixed columns leave, and every name stops at the same width, the full name in its title. */
+/* 900: the fixed columns take 620, so the name never gets less than 280; narrower, the table scrolls and Actions stays
+   pinned at the right (screens.css). */
+.btable.btable--names { table-layout: fixed; min-width: 900px; }
+.btable--names .btable__col-apps { width: 220px; }
+.btable--names .btable__primary { min-width: 0; }
+.btable--names .btable__link {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 36ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btable--names .btable__primary > .blist__tile,
+.btable--names .btable__primary .btable__marks,
+.btable--names .btable__primary .bx-badge { flex-shrink: 0; }

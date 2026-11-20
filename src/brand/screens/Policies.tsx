@@ -121,6 +121,10 @@ const POLICY_KINDS: { value: PolicyKind; label: string }[] = MIGRATION_FIRST
 const MORE_FILTERS: boolean = shows('moreFilters')
 /* The bar on one line, its buttons dropping to icons as it narrows (19 Nov): Design only (rollout.ts `oneLineBar`). */
 const ONE_LINE_BAR: boolean = shows('oneLineBar')
+/* Policy names one width in every row, cut with an ellipsis, and the columns fixed so they sit in the same place on
+   every tab (owner, 20 Nov 2026). rollout.ts `policyNameFit`; screens.css `.btable--names`. */
+const NAME_FIT: boolean = shows('policyNameFit')
+const TABLE_CLASS = NAME_FIT ? 'btable btable--names' : 'btable'
 
 const KIND_KEY = 'brand-policies-type'
 let lastKind: PolicyKind | null = null
@@ -660,7 +664,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
           </h3>
         )}
         <div className="btable__scroll">
-          <table className="btable">
+          <table className={TABLE_CLASS}>
             <thead>
               <tr>
                 <th scope="col" className="btable__col-pick">
@@ -682,7 +686,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   />
                 </th>
                 {head('name', 'Policy name')}
-                <th scope="col">Applications</th>
+                <th scope="col" className="btable__col-apps">Applications</th>
                 {showExposure && !review && head('exposure', 'Exposure')}
                 {review ? (
                   <th scope="col" className="btable__col-activity">
@@ -1122,7 +1126,7 @@ function PostSignInPolicies() {
       <div className="btable-wrap">
         {rows.length > 0 && (
           <div className="btable__scroll">
-            <table className="btable">
+            <table className={TABLE_CLASS}>
               <thead>
                 <tr>
                   <SortHead
@@ -1131,7 +1135,7 @@ function PostSignInPolicies() {
                     dir={sort.dir}
                     onSort={() => setSort((s) => ({ key: 'name', dir: s.key === 'name' && s.dir === 1 ? -1 : 1 }))}
                   />
-                  <th scope="col">Applications</th>
+                  <th scope="col" className="btable__col-apps">Applications</th>
                   <th scope="col" className="btable__col-status">
                     Status
                   </th>
@@ -1148,7 +1152,7 @@ function PostSignInPolicies() {
                         <span className="blist__tile bpol__tile" aria-hidden>
                           <ShieldCheck size={18} strokeWidth={1.8} />
                         </span>
-                        <button type="button" className="btable__link" onClick={() => openBuilder(p)}>
+                        <button type="button" className="btable__link" onClick={() => openBuilder(p)} title={NAME_FIT ? p.name : undefined}>
                           {p.name}
                         </button>
                       </div>
@@ -1513,7 +1517,7 @@ function PolicyRow({
           <span className="blist__tile bpol__tile" aria-hidden>
             <ShieldCheck size={18} strokeWidth={1.8} />
           </span>
-          <button type="button" className="btable__link" onClick={onOpen}>
+          <button type="button" className="btable__link" onClick={onOpen} title={NAME_FIT ? policy.name : undefined}>
             {policy.name}
           </button>
           <PolicyMarks policy={policy} />

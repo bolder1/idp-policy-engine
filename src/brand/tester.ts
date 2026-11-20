@@ -1,6 +1,7 @@
 import type { Features } from './edition'
 import type { BrandScreen } from './store'
 import { LINE } from './lines'
+import { shows } from './rollout'
 
 /* -----------------------------------------------------------------------------
    The phase 1 tester build (owner, 18 Nov 2026: "provide a link for our testers ... with a completely empty
@@ -24,8 +25,10 @@ export const TESTER: boolean = LINE === 'tester'
    picked these six for dev and the handoff too. Each keeps its own switch, so one can be taken back alone.
    -------------------------------------------------------------------------- */
 
-/** Favorites, not templates ("call it Mark as favorite"). The words only: the star, the flag and the shelf are the same. */
-export const FAVORITES = true
+/** Favorites, not templates ("call it Mark as favorite"). The words only: the star, the flag and the shelf are the same.
+ *  Templates again where the rollout table's `templateBookmark` entry says (owner, 20 Nov: "change favorites text to
+ *  templates"). */
+export const FAVORITES: boolean = !shows('templateBookmark')
 export const MARK_LABEL = FAVORITES ? 'Mark as favorite' : 'Mark as template'
 export const UNMARK_LABEL = FAVORITES ? 'Remove from favorites' : 'Remove from templates'
 export const YOURS_LABEL = FAVORITES ? 'Your favorites' : 'Your templates'

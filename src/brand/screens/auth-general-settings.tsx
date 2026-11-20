@@ -2,7 +2,7 @@ import { useId } from 'react'
 
 import { Drawer, Toggle } from '../kit'
 import { Picker } from '../picker'
-import { MOBILE_ISSUER, MORE_GENERAL_SETTINGS, USERS_2FA_ROW, type AuthGeneral } from './auth-general'
+import { DEVICE_PROFILE_EXPIRY, MOBILE_ISSUER, MORE_GENERAL_SETTINGS, USERS_2FA_ROW, type AuthGeneral } from './auth-general'
 
 /* -----------------------------------------------------------------------------
    GENERAL SETTINGS of Authentication methods (owner, 21 Oct 2026: "a general settings for authentication methods, so the
@@ -91,6 +91,31 @@ export function GeneralSettings({ value, onChange }: { value: AuthGeneral; onCha
           </Row>
         )}
       </section>
+
+      {/* Owner, 20 Nov 2026: "add a new option for device profile expiry". Its own section: the one above is who must
+          verify, and an expiry is not a "who". */}
+      {DEVICE_PROFILE_EXPIRY && (
+        <section aria-labelledby={`${id}-dev`}>
+          <h3 id={`${id}-dev`}>Devices</h3>
+          {/* A number the admin types, not a list of choices (owner, 20 Nov 2026: "a textbox with number … we don't
+              provide dropdown for this, treat it like custom"). The same width as Mobile issuer name, so the ends line up. */}
+          <Row title="Device profile expiry" hint="A trusted device must be verified again after this many days.">
+            <span className="bm8__gnum">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={3650}
+                step={1}
+                value={value.deviceExpiryDays}
+                onChange={(e) => set('deviceExpiryDays', e.target.value.replace(/\D/g, ''))}
+                aria-label="Device profile expiry in days"
+              />
+              <span aria-hidden>days</span>
+            </span>
+          </Row>
+        </section>
+      )}
 
       {MORE_GENERAL_SETTINGS && (
       <section aria-labelledby={`${id}-rules`}>

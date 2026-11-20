@@ -20,6 +20,8 @@ export interface AuthGeneral {
   lockAfter: string
   /** The name authenticator apps show above the code. */
   mobileIssuer: string
+  /** Days a registered device profile stays trusted before the device must be verified again; 0 is never. */
+  deviceExpiryDays: string
 }
 
 export const AUTH_GENERAL_SEED: AuthGeneral = {
@@ -33,7 +35,12 @@ export const AUTH_GENERAL_SEED: AuthGeneral = {
   notify: true,
   lockAfter: '5',
   mobileIssuer: 'miniOrange',
+  deviceExpiryDays: '90',
 }
+
+/* Device profile expiry, after Mobile issuer name (owner, 20 Nov 2026: "under authentication method, add a new option
+   for device profile expiry"). The rollout table's `deviceProfileExpiry` entry; other lines have no such row. */
+export const DEVICE_PROFILE_EXPIRY: boolean = shows('deviceProfileExpiry')
 
 /* The Users row of "Two-step verification is required for" goes, and Mobile issuer name comes in after Additional
    admins (owner, 19 Nov 2026: "Hide this and add mobile issuer name"). Both follow the rollout table's `mobileIssuer`

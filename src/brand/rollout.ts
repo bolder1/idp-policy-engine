@@ -39,6 +39,15 @@ export const ROLLOUT = {
   /** The account menu names the line's role (Designer, Developer, Tester) with the sign-in's email, and shows the
    *  line's own 3D badge (20 Nov, role-avatar.tsx). Every line, on the owner's word ("for all 3"). */
   roleIdentity: ALL,
+  /** Templates drawn with a bookmark, and called templates again rather than favorites (20 Nov, owner: "change icon of
+   *  templates to bookmark icon, change favorites text to templates"). Every line, on the owner's word ("push all 3
+   *  changes to all 3 roles, these are global changes"). */
+  templateBookmark: ALL,
+  /** Authentication methods → General settings: a Device profile expiry field, a number of days (20 Nov). Every line, as above. */
+  deviceProfileExpiry: ALL,
+  /** All Policies and Post sign-in tables: every policy name one width, cut with an ellipsis (full name on hover), and
+   *  fixed columns so they sit in the same place on every tab (20 Nov). Every line, as above. */
+  policyNameFit: ALL,
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

@@ -1152,6 +1152,18 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
   background: var(--surface-raised); color: var(--text-primary); font: inherit;
 }
 .bm8__gtext-input:focus-visible { outline: 2px solid var(--border-strong); outline-offset: 1px; }
+/* Device profile expiry (auth-general-settings.tsx): a number with its unit inside the field, as wide as the text field
+   above it so the row ends line up. */
+.bm8__gnum {
+  display: inline-flex; align-items: center; width: 240px; height: 36px; padding-right: var(--space-5);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised);
+}
+.bm8__gnum:focus-within { outline: 2px solid var(--border-strong); outline-offset: 1px; }
+.bm8__gnum > input {
+  flex: 1; min-width: 0; height: 100%; padding: 0 var(--space-5);
+  border: 0; background: none; color: var(--text-primary); font: inherit; outline: none;
+}
+.bm8__gnum > span { color: var(--text-secondary); font-size: var(--fs-sm); }
 
 /* The general settings on the page's own tab (owner, 21 Oct 2026), the same rows the slide-over draws.
 

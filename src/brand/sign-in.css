@@ -69,3 +69,37 @@
   font-size: 12px;
   color: var(--fb-negative-fg);
 }
+
+/* Two steps (20 Nov): pick a version, then sign in to it. */
+.bsi__step { display: grid; gap: 6px; }
+
+.bsi__versions { display: grid; gap: 8px; }
+.bsi__version {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 10px 12px;
+  font: inherit; text-align: left; color: var(--text-primary);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.bsi__version:hover { border-color: var(--blue); background: var(--blue-soft); }
+.bsi__version:focus-visible { outline: 2px solid var(--text-link); outline-offset: 1px; }
+.bsi__version .role-avatar { flex: none; }
+.bsi__vtext { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.bsi__vtext strong { font-size: 14px; font-weight: 600; }
+.bsi__vtext em { font-style: normal; font-size: 12px; color: var(--text-muted); }
+.bsi__vgo { flex: none; color: var(--text-muted); }
+
+.bsi__back {
+  justify-self: start;
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 0 0 4px; padding: 0;
+  font: inherit; font-size: 12px; color: var(--text-link);
+  background: none; border: 0; cursor: pointer;
+}
+.bsi__back:focus-visible { outline: 2px solid var(--text-link); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+.bsi__chosen { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.bsi__chosen .bsi__title { font-size: 18px; }

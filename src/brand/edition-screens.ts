@@ -1,6 +1,11 @@
 import type { Features } from './edition'
 import type { BrandScreen } from './store'
 import { TESTER, TESTER_WITHHELD } from './tester'
+import { shows } from './rollout'
+
+/* Risk signal profile and External Hooks: Design only (rollout.ts `riskAndHooks`). */
+const RISK_AND_HOOKS: boolean = shows('riskAndHooks')
+const RISK_AND_HOOKS_SCREENS: ReadonlyArray<BrandScreen['name']> = ['risk-signals', 'hooks']
 
 /* -----------------------------------------------------------------------------
    Pages an edition can withhold, and the flag that holds each back.
@@ -21,6 +26,7 @@ export const SCREEN_FEATURE: Partial<Record<BrandScreen['name'], keyof Features>
 /** Whether this edition offers the screen. A screen no flag holds back always is. */
 export function screenOffered(screen: Pick<BrandScreen, 'name'> | undefined, features: Features): boolean {
   if (TESTER && screen && TESTER_WITHHELD.includes(screen.name)) return false
+  if (!RISK_AND_HOOKS && screen && RISK_AND_HOOKS_SCREENS.includes(screen.name)) return false
   const flag = screen ? SCREEN_FEATURE[screen.name] : undefined
   return !flag || features[flag]
 }

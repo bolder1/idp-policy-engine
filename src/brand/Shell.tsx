@@ -65,7 +65,8 @@ import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
 import { METHODS_NEW, TESTER } from './tester'
-import { LOCK_EMPTY_TABS, LOCKED_TIP } from './rail-lock'
+import { LOCK_EMPTY_TABS, LOCKED_TIP, railLocked } from './rail-lock'
+import { shows } from './rollout'
 import { GlobalSearch } from './GlobalSearch'
 import { GLOBAL_SEARCH, type SearchSources } from './global-search'
 import { ACCESS_CHECKS } from './screens/sign-in-tests/names'
@@ -76,6 +77,9 @@ import { useBrand, useToast, type BrandScreen } from './store'
 import { pressToastAction } from './toast-action'
 import { useTheme } from './theme-mode'
 import { playCue, playToastCue, useSoundSetting } from './sound'
+
+/* Search, the theme switch and the sound switch in the top bar: Design only (rollout.ts `topBarTools`). */
+const TOP_BAR_TOOLS: boolean = shows('topBarTools')
 
 /* -----------------------------------------------------------------------------
    AdminShell — the live console's chrome, measured off
@@ -594,8 +598,8 @@ export function Shell({ children }: { children: ReactNode }) {
           {/* While policies move in the background (migrate/move-job-pill.tsx); nothing while none do. */}
           <MoveJobPill />
           {/* At the right with the other tools (owner, 4 Nov 2026), first in the group. */}
-          {/* The phase 1 tester build (tester.ts) has no search, theme switch, sound switch or Customize sidebar. */}
-          {GLOBAL_SEARCH && !TESTER && <GlobalSearch pages={searchPages} />}
+          {/* Search, theme and sound: Design only (TOP_BAR_TOOLS). Customize sidebar: not in the tester build. */}
+          {GLOBAL_SEARCH && TOP_BAR_TOOLS && <GlobalSearch pages={searchPages} />}
           {/* The edition switch belongs on the shell, not on a screen: the flag
               it flips spans the list, the create flow and the builder. */}
           {/* Two prototype controls, side by side and both labelled as such.
@@ -622,7 +626,7 @@ export function Shell({ children }: { children: ReactNode }) {
               keyboard. */}
           {/* The Mode button, in the showcase build too (owner, 4 Oct 2026: "bring the old Mode button at the
               top"); the Access checks canvas follows it (canvas-shelf.ts `useStageFollowsTheme`). */}
-          {!TESTER && <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+          {TOP_BAR_TOOLS && <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
             <button
               type="button"
               className="bshell__icon"
@@ -636,7 +640,7 @@ export function Shell({ children }: { children: ReactNode }) {
               turned off here, and remembered. Named by what a press does, as the Mode button is — a changing name
               with aria-pressed as well would read "Turn sound off, pressed". Turning it on plays the switch's tick,
               so the admin hears that it works. */}
-          {!TESTER && <Tip text={sound ? 'Turn sound off' : 'Turn sound on'}>
+          {TOP_BAR_TOOLS && <Tip text={sound ? 'Turn sound off' : 'Turn sound on'}>
             <button
               type="button"
               className="bshell__icon"
@@ -717,8 +721,8 @@ export function Shell({ children }: { children: ReactNode }) {
                 const name = badge ? `${item.label}, ${badge}` : item.label
                 /* A group with one built page in it is not "not built". */
                 const empty = !(item.screen || item.children?.some((c) => c.screen))
-                /* Outside Design, an item with no page is locked (rail-lock.ts). */
-                const locked = LOCK_EMPTY_TABS && empty
+                /* Outside Design, an item with no page is locked, and Apps on Tester (rail-lock.ts). */
+                const locked = railLocked(item.label, empty)
                 const caveat = locked ? LOCKED_TIP : empty ? NOT_BUILT : null
                 const collapsedTip = caveat ? `${name}. ${caveat}` : name
                 const tip = collapsed ? collapsedTip : caveat

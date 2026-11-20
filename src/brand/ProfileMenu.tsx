@@ -11,6 +11,12 @@ import type { Line } from './lines'
 import { MIGRATION_FIRST, START_AFTER_MIGRATION, bringBackOldPolicies } from './migrate/phase'
 import { useBrand } from './store'
 import { SHOWCASE } from './showcase'
+import { shows } from './rollout'
+import { RoleAvatar } from './role-avatar'
+import { ROLE_ACCOUNT } from './role-account'
+
+/* The admin's name and badge follow the line (rollout.ts `roleIdentity`), with the sign-in's email under the name. */
+const ROLE_IDENTITY: boolean = shows('roleIdentity')
 
 /* -----------------------------------------------------------------------------
    The account menu, and the only way between the two sides.
@@ -51,6 +57,10 @@ export function ProfileMenu() {
   const [locking, setLocking] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const roles: Line[] = LINE && HOME_LINE && !FORCED_TESTER ? linesFor(HOME_LINE) : []
+  /* On the console, the line names who is signed in; the User Dashboard keeps its end user. The tester deploy has no
+     sign-in, so no email: the view's name stands under the role instead. */
+  const roleLine: Line | null = ROLE_IDENTITY && role !== 'user' ? LINE : null
+  const who = roleLine ? { name: ROLE_ACCOUNT[roleLine].name, username: LINE_EMAIL || ROLE_ACCOUNT[roleLine].username } : account
   const pickLine = (l: Line) => {
     close(false)
     if (l === LINE) return
@@ -137,13 +147,13 @@ export function ProfileMenu() {
       <button
         ref={trigger}
         type="button"
-        className="bshell__avatar bpm__trigger"
+        className={`bshell__avatar bpm__trigger${roleLine ? ' has-role' : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Account: ${account.name}`}
+        aria-label={`Account: ${who.name}`}
         onClick={() => setOpen((o) => !o)}
       >
-        {account.initials}
+        {roleLine ? <RoleAvatar line={roleLine} size={30} /> : account.initials}
       </button>
 
       <AnimatePresence>
@@ -162,12 +172,12 @@ export function ProfileMenu() {
             {/* The identity block the live menu opens with — who you are, above
                 what you can do about it. */}
             <div className="bpm__who">
-              <span className="bpm__whoav" aria-hidden>
-                {account.initials}
+              <span className={`bpm__whoav${roleLine ? ' has-role' : ''}`} aria-hidden>
+                {roleLine ? <RoleAvatar line={roleLine} size={36} /> : account.initials}
               </span>
               <span className="bpm__whotext">
-                <strong>{account.name}</strong>
-                <em>{account.username}</em>
+                <strong>{who.name}</strong>
+                <em>{who.username}</em>
               </span>
             </div>
 

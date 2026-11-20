@@ -732,3 +732,9 @@
    overlap"): the items scroll in their own area; the reminder card and Customize sidebar sit below a divider, fixed. */
 .bshell__nav { min-height: 0; }
 .bshell__rail > .brail-note { margin: 0; border-radius: 0; border-width: var(--bw-thin) 0 0; padding: var(--space-6) var(--space-7); }
+
+/* The line's 3D badge fills the avatar (role-avatar.tsx): no disc behind it, the badge is its own. */
+.bshell__avatar.has-role { background: none; padding: 0; overflow: visible; }
+.bpm__whoav.has-role,
+[data-brand='rebrand'] .bpm__whoav.has-role { width: 36px; height: 36px; background: none; }
+.role-avatar { display: block; }

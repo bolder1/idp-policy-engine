@@ -27,6 +27,18 @@ export const ROLLOUT = {
   moreFilters: ['design'],
   /** All Policies' bar on one line: its buttons drop to icons as it narrows (19 Nov). Design only. */
   oneLineBar: ['design'],
+  /** The top bar's Search, theme switch and sound switch (20 Nov). Tester never had them; the owner took them off
+   *  Dev handoff ("Search, dark theme, sound, hide this from dev"). Where they are hidden the page is light and silent. */
+  topBarTools: ['design'],
+  /** Policies → Risk signal profile and External Hooks in the rail (20 Nov). Tester never had them (tester.ts
+   *  TESTER_WITHHELD); the owner took them off Dev handoff ("hide these 2 from dev as well"). */
+  riskAndHooks: ['design'],
+  /** Apps in the rail is locked, like an item with no page (20 Nov). A lock, so it lists the lines that GET it, as
+   *  railLock does: Tester only (owner: "lock this for tester as of now"). Its Dashboard shortcut goes with it. */
+  lockApps: ['tester'],
+  /** The account menu names the line's role (Designer, Developer, Tester) with the sign-in's email, and shows the
+   *  line's own 3D badge (20 Nov, role-avatar.tsx). Every line, on the owner's word ("for all 3"). */
+  roleIdentity: ALL,
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
+import { shows } from './rollout'
+
 /* -----------------------------------------------------------------------------
    Light or dark, for the whole console and the end-user site alike.
 
@@ -32,7 +34,8 @@ export function readTheme(): Theme {
    Mode button is back at the top (owner, 4 Oct 2026: "we have a mode button at the
    top … bring the old Mode button at the top"), and the Access checks canvas follows
    it, so the stored theme holds in the showcase too. */
-let current: Theme = readTheme()
+/* A line without the theme switch (rollout.ts `topBarTools`) is light, whatever another line stored. */
+let current: Theme = shows('topBarTools') ? readTheme() : 'light'
 const listeners = new Set<() => void>()
 
 function paint(theme: Theme): void {

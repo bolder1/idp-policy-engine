@@ -5,6 +5,7 @@ import { PageHead } from '../Shell'
 import { Button } from '../kit'
 import { useBrand } from '../store'
 import { TESTER } from '../tester'
+import { LOCK_APPS } from '../rail-lock'
 import { IntroWidget } from './intro-widgets'
 import './intro.css'
 import { useSetupSteps } from './setup-steps'
@@ -116,7 +117,8 @@ export function HomeHub({ preview }: { preview?: ReactNode } = {}) {
       <section aria-label="Shortcuts">
         <h3 className="bmv__lanehead">Go to</h3>
         <ul className="bmd__places">
-          <Shortcut icon={AppWindow} name="Applications" line="Connect apps and give each its sign-in policy" onOpen={() => store.go({ name: 'applications' })} />
+          {/* Apps is locked on Tester (rail-lock.ts `LOCK_APPS`), so its shortcut is not offered there. */}
+          {!LOCK_APPS && <Shortcut icon={AppWindow} name="Applications" line="Connect apps and give each its sign-in policy" onOpen={() => store.go({ name: 'applications' })} />}
           <Shortcut icon={ShieldCheck} name="Policies" line="Who signs in to what, and how" onOpen={() => store.go({ name: 'policies' })} />
           {!TESTER && <Shortcut icon={ScanSearch} name="Access checks" line="Test a sign-in against your policies" onOpen={() => store.go({ name: 'sign-in-tests' })} />}
           {!TESTER && <Shortcut icon={ListChecks} name="Sign-in activity" line="Recent sign-ins and what decided them" onOpen={() => store.go({ name: 'sign-in-activity' })} />}

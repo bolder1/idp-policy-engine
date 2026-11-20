@@ -3,6 +3,7 @@ import { DISPLAY_TOKEN_METHOD_ID } from '../hardware-tokens'
 import { methodBlocker, type AuthMethod } from '../methods'
 import { familySettingsFor, methodSettingsFor, mfaMethodFor } from '../mfa-join'
 import type { BrandScreen } from '../store'
+import { shows } from '../rollout'
 
 /* -----------------------------------------------------------------------------
    The Authentication methods slider, and which rows open it.
@@ -127,8 +128,24 @@ export function backLabel(under: PanelPage | null): string | null {
    of what they assume about the person. */
 const DEFAULT_PREFERENCE = ['otp-email', 'email-link', 'otp-sms', 'otp-call']
 
+/* The live console's "Select Default Authentication Method" lists exactly these seven, and lets the admin pick any of
+   them (owner, 20 Nov 2026: "all these options should have mark as default … add the button to all these options").
+   With the rollout table's `allDefaults` entry, each one offers Make default once it is configured and on, whatever its
+   SMS balance says: the balance stops a send, not the choice. Display Token joins them. */
+const ALL_DEFAULTS: boolean = shows('allDefaults')
+export const LIVE_DEFAULT_METHODS: readonly string[] = [
+  'otp-sms',
+  'otp-email',
+  'otp-alt-email',
+  DISPLAY_TOKEN_METHOD_ID,
+  'sms-link',
+  'email-link',
+  'otp-sms-email',
+]
+
 /** Whether a method can be the tenant default now: the sheet allows it, it is on, and it can still send. */
 export function canServeAsDefault(m: AuthMethod): boolean {
+  if (ALL_DEFAULTS && LIVE_DEFAULT_METHODS.includes(m.id)) return !methodBlocker(m)
   return Boolean(mfaMethodFor(m.id)?.canBeDefault) && !methodBlocker(m) && m.balance?.remaining !== 0
 }
 

@@ -48,6 +48,10 @@ export const ROLLOUT = {
   /** All Policies and Post sign-in tables: every policy name one width, cut with an ellipsis (full name on hover), and
    *  fixed columns so they sit in the same place on every tab (20 Nov). Every line, as above. */
   policyNameFit: ALL,
+  /** Authentication methods: Make default on all seven methods the live console's default list names (OTP over SMS,
+   *  Email, Alternate Email, Display Token, SMS Link, Email Link, OTP over SMS and Email), whatever their SMS balance
+   *  (20 Nov, auth-panel.ts `LIVE_DEFAULT_METHODS`). Every line, on the owner's word ("push this directly to all 3"). */
+  allDefaults: ALL,
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

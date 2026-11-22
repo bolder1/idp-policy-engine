@@ -19,14 +19,15 @@ export const ROLLOUT = {
   mobileIssuer: ALL,
   /** Rail items with no page are locked (19 Nov). Design keeps every row open. */
   railLock: ['handoff', 'tester'],
-  /** The customizable Dashboard and its Classic / New switch (18-19 Nov, dashboard/phase.ts). Design only (owner,
-   *  19 Nov: "the dashboard is for design only"). Dev handoff and Tester keep Classic until he has checked it. */
-  dashboardV2: ['design'],
+  /** The customizable Dashboard and its Classic / New switch (18-19 Nov, dashboard/phase.ts). Design only on
+   *  19 Nov ("the dashboard is for design only"); every line after the owner's check on 20 Nov. */
+  dashboardV2: ALL,
   /** All Policies → More filters, its one chip and its button (19 Nov: 25b0bd7, 7c29103, c76c28a). Pushed to every
    *  line before the Design-only rule; taken back to Design on the owner's word ("Move to Design only"). */
   moreFilters: ['design'],
-  /** All Policies' bar on one line: its buttons drop to icons as it narrows (19 Nov). Design only. */
-  oneLineBar: ['design'],
+  /** All Policies' bar on one line: its buttons drop to icons as it narrows (19 Nov). Every line on the owner's
+   *  check (20 Nov). */
+  oneLineBar: ALL,
   /** The top bar's Search, theme switch and sound switch (20 Nov). Tester never had them; the owner took them off
    *  Dev handoff ("Search, dark theme, sound, hide this from dev"). Where they are hidden the page is light and silent. */
   topBarTools: ['design'],
@@ -52,6 +53,25 @@ export const ROLLOUT = {
    *  Email, Alternate Email, Display Token, SMS Link, Email Link, OTP over SMS and Email), whatever their SMS balance
    *  (20 Nov, auth-panel.ts `LIVE_DEFAULT_METHODS`). Every line, on the owner's word ("push this directly to all 3"). */
   allDefaults: ALL,
+  /** Mark as template on every draft: a never-published policy, an unsaved one on the canvas, even with no rule yet
+   *  (20 Nov, owner: "draft policy should also be saved as template"). Migrated drafts in review stay without it.
+   *  Every line after the owner's check (20 Nov). */
+  draftTemplates: ALL,
+  /** "Your templates" is called "My templates" (20 Nov). Every line after the owner's check. */
+  myTemplates: ALL,
+  /** Leaving a canvas that holds no rule asks first: No rule added, Discard or Continue (20 Nov). Every line after
+   *  the owner's check. */
+  noRuleAlert: ALL,
+  /** The start chooser ("How should this policy start?") has Back and the name in its bar, nothing else; Save draft,
+   *  Save policy and the ⋯ menu come once a path is picked (20 Nov). Every line after the owner's check. */
+  emptyStartBar: ALL,
+  /** Dashboard Customize: a drop previews live (the board makes room before the widget is let go), a refused drop or a
+   *  locked bar says why, and the colour themes and a dark board are back (20 Nov). Every line, with the Dashboard. */
+  dashboardGrid: ALL,
+  /** Dashboard audit fixes (22 Nov): the dark board no longer shifts the page when it turns on, Customize's row tools
+   *  stay in reach below 1120px instead of slipping under the rail, and initials on the board meet the 12px floor.
+   *  Design only until the owner has checked it. */
+  dashboardPolish: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

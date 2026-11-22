@@ -31,7 +31,10 @@ export const TESTER: boolean = LINE === 'tester'
 export const FAVORITES: boolean = !shows('templateBookmark')
 export const MARK_LABEL = FAVORITES ? 'Mark as favorite' : 'Mark as template'
 export const UNMARK_LABEL = FAVORITES ? 'Remove from favorites' : 'Remove from templates'
-export const YOURS_LABEL = FAVORITES ? 'Your favorites' : 'Your templates'
+/* "My templates" where the rollout table's `myTemplates` entry says (owner, 20 Nov 2026: "rename Your templates as My
+   templates"). */
+export const MY_TEMPLATES: boolean = shows('myTemplates')
+export const YOURS_LABEL = FAVORITES ? 'Your favorites' : MY_TEMPLATES ? 'My templates' : 'Your templates'
 export const YOURS_LINE = FAVORITES ? 'Marked by your team' : 'Built by your team'
 
 /** Save rule: a rule stays Unsaved on its card until the rule panel's Save rule stores it. */

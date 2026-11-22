@@ -8,7 +8,7 @@ import { daysLeft } from '../migrate/legacy'
 import { useBrand } from '../store'
 import { DENY_REASON_WORD } from '../screens/testing/deny-reason'
 import { BarChart, CategoryBar, Donut, Gauge, HeatGrid, Spark, WaveChart, type Part, type Series } from './charts'
-import { BEFORE_WORD, RAMP, RANGE_WORD, SERIES_COLOR, fmt, pct } from './format'
+import { RAMP, SERIES_COLOR, beforeLine, figureCaption, fmt, pct, rangeCaption } from './format'
 import { viewOf } from './model'
 import {
   APP_SHARES,
@@ -37,6 +37,10 @@ import {
 import { NOW, personAt, pickAt, timeAxis, useActivity, usePolicyFacts, useSignIns } from './sources'
 import { pickOf, useTile } from './tile-context'
 import { BarList, Clear, Count, Filter, Fit, Head, Legend, Mark, More, Row, Stat, Table, Trend } from './widget-kit'
+import { shows } from '../rollout'
+
+/** The 22 Nov copy round (rollout.ts dashboardPolish). */
+const POLISH = shows('dashboardPolish')
 
 /* -----------------------------------------------------------------------------
    Posture and sign-in activity: what the tenant is exposed to, and what is
@@ -57,7 +61,7 @@ export function SignInsTotal() {
     <Stat
       value={<Count value={t.all} />}
       chip={<Trend change={d} />}
-      line={`${d >= 0 ? 'Up' : 'Down'} on ${BEFORE_WORD[range]}`}
+      line={beforeLine(d >= 0, range)}
       up={d >= 0}
       caption={`Busiest ${range === '24h' ? 'at' : 'on'} ${busiest(points, range)}`}
       spark={<Spark values={points.map((p) => p.allowed + p.mfa + p.blocked)} still={preview} />}
@@ -73,7 +77,7 @@ export function BlockedTotal() {
     <Stat
       value={<Count value={t.blocked} />}
       chip={<Trend change={d} good="down" />}
-      line={`${d >= 0 ? 'Up' : 'Down'} on ${BEFORE_WORD[range]}`}
+      line={beforeLine(d >= 0, range)}
       up={d >= 0}
       caption={`${pct(t.all ? t.blocked / t.all : 0, 1)} of all sign-ins`}
       spark={<Spark values={points.map((p) => p.blocked)} color="var(--dash-bad)" still={preview} />}
@@ -96,7 +100,7 @@ export function SuccessRate() {
         </>
       }
       chip={<Trend change={d} good="up" points />}
-      line={`${d >= 0 ? 'Up' : 'Down'} on ${BEFORE_WORD[range]}`}
+      line={beforeLine(d >= 0, range)}
       up={d >= 0}
       caption="Let in, with or without MFA"
       spark={<Spark values={points.map((p) => (p.allowed + p.mfa) / Math.max(1, p.allowed + p.mfa + p.blocked))} still={preview} />}
@@ -301,7 +305,7 @@ export function RiskyUsers() {
   })
   return (
     <>
-      <Head caption={`Blocked sign-ins in ${RANGE_WORD[range]}`} />
+      <Head caption={rangeCaption(range, 'Blocked sign-ins')} />
       <div className="bdw-body">
         <Fit items={people} pitch={52}>
           {(p) => <Row key={p.who.id} lead={<Face kind="user" name={p.who.name} decorative />} title={p.who.name} sub={DENY_REASON_WORD[p.reason]} trail={<b className="bdw-num">{fmt(p.count)}</b>} />}
@@ -333,18 +337,21 @@ export function SignIns() {
   const Chart = viewOf(tile)?.id === 'bars' ? BarChart : WaveChart
   return (
     <>
-      <Head caption={`Sign-ins in ${RANGE_WORD[range]}`}>
+      <Head caption={rangeCaption(range, 'Sign-ins')}>
         <Filter label="Sign-ins shown" value={pick} options={SERIES_FILTER} />
       </Head>
       <div className="bdw-body bdw-chartbox">
-        <ul className="bdw-keys" aria-hidden>
-          {shown.map((k) => (
-            <li key={k}>
-              <i style={{ background: SERIES_COLOR[k] }} />
-              {SERIES_WORD[k]}
-            </li>
-          ))}
-        </ul>
+        {/* With one series picked, the filter already names it (dashboardPolish): the key is for telling colours apart. */}
+        {!(POLISH && shown.length === 1) && (
+          <ul className="bdw-keys" aria-hidden>
+            {shown.map((k) => (
+              <li key={k}>
+                <i style={{ background: SERIES_COLOR[k] }} />
+                {SERIES_WORD[k]}
+              </li>
+            ))}
+          </ul>
+        )}
         <Chart key={`${pick}${range}`} series={series} labels={axis.labels} ticks={axis.ticks} still={preview} />
       </div>
     </>
@@ -397,7 +404,7 @@ export function Blocked() {
   const parts: Part[] = REASON_SHARES.map((r, i) => ({ key: r.reason, label: DENY_REASON_WORD[r.reason], value: counts[i], color: RAMP[i] }))
   return (
     <>
-      <Head caption={`Reasons in ${RANGE_WORD[range]}`} />
+      <Head caption={rangeCaption(range, 'Reasons')} />
       {donut ? (
         <div className="bdw-body bdw-donutbox">
           <Donut parts={parts} caption="Blocked" still={preview} />
@@ -421,7 +428,7 @@ export function TopApps() {
   const open = (id: string) => (preview ? undefined : () => store.go({ name: 'application', appId: id }))
   return (
     <>
-      <Head caption={`Sign-ins in ${RANGE_WORD[range]}`} />
+      <Head caption={rangeCaption(range, 'Sign-ins')} />
       <div className="bdw-body">
         {viewOf(tile)?.id === 'grid' ? (
           <ul className="bdw-appgrid">
@@ -452,7 +459,7 @@ export function Funnel() {
   const start = steps[0].value || 1
   return (
     <>
-      <Head caption={`Sign-ins started in ${RANGE_WORD[range]}`} />
+      <Head caption={rangeCaption(range, 'Sign-ins started')} />
       <div className="bdw-body">
         <ol className="bdw-funnel">
           {steps.map((s, i) => {
@@ -483,7 +490,7 @@ export function Methods() {
   const parts: Part[] = METHODS.map((m, i) => ({ key: m.name, label: m.name, value: counts[i], color: RAMP[i] }))
   return (
     <>
-      <Head caption={`Second methods used in ${RANGE_WORD[range]}`} />
+      <Head caption={rangeCaption(range, 'Second methods used')} />
       {viewOf(tile)?.id === 'bars' ? (
         <div className="bdw-body">
           <BarList items={parts.map((p) => ({ key: p.key, label: p.label, value: p.value }))} />
@@ -514,7 +521,7 @@ export function MfaDelivery() {
   ]
   return (
     <>
-      <Head caption={`${pct(sent ? failed / sent : 0, 1)} failed in ${RANGE_WORD[range]}`}>
+      <Head caption={figureCaption(range, `${pct(sent ? failed / sent : 0, 1)} failed`)}>
         <Filter label="Channel" value={pick} options={CHANNEL_FILTER} />
       </Head>
       <div className="bdw-body bdw-chartbox">
@@ -530,7 +537,7 @@ export function Locations() {
   const counts = split(t.all, PLACES.map((p) => p.share))
   return (
     <>
-      <Head caption={`Sign-ins in ${RANGE_WORD[range]}`} />
+      <Head caption={rangeCaption(range, 'Sign-ins')} />
       <div className="bdw-body">
         <BarList items={PLACES.map((p, i) => ({ key: p.place, label: p.place, value: counts[i], hint: `${pct(p.blocked, 1)} blocked` }))} />
       </div>
@@ -544,7 +551,7 @@ export function RiskSignals() {
   const counts = split(Math.round((t.mfa + t.blocked) * 0.6), RISK_SIGNALS.map((r) => r.share))
   return (
     <>
-      <Head caption={`Raised in ${RANGE_WORD[range]}`} />
+      <Head caption={rangeCaption(range, 'Raised')} />
       <div className="bdw-body">
         <BarList items={RISK_SIGNALS.map((r, i) => ({ key: r.name, label: r.name, value: counts[i] }))} />
       </div>

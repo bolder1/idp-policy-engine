@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { shows } from '../rollout'
 import { useBrand } from '../store'
 import type { Range } from './model'
 import type { SeriesKey } from './seed'
@@ -33,6 +34,21 @@ export function tickLabel(at: Date, range: Range): string {
 
 export const RANGE_WORD: Record<Range, string> = { '24h': 'the last 24 hours', '7d': 'the last 7 days', '30d': 'the last 30 days' }
 export const BEFORE_WORD: Record<Range, string> = { '24h': 'the 24 hours before', '7d': 'the 7 days before', '30d': 'the 30 days before' }
+const SPAN_WORD: Record<Range, string> = { '24h': '24 hours', '7d': '7 days', '30d': '30 days' }
+
+/* The 22 Nov copy round (rollout.ts dashboardPolish): the range is said once, in the page bar, so a widget's caption no
+   longer repeats it; and the comparison line reads "Down from the previous 7 days". */
+const POLISH = shows('dashboardPolish')
+
+/** A caption that only names the range ("Sign-ins in the last 7 days"): none once the range is said once. */
+export const rangeCaption = (range: Range, what: string): string | undefined => (POLISH ? undefined : `${what} in ${RANGE_WORD[range]}`)
+
+/** A caption that carries a figure ("4.2% failed in the last 7 days"): the figure stays, the range goes. */
+export const figureCaption = (range: Range, figure: string): string => (POLISH ? figure : `${figure} in ${RANGE_WORD[range]}`)
+
+/** A stat card's comparison with the period before. */
+export const beforeLine = (up: boolean, range: Range): string =>
+  POLISH ? `${up ? 'Up' : 'Down'} from the previous ${SPAN_WORD[range]}` : `${up ? 'Up' : 'Down'} on ${BEFORE_WORD[range]}`
 
 /* The data colours, all from the dashboard's theme (dashboard.css, themes.ts). The first two series take the
    theme's colours; blocked stays red in every theme, because there it means something. */

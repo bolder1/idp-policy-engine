@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { Check, LayoutDashboard, LayoutGrid, Plus, Redo2, RotateCcw, Rows3, Settings2, Shapes, Store, Undo2, type LucideIcon } from 'lucide-react'
+import { Check, LayoutDashboard, LayoutGrid, Moon, Plus, Redo2, RotateCcw, Rows3, Settings2, Shapes, Store, Sun, Undo2, type LucideIcon } from 'lucide-react'
 import { PageHead } from '../Shell'
 import { EmptyState } from '../empty'
 import { Button, IconButton, Modal, RowMenu, Tabs, type MenuItem } from '../kit'
@@ -8,13 +8,17 @@ import { Picker } from '../picker'
 import { PageBar } from '../screens/page-bar'
 import { primeSound } from '../sound'
 import { useBrand } from '../store'
+import { shows } from '../rollout'
+import { useTheme } from '../theme-mode'
+import { checkLayout } from './check'
+import type { Mark } from './tags'
 import { Board, type BoardHandle } from './Board'
 import { Gallery, type GalleryMode } from './Gallery'
 import { Library } from './Library'
 import { ThemePicker } from './ThemeMenus'
 import { DASHBOARD_THEMES } from './phase'
 import { useMigrationOpen } from './format'
-import { addWidget, allCells, arrange, findCell, fromSpecs, hasWidget, removeCell, removeRow, type ArrangeMode, type Cell, type Row } from './layout'
+import { addToRow, addWidget, allCells, arrange, findCell, fromSpecs, hasWidget, removeCell, removeRow, type ArrangeMode, type Cell, type Row } from './layout'
 import {
   RANGES,
   WIDGETS,
@@ -63,6 +67,11 @@ import { THEMES, type ThemeId } from './themes'
    -------------------------------------------------------------------------- */
 
 type Naming = { kind: 'rename' | 'template'; value: string }
+
+/** The Light / Dark switch for the board itself, and the check of every layout kept (rollout.ts dashboardGrid). */
+const GRID = shows('dashboardGrid')
+/** The 22 Nov audit fixes (rollout.ts dashboardPolish): the page carries `data-polish` and dashboard.css scopes them to it. */
+const POLISH = shows('dashboardPolish')
 type Snap = { rows: Row[]; theme: ThemeId }
 
 const ARRANGED: Record<ArrangeMode, string> = { tidy: 'Tidied up', type: 'Arranged by type', need: 'Arranged by need' }
@@ -86,6 +95,10 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   const [building, setBuilding] = useState(true)
   const [hint, setHint] = useState(false)
   const [said, setSaid] = useState('')
+  /* The widget just added or moved, which wears a New or Moved tag in Customize until the next change (tags.ts). */
+  const [mark, setMark] = useState<Mark | null>(null)
+  /* The row whose Add here opened the library: what is added goes there (Board.tsx). */
+  const [slot, setSlot] = useState<{ id: string; label: string } | null>(null)
   const boardRef = useRef<BoardHandle>(null)
   const page = useRef<HTMLDivElement>(null)
 
@@ -121,7 +134,13 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
     redraw((n) => n + 1)
   }
   const put = (next: Row[]) => set((p) => withRows(p, next, board.id))
-  const commit = (next: Row[], text = '') => {
+  const commit = (next: Row[], text = '', moved?: string) => {
+    setMark(moved ? { id: moved, kind: 'moved' } : null)
+    /* Every layout kept is checked (check.ts); in development a broken one says so, with what is wrong. */
+    if (GRID && import.meta.env.DEV) {
+      const wrong = checkLayout(next)
+      if (wrong.length) console.warn('Dashboard layout:', wrong.map((w) => w.text))
+    }
     remember()
     put(next)
     if (text) setSaid(text)
@@ -160,6 +179,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   }
   const leave = () => {
     setEditing(false)
+    setMark(null)
     entered.current = null
   }
   const cancel = () => {
@@ -201,13 +221,18 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   /* The widget last added from the library, brought into view when the library closes. */
   const added = useRef<string | null>(null)
   const add = (w: WidgetId) => {
-    const r = addWidget(rows, w)
+    const into = slot ? addToRow(rows, slot.id, w) : null
+    const r = into ?? addWidget(rows, w)
     commit(r.rows, `${WIDGETS[w].name} added`)
+    setMark({ id: r.id, kind: 'new' })
     added.current = r.id
     store.showToast(`${WIDGETS[w].name} added`, { label: 'Undo', run: undo })
+    /* One widget per Add here: the library closes and the board shows where it went. */
+    if (slot) closeLibrary()
   }
   const closeLibrary = () => {
     setLibrary(false)
+    setSlot(null)
     const id = added.current
     added.current = null
     if (id) window.setTimeout(() => page.current?.querySelector(`[data-cell="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 220)
@@ -336,9 +361,49 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   ]
 
   const empty = rows.length === 0
+  /* Stable for a layout, so the board works out which rows have room once per change, not on every render. */
+  const onBoard = useCallback((w: WidgetId) => hasWidget(rows, w), [rows])
+  /* The console's own dark theme makes the board dark too; then the board's switch has nothing to do and is not shown. */
+  const [consoleTheme] = useTheme()
+  const night = GRID && (prefs.look === 'dark' || consoleTheme === 'dark')
+  /* Popups open outside the page: while the night board shows, the document says so and they follow (dashboard.css). */
+  useEffect(() => {
+    if (!night) return
+    const root = document.documentElement
+    root.setAttribute('data-dash-look', 'dark')
+    return () => root.removeAttribute('data-dash-look')
+  }, [night])
+  const lookSwitch =
+    GRID && consoleTheme !== 'dark' ? (
+      <IconButton
+        icon={prefs.look === 'dark' ? Sun : Moon}
+        label={prefs.look === 'dark' ? 'Light board' : 'Dark board'}
+        tone="ghost"
+        onClick={() => set((p) => ({ ...p, look: p.look === 'dark' ? 'light' : 'dark' }))}
+      />
+    ) : null
+
+  const rangePicker = <Picker label="Time range" prefix="Range" size="md" value={range} options={RANGES} onChange={(v) => set((p) => ({ ...p, range: v as Range }))} />
+  const barRight = editing ? (
+    lookSwitch
+  ) : (
+    <>
+      {lookSwitch}
+      <AnimatePresence>
+        {hint && (
+          <motion.span className="bdash-hint" role="status" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
+            Customize to move, resize or add widgets
+          </motion.span>
+        )}
+      </AnimatePresence>
+      <Button variant="neutral" icon={Settings2} onClick={() => enter()}>
+        Customize
+      </Button>
+    </>
+  )
 
   return (
-    <div className="bpage bdash bdash-vars" ref={page} style={{ ['--dash-brand' as string]: prefs.brand }}>
+    <div className="bpage bdash bdash-vars" ref={page} data-look={night ? 'dark' : undefined} data-polish={POLISH ? '' : undefined} style={{ ['--dash-brand' as string]: prefs.brand }}>
       <PageHead title="Dashboard" caption="Your tenant at a glance." preview={switches} />
 
       <div className="bdash-tabs">
@@ -347,27 +412,16 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
           <IconButton icon={Plus} label="New dashboard" tone="ghost" onClick={() => setGallery('new')} />
           <RowMenu label={`Actions for ${board.name}`} items={menu} onSelect={onMenu} size="md" />
         </span>
+        {/* One band instead of two (dashboardPolish): the range, the board's look and Customize ride the tabs row. */}
+        {POLISH && (
+          <span className="bdash-tabs__bar">
+            {rangePicker}
+            {barRight}
+          </span>
+        )}
       </div>
 
-      <PageBar
-        left={<Picker label="Time range" prefix="Range" size="md" value={range} options={RANGES} onChange={(v) => set((p) => ({ ...p, range: v as Range }))} />}
-        right={
-          editing ? null : (
-            <>
-              <AnimatePresence>
-                {hint && (
-                  <motion.span className="bdash-hint" role="status" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
-                    Customize to move, resize or add widgets
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              <Button variant="neutral" icon={Settings2} onClick={() => enter()}>
-                Customize
-              </Button>
-            </>
-          )
-        }
-      />
+      {!POLISH && <PageBar left={rangePicker} right={barRight} />}
 
       <div className="bdash-layout" data-dash-theme={DASHBOARD_THEMES ? theme : 'mono'}>
         {empty && !editing ? (
@@ -401,6 +455,12 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
             onPatch={patch}
             onColour={colour}
             onSay={setSaid}
+            mark={mark}
+            onAddHere={(r, i) => {
+              setSlot({ id: r.id, label: `row ${i + 1}` })
+              openLibrary()
+            }}
+            onBoard={onBoard}
           />
         )}
       </div>
@@ -455,7 +515,15 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
         )}
       </AnimatePresence>
 
-      <Library open={library} empty={empty} has={(w) => hasWidget(rows, w)} onAdd={add} onRemove={removeWidget} onClose={closeLibrary} />
+      <Library
+        open={library}
+        empty={empty}
+        has={onBoard}
+        onAdd={add}
+        onRemove={removeWidget}
+        onClose={closeLibrary}
+        row={slot ? { label: slot.label, fits: (w) => addToRow(rows, slot.id, w) !== null } : null}
+      />
 
       <p className="u-sr-only" aria-live="polite">
         {said}

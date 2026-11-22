@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'motion/react'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Plus } from 'lucide-react'
 import { RowMenu, type MenuItem } from '../kit'
 import { appRoot } from '../dialog-chrome'
 import { pct, useSize } from './format'
@@ -9,29 +9,40 @@ import {
   COLS,
   GAP,
   STEP,
+  barLock,
+  colMaxSpan,
+  colMinSpan,
   colRange,
   evenRow,
   findCell,
+  fitsRow,
   moveCell,
   moveRow,
   newId,
   place,
   rowMaxH,
   rowMinH,
+  rowLock,
   rowNaturalH,
   setBoundary,
   setRowHeight,
   setStackSplit,
   stackHeights,
   stackRange,
+  whyNot,
   type Cell,
   type Row,
   type Target,
 } from './layout'
 import { geometry, type Geometry } from './geometry'
-import { WIDGETS, type Range, type WidgetId } from './model'
+import { WIDGETS, WIDGET_IDS, type Range, type WidgetId } from './model'
 import type { ThemeId } from './themes'
 import { CellLift, Tile, type CellHandlers } from './Tile'
+import { resolveTarget, targetKey, type DragPhase } from './drag'
+import { tagsOf, type Mark } from './tags'
+import { applySplit } from './splits'
+import { SplitPicker } from './SplitPicker'
+import { shows } from '../rollout'
 
 /* -----------------------------------------------------------------------------
    The board: rows of widgets, and in Customize the controls that shape them
@@ -76,6 +87,21 @@ interface Drop {
   shape: 'v' | 'h' | 'box'
 }
 
+/** The drop previews live: once the pointer rests on a place, the board makes room there and the widget's slot moves to
+    it, so what is let go is what was seen (owner, 20 Nov 2026: "like a preview"). Design only (rollout.ts). */
+const LIVE = shows('dashboardGrid')
+/** How long the pointer rests on a place before the board makes room there: long enough that sweeping across the board
+    does not shuffle it, short enough to feel immediate. */
+const DWELL_MS = 90
+/** How far outside the board a widget can be carried before letting go puts it back. */
+const OUTSIDE = 40
+
+/** The board as a drag shows it: the rows, and where everything in them is drawn. */
+interface View {
+  rows: Row[]
+  geo: Geometry
+}
+
 interface Dock {
   kind: 'cell' | 'new' | 'row'
   id: string
@@ -91,6 +117,14 @@ interface Dock {
   geo: Geometry
   /** Targets already tried, so a pointer resting on one does not lay the board out again. */
   tried: Map<string, boolean>
+  /** Why the last place tried was refused, for the tip. */
+  why: string | null
+  /** What the board shows now: `rows` until a preview lands, then the preview. Places are found on this. */
+  view: View
+  /** The target the preview shows, and the one waiting out its dwell. */
+  shownKey: string | null
+  waitKey: string | null
+  wait: number
   stop: () => void
 }
 
@@ -124,6 +158,8 @@ function Bar({
   onDone,
   onKey,
   onReset,
+  locked = null,
+  onLocked,
 }: {
   /** `vertical`: a bar between two columns, moving width. `horizontal`: a bar moving height. */
   orientation: 'vertical' | 'horizontal'
@@ -137,6 +173,9 @@ function Bar({
   onDone: (keep: boolean) => void
   onKey: (e: KeyboardEvent<HTMLDivElement>) => void
   onReset: () => void
+  /** Why the bar cannot move, where both its sides are at a limit: it shows no grip and says so when pressed. */
+  locked?: string | null
+  onLocked?: (why: string, x: number, y: number) => void
 }) {
   const from = useRef<{ x: number; y: number } | null>(null)
   return (
@@ -148,13 +187,19 @@ function Bar({
       aria-valuenow={Math.round(now)}
       aria-valuemin={Math.round(min)}
       aria-valuemax={Math.round(max)}
+      aria-disabled={locked ? true : undefined}
+      title={locked ?? undefined}
       data-chrome
-      className={`bdash-bar is-${orientation === 'vertical' ? 'v' : 'h'} ${className}`}
+      className={`bdash-bar is-${orientation === 'vertical' ? 'v' : 'h'} ${className}${locked ? ' is-locked' : ''}`}
       style={style}
       onPointerDown={(e) => {
         if (e.button !== 0) return
         e.preventDefault()
         e.stopPropagation()
+        if (locked) {
+          onLocked?.(locked, e.clientX, e.clientY)
+          return
+        }
         e.currentTarget.setPointerCapture(e.pointerId)
         from.current = { x: e.clientX, y: e.clientY }
         onDrag('start', 0, 0, e.clientX, e.clientY)
@@ -172,8 +217,14 @@ function Bar({
         from.current = null
         onDone(false)
       }}
-      onKeyDown={onKey}
-      onDoubleClick={onReset}
+      onKeyDown={(e) => {
+        if (locked && e.key !== 'Tab') {
+          if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) e.preventDefault()
+          return onLocked?.(locked, -1, -1)
+        }
+        onKey(e)
+      }}
+      onDoubleClick={locked ? undefined : onReset}
     >
       <i className="bdash-bar__grip" aria-hidden />
     </div>
@@ -195,6 +246,9 @@ export function Board({
   onPatch,
   onColour,
   onSay,
+  mark = null,
+  onAddHere,
+  onBoard,
 }: {
   ref?: Ref<BoardHandle>
   rows: Row[]
@@ -206,8 +260,14 @@ export function Board({
   pinnedRow: string | null
   /** The dashboard is being built from a layout: its widgets arrive one after another. */
   building: boolean
-  /** The layout changed by hand: keep it, and say what happened. */
-  onCommit: (next: Row[], said: string) => void
+  /** The layout changed by hand: keep it, and say what happened. `moved`: the widget that was moved, for its tag. */
+  onCommit: (next: Row[], said: string, moved?: string) => void
+  /** The widget just added or moved, which wears a tag saying so (tags.ts). */
+  mark?: Mark | null
+  /** A row's Add here: open the library for what fits that row. */
+  onAddHere?: (row: Row, index: number) => void
+  /** Widgets already on the dashboard, which a row's Add here does not offer. */
+  onBoard?: (w: WidgetId) => boolean
   onRemove: (c: Cell) => void
   onRemoveRow: (r: Row) => void
   onPatch: (id: string, p: Partial<Pick<Cell, 'view' | 'pick'>>) => void
@@ -225,6 +285,10 @@ export function Board({
   const [chip, setChip] = useState<WidgetId | null>(null)
   const [picked, setPicked] = useState<{ id: string; origin: Row[] } | null>(null)
   const [settle, setSettle] = useState<string | null>(null)
+  /* The board as a widget being carried shows it: room made where it would land (LIVE). */
+  const [preview, setPreview] = useState<Row[] | null>(null)
+  /* Where a widget's drag is (drag.ts), on the board as data-drag for the rigs and the styles. */
+  const [phase, setPhase] = useState<DragPhase>('idle')
   const bar = useRef<BarDrag | null>(null)
   const barDraft = useRef<Row[] | null>(null)
   const session = useRef<Dock | null>(null)
@@ -247,7 +311,7 @@ export function Board({
     if (el && !el.style.transform) el.style.transform = `translate(${chipAt.current.x}px, ${chipAt.current.y}px)`
   }, [])
 
-  const shown = draft ?? rows
+  const shown = preview ?? draft ?? rows
   const geo = useMemo(() => geometry(shown, size.w, stacked), [shown, size.w, stacked])
 
   /* What the window's own listeners read: they outlive the render that added them. */
@@ -328,6 +392,8 @@ export function Board({
     setDock(null)
     setLift(null)
     setChip(null)
+    setPreview(null)
+    setPhase('idle')
   }, [editing])
   useEffect(() => () => session.current?.stop(), [])
 
@@ -377,6 +443,7 @@ export function Board({
     if (!el || !box || !host || still) {
       setLift(null)
       setSettle(null)
+      setPhase('idle')
       return
     }
     const hb = host.getBoundingClientRect()
@@ -390,6 +457,7 @@ export function Board({
     glide.onfinish = () => {
       setLift(null)
       setSettle(null)
+      setPhase('idle')
     }
     return () => {
       glide.onfinish = null
@@ -425,7 +493,14 @@ export function Board({
       if (b.kind === 'col') {
         const { lo, hi } = colRange(r, b.index)
         const a = r.columns[b.index].span
-        const edge = a === lo || a === hi ? ` · ${a === lo ? 'narrowest' : 'widest'}` : ''
+        const nameA = WIDGETS[r.columns[b.index].cells[0].widget].name
+        const nameB = WIDGETS[r.columns[b.index + 1].cells[0].widget].name
+        const left = r.columns[b.index]
+        const plain = a === lo || a === hi ? ` · ${a === lo ? 'narrowest' : 'widest'}` : ''
+        /* At a limit, the tip names the widget that holds it there. */
+        const named =
+          a === lo ? ` · ${a <= colMinSpan(left) ? `${nameA} at its narrowest` : `${nameB} at its widest`}` : a === hi ? ` · ${a >= colMaxSpan(left) ? `${nameA} at its widest` : `${nameB} at its narrowest`}` : ''
+        const edge = LIVE ? named : plain
         showTip(x, y, `${pct(a / COLS)} | ${pct(r.columns[b.index + 1].span / COLS)}${edge}`)
         /* Another row with a bar in the same place: draw the line they share. */
         const at = bounds(r)[b.index]
@@ -491,6 +566,14 @@ export function Board({
     if (JSON.stringify(next) !== JSON.stringify(row)) onCommit(rows.map((x) => (x.id === row.id ? next : x)), kind === 'row' ? 'Row height put back' : 'Evened out')
   }
 
+  /** A locked bar pressed: the tip by the pointer (or the bar, from the keys) says why, and the reader hears it. */
+  const sayLocked = (why: string, x: number, y: number) => {
+    onSay(why)
+    if (x < 0) return
+    showTip(x, y, why)
+    window.setTimeout(() => showTip(0, 0, null), 1600)
+  }
+
   /* ---- dragging widgets and rows ---- */
 
   /** Where a drop would land, and the line or outline that says so, in the board's own pixels. Null where nothing can
@@ -501,18 +584,35 @@ export function Board({
     const hb = host.getBoundingClientRect()
     const px = x - hb.left
     const py = y - hb.top
-    const now = d.rows
-    const g = d.geo
+    /* A widget is found a place on the board as it is drawn (a preview, if one shows); a row on the board as it was. */
+    const now = d.kind === 'cell' ? d.view.rows : d.rows
+    const g = d.kind === 'cell' ? d.view.geo : d.geo
     const pinned = live.current.pinnedRow
     const floor = pinned && now[0]?.id === pinned ? 1 : 0
 
+    /** The place said against the board as it was before the drag; 'keep' over the widget's own slot. */
+    const said = (t: Target): Target | 'keep' => (d.kind === 'cell' && d.view.rows !== d.rows ? resolveTarget(t, d.view.rows, d.rows, d.id) : t)
     const valid = (t: Target): boolean => {
-      const key = JSON.stringify(t)
+      const o = said(t)
+      if (o === 'keep') return false
+      const key = targetKey(o)
       const known = d.tried.get(key)
-      if (known !== undefined) return known
-      const ok = d.kind === 'cell' ? moveCell(now, d.id, t) !== null : d.kind === 'new' && !!d.widget && place(now, { id: 'x', widget: d.widget, weight: 1 }, t) !== null
-      d.tried.set(key, ok)
+      if (known === undefined) {
+        const ok = d.kind === 'cell' ? moveCell(d.rows, d.id, o) !== null : d.kind === 'new' && !!d.widget && place(d.rows, { id: 'x', widget: d.widget, weight: 1 }, o) !== null
+        d.tried.set(key, ok)
+      }
+      const ok = d.tried.get(key) === true
+      if (!ok && d.kind !== 'row') {
+        const cell = d.kind === 'cell' ? findCell(d.rows, d.id) : null
+        const widget = cell ? d.rows[cell.r].columns[cell.c].cells[cell.k].widget : d.widget
+        if (widget) d.why = whyNot(d.rows, { id: d.id, widget }, o) ?? d.why
+      }
       return ok
+    }
+    /** A drop said against the board as it was. */
+    const out = (t: Target, rect: Rect, shape: Drop['shape']): Drop | null => {
+      const o = said(t)
+      return o === 'keep' ? null : { target: o, rect, shape }
     }
     /* A gap between rows (or above the first, below the last): a row of its own there. */
     const between = (index: number): Drop | null => {
@@ -527,7 +627,7 @@ export function Board({
         return to === from ? null : { target: null, rowTo: to, rect, shape: 'h' }
       }
       const target: Target = { at: 'row', before: now[at]?.id ?? null }
-      return valid(target) ? { target, rect, shape: 'h' } : null
+      return valid(target) ? out(target, rect, 'h') : null
     }
 
     if (g.rows.length === 0) return between(0)
@@ -543,7 +643,7 @@ export function Board({
     const cols = row.columns.map((c) => ({ c, b: g.cols[c.id] }))
     const colLine = (before: string | null, xLine: number): Drop | null => {
       const target: Target = { at: 'column', row: row.id, before }
-      return valid(target) ? { target, rect: { left: xLine - 1.5, top: rb.y, width: 3, height: rb.h }, shape: 'v' } : null
+      return valid(target) ? out(target, { left: xLine - 1.5, top: rb.y, width: 3, height: rb.h }, 'v') : null
     }
     const ci = cols.findIndex((o) => px >= o.b.x && px <= o.b.x + o.b.w)
     if (ci < 0) {
@@ -556,7 +656,7 @@ export function Board({
     const cells = col.cells.map((cell) => ({ cell, b: g.cells[cell.id] }))
     const stackLine = (before: string | null, yLine: number): Drop | null => {
       const target: Target = { at: 'stack', column: col.id, before }
-      return valid(target) ? { target, rect: { left: cb.x, top: yLine - 1.5, width: cb.w, height: 3 }, shape: 'h' } : null
+      return valid(target) ? out(target, { left: cb.x, top: yLine - 1.5, width: cb.w, height: 3 }, 'h') : null
     }
     const ki = cells.findIndex((o) => py >= o.b.y && py <= o.b.y + o.b.h)
     if (ki < 0) {
@@ -577,7 +677,7 @@ export function Board({
     if (d.kind === 'cell') {
       if (cell.id === d.id) return null
       const target: Target = { at: 'swap', cell: cell.id }
-      return valid(target) ? { target, rect: { left: kb.x, top: kb.y, width: kb.w, height: kb.h }, shape: 'box' } : null
+      return valid(target) ? out(target, { left: kb.x, top: kb.y, width: kb.w, height: kb.h }, 'box') : null
     }
     return stackLine(nextCell, kb.y + kb.h + GAP / 2) ?? colLine(nextCol, cb.x + cb.w + GAP / 2)
   }
@@ -585,23 +685,35 @@ export function Board({
   const finish = (d: Dock, keep: boolean) => {
     if (session.current === d) flush()
     d.stop()
+    window.clearTimeout(d.wait)
     session.current = null
     setDock(null)
     showDrop(null)
+    showTip(0, 0, null)
     setChip(null)
+    setPreview(null)
+    setPhase('idle')
     if (!d.started) return
     dragged.current = true
     window.setTimeout(() => (dragged.current = false), 0)
     const now = live.current.rows
     const out = d.drop
+    /* What the preview showed is what lands, to the pixel: the same rows, ids and all. */
+    if (keep && LIVE && d.kind === 'cell' && d.view.rows !== d.rows && d.shownKey) {
+      live.current.onCommit(d.view.rows, `${WIDGETS[findWidget(now, d.id)].name} moved`, d.id)
+      setSettle(d.id)
+      setPhase('settling')
+      return
+    }
     if (keep && out) {
       if (d.kind === 'row' && out.rowTo !== undefined) {
         live.current.onCommit(moveRow(now, now.findIndex((r) => r.id === d.id), out.rowTo), 'Row moved')
       } else if (d.kind === 'cell' && out.target) {
         const next = moveCell(now, d.id, out.target)
         if (next) {
-          live.current.onCommit(next, `${WIDGETS[findWidget(now, d.id)].name} ${out.target.at === 'swap' ? 'swapped' : 'moved'}`)
+          live.current.onCommit(next, `${WIDGETS[findWidget(now, d.id)].name} ${out.target.at === 'swap' ? 'swapped' : 'moved'}`, d.id)
           setSettle(d.id)
+          setPhase('settling')
           return
         }
       } else if (d.kind === 'new' && out.target && d.widget) {
@@ -611,6 +723,78 @@ export function Board({
       }
     }
     setLift(null)
+  }
+
+  /** One frame of a widget being carried with the live preview (drag.ts has the states):
+      · over its own slot in the preview, nothing changes;
+      · carried off the board, the board shows itself as it was, and letting go puts the widget back;
+      · resting on a place for DWELL_MS, the board makes room there;
+      · over a place it cannot go, the room already made stays, and the tip says why not. */
+  const carry = (d: Dock, x: number, y: number) => {
+    const host = board.current
+    if (!host) return
+    const hb = host.getBoundingClientRect()
+    const px = x - hb.left
+    const py = y - hb.top
+    const off = px < -OUTSIDE || px > hb.width + OUTSIDE || py < -OUTSIDE || py > hb.height + OUTSIDE
+    const toOrigin = () => {
+      window.clearTimeout(d.wait)
+      d.waitKey = null
+      if (d.view.rows === d.rows) return
+      d.view = { rows: d.rows, geo: d.geo }
+      d.shownKey = null
+      d.drop = null
+      setPreview(null)
+      setPhase('carrying')
+    }
+    if (off) {
+      toOrigin()
+      showDrop(null)
+      showTip(x, y, 'Let go to put it back')
+      return
+    }
+    const slot = d.view.geo.cells[d.id]
+    if (slot && px >= slot.x && px <= slot.x + slot.w && py >= slot.y && py <= slot.y + slot.h) {
+      window.clearTimeout(d.wait)
+      d.waitKey = null
+      showDrop(null)
+      showTip(0, 0, null)
+      return
+    }
+    d.why = null
+    const found = hit(x, y, d)
+    if (!found?.target) {
+      window.clearTimeout(d.wait)
+      d.waitKey = null
+      showDrop(null)
+      showTip(x, y, d.why)
+      return
+    }
+    showTip(0, 0, null)
+    const key = targetKey(found.target)
+    if (key === d.shownKey) {
+      showDrop(null)
+      return
+    }
+    /* The line says where it would go while the board waits to be sure. */
+    showDrop(found)
+    if (key === d.waitKey) return
+    window.clearTimeout(d.wait)
+    d.waitKey = key
+    const target = found.target
+    d.wait = window.setTimeout(() => {
+      if (session.current !== d || d.waitKey !== key) return
+      const next = moveCell(d.rows, d.id, target)
+      d.waitKey = null
+      if (!next) return
+      const { width, stacked: narrow } = live.current
+      d.view = { rows: next, geo: geometry(next, width, narrow) }
+      d.shownKey = key
+      d.drop = found
+      showDrop(null)
+      setPreview(next)
+      setPhase('previewing')
+    }, DWELL_MS)
   }
 
   const begin = (kind: Dock['kind'], id: string, e: PointerEvent<HTMLElement>, grab: { x: number; y: number }, widget?: WidgetId) => {
@@ -629,14 +813,21 @@ export function Board({
       rows: now,
       geo: geometry(now, width, narrow),
       tried: new Map(),
+      why: null,
+      view: { rows: now, geo: geometry(now, width, narrow) },
+      shownKey: null,
+      waitKey: null,
+      wait: 0,
       stop: () => {},
     }
+    d.view.geo = d.geo
     const move = (ev: globalThis.PointerEvent) => {
       const x = ev.clientX
       const y = ev.clientY
       if (!d.started) {
         if (Math.hypot(x - d.startX, y - d.startY) < 5) return
         d.started = true
+        setPhase('carrying')
         document.documentElement.classList.add('bdash-dragging')
         setPicked(null)
         setDock({ kind, id })
@@ -658,8 +849,11 @@ export function Board({
         if (session.current !== d) return
         if (kind === 'cell' && liftEl.current) liftEl.current.style.transform = `translate(${x - d.grabX}px, ${y - d.grabY}px)`
         if (kind === 'new' && chipEl.current) chipEl.current.style.transform = `translate(${x}px, ${y}px)`
+        if (kind === 'cell' && LIVE) return carry(d, x, y)
+        d.why = null
         d.drop = hit(x, y, d)
         showDrop(d.drop)
+        showTip(x, y, d.drop ? null : d.why)
       })
     }
     const up = () => finish(d, true)
@@ -731,7 +925,7 @@ export function Board({
       const name = WIDGETS[c.widget].name
       const mine = picked?.id === c.id ? picked : null
       const keep = () => {
-        if (mine && draft && JSON.stringify(draft) !== JSON.stringify(mine.origin)) onCommit(draft, `${name} moved`)
+        if (mine && draft && JSON.stringify(draft) !== JSON.stringify(mine.origin)) onCommit(draft, `${name} moved`, c.id)
         setDraft(null)
         setPicked(null)
       }
@@ -797,6 +991,12 @@ export function Board({
 
   const edit = editing && !stacked
   const byId = new Map(shown.map((r) => [r.id, r]))
+  /* Rows with room for one more widget, which show an Add here. Worked out once per layout, not per frame. */
+  const roomy = useMemo(() => {
+    if (!edit || !LIVE || !onAddHere) return new Set<string>()
+    const free = WIDGET_IDS.filter((w) => !onBoard?.(w))
+    return new Set(rows.filter((r) => r.id !== pinnedRow && fitsRow(rows, r.id, free).length > 0).map((r) => r.id))
+  }, [edit, rows, pinnedRow, onAddHere, onBoard])
   const movingRow = dock?.kind === 'row' ? dock.id : null
   const stateOf = (cell: Cell, row: string): 'rest' | 'slot' | 'hidden' | 'dim' =>
     settle === cell.id ? 'hidden' : dock?.kind === 'cell' && dock.id === cell.id ? 'slot' : movingRow === row ? 'dim' : 'rest'
@@ -805,6 +1005,7 @@ export function Board({
     <div
       className={`bdash-board${editing ? ' is-editing' : ''}${stacked ? ' is-stacked' : ''}${sizing ? ` is-sizing is-sizing-${sizing}` : ''}${dock ? ' is-docking' : ''}`}
       ref={setBoard}
+      data-drag={phase}
       style={{ height: geo.height + (edit ? GAP : 0) }}
     >
       {/* Each row's grip, in the margin beside it; pointing at it outlines the row it moves. Not while a bar is held:
@@ -839,14 +1040,39 @@ export function Board({
                   <RowMenu label={`Row ${ri + 1}`} icon={GripVertical} items={rowMenu(row, ri)} onSelect={onRowMenu(row, ri)} align="start" />
                 </span>
               )}
+              {/* Row splits: the row's layouts as small diagrams (splits.ts, owner 20 Nov 2026). */}
+              {LIVE && row.id !== pinnedRow && !dock && (
+                <SplitPicker
+                  row={row}
+                  index={ri}
+                  onSplit={(spans, name) => {
+                    const next = applySplit(row, spans)
+                    if (next) onCommit(rows.map((r) => (r.id === row.id ? next : r)), `Row ${ri + 1} set to ${name.toLowerCase()}`)
+                  }}
+                />
+              )}
+              {/* Add here: a widget straight into this row, from the widgets that fit it (owner, 20 Nov 2026). */}
+              {roomy.has(row.id) && !dock && (
+                <button type="button" className="bdash-row__add" data-chrome aria-label={`Add a widget to row ${ri + 1}`} title="Add a widget to this row" onClick={() => onAddHere?.(row, ri)}>
+                  <Plus size={14} strokeWidth={2.4} aria-hidden />
+                </button>
+              )}
             </div>
           )
         })}
 
+      {/* Too narrow to arrange: the board shows one widget under another, and says why nothing can be moved (owner, 20 Nov
+          2026: "if something can't move, let the user know"). */}
+      {editing && stacked && LIVE && (
+        <p className="bdash-narrow" role="status">
+          Widen the window to move and size widgets
+        </p>
+      )}
+
       {/* The widgets, in reading order, each placed by its box. */}
       {shown.flatMap((row) =>
-        row.columns.flatMap((col) =>
-          col.cells.map((cell) => {
+        row.columns.flatMap((col, ci) =>
+          col.cells.map((cell, ki) => {
             const box = geo.cells[cell.id]
             if (!box) return null
             return (
@@ -862,6 +1088,7 @@ export function Board({
                 boardTheme={theme}
                 brand={brand}
                 handlers={handlers}
+                tags={edit && LIVE ? tagsOf(row, ci, ki, row.id === pinnedRow, mark) : undefined}
               />
             )
           }),
@@ -888,6 +1115,8 @@ export function Board({
               onDone={endBar}
               onKey={keyBar('col', row, b.index, 0)}
               onReset={resetBar('col', row, b.index, 0)}
+              locked={LIVE ? barLock(row, b.index) : null}
+              onLocked={sayLocked}
             />
           )
         })}
@@ -932,6 +1161,8 @@ export function Board({
               onDone={endBar}
               onKey={keyBar('row', row, 0, 0)}
               onReset={resetBar('row', row, 0, 0)}
+              locked={LIVE ? rowLock(row) : null}
+              onLocked={sayLocked}
             />
           )
         })}

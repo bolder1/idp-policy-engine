@@ -8,6 +8,7 @@ import type { ThemeId } from './themes'
 import { DASHBOARD_THEMES } from './phase'
 import { ColourList } from './ThemeMenus'
 import { WidgetBody } from './widgets'
+import { tagKey, type TileTag } from './tags'
 
 /* -----------------------------------------------------------------------------
    One widget on the board.
@@ -66,6 +67,8 @@ interface TileProps {
   brand: string
   /** Stable for the board's life (Board.tsx), so a tile is not drawn again for a new set of callbacks. */
   handlers: CellHandlers
+  /** In Customize: what just happened to it, and the limit it is held at (tags.ts). */
+  tags?: TileTag[]
 }
 
 /** A widget's controls in Customize. Memoized apart from the card, so a widget that only moves (a row above it growing,
@@ -127,7 +130,7 @@ const Chrome = memo(
     a.handlers === b.handlers,
 )
 
-function TileView({ cell, box, editing, range, movable, state, picked, boardTheme, brand, handlers }: TileProps) {
+function TileView({ cell, box, editing, range, movable, state, picked, boardTheme, brand, handlers, tags }: TileProps) {
   const meta = WIDGETS[cell.widget]
   return (
     <section
@@ -147,6 +150,15 @@ function TileView({ cell, box, editing, range, movable, state, picked, boardThem
       </div>
 
       {editing && <Chrome cell={cell} movable={movable} picked={picked} boardTheme={boardTheme} brand={brand} handlers={handlers} />}
+      {editing && tags && tags.length > 0 && state === 'rest' && (
+        <span className="bdash-tile__tags" data-chrome>
+          {tags.map((t) => (
+            <span key={t.kind} className={`bdash-tag is-${t.kind}`} title={t.why} aria-label={t.why}>
+              {t.label}
+            </span>
+          ))}
+        </span>
+      )}
     </section>
   )
 }
@@ -173,7 +185,8 @@ export const Tile = memo(
     a.picked === b.picked &&
     a.boardTheme === b.boardTheme &&
     a.brand === b.brand &&
-    a.handlers === b.handlers,
+    a.handlers === b.handlers &&
+    tagKey(a.tags) === tagKey(b.tags),
 )
 
 /** The copy under the pointer while a widget is dragged. It is drawn once; the board moves it with a transform on

@@ -336,12 +336,16 @@ export interface LeaveGuard {
   saveLabel?: () => string
   /** Why saving is not possible right now, or null. */
   blocked?: () => string | null
+  /** The canvas holds no rule: the dialog asks No rule added, Discard or Continue (leave-guard.tsx). */
+  noRule?: () => boolean
 }
 
 export interface PendingLeave {
   saveLabel: string
   canSave: boolean
   blocked: string | null
+  /** Leaving a canvas with no rule on it. */
+  noRule?: boolean
 }
 
 export interface BrandStore {
@@ -877,6 +881,7 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
       saveLabel: g.saveLabel?.() ?? 'Save',
       canSave: offered,
       blocked: offered ? (g.blocked?.() ?? null) : null,
+      noRule: g.noRule?.() ?? false,
     }
   }
 

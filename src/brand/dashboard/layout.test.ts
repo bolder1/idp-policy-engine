@@ -106,13 +106,15 @@ describe('a bar between two stacked widgets', () => {
   it('shares the column’s height between them', () => {
     const px = stackHeights(r, r.columns[0])
     expect(px[0] + px[1] + GAP).toBeCloseTo(400)
-    const next = setStackSplit(r, 0, 0, 220)
+    const next = setStackSplit(r, 0, 0, 190)
     const after = stackHeights(next, next.columns[0])
-    expect(Math.round(after[0])).toBe(220)
+    expect(Math.round(after[0])).toBe(190)
     expect(Math.round(after[0] + after[1])).toBe(Math.round(px[0] + px[1]))
   })
-  it('keeps both at least as tall as they read', () => {
-    expect(stackRange(r, 0, 0).lo).toBe(WIDGETS.mfa.minH)
+  it('keeps both between the shortest and tallest they read at', () => {
+    const pair = stackHeights(r, r.columns[0]).reduce((a, b) => a + b, 0)
+    expect(stackRange(r, 0, 0).lo).toBe(Math.max(WIDGETS.mfa.minH, pair - WIDGETS['active-policies'].maxH))
+    expect(stackRange(r, 0, 0).hi).toBeLessThanOrEqual(WIDGETS.mfa.maxH)
     const next = setStackSplit(r, 0, 0, 10)
     expect(stackHeights(next, next.columns[0])[0]).toBeGreaterThanOrEqual(WIDGETS.mfa.minH - 0.5)
   })
@@ -130,9 +132,11 @@ describe('placing and moving widgets', () => {
     expect(shape(next)[1]).toBe('4:ch 4:bl 4:n')
     whole(next)
   })
-  it('refuses a column where there is no room for it', () => {
-    const full = place(board(), cell('n', 'mfa'), { at: 'column', row: 'r3', before: null })
+  it('refuses a column where there is no room for it, or where it would be stretched', () => {
+    const full = place(board(), cell('n', 'health'), { at: 'column', row: 'r3', before: null })
     expect(full).not.toBeNull()
+    /* A number beside a 432 px table would be stretched past its tallest. */
+    expect(place(board(), cell('n', 'mfa'), { at: 'column', row: 'r3', before: null })).toBeNull()
     const five = place(board(), cell('n', 'recent-sign-ins'), { at: 'column', row: 'r1', before: null })
     expect(five).toBeNull()
   })
@@ -148,14 +152,16 @@ describe('placing and moving widgets', () => {
     expect(shape(next)[2]).toBe('12:n')
   })
   it('swaps two widgets, each taking the other’s place', () => {
-    const next = moveCell(board(), 's1', { at: 'swap', cell: 'bl' })!
-    expect(shape(next)[0].startsWith('3:bl')).toBe(true)
-    expect(shape(next)[1]).toContain('s1')
+    const next = moveCell(board(), 'ch', { at: 'swap', cell: 'tb' })!
+    expect(shape(next)[2]).toBe('12:ch')
+    expect(shape(next)[1]).toContain('tb')
     whole(next)
+    /* A number swapped into a row of charts would be stretched: refused. */
+    expect(moveCell(board(), 's1', { at: 'swap', cell: 'bl' })).toBeNull()
   })
   it('moves a widget out of its row, which closes up and evens out', () => {
-    const next = moveCell(board(), 'bl', { at: 'column', row: 'r1', before: 'r1c2' })!
-    expect(shape(next)[0]).toBe('3:s1 2:s2 3:bl 2:s3 2:s4')
+    const next = moveCell(board(), 'bl', { at: 'column', row: 'r3', before: null })!
+    expect(shape(next)[2]).toBe('6:tb 6:bl')
     expect(shape(next)[1]).toBe('12:ch')
     whole(next)
   })
@@ -205,10 +211,10 @@ describe('templates read as rows', () => {
     const rows = fromSpecs(OVERVIEW.rows)
     expect(toSpecs(fromSpecs(toSpecs(rows)))).toEqual(toSpecs(rows))
   })
-  it('turn grid boxes with holes into full rows', () => {
+  it('turn grid boxes with holes into full rows, splitting a number from a taller chart', () => {
     const rows = fromSpecs(fromBoxes([{ widget: 'mfa', x: 0, y: 0, w: 3, h: 3 }, { widget: 'sign-ins', x: 5, y: 0, w: 5, h: 6 }]))
     whole(rows)
-    expect(rows).toHaveLength(1)
+    expect(shape(rows).map((r) => r.split(' ').length)).toEqual([1, 1])
   })
 })
 

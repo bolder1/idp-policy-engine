@@ -22,6 +22,8 @@ export interface LeaveGuardOptions {
       A function is asked only when somebody tries to leave: a check that costs
       something to run (a zone's saved sign-ins) is not run on every render. */
   blocked?: string | null | (() => string | null)
+  /** The canvas holds no rule (rollout.ts `noRuleAlert`): the dialog asks No rule added, Discard or Continue. */
+  noRule?: boolean
 }
 
 export function useLeaveGuard(opts: LeaveGuardOptions): (run: () => void) => void {
@@ -40,6 +42,7 @@ export function useLeaveGuard(opts: LeaveGuardOptions): (run: () => void) => voi
         const b = latest.current.blocked
         return typeof b === 'function' ? b() : (b ?? null)
       },
+      noRule: () => !!latest.current.noRule,
     }),
     [],
   )
@@ -82,6 +85,25 @@ export function LeaveDialog() {
   const p = pendingLeave ?? last.current
   /* A reason for a Save that is not on offer explains nothing. */
   const reason = p?.canSave ? (p.blocked ?? null) : null
+
+  /* Leaving a canvas with no rule on it (owner, 20 Nov 2026: "alert modal when user backs from canvas without adding
+     rule, with discard and continue options"). Nothing to save, since a policy is kept only once it has a rule
+     (policy-draft.ts), so two buttons: Continue stays on the canvas, Discard leaves without it. */
+  if (p?.noRule)
+    return (
+      <Confirm
+        open={!!pendingLeave}
+        onClose={leaveStay}
+        tone="warning"
+        shape="hero"
+        title="No rule added"
+        cancelLabel="Continue"
+        confirmLabel="Discard"
+        onConfirm={leaveDiscard}
+      >
+        A policy is saved only once it has a rule.
+      </Confirm>
+    )
 
   return (
     /* The hero shape (owner, 22 Oct 2026: "hero shape for delete and discard").

@@ -84,14 +84,17 @@ describe('a policy cannot be saved with no rules', () => {
     expect(src).toContain('const stop = noRules ? NO_RULES_REASON : unnamed ? UNNAMED_REASON : null')
     expect(src).toContain('const saveNow = () => {\n    if (stop) return store.showToast(stop)')
     expect(src).toMatch(/const saveDraft = \(\) => \{\n\s+if \(!saved\) return false\n\s+if \(stop\) \{/)
-    expect(src).toContain('blocked: stop })')
+    expect(src).toContain('blocked: stop, noRule: noRuleLeave })')
     expect(boardBarSrc).toContain('blocked={stop && toPublish ? stop : undefined}')
     expect(boardBarSrc).toContain('blocked={stop && unsaved ? stop : undefined}')
   })
 
-  it('asks nothing on leaving a new policy with no rule, and asks as usual with one', () => {
+  /* Owner, 20 Nov 2026: leaving a canvas with no rule asks No rule added, Discard or Continue, where the rollout table's
+     `noRuleAlert` entry says; elsewhere a new policy with no rule still leaves without asking. */
+  it('asks No rule added on leaving a canvas with no rule (noRuleAlert), and asks as usual with one', () => {
     expect(boardBuilderSrc).toContain('const toLose = unsaved && !(saved?.provisional && noRules)')
-    expect(boardBuilderSrc).toContain('useLeaveGuard({ dirty: toLose,')
+    expect(boardBuilderSrc).toContain('const noRuleLeave = NO_RULE_ALERT && noRules')
+    expect(boardBuilderSrc).toContain('useLeaveGuard({ dirty: toLose || noRuleLeave,')
   })
 })
 

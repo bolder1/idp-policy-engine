@@ -34,7 +34,7 @@ import { useSimEnv } from '../screens/sim-env'
 import { resolveSignIn, type TenantResolution } from '../screens/tenant-resolver'
 import { useBrand, type BrandScreen } from '../store'
 import { BarChart, CategoryBar, Meter, Tracker, WaveChart, type Part, type Series } from './charts'
-import { RAMP, RANGE_WORD, fmt, pct, useMigrationOpen } from './format'
+import { RAMP, figureCaption, fmt, pct, useMigrationOpen } from './format'
 import { viewOf } from './model'
 import { ADMIN_ACTIVITY, CONNECTIONS, DORMANT, LICENSE, REQUESTS, SYNCS, agoWord, answer, registrations, useAnswered } from './seed'
 import { NOW, personAt, pickAt, timeAxis, useActivity, usePolicyFacts } from './sources'
@@ -275,7 +275,7 @@ export function Registrations() {
   const Chart = viewOf(tile)?.id === 'area' ? WaveChart : BarChart
   return (
     <>
-      <Head caption={`${fmt(points.reduce((s, p) => s + p.count, 0))} added in ${RANGE_WORD[range]}`} />
+      <Head caption={figureCaption(range, `${fmt(points.reduce((s, p) => s + p.count, 0))} added`)} />
       <div className="bdw-body bdw-chartbox">
         <Chart key={range} series={series} labels={axis.labels} ticks={axis.ticks} still={preview} />
       </div>

@@ -4,6 +4,11 @@ import type { Policy } from '../data'
 import { narrowToAudience } from './board/apply-template'
 import { useBrand, useNameLookup } from '../store'
 import { scenarioFromPolicy } from '../template-from-policy'
+import { shows } from '../rollout'
+import { isDraftPolicy } from './status-options'
+
+/* A draft becomes a template as it stands, even with no rule yet (rollout.ts `draftTemplates`, 20 Nov 2026). */
+const DRAFT_TEMPLATES: boolean = shows('draftTemplates')
 
 /* -----------------------------------------------------------------------------
    Mark as template, from wherever it is offered (owner, 18 Nov 2026: "we don't need this [dialog] any more, call it mark
@@ -32,11 +37,12 @@ export function useSaveAsTemplate(): { open: (policy: Policy) => void; marked: (
       return
     }
     /* A template whose rules apply to nobody would offer nothing to use, so it is refused here in the dialog's words. */
-    if (policy.rules.length === 0) {
+    const emptyDraft = DRAFT_TEMPLATES && isDraftPolicy(policy) && policy.rules.length === 0
+    if (policy.rules.length === 0 && !emptyDraft) {
       store.showToast('Add a rule before marking this policy as a template.')
       return
     }
-    if (!policy.rules.some((r) => narrowToAudience(r, policy.audience, store.users) !== null)) {
+    if (!emptyDraft && !policy.rules.some((r) => narrowToAudience(r, policy.audience, store.users) !== null)) {
       store.showToast('None of these rules apply to anyone in this policy.')
       return
     }

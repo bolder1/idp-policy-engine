@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { WIDGETS } from './catalog'
 import { fromBoxes, fromSpecs, newId, tidyRows, toSpecs, type Box, type Cell, type Column, type Row, type RowSpec } from './layout'
-import { DEFAULT_BRAND, isBrandColour, isTheme, type ThemeId } from './themes'
+import { DEFAULT_BRAND, DEFAULT_THEME, isBrandColour, isTheme, type ThemeId } from './themes'
 import { OVERVIEW } from './templates'
 
 /* -----------------------------------------------------------------------------
@@ -69,7 +69,15 @@ export interface DashPrefs {
   range: Range
   /** The tenant's brand colour, for the Brand and Brand accent themes: a swatch's token or a hex. */
   brand: string
+  /** Light, or the Dashboard's own dark board (owner, 20 Nov 2026: "dark mode as well, a premium one"). */
+  look: Look
 }
+
+export type Look = 'light' | 'dark'
+export const LOOKS: { value: Look; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+]
 
 export const activeBoard = (p: DashPrefs): Board => p.boards.find((b) => b.id === p.active) ?? p.boards[0]
 
@@ -87,7 +95,7 @@ export function freshName(taken: readonly { name: string }[], base: string): str
 
 /** A new dashboard from a template, opened at once. */
 export function addBoard(p: DashPrefs, name: string, t: Pick<DashTemplate, 'id' | 'rows' | 'theme'>): DashPrefs {
-  const board: Board = { id: newId('b'), name: freshName(p.boards, name.trim() || 'Dashboard'), rows: fromSpecs(t.rows), from: t.id, theme: t.theme ?? 'mono' }
+  const board: Board = { id: newId('b'), name: freshName(p.boards, name.trim() || 'Dashboard'), rows: fromSpecs(t.rows), from: t.id, theme: t.theme ?? DEFAULT_THEME }
   return { ...p, boards: [...p.boards, board], active: board.id }
 }
 
@@ -128,11 +136,12 @@ export function defaultPrefs(): DashPrefs {
     version: 'classic',
     seen: false,
     hinted: false,
-    boards: [{ id: 'overview', name: OVERVIEW.name, rows: fromSpecs(OVERVIEW.rows), from: OVERVIEW.id, theme: 'mono' }],
+    boards: [{ id: 'overview', name: OVERVIEW.name, rows: fromSpecs(OVERVIEW.rows), from: OVERVIEW.id, theme: DEFAULT_THEME }],
     active: 'overview',
     own: [],
     range: '7d',
     brand: DEFAULT_BRAND,
+    look: 'light',
   }
 }
 
@@ -219,6 +228,7 @@ export function parseDash(value: string | null): DashPrefs {
       own,
       range: oneOf(v.range, ['24h', '7d', '30d'], d.range),
       brand: isBrandColour(v.brand) ? v.brand : d.brand,
+      look: oneOf(v.look, ['light', 'dark'], d.look),
     }
   } catch {
     return d

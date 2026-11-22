@@ -22,7 +22,7 @@ import type { WhoDirectory } from '../rule-who'
 import { TEMPLATE_CATEGORIES } from '../template-phase'
 import { SaveToggle, TemplateCard, TemplatePreview, UsedBy, scenarioCard, type CardModel } from './TemplateCard'
 import { DetailHead, TemplateDetail } from './TemplateDetail'
-import { YOURS_LABEL, YOURS_LINE } from '../tester'
+import { MY_TEMPLATES, YOURS_LABEL, YOURS_LINE } from '../tester'
 import { FavoritesArt } from '../empty-art'
 import { FAVORITES } from '../tester'
 
@@ -600,7 +600,7 @@ export function TemplateSheet({
                       icon={TemplateIcon}
                       title="No Xecurify templates"
                       blurb="Templates from miniOrange show here."
-                      action={<Button onClick={showOther}>{FAVORITES ? 'Show your favorites' : 'Show your templates'}</Button>}
+                      action={<Button onClick={showOther}>{FAVORITES ? 'Show your favorites' : MY_TEMPLATES ? 'Show my templates' : 'Show your templates'}</Button>}
                     />
                   ))}
                 </>

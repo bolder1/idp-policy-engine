@@ -11,16 +11,22 @@
    and the brand colours an admin can pick.
    -------------------------------------------------------------------------- */
 
-export type ThemeId = 'mono' | 'console' | 'accent' | 'brand' | 'colourful'
-export const THEME_IDS: ThemeId[] = ['mono', 'console', 'accent', 'brand', 'colourful']
+export type ThemeId = 'mono' | 'console' | 'accent' | 'brand' | 'colourful' | 'ocean' | 'aurora'
+/* The modern palettes first (owner, 20 Nov 2026: "good colors, something modern"), then the quiet ones. */
+export const THEME_IDS: ThemeId[] = ['colourful', 'ocean', 'aurora', 'mono', 'console', 'accent', 'brand']
 
 export const THEMES: Record<ThemeId, { name: string; line: string }> = {
+  colourful: { name: 'Colourful', line: 'Indigo, sky, violet and teal' },
+  ocean: { name: 'Ocean', line: 'Blues into teal' },
+  aurora: { name: 'Aurora', line: 'Violet into pink' },
   mono: { name: 'Monochrome', line: 'Ink and greys' },
   console: { name: 'Console', line: 'The console’s own accent' },
   accent: { name: 'Brand accent', line: 'Greys and one brand colour' },
   brand: { name: 'Brand', line: 'Shades of your brand colour' },
-  colourful: { name: 'Colourful', line: 'A colour for each series' },
 }
+
+/** The theme a new dashboard starts in. */
+export const DEFAULT_THEME: ThemeId = 'colourful'
 
 /** The brand colours on offer, as tokens. Xecurify's own orange first; a custom colour is a hex the admin types. */
 export const BRAND_SWATCHES: { label: string; value: string }[] = [

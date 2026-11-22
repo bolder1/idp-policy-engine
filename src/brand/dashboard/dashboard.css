@@ -74,17 +74,7 @@
   --dash-bar-hover: color-mix(in srgb, var(--text-primary) 15%, var(--surface-raised));
   --dash-wash: color-mix(in srgb, var(--text-primary) 4%, var(--surface-raised));
 }
-/* A colour per series and per part, from the console's own palette. */
-[data-dash-theme='colourful'] {
-  --dash-hue: var(--blue);
-  --dash-s2: var(--tpl-device);
-  --dash-r1: var(--blue);
-  --dash-r2: var(--tpl-device);
-  --dash-r3: var(--tpl-compliance);
-  --dash-r4: var(--tpl-risk);
-  --dash-r5: var(--tpl-quick);
-  --dash-r6: var(--_terracotta-600);
-}
+/* Colourful, Ocean and Aurora are at the foot of this sheet (20 Nov). */
 
 /* Colours change in place when a theme does. */
 .bdc :is(path, rect, circle, stop),
@@ -2769,4 +2759,472 @@ button.bdw-bar__row:hover .bdw-bar {
   color: var(--text-primary);
   font-size: var(--fs-base);
   font-weight: var(--fw-medium);
+}
+
+/* ==== 20 Nov 2026: modern palettes, the night board, the live preview, locked bars ================================
+   The owner: "good colors, something modern … for the whole dashboard", "dark mode as well, a premium one", and a
+   preview of a drop before it lands. Every value is a token (tokens.css, "Dashboard data palette and night board"). */
+
+/* ---- the modern palettes -------------------------------------------------------------------------------------- */
+[data-dash-theme='colourful'] {
+  --dash-hue: var(--viz-indigo);
+  --dash-s2: var(--viz-sky);
+  --dash-r1: var(--viz-indigo);
+  --dash-r2: var(--viz-sky);
+  --dash-r3: var(--viz-violet);
+  --dash-r4: var(--viz-teal);
+  --dash-r5: var(--viz-pink);
+  --dash-r6: var(--viz-slate);
+}
+[data-dash-theme='ocean'] {
+  --dash-hue: var(--viz-sky);
+  --dash-s2: var(--viz-teal);
+  --dash-r1: var(--viz-sky);
+  --dash-r2: var(--viz-indigo);
+  --dash-r3: var(--viz-teal);
+  --dash-r4: color-mix(in srgb, var(--viz-sky) 55%, var(--surface-raised));
+  --dash-r5: color-mix(in srgb, var(--viz-teal) 45%, var(--surface-raised));
+  --dash-r6: var(--viz-slate);
+}
+[data-dash-theme='aurora'] {
+  --dash-hue: var(--viz-violet);
+  --dash-s2: var(--viz-pink);
+  --dash-r1: var(--viz-violet);
+  --dash-r2: var(--viz-pink);
+  --dash-r3: var(--viz-indigo);
+  --dash-r4: var(--viz-sky);
+  --dash-r5: var(--viz-teal);
+  --dash-r6: var(--viz-slate);
+}
+
+/* ---- the night board ------------------------------------------------------------------------------------------------
+   The Dashboard's own dark look, and its look whenever the console is dark. The console's tokens are said again for
+   the page and everything in it, so every widget, chart, bar and button follows without a rule of its own; the data
+   hues take their lifted twins. Popups open outside the page and keep the console's own look. */
+/* The popups the board opens (Add widgets, Layouts, the Theme menu, row menus, dialogs, toasts) are drawn outside the page,
+   so while the night board shows, the page marks the document (Dashboard.tsx data-dash-look) and they take its tokens too. */
+.bdash[data-look='dark'],
+:root[data-dash-look='dark'] :is(.bdash-market, .bx-modal, .bx-apop, .bx-menu, .bshell__toast) {
+  --surface-page: var(--night-page);
+  --surface-raised: var(--night-card);
+  --surface-sunken: var(--night-sunken);
+  --surface-inset: var(--night-inset);
+  --surface-overlay: var(--night-card-top);
+  --surface-inverse: var(--night-text);
+  --border-subtle: var(--night-edge);
+  --border-default: var(--night-edge);
+  --border-strong: var(--night-edge-strong);
+  --text-primary: var(--night-text);
+  --text-body: var(--night-body);
+  --text-secondary: var(--night-secondary);
+  --text-tertiary: var(--night-tertiary);
+  --text-muted: var(--night-tertiary);
+  --text-inverse: var(--night-page);
+  --accent: var(--night-secondary);
+  --accent-hover: var(--night-body);
+  --accent-strong: var(--night-text);
+  --accent-soft: var(--night-inset);
+  --accent-soft-border: var(--night-edge-strong);
+  --focus-halo: var(--night-glow);
+  --int-neutral-bg: var(--night-card-top);
+  --int-neutral-bg-hover: var(--night-inset);
+  --int-neutral-bg-active: var(--night-edge);
+  --int-neutral-border: var(--night-edge-strong);
+  --int-neutral-border-hover: var(--night-tertiary);
+  --int-neutral-text: var(--night-text);
+  --int-ghost-bg-hover: var(--night-inset);
+  --int-ghost-bg-active: var(--night-edge);
+  --int-ghost-text: var(--night-secondary);
+  --ctl-bg: var(--night-card-top);
+  --ctl-bg-hover: var(--night-inset);
+  --ctl-border: var(--night-edge-strong);
+  --ctl-border-hover: var(--night-tertiary);
+  --dash-good: var(--night-good);
+  --dash-bad: var(--night-bad);
+  --dash-warn: var(--night-warn);
+  --viz-indigo: var(--viz-indigo-lit);
+  --viz-sky: var(--viz-sky-lit);
+  --viz-violet: var(--viz-violet-lit);
+  --viz-teal: var(--viz-teal-lit);
+  --viz-pink: var(--viz-pink-lit);
+  --viz-slate: var(--viz-slate-lit);
+  --fb-positive-bg: var(--night-good-wash);
+  --fb-positive-border: var(--night-good-edge);
+  --fb-positive-fg: var(--night-good);
+  --fb-positive-dot: var(--night-good);
+  --fb-negative-bg: var(--night-bad-wash);
+  --fb-negative-border: var(--night-bad-edge);
+  --fb-negative-fg: var(--night-bad);
+  --fb-negative-dot: var(--night-bad);
+  --fb-notice-bg: var(--night-warn-wash);
+  --fb-notice-border: var(--night-warn-edge);
+  --fb-notice-fg: var(--night-warn);
+  --fb-notice-dot: var(--night-warn);
+  --fb-info-bg: var(--night-info-wash);
+  --fb-info-fg: var(--night-info);
+  --fb-info-border: var(--night-edge-strong);
+  --fb-neutral-bg: var(--night-inset);
+  --fb-neutral-fg: var(--night-body);
+  --fb-neutral-border: var(--night-edge-strong);
+  --fb-accent-bg: var(--night-inset);
+  --fb-accent-fg: var(--night-text);
+  --fb-accent-border: var(--night-edge-strong);
+  --fb-positive-strong-bg: var(--night-good-wash);
+  --fb-positive-strong-fg: var(--night-good);
+  --fb-positive-strong-border: var(--night-good-edge);
+  --brand-subtle-bg: var(--night-brand-wash);
+  --brand-subtle-border: var(--night-brand-edge);
+  --brand-active: var(--night-brand-text);
+  --text-link: var(--night-link);
+  --state-hover-bg: var(--night-hover);
+  --table-head-bg: var(--night-sunken);
+  --el-low: var(--night-el-low);
+  --el-mid: var(--night-el-mid);
+  --el-high: var(--night-el-high);
+  --tpl-quick-wash: var(--night-inset);
+  --tpl-device-wash: var(--night-inset);
+  --tpl-risk-wash: var(--night-inset);
+  --tpl-compliance-wash: var(--night-inset);
+  color-scheme: dark;
+}
+/* A contained night canvas on a light console: the page drawn as one deep panel, lit faintly from its top left. */
+.bdash[data-look='dark'] {
+  color: var(--text-body);
+}
+.bdash[data-look='dark']:not([data-polish]) {
+  padding: var(--space-6) var(--space-7) var(--space-7);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(1100px 520px at 12% -8%, var(--night-glow), transparent 62%),
+    var(--night-page);
+  transition: background-color 320ms var(--ease-standard);
+}
+.bdash[data-look='dark'] .bdash-tile__card {
+  background-image: linear-gradient(180deg, var(--night-card-top), var(--night-card) 42%);
+  box-shadow: var(--night-shadow);
+}
+.bdash[data-look='dark'] .bdash-tile.is-stat .bdash-tile__card {
+  background-image:
+    linear-gradient(to top, color-mix(in srgb, var(--dash-hue) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--night-card-top), var(--night-card) 42%);
+}
+.bdash[data-look='dark'] .bdash-dock__bar {
+  background: color-mix(in srgb, var(--night-card-top) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--night-shadow);
+}
+
+/* ---- the live preview -----------------------------------------------------------------------------------------------
+   While a widget is carried, its slot is where it will land. Once the board has made room (data-drag previewing) the
+   slot is drawn as the landing place: a quiet fill in the accent with a halo, never orange. */
+.bdash-board[data-drag='previewing'] .bdash-tile.is-slot .bdash-tile__card,
+.bdash-board[data-drag='carrying'] .bdash-tile.is-slot .bdash-tile__card {
+  border: var(--bw-default) solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised));
+  box-shadow: 0 0 0 4px var(--focus-halo);
+  transition:
+    background-color 160ms var(--ease-standard),
+    border-color 160ms var(--ease-standard);
+}
+.bdash-board[data-drag='carrying'] .bdash-tile.is-slot .bdash-tile__card {
+  border-color: var(--border-default);
+  background: var(--surface-sunken);
+  box-shadow: none;
+}
+
+/* ---- a bar that cannot move ---------------------------------------------------------------------------------------
+   Both its sides are at a limit (layout.ts barLock): no grip and no resize cursor, and pressing it says why. */
+.bdash-bar.is-locked {
+  cursor: not-allowed;
+}
+.bdash-bar.is-locked .bdash-bar__grip,
+.bdash-bar.is-locked:hover .bdash-bar__grip {
+  background: transparent;
+}
+.bdash-bar.is-locked:hover::before,
+.bdash-bar.is-locked:active::before {
+  opacity: 0;
+}
+.bdash-bar.is-locked:focus-visible .bdash-bar__grip {
+  background: var(--border-default);
+}
+
+
+/* ---- tags on a widget in Customize (tags.ts) -------------------------------------------------------------------------
+   Bottom right, inside the card: what just happened to it, and the limit it is held at. Quiet until pointed at, so a
+   board of them does not shout; New is blue, the rest greyscale (never orange). A widget just added or moved also
+   wears a ring that settles in once, so the eye finds it (owner, 20 Nov 2026: "I don't know where it's added"). */
+.bdash-tile__tags {
+  position: absolute;
+  z-index: 4;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  gap: var(--space-2);
+  pointer-events: auto;
+}
+.bdash-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-3);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: help;
+  opacity: 0.86;
+  transition:
+    opacity var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.bdash-tile:hover .bdash-tag,
+.bdash-tag:focus-visible {
+  opacity: 1;
+  border-color: var(--border-strong);
+}
+.bdash-tag.is-new {
+  border-color: color-mix(in srgb, var(--blue) 40%, transparent);
+  background: color-mix(in srgb, var(--blue) 12%, var(--surface-raised));
+  color: var(--blue);
+  opacity: 1;
+}
+.bdash-tag.is-moved {
+  border-color: var(--accent-soft-border);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  opacity: 1;
+}
+.bdash[data-look='dark'] .bdash-tag.is-new {
+  border-color: color-mix(in srgb, var(--night-link) 40%, transparent);
+  background: color-mix(in srgb, var(--night-link) 14%, transparent);
+  color: var(--night-link);
+}
+.bdash-tile:has(.bdash-tag.is-new) .bdash-tile__card,
+.bdash-tile:has(.bdash-tag.is-moved) .bdash-tile__card {
+  border-color: color-mix(in srgb, var(--blue) 45%, var(--border-default));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--blue) 14%, transparent);
+  animation: bdash-arrive 900ms var(--ease-standard) 1;
+}
+.bdash-tile:has(.bdash-tag.is-moved) .bdash-tile__card {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 4px var(--focus-halo);
+}
+@keyframes bdash-arrive {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue) 40%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--blue) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--blue) 14%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bdash-tile:has(.bdash-tag) .bdash-tile__card {
+    animation: none;
+  }
+}
+
+/* The board too narrow to arrange: one quiet line above it. */
+.bdash-narrow {
+  position: absolute;
+  z-index: 6;
+  top: calc(var(--space-7) * -1 - var(--space-2));
+  left: 0;
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm);
+}
+
+/* A dock too wide for the window wraps onto a second line rather than lose Cancel and Done off its edge. */
+.bdash-dock__bar {
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: var(--space-2);
+}
+
+/* A row's Add here (owner, 20 Nov 2026): a round plus in the margin under the row's grip, on rows with room for one more
+   widget. Quiet until pointed at; it opens Add widgets with only what fits that row. */
+.bdash-row__add {
+  position: absolute;
+  z-index: 5;
+  top: calc(50% + 22px);
+  left: -32px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  pointer-events: auto;
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.bdash-row__add:hover,
+.bdash-row__add:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  outline: none;
+}
+.bdash-row__add:focus-visible {
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+
+/* ---- row splits (splits.ts) ------------------------------------------------------------------------------------------
+   A columns button in the margin above the row's grip opens the row's layouts as small diagrams: the one it has now is
+   raised and ticked; one its widgets cannot take is faint and names the widget that holds it back. */
+.bdash-row__split {
+  position: absolute;
+  z-index: 5;
+  top: calc(50% - 44px);
+  left: -32px;
+  pointer-events: auto;
+}
+.bdash-row__splitbtn {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.bdash-row__splitbtn:hover,
+.bdash-row__splitbtn[aria-expanded='true'],
+.bdash-row__splitbtn:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  outline: none;
+}
+.bdash-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+.bdash-split__opt {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.bdash-split__pic {
+  width: 56px;
+  height: 22px;
+  fill: currentColor;
+  opacity: 0.55;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bdash-split__opt:not(.is-on):not([aria-disabled='true']):hover {
+  border-color: var(--border-strong);
+  background: var(--state-hover-bg);
+  color: var(--text-secondary);
+}
+.bdash-split__opt:not([aria-disabled='true']):hover .bdash-split__pic,
+.bdash-split__opt.is-on .bdash-split__pic {
+  opacity: 0.9;
+}
+.bdash-split__opt.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  cursor: default;
+}
+.bdash-split__opt[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.bdash-split__opt:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.bdash-split__tick {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+}
+
+/* ---- audit fixes, 22 Nov (rollout.ts dashboardPolish, Design only) --------------------------------------------------
+   Scoped to `data-polish` on the page, which only the lines in the rollout entry carry. */
+
+/* The night canvas is drawn behind the page, inset from its edge, rather than by changing the page's own padding: turning
+   the dark board on or off no longer moves a single widget. */
+.bdash[data-polish] {
+  position: relative;
+  isolation: isolate;
+}
+.bdash[data-polish][data-look='dark']::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: var(--space-4);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(1100px 520px at 12% -8%, var(--night-glow), transparent 62%),
+    var(--night-page);
+  pointer-events: none;
+}
+
+/* Where the rail has narrowed, the page's side margin (console-theme.css) is narrower than the row tools that sit in it
+   (grip and split at -34px), so in Customize the board makes room for them rather than letting them slip under the rail. */
+@media (max-width: 1120px) {
+  .bdash[data-polish] .bdash-board.is-editing {
+    margin-left: var(--space-7);
+  }
+}
+
+/* Initials on the board meet the 12px floor (kit.css draws them at 9 and 10px). */
+.bdash[data-polish] .bx-face {
+  font-size: var(--fs-sm);
+  letter-spacing: -0.02em;
+}
+
+/* One band for the page's tools: the board tabs on the left, the range, the board's look and Customize on the right of
+   the same row, above its rule. The tabs keep their underline on the rule; the tools stand clear of it. */
+.bdash[data-polish] .bdash-tabs {
+  align-items: flex-end;
+}
+.bdash[data-polish] .bdash-tabs__tools {
+  align-self: center;
+}
+.bdash-tabs__bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+  padding-bottom: var(--space-4);
+}
+
+/* A narrow stat card wraps its comparison onto a second line rather than cutting it ("Down from the …"). */
+.bdash[data-polish] .bdw-stat__line span {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }

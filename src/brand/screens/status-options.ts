@@ -3,6 +3,7 @@ import { TEMPLATES_MANAGED } from '../template-phase'
 import { monitorBlocker, openForEditing } from '../policy-draft'
 import { ACCESS_CHECK } from './sign-in-tests/names'
 import { MARK_LABEL, UNMARK_LABEL } from '../tester'
+import { shows } from '../rollout'
 
 /* What a published policy can be switched to, where its menu and dialog
    portal, and which switches ask first. Plain functions, kept apart from the
@@ -116,9 +117,18 @@ export type RowMenuId = 'edit' | 'test' | StatusTarget | 'monitoring' | 'trail' 
 /* Whether a policy can be saved as a template, wherever it is offered — the Policies list, the board's bar, an
    application's Policies tab. A sign-in policy with at least one rule: a post sign-in policy decides no sign-in, so
    there is nothing to reuse, and a template of a policy with no rules would apply nothing. */
+/* Every draft can be a template, even one with no rule yet (owner, 20 Nov 2026: "draft policy should also be saved as
+   template", every draft, the unsaved one on the canvas too). rollout.ts `draftTemplates`. */
+const DRAFT_TEMPLATES: boolean = shows('draftTemplates')
+
+/** A policy that is not live as it stands: never published, edits saved but not published, or not saved at all. */
+export const isDraftPolicy = (p: Policy): boolean => p.status === 'draft' || !!p.pendingDraft || !!p.provisional
+
 export function canSaveAsTemplate(policy: Policy): boolean {
   /* Not offered while the tenant cannot manage templates (template-phase.ts). */
-  return TEMPLATES_MANAGED && policy.type !== 'Session' && openForEditing(policy).rules.length > 0
+  if (!TEMPLATES_MANAGED || policy.type === 'Session') return false
+  if (DRAFT_TEMPLATES && isDraftPolicy(policy)) return true
+  return openForEditing(policy).rules.length > 0
 }
 
 export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean; /** Already a template: the item takes it off again. */ marked?: boolean }): { id: RowMenuId; label: string }[] {

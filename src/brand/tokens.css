@@ -562,6 +562,68 @@
   }
 }
 
+/* --- Dashboard data palette and night board (20 Nov 2026) ----------------------
+   The owner: "good colors, something modern … for the whole dashboard", and "dark
+   mode as well, a premium one". Used only by dashboard/dashboard.css.
+
+   The data palette is six cool, evenly bright hues, so no series shouts over
+   another. Red, green and amber are left out on purpose: they keep their meaning
+   (blocked, ran well, close to a limit) in every theme. Each has a lifted twin
+   for the night board, where a hue needs more light to read at the same weight.
+
+   The night board is deeper than the console's dark theme, with a faint blue
+   cast: near-black ground, cards a step up with a hairline edge and a top light,
+   so it reads as layered glass rather than grey boxes. */
+:root {
+  --viz-indigo: #4f46e5;
+  --viz-sky: #0ea5e9;
+  --viz-violet: #8b5cf6;
+  --viz-teal: #14b8a6;
+  --viz-pink: #ec4899;
+  --viz-slate: #64748b;
+  --viz-indigo-lit: #818cf8;
+  --viz-sky-lit: #38bdf8;
+  --viz-violet-lit: #a78bfa;
+  --viz-teal-lit: #2dd4bf;
+  --viz-pink-lit: #f472b6;
+  --viz-slate-lit: #94a3b8;
+
+  --night-page: #07090d;
+  --night-card: #0e1219;
+  --night-card-top: #141a23;
+  --night-sunken: #0a0d13;
+  --night-inset: #161c26;
+  --night-edge: #1c2430;
+  --night-edge-strong: #2a3442;
+  --night-text: #f4f7fb;
+  --night-body: #cdd5df;
+  --night-secondary: #9aa5b4;
+  --night-tertiary: #6e7a8a;
+  --night-glow: rgba(129, 140, 248, 0.16);
+  --night-shine: rgba(255, 255, 255, 0.05);
+  --night-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px -12px rgba(0, 0, 0, 0.7);
+  --night-good: #34d399;
+  --night-bad: #fb7185;
+  --night-warn: #fbbf24;
+  --night-info: #7dd3fc;
+  /* Chips and badges on the night board: the meaning colour as a faint wash with a lit edge, never a light pill. */
+  --night-good-wash: rgba(52, 211, 153, 0.12);
+  --night-good-edge: rgba(52, 211, 153, 0.3);
+  --night-bad-wash: rgba(251, 113, 133, 0.12);
+  --night-bad-edge: rgba(251, 113, 133, 0.32);
+  --night-warn-wash: rgba(251, 191, 36, 0.12);
+  --night-warn-edge: rgba(251, 191, 36, 0.3);
+  --night-info-wash: rgba(125, 211, 252, 0.12);
+  --night-brand-wash: rgba(239, 118, 80, 0.14);
+  --night-brand-edge: rgba(239, 118, 80, 0.38);
+  --night-brand-text: #f6a487;
+  --night-link: #8ab4ff;
+  --night-hover: rgba(255, 255, 255, 0.04);
+  --night-el-low: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --night-el-mid: 0 6px 18px -8px rgba(0, 0, 0, 0.7);
+  --night-el-high: 0 18px 40px -16px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
 /* --- Priority ramp -------------------------------------------------------------
    Attribute priority is ORDINAL — Low, Medium, High is a magnitude, not a
    verdict. It was drawn as a traffic light (green / blue / grey), which reads

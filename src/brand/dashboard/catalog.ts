@@ -128,7 +128,10 @@ const DONUT_OR_BARS: ViewChoice[] = [
 ]
 
 /* The sizes each kind of content reads well at. */
-const STAT = { kind: 'stat' as const, w: 3, minW: 2, maxW: 6, h: 176, minH: 160, maxH: 360 }
+/* A number reads in one size: tall enough for its label, value and two lines, and no taller (owner, 20 Nov 2026: "some of
+   them should not go max height … they don't have any data … stick to a certain height and width"). Two of them stacked
+   are a chart's height, which is how they sit beside one. */
+const STAT = { kind: 'stat' as const, w: 3, minW: 2, maxW: 6, h: 176, minH: 160, maxH: 200 }
 const LIST = { w: 4, minW: 3, maxW: 8, h: 368, minH: 240, maxH: 720 }
 const CHART = { w: 8, minW: 4, maxW: 12, h: 368, minH: 240, maxH: 720 }
 
@@ -136,8 +139,8 @@ export const WIDGETS: Record<WidgetId, WidgetMeta> = {
   /* Posture */
   'active-policies': { ...STAT, name: 'Active sign-in policies', blurb: 'Policies deciding sign-ins now, and the apps they cover', category: 'posture', words: 'policy count' },
   mfa: { ...STAT, name: 'MFA coverage', blurb: 'Share of users with a second method set up', category: 'posture', words: 'two factor 2fa enrolled' },
-  phishing: { name: 'Phishing-resistant sign-ins', blurb: 'Share of sign-ins made with a passkey or a hardware token', category: 'posture', kind: 'gauge', w: 3, minW: 3, maxW: 6, h: 368, minH: 240, maxH: 560, words: 'passkey fido webauthn hardware token' },
-  coverage: { name: 'Policy coverage', blurb: 'Apps with an active policy, a policy that is not active, and none', category: 'posture', kind: 'catbar', w: 6, minW: 4, maxW: 12, h: 176, minH: 160, maxH: 320, words: 'apps gaps' },
+  phishing: { name: 'Phishing-resistant sign-ins', blurb: 'Share of sign-ins made with a passkey or a hardware token', category: 'posture', kind: 'gauge', w: 3, minW: 3, maxW: 6, h: 368, minH: 240, maxH: 440, words: 'passkey fido webauthn hardware token' },
+  coverage: { name: 'Policy coverage', blurb: 'Apps with an active policy, a policy that is not active, and none', category: 'posture', kind: 'catbar', w: 6, minW: 4, maxW: 12, h: 176, minH: 160, maxH: 240, words: 'apps gaps' },
   'apps-without': { ...LIST, name: 'Apps without a sign-in policy', blurb: 'Apps anyone can sign in to with no policy of their own', category: 'posture', kind: 'list', words: 'gaps coverage add policy' },
   health: { ...LIST, name: 'Policy health', blurb: 'Drafts, inactive policies and overlaps, each with its fix', category: 'posture', kind: 'checklist', words: 'drafts inactive monitoring overlaps' },
   expiring: { ...LIST, name: 'Expiring soon', blurb: 'Certificates, tokens and the license, by days left', category: 'posture', kind: 'list', words: 'saml certificate scim token secret renewal' },
@@ -175,11 +178,11 @@ export const WIDGETS: Record<WidgetId, WidgetMeta> = {
   changes: { ...LIST, name: 'Recent policy changes', blurb: 'Who changed which policy, and when', category: 'engine', kind: 'feed', words: 'change log history' },
   'top-rules': { ...CHART, name: 'Rules that decided most', blurb: 'The rules that ended the most sign-ins', category: 'engine', kind: 'barlist', w: 6, words: 'rule leaderboard' },
   check: { ...LIST, name: 'Check access', blurb: 'Pick a person and an app, and see what a sign-in gets', category: 'engine', kind: 'form', minH: 304, maxH: 560, words: 'test run decision' },
-  blocks: { name: 'Building blocks', blurb: 'Zones, device profiles, methods and hooks your rules use', category: 'engine', kind: 'grid', w: 4, minW: 3, maxW: 12, h: 240, minH: 176, maxH: 480, words: 'zones device profiles hooks methods' },
+  blocks: { name: 'Building blocks', blurb: 'Zones, device profiles, methods and hooks your rules use', category: 'engine', kind: 'grid', w: 4, minW: 3, maxW: 12, h: 240, minH: 176, maxH: 376, words: 'zones device profiles hooks methods' },
 
   /* People */
-  directory: { name: 'Directory', blurb: 'Users, groups, apps and policies, counted', category: 'people', kind: 'grid', w: 4, minW: 3, maxW: 12, h: 240, minH: 176, maxH: 480, words: 'users groups apps totals' },
-  'user-types': { name: 'Users by type', blurb: 'Employees, contractors and partners', category: 'people', kind: 'catbar', w: 4, minW: 3, maxW: 12, h: 176, minH: 160, maxH: 320, words: 'employee contractor partner' },
+  directory: { name: 'Directory', blurb: 'Users, groups, apps and policies, counted', category: 'people', kind: 'grid', w: 4, minW: 3, maxW: 12, h: 240, minH: 176, maxH: 376, words: 'users groups apps totals' },
+  'user-types': { name: 'Users by type', blurb: 'Employees, contractors and partners', category: 'people', kind: 'catbar', w: 4, minW: 3, maxW: 12, h: 176, minH: 160, maxH: 240, words: 'employee contractor partner' },
   registrations: { ...CHART, name: 'New users', blurb: 'Users added across the range', category: 'people', kind: 'bars', w: 6, h: 304, views: BARS_OR_AREA, words: 'registrations sign ups joined' },
   dormant: { ...LIST, name: 'Dormant users', blurb: 'People who have not signed in for 60 days or more', category: 'people', kind: 'list', words: 'inactive stale' },
   approvals: { ...LIST, name: 'Pending approvals', blurb: 'App access requests to approve or reject', category: 'people', kind: 'list', words: 'requests access' },
@@ -189,10 +192,10 @@ export const WIDGETS: Record<WidgetId, WidgetMeta> = {
   /* Admin */
   'admin-activity': { ...LIST, name: 'Admin activity', blurb: 'What admins changed in the console, newest first', category: 'admin', kind: 'feed', words: 'audit log' },
   connections: { ...CHART, name: 'Connections', blurb: 'Identity sources and services, and how they ran for 30 days', category: 'admin', kind: 'tracker', w: 6, words: 'status uptime siem sms email directory' },
-  license: { name: 'License', blurb: 'Users, SMS and email credits against their limits', category: 'admin', kind: 'meters', w: 4, minW: 3, maxW: 12, h: 304, minH: 112, maxH: 480, words: 'plan renewal credits' },
+  license: { name: 'License', blurb: 'Users, SMS and email credits against their limits', category: 'admin', kind: 'meters', w: 4, minW: 3, maxW: 12, h: 304, minH: 112, maxH: 400, words: 'plan renewal credits' },
   setup: { ...LIST, name: 'Setup checklist', blurb: 'The steps to a working tenant, and the ones left', category: 'admin', kind: 'checklist', words: 'getting started onboarding' },
-  shortcuts: { name: 'Quick actions', blurb: 'New policy, add an app, add a user, check access', category: 'admin', kind: 'actions', w: 4, minW: 2, maxW: 6, h: 368, minH: 176, maxH: 560, words: 'shortcuts create' },
-  'whats-new': { name: "What's new", blurb: 'What the new policy builder brings', category: 'admin', kind: 'note', w: 4, minW: 3, maxW: 8, h: 240, minH: 176, maxH: 480, words: 'announcement release' },
+  shortcuts: { name: 'Quick actions', blurb: 'New policy, add an app, add a user, check access', category: 'admin', kind: 'actions', w: 4, minW: 2, maxW: 6, h: 368, minH: 176, maxH: 440, words: 'shortcuts create' },
+  'whats-new': { name: "What's new", blurb: 'What the new policy builder brings', category: 'admin', kind: 'note', w: 4, minW: 3, maxW: 8, h: 240, minH: 176, maxH: 376, words: 'announcement release' },
 }
 export const WIDGET_IDS = Object.keys(WIDGETS) as WidgetId[]
 

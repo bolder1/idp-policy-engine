@@ -87,6 +87,12 @@ const colNaturalH = (c: Pick<Column, 'cells'>) => sum(c.cells.map((x) => meta(x.
 
 export const rowMinH = (r: Pick<Row, 'columns'>) => Math.max(0, ...r.columns.map(colMinH))
 export const rowMaxH = (r: Pick<Row, 'columns'>) => Math.max(rowMinH(r), Math.min(ROW_MAX, ...r.columns.map(colMaxH)))
+/** The tallest the row can go before some widget in it is stretched past what it reads at. Unlike `rowMaxH`, it is not
+    raised to the row's minimum, so a row whose minimum is over it is one that cannot be drawn well. */
+export const rowCeil = (r: Pick<Row, 'columns'>) => Math.min(ROW_MAX, ...r.columns.map(colMaxH))
+/** A row every widget in it reads well in: it can be as tall as its tallest needs without stretching another. */
+export const rowFits = (r: Pick<Row, 'columns'>) => rowMinH(r) <= rowCeil(r)
+
 /** The height its widgets arrive at: the tallest column's. */
 export const rowNaturalH = (r: Pick<Row, 'columns'>) => clamp(snapH(Math.max(0, ...r.columns.map(colNaturalH))), rowMinH(r), rowMaxH(r))
 
@@ -141,14 +147,19 @@ function fitStack(cells: readonly Cell[], height: number): Cell[] {
   if (cells.length <= 1) return cells.map((c) => ({ ...c, weight: 1 }))
   const avail = height - GAP * (cells.length - 1)
   const mins = cells.map((c) => meta(c.widget).minH)
+  const maxs = cells.map((c) => meta(c.widget).maxH)
   const total = sum(cells.map((c) => (c.weight > 0 ? c.weight : 1)))
   let px = cells.map((c) => ((c.weight > 0 ? c.weight : 1) / total) * avail)
-  for (let pass = 0; pass < 3; pass++) {
-    const short = sum(px.map((p, i) => Math.max(0, mins[i] - p)))
-    if (short <= 0.5) break
-    const spare = sum(px.map((p, i) => Math.max(0, p - mins[i])))
-    const keep = spare > 0 ? Math.max(0, (spare - short) / spare) : 0
-    px = px.map((p, i) => (p <= mins[i] ? mins[i] : mins[i] + (p - mins[i]) * keep))
+  /* Each cell held between its shortest and tallest; what that frees or takes is shared by the cells that still have
+     room, in proportion, until it all fits (a few passes settle it). */
+  for (let pass = 0; pass < 6; pass++) {
+    px = px.map((p, i) => clamp(p, mins[i], maxs[i]))
+    const diff = avail - sum(px)
+    if (Math.abs(diff) <= 0.5) break
+    const open = px.map((p, i) => (diff > 0 ? maxs[i] - p : p - mins[i]))
+    const room = sum(open.map((o) => Math.max(0, o)))
+    if (room <= 0) break
+    px = px.map((p, i) => p + (diff * Math.max(0, open[i])) / room)
   }
   return cells.map((c, i) => ({ ...c, weight: Math.round(px[i]) }))
 }
@@ -173,6 +184,17 @@ export function tidyRows(rows: readonly Row[]): Row[] {
     while (first.length > 1 && (first.length > MAX_COLS || sum(first.map(colMinSpan)) > COLS)) {
       rest.unshift(first[first.length - 1])
       first = first.slice(0, -1)
+    }
+    /* A row that would stretch a widget past its tallest (a number beside a chart, from an older board or a template)
+       lets the columns that need the most height go to a row of their own below, so nothing is drawn emptier than it
+       reads (owner, 20 Nov 2026). */
+    while (first.length > 1 && !rowFits({ columns: first })) {
+      const ceil = Math.min(...first.map(colMaxH))
+      const tall = first.filter((c) => colMinH(c) > ceil)
+      const keep = first.filter((c) => colMinH(c) <= ceil)
+      if (!tall.length || !keep.length) break
+      rest.unshift(...tall)
+      first = keep
     }
     out.push(tidyRow({ ...row, columns: first.length === cols.length ? first : withEven(first) }))
     if (rest.length) out.push(...tidyRows([{ id: newId('r'), height: row.height, columns: withEven(rest) }]))
@@ -284,8 +306,9 @@ export function removeCell(rows: readonly Row[], id: string): Row[] {
     if (r !== at.r) return [row]
     const col = row.columns[at.c]
     if (col.cells.length > 1) {
+      /* What is left of the stack may now be shorter than the row: the row splits rather than stretch it (tidyRows). */
       const cells = col.cells.filter((x) => x.id !== id)
-      return [tidyRow({ ...row, columns: row.columns.map((x, i) => (i === at.c ? { ...x, cells } : x)) })]
+      return tidyRows([{ ...row, columns: row.columns.map((x, i) => (i === at.c ? { ...x, cells } : x)) }])
     }
     const columns = row.columns.filter((_, i) => i !== at.c)
     return columns.length ? [evenRow({ ...row, columns })] : []
@@ -308,7 +331,7 @@ export function place(rows: readonly Row[], cell: Cell, target: Target): Row[] |
     const at = target.before === null ? row.columns.length : row.columns.findIndex((c) => c.id === target.before)
     if (at < 0) return null
     const columns = [...row.columns.slice(0, at), lone(), ...row.columns.slice(at)]
-    if (columns.length > MAX_COLS || sum(columns.map(colMinSpan)) > COLS) return null
+    if (columns.length > MAX_COLS || sum(columns.map(colMinSpan)) > COLS || !rowFits({ columns })) return null
     const next = evenRow({ ...row, height: Math.max(row.height, meta(cell.widget).minH), columns })
     return rows.map((x, i) => (i === r ? next : x))
   }
@@ -319,6 +342,9 @@ export function place(rows: readonly Row[], cell: Cell, target: Target): Row[] |
       const row = rows[r]
       const col = row.columns[c]
       if (col.cells.length >= MAX_STACK) return null
+      /* A column alone in its row is the row's full width and cannot narrow: a widget that reads narrower is not
+         stacked into it, where it would be drawn twelve columns wide (owner, 20 Nov 2026). */
+      if (row.columns.length === 1 && meta(cell.widget).maxW < COLS) return null
       const at = target.before === null ? col.cells.length : col.cells.findIndex((x) => x.id === target.before)
       if (at < 0) return null
       const px = stackHeights(row, col)
@@ -328,8 +354,10 @@ export function place(rows: readonly Row[], cell: Cell, target: Target): Row[] |
       const columns = row.columns.map((x, i) => (i === c ? grown : x))
       if (sum(columns.map(colMinSpan)) > COLS) return null
       const shape = { columns }
-      /* The row keeps its height unless the stack needs more, and grows only as far as everything in it allows. */
-      if (rowMinH(shape) > rowMaxH(shape)) return null
+      /* The row keeps its height unless the stack needs more, and grows only as far as everything in it allows: a stack
+         that would stretch a widget beside it past its tallest is refused (rowFits, not rowMaxH, which is never under
+         the row's minimum and so never refused anything). */
+      if (!rowFits(shape)) return null
       const next = tidyRow({ ...row, columns, height: Math.max(row.height, rowMinH(shape)) })
       return rows.map((x, i) => (i === r ? next : x))
     }
@@ -356,7 +384,72 @@ function swapCells(rows: readonly Row[], a: string, b: string): Row[] | null {
       }),
     })),
   }))
+  /* A swap that leaves a widget stretched past its tallest, or a row too narrow for what arrived, is refused. */
+  for (const r of [pa.r, pb.r]) {
+    const row = next[r]
+    if (!rowFits(row) || sum(row.columns.map(colMinSpan)) > COLS) return null
+  }
   return tidyRows(next)
+}
+
+/* ---- why not ---------------------------------------------------------------------------------------------------- */
+
+/** Why a widget cannot go to a target, in a few words for the tip beside the pointer; null where it can. */
+export function whyNot(rows: readonly Row[], cell: Pick<Cell, 'id' | 'widget'>, target: Target): string | null {
+  const m = meta(cell.widget)
+  const base = findCell(rows, cell.id) ? removeCell(rows, cell.id) : [...rows]
+  if (target.at === 'column') {
+    const row = base.find((r) => r.id === target.row)
+    if (!row) return null
+    if (row.columns.length >= MAX_COLS) return `A row holds ${MAX_COLS} widgets`
+    if (sum(row.columns.map(colMinSpan)) + m.minW > COLS) return 'No room in this row'
+    const shape = { columns: [...row.columns, { id: 'x', span: m.minW, cells: [{ id: 'x', widget: cell.widget, weight: 1 }] }] }
+    if (!rowFits(shape)) return tallest(shape) ?? 'Too tall for this row'
+    return null
+  }
+  if (target.at === 'stack') {
+    const row = base.find((r) => r.columns.some((c) => c.id === target.column))
+    const col = row?.columns.find((c) => c.id === target.column)
+    if (!row || !col) return null
+    if (col.cells.length >= MAX_STACK) return `A stack holds ${MAX_STACK}`
+    if (row.columns.length === 1 && m.maxW < COLS) return `Too wide here for ${m.name}`
+    const grown = { ...col, cells: [...col.cells, { id: 'x', widget: cell.widget, weight: 1 }] }
+    const columns = row.columns.map((c) => (c.id === col.id ? grown : c))
+    if (sum(columns.map(colMinSpan)) > COLS) return 'No room in this row'
+    if (!rowFits({ columns })) return tallest({ columns }) ?? 'Too tall to stack here'
+    return null
+  }
+  if (target.at === 'swap') {
+    const other = allCells(rows).find((c) => c.id === target.cell)
+    if (!other) return null
+    return `${m.name} does not fit in ${meta(other.widget).name}'s place`
+  }
+  return null
+}
+
+/** The widget a row's height would stretch past its tallest: what a refusal names. */
+function tallest(r: Pick<Row, 'columns'>): string | null {
+  const need = rowMinH(r)
+  for (const c of r.columns) if (colMaxH(c) < need) return `${meta(c.cells[0].widget).name} would be stretched`
+  return null
+}
+
+/** A bar that cannot move, and why: both sides are at a limit. Null where it moves. */
+export function barLock(row: Row, i: number): string | null {
+  const { lo, hi } = colRange(row, i)
+  if (hi > lo) return null
+  const a = row.columns[i]
+  const b = row.columns[i + 1]
+  if (!a || !b) return null
+  const name = (c: Column) => meta(c.cells[0].widget).name
+  if (a.span >= colMaxSpan(a) && b.span >= colMaxSpan(b)) return `${name(a)} and ${name(b)} are both at their widest`
+  if (a.span <= colMinSpan(a) && b.span <= colMinSpan(b)) return `${name(a)} and ${name(b)} are both at their narrowest`
+  return `${name(a)} and ${name(b)} cannot share this width another way`
+}
+
+/** A height bar that cannot move: the row's shortest and tallest are the same. */
+export function rowLock(row: Row): string | null {
+  return rowMaxH(row) > rowMinH(row) ? null : 'This row is as tall as its widgets need and no taller'
 }
 
 /** A cell moved to a target, or null where it cannot go. Moving a cell to where it already is changes nothing. */
@@ -376,19 +469,114 @@ export function same(a: readonly Row[], b: readonly Row[]): boolean {
   return key(a) === key(b)
 }
 
-/** Where the plus in the library puts a widget: beside others like it if a row of them has room, else a row of its own at the foot. */
-export function addWidget(rows: readonly Row[], widget: WidgetId): { rows: Row[]; id: string } {
+/** The width a column arrives at: its widest widget's own. */
+const colNaturalW = (c: Pick<Column, 'cells'>) => clamp(Math.max(...c.cells.map((x) => meta(x.widget).w)), colMinSpan(c), colMaxSpan(c))
+
+/** A widget joined to the end of a row at the width it arrives at, or as near as the row allows, taken from the
+    columns with the most to spare: first what they have over their own arrival width, then over their narrowest.
+    The other columns keep their widths otherwise, so a row made uneven on purpose stays so. Null where it does not
+    fit (no room, too many columns, or the row would stretch a widget past its tallest). */
+export function joinRow(row: Row, cell: Cell): Row | null {
+  const m = meta(cell.widget)
+  if (row.columns.length >= MAX_COLS) return null
+  const spans = row.columns.map((c) => c.span)
+  const nat = row.columns.map(colNaturalW)
+  const lo = row.columns.map(colMinSpan)
+  let want = Math.min(m.w, m.maxW)
+  let got = 0
+  const take = (floor: number[]) => {
+    while (got < want) {
+      let pick = -1
+      for (let i = 0; i < spans.length; i++) if (spans[i] > floor[i] && (pick < 0 || spans[i] - floor[i] > spans[pick] - floor[pick])) pick = i
+      if (pick < 0) return
+      spans[pick]--
+      got++
+    }
+  }
+  take(nat)
+  if (got < want) take(lo)
+  if (got < m.minW) return null
+  want = got
+  const columns = [...row.columns.map((c, i) => ({ ...c, span: spans[i] })), { id: newId('c'), span: want, cells: [{ ...cell, weight: 1 }] }]
+  if (!rowFits({ columns })) return null
+  /* A newcomer never makes the row shorter than the height its widgets were given: a short widget does not shrink the
+     charts beside it (owner, 20 Nov 2026). */
+  if (row.height > 0 && rowCeil({ columns }) < row.height) return null
+  return tidyRow({ ...row, height: Math.max(row.height, m.minH), columns })
+}
+
+/** How well a widget sits in a row it joined: 0 is as it arrives everywhere; each column short of its own width, and
+    each step of height away from its own, costs. */
+function joinCost(before: Row, after: Row, cell: Cell): number {
+  const m = meta(cell.widget)
+  const mine = after.columns[after.columns.length - 1]
+  const short = (c: Column) => Math.max(0, colNaturalW(c) - c.span)
+  /* Only what joining takes from them counts: a row already made narrow on purpose is not held against the newcomer. */
+  const others = after.columns.slice(0, -1).reduce((a, c, i) => a + short(c) - short(before.columns[i]), 0)
+  const grown = Math.max(0, after.height - before.height) / 48
+  return (m.w - mine.span) * 2 + others + grown + Math.abs(after.height - m.h) / 96
+}
+
+/** How a widget was added: beside others in a row, or on a row of its own. */
+export type Added = 'joined' | 'row'
+
+/** Where Add widgets puts a widget (owner, 20 Nov 2026: "by default you use the whole row for a single item … use the
+    width and height smartly"):
+    · a number joins a row of numbers with room, the row evening out;
+    · anything else joins the row where it sits best: at or near its own width, taken from widgets with width to
+      spare, in a row near its own height (joinCost), never beside a table or a strip, never into a row of numbers;
+    · only where no row takes it well does it start a row of its own at the foot. */
+export function addWidget(rows: readonly Row[], widget: WidgetId): { rows: Row[]; id: string; how: Added } {
   const cell: Cell = { id: newId('w'), widget, weight: 1 }
   const k = klass(widget)
-  const limit = k === 'stat' ? 4 : k === 'mid' ? 3 : 0
-  for (const row of rows) {
-    if (row.columns.length >= limit) continue
-    if (!row.columns.every((c) => c.cells.length === 1 && klass(c.cells[0].widget) === k)) continue
-    const out = place(rows, cell, { at: 'column', row: row.id, before: null })
-    if (out) return { rows: out, id: cell.id }
+  const own = (): { rows: Row[]; id: string; how: Added } => ({ rows: place(rows, cell, { at: 'row', before: null }) ?? [...rows], id: cell.id, how: 'row' })
+  if (k === 'full') return own()
+  const kinds = (r: Row) => r.columns.flatMap((c) => c.cells.map((x) => klass(x.widget)))
+  if (k === 'stat') {
+    for (const row of rows) {
+      if (row.columns.length >= 4 || !row.columns.every((c) => c.cells.length === 1) || !kinds(row).every((x) => x === 'stat')) continue
+      const out = place(rows, cell, { at: 'column', row: row.id, before: null })
+      if (out) return { rows: out, id: cell.id, how: 'joined' }
+    }
+    return own()
   }
-  return { rows: place(rows, cell, { at: 'row', before: null }) ?? [...rows], id: cell.id }
+  let best: { at: number; row: Row; cost: number } | null = null
+  rows.forEach((row, at) => {
+    const ks = kinds(row)
+    if (ks.includes('full') || ks.every((x) => x === 'stat')) return
+    const next = joinRow(row, cell)
+    if (!next) return
+    const cost = joinCost(row, next, cell)
+    /* Ties go to the lower row, nearer where the admin is looking after adding. */
+    if (!best || cost <= best.cost) best = { at, row: next, cost }
+  })
+  const pick = best as { at: number; row: Row; cost: number } | null
+  /* Joining at less than its own width less one column, or making a row much taller, is worse than a row of its own. */
+  if (!pick || pick.cost > 3) return own()
+  return { rows: rows.map((r, i) => (i === pick.at ? pick.row : r)), id: cell.id, how: 'joined' }
 }
+
+/** A widget added to one row, from that row's Add here (owner, 20 Nov 2026): numbers into a row of numbers even it out,
+    anything else joins at its own width as `joinRow` does. Null where it does not fit that row. */
+export function addToRow(rows: readonly Row[], rowId: string, widget: WidgetId): { rows: Row[]; id: string } | null {
+  const r = rows.findIndex((x) => x.id === rowId)
+  const row = rows[r]
+  if (!row) return null
+  const cell: Cell = { id: newId('w'), widget, weight: 1 }
+  const ks = row.columns.flatMap((c) => c.cells.map((x) => klass(x.widget)))
+  if (ks.includes('full') || klass(widget) === 'full') return null
+  const stats = ks.every((x) => x === 'stat')
+  if (stats !== (klass(widget) === 'stat')) return null
+  if (stats) {
+    const out = place(rows, cell, { at: 'column', row: rowId, before: null })
+    return out ? { rows: out, id: cell.id } : null
+  }
+  const next = joinRow(row, cell)
+  return next ? { rows: rows.map((x, i) => (i === r ? next : x)), id: cell.id } : null
+}
+
+/** The widgets that would fit a row, of those given. */
+export const fitsRow = (rows: readonly Row[], rowId: string, widgets: readonly WidgetId[]): WidgetId[] => widgets.filter((w) => addToRow(rows, rowId, w) !== null)
 
 /* ---- specs ------------------------------------------------------------------------------------------------------- */
 
@@ -521,9 +709,15 @@ function pack(list: readonly Cell[]): Row[] {
       const last = groups[groups.length - 1]
       for (const group of groups.slice(0, -1)) rows.push(rowOf(group))
       const next = q[0] && klass(q[0].widget)
-      if (last.length <= 2 && (next === 'mid' || next === 'wide')) {
-        const spans = last.map(() => 3)
-        rows.push(rowOf([...last, q.shift()!], [...spans, COLS - 3 * last.length]))
+      /* Two numbers left over sit stacked in one column beside the chart or list after them: together they are its
+         height, where side by side they would be stretched to it. */
+      if (last.length === 2 && (next === 'mid' || next === 'wide')) {
+        const partner = q.shift()!
+        const stack: Column = { id: newId('c'), span: 3, cells: last.map((c) => ({ ...c, weight: 1 })) }
+        const other: Column = { id: newId('c'), span: COLS - 3, cells: [{ ...partner, weight: 1 }] }
+        const columns = [stack, other]
+        const row = tidyRow({ id: newId('r'), height: rowNaturalH({ columns }), columns })
+        rows.push(rowFits(row) ? row : rowOf(last), ...(rowFits(row) ? [] : [rowOf([partner])]))
       } else rows.push(rowOf(last))
     } else if (k === 'wide') {
       const partner = q.findIndex((x, i) => i < 4 && klass(x.widget) === 'mid')

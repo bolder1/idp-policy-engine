@@ -34,6 +34,7 @@ export function Library({
   onAdd,
   onRemove,
   onClose,
+  row = null,
 }: {
   open: boolean
   has: (w: WidgetId) => boolean
@@ -42,6 +43,8 @@ export function Library({
   onAdd: (w: WidgetId) => void
   onRemove: (w: WidgetId) => void
   onClose: () => void
+  /** Opened from a row's Add here: only what fits that row and is not on the dashboard yet. */
+  row?: { label: string; fits: (w: WidgetId) => boolean } | null
 }) {
   const [q, setQ] = useState('')
   const [shelf, setShelf] = useState<Shelf>('all')
@@ -61,6 +64,7 @@ export function Library({
   const sections = useMemo(() => {
     const match = (w: WidgetId) => {
       const m = WIDGETS[w]
+      if (row && (has(w) || !row.fits(w))) return false
       return !words || `${m.name} ${m.blurb} ${m.words ?? ''}`.toLowerCase().includes(words)
     }
     const out: { key: string; label: string; widgets: WidgetId[] }[] = []
@@ -69,19 +73,19 @@ export function Library({
       if (on.length) out.push({ key: 'on', label: 'On this dashboard', widgets: on })
       return out
     }
-    if (empty && !words && shelf === 'all') out.push({ key: 'suggested', label: 'Suggested', widgets: SUGGESTED })
+    if (empty && !row && !words && shelf === 'all') out.push({ key: 'suggested', label: 'Suggested', widgets: SUGGESTED })
     for (const c of CATEGORIES) {
       if (shelf !== 'all' && shelf !== c.value) continue
       const widgets = WIDGET_IDS.filter((w) => WIDGETS[w].category === c.value && match(w))
       if (widgets.length) out.push({ key: c.value, label: c.label, widgets })
     }
     return out
-  }, [words, shelf, empty, has])
+  }, [words, shelf, empty, has, row])
 
-  const shelves: { value: Shelf; label: string }[] = [{ value: 'all', label: 'All widgets' }, ...CATEGORIES, { value: 'on', label: 'On this dashboard' }]
+  const shelves: { value: Shelf; label: string }[] = [{ value: 'all', label: 'All widgets' }, ...CATEGORIES, ...(row ? [] : [{ value: 'on' as const, label: 'On this dashboard' }])]
 
   return (
-    <Market open={open} title="Add widgets" by="Pick what this dashboard shows" icon={LayoutGrid} query={q} onQuery={setQ} placeholder="Search widgets" onClose={onClose}>
+    <Market open={open} title={row ? `Add to ${row.label}` : 'Add widgets'} by={row ? 'Widgets that fit this row' : 'Pick what this dashboard shows'} icon={LayoutGrid} query={q} onQuery={setQ} placeholder="Search widgets" onClose={onClose}>
       <div className="bmarket__chips" role="group" aria-label="Widgets by need">
         {shelves.map((s) => (
           <Chip key={s.value} active={shelf === s.value} onClick={() => setShelf(s.value)}>
@@ -100,7 +104,7 @@ export function Library({
         </section>
       ))}
       {sections.length === 0 && (
-        <p className="bdash-market__none">{shelf === 'on' && !words ? 'Nothing on this dashboard yet' : `No widget matches “${q.trim()}”`}</p>
+        <p className="bdash-market__none">{shelf === 'on' && !words ? 'Nothing on this dashboard yet' : row && !words ? 'Nothing else fits this row' : `No widget matches “${q.trim()}”`}</p>
       )}
     </Market>
   )

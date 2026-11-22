@@ -86,6 +86,13 @@ import { boardShortcuts, chord, isMacPlatform } from './shortcuts'
 import { boardTourSeen } from '../../tour/board-tour'
 
 import { useLeaveGuard } from '../../leave-guard'
+import { shows } from '../../rollout'
+
+/* Leaving a canvas that holds no rule asks first (owner, 20 Nov 2026). rollout.ts `noRuleAlert`. */
+const NO_RULE_ALERT: boolean = shows('noRuleAlert')
+/* The start chooser's bar: Back and the name, no Save draft, Save policy or ⋯ (owner, 20 Nov 2026). rollout.ts
+   `emptyStartBar`. */
+const EMPTY_START_BAR: boolean = shows('emptyStartBar')
 import './board.css'
 import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
 import { MovedPanel, MovedWalk, PublishMoved } from '../../migrate/moved-panel'
@@ -940,7 +947,9 @@ export function BoardBuilder({
   /* The draft lives in this component, so leaving the board would destroy it.
      Every way out asks first, and Save as draft keeps the work without
      publishing it. */
-  useLeaveGuard({ dirty: toLose, save: saveDraft, saveLabel: 'Save as draft', blocked: stop })
+  /* With no rule on the canvas, every way out asks No rule added, Discard or Continue (rollout.ts `noRuleAlert`). */
+  const noRuleLeave = NO_RULE_ALERT && noRules
+  useLeaveGuard({ dirty: toLose || noRuleLeave, save: saveDraft, saveLabel: 'Save as draft', blocked: stop, noRule: noRuleLeave })
 
   /* The rehearsal that was re-walked here on every draft is Check access's
      run now, which reads the draft directly (TryJourney `policy`). */
@@ -2387,7 +2396,12 @@ export function BoardBuilder({
         turnOnAsk={turnOnAsk}
         onLearn={() => setTour(true)}
         onWatchDemo={BAR_DEMO ? () => setDemo(true) : undefined}
+        /* While the canvas asks "How should this policy start?" there is nothing to save, so the bar is Back and the
+           name only; Save draft, Save policy and the ⋯ menu arrive once a path is picked (owner, 20 Nov 2026: "only back
+           button is enough … go inside and only then they can see the draft and save option"). The same test as
+           BoardEmpty's below. rollout.ts `emptyStartBar`. */
         actions={
+          EMPTY_START_BAR && !!saved && !saved.movedFrom?.length && draft.rules.length === 0 && !scratch && !describing && !readOpen && !post ? undefined : (
           <BoardBarActions
             reading={readOpen}
             onRead={toggleRead}
@@ -2416,6 +2430,7 @@ export function BoardBuilder({
             onContactSupport={experience === 'today' && !!saved?.movedFrom?.length && saved.status !== 'draft' ? contactSupport : undefined}
             publish={movedLocked ? <PublishMoved policy={saved} onEdit={walkPublished.has(saved.id) ? undefined : () => setMovedEditing(true)} /> : undefined}
           />
+          )
         }
       />
 

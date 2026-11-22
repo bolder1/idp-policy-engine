@@ -38,8 +38,8 @@ describe('the widget catalog', () => {
 })
 
 describe('themes', () => {
-  it('name five themes, Monochrome first', () => {
-    expect(THEME_IDS).toEqual(['mono', 'console', 'accent', 'brand', 'colourful'])
+  it('name seven themes, the modern palettes first', () => {
+    expect(THEME_IDS).toEqual(['colourful', 'ocean', 'aurora', 'mono', 'console', 'accent', 'brand'])
     for (const id of THEME_IDS) expect(THEMES[id].name.length).toBeGreaterThan(3)
   })
   it('take only a swatch’s token or a six-digit hex as a brand colour', () => {
@@ -58,7 +58,7 @@ describe('dashboards', () => {
     expect(p.boards.map((b) => b.name)).toEqual(['Overview', tpl.name, `${tpl.name} 2`])
     expect(p.active).toBe(p.boards[2].id)
     expect(activeBoard(p).rows.length).toBe(tpl.rows.length)
-    expect(activeBoard(p)).toMatchObject({ from: tpl.id, theme: 'mono' })
+    expect(activeBoard(p)).toMatchObject({ from: tpl.id, theme: 'colourful' })
   })
   it('take a template’s layout and keep their own name and theme', () => {
     const p = applyTemplate(withTheme(defaultPrefs(), 'colourful'), tpl)
@@ -141,13 +141,16 @@ describe('storage', () => {
     expect(b.theme).toBe('mono')
     expect(p.brand).toBe(BRAND_SWATCHES[0].value)
     const cells = allCells(b.rows)
-    expect(cells.map((c) => c.widget)).toEqual(['blocked', 'mfa'])
-    expect(cells[0].view).toBeUndefined()
-    expect(cells[0].color).toBeUndefined()
-    expect(cells[1].color).toBe('brand')
+    /* A number beside a list would be stretched to the list's height, so the row splits: the number stays, the list goes below. */
+    expect(cells.map((c) => c.widget)).toEqual(['mfa', 'blocked'])
+    const [mfa, blocked] = cells
+    expect(blocked.view).toBeUndefined()
+    expect(blocked.color).toBeUndefined()
+    expect(mfa.color).toBe('brand')
     expect(new Set(cells.map((c) => c.id)).size).toBe(2)
     expect(b.rows[0].columns.reduce((a, c) => a + c.span, 0)).toBe(12)
-    expect(b.rows[0].height).toBeGreaterThanOrEqual(WIDGETS.blocked.minH)
+    expect(b.rows[1].height).toBeGreaterThanOrEqual(WIDGETS.blocked.minH)
+    expect(b.rows[0].height).toBeLessThanOrEqual(WIDGETS.mfa.maxH)
   })
   it('round-trips what it stores', () => {
     const base = saveAsTemplate(withTheme(addBoard(defaultPrefs(), 'Security watch', XECURIFY_TEMPLATES[1]), 'colourful'), 'Mine')

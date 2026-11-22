@@ -95,6 +95,8 @@ import {
 } from '../risk-signals'
 
 import { SHOWCASE } from '../showcase'
+import { RiskArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 import './risk-signals.css'
 
 /* A mark per signal.
@@ -405,7 +407,7 @@ function RiskProfileList({
       <>
         {head}
         <EmptyState
-          icon={Activity}
+          art={NEW_EMPTY_ART && <RiskArt />} icon={Activity}
           title="No risk profiles"
           blurb="Create one to set how much each risk signal counts."
           action={

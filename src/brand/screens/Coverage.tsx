@@ -9,6 +9,8 @@ import { coversEveryApp, enforces, type AccessDecision, type App, type Group, ty
 import { isPostSignIn } from '../post-sign-in'
 import { whoPasses } from '../rule-who'
 import { useBrand } from '../store'
+import { AppsArt, GroupsArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    Coverage.
@@ -172,7 +174,7 @@ export function Coverage({ onNew }: {
     const noApps = store.apps.length === 0
     return (
       <EmptyState
-        icon={noApps ? AppWindow : Users}
+        art={NEW_EMPTY_ART && (noApps ? <AppsArt /> : <GroupsArt />)} icon={noApps ? AppWindow : Users}
         title={noApps ? 'No applications yet' : 'No groups yet'}
         blurb={noApps ? 'Coverage shows each application against each group.' : 'Coverage shows each group against each application.'}
         action={

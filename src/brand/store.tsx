@@ -48,6 +48,7 @@ import { normaliseHook, type Hook } from './hooks'
    before that, and a post sign-in one to Monitoring ever. */
 import { refusesStatus, settled, showcaseTenant, tenantAt, testerTenant, type Tenant } from './fixtures'
 import { SHOWCASE } from './showcase'
+import { EMPTY_TENANT, emptyTenant } from './empty-tenant'
 import { TESTER, testerFeatures } from './tester'
 import { EMPTY_LEGACY, MIGRATE_SCALE, showcaseLegacy, type DeadlineView, type LegacyEstate } from './migrate/legacy'
 import { scaleApps, scaleLegacy } from './migrate/scale-seed'
@@ -786,7 +787,7 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
      tenant (showcase-seed.ts); every other build loads the Security IT
      Manager's, which is the default persona below. Chosen once, lazily, and
      read by every initialiser that follows. */
-  const [seed] = useState<Tenant>(() => (TESTER ? testerTenant() : SHOWCASE ? showcaseTenant() : tenantAt('medium')))
+  const [seed] = useState<Tenant>(() => (EMPTY_TENANT ? emptyTenant() : TESTER ? testerTenant() : SHOWCASE ? showcaseTenant() : tenantAt('medium')))
   /* `fresh` (the app passes it, tests do not): the new builder as a tenant first meets it, with no sign-in policies
      of its own yet, so the move from the old builder starts on an empty page (owner, 3 Nov 2026). */
   const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)
@@ -813,13 +814,13 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
     },
     [seed, setPolicies],
   )
-  const [changeLog, setChangeLog] = useState<ChangeEntry[]>(() => (SHOWCASE ? seedChangeLog(seed.policies, new Date()) : []))
+  const [changeLog, setChangeLog] = useState<ChangeEntry[]>(() => (SHOWCASE && !EMPTY_TENANT ? seedChangeLog(seed.policies, new Date()) : []))
   /* Zones are edited in place now that they carry two sections, so they need
      the same draft/commit treatment policies already had. */
   const [zones, setZones, zonesRef] = useCollection<Zone>(() => seed.zones)
   const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => seed.scenarios)
   const [savedSignIns, setSavedSignIns, savedSignInsRef] = useCollection<SavedSignIn>(() => seed.savedSignIns)
-  const [legacy, setLegacy] = useState<LegacyEstate>(() => (SHOWCASE && !TESTER ? (MIGRATE_SCALE ? scaleLegacy : showcaseLegacy) : EMPTY_LEGACY))
+  const [legacy, setLegacy] = useState<LegacyEstate>(() => (SHOWCASE && !TESTER && !EMPTY_TENANT ? (MIGRATE_SCALE ? scaleLegacy : showcaseLegacy) : EMPTY_LEGACY))
   const [movedLegacy, setMovedLegacy] = useState<Record<string, string>>({})
   const movedLegacyRef = useRef(movedLegacy)
   movedLegacyRef.current = movedLegacy
@@ -850,7 +851,8 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
     setActivity((a) => ({ ...a, ...Object.fromEntries(ids.map((id) => [id, { kind, at }])) }))
   }, [])
   const [screen, setScreenState] = useState<BrandScreen>(MIGRATION_FIRST && !OPENS_AFTER_MIGRATION ? { name: 'old-login' } : { name: 'policies' })
-  const [migrationStarted, setMigrationStarted] = useState(!MIGRATION_FIRST)
+  /* The empty tenant has no old console to move, so it opens on Policies, as after the move. */
+  const [migrationStarted, setMigrationStarted] = useState(!MIGRATION_FIRST || EMPTY_TENANT)
   /* The screen as of the last navigation, for `go` to compare against without
      waiting for a render. */
   const screenRef = useRef(screen)

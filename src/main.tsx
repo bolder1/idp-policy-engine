@@ -31,6 +31,7 @@ import './brand/shell.css'
 import './brand/user-shell.css'
 import './brand/screens.css'
 import './brand/empty.css'
+import './brand/empty-wipe.css'
 import './brand/edition.css'
 import './brand/persona.css'
 /* Every per-screen stylesheet is here rather than in the screen module that

@@ -1,7 +1,7 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, History, LayoutGrid, Lock, LogOut, ScrollText, UserRound } from 'lucide-react'
+import { Check, Eraser, History, LayoutGrid, Lock, LogOut, RotateCcw, ScrollText, UserRound } from 'lucide-react'
 
 import { Tip } from './kit'
 import { DesignLock } from './DesignLock'
@@ -13,10 +13,15 @@ import { useBrand } from './store'
 import { SHOWCASE } from './showcase'
 import { shows } from './rollout'
 import { RoleAvatar } from './role-avatar'
+import { EMPTY_BY_MODE, EMPTY_TENANT } from './empty-tenant'
+import { EmptyWipe } from './empty-wipe'
 import { ROLE_ACCOUNT } from './role-account'
 
 /* The admin's name and badge follow the line (rollout.ts `roleIdentity`), with the sign-in's email under the name. */
 const ROLE_IDENTITY: boolean = shows('roleIdentity')
+/* Go empty / Bring back data: a review tool, not product (empty-tenant.ts). Design only; not on the empty server, which
+   has no way out. */
+const GO_EMPTY: boolean = shows('emptyTenant') && !EMPTY_BY_MODE
 
 /* -----------------------------------------------------------------------------
    The account menu, and the only way between the two sides.
@@ -56,6 +61,8 @@ export function ProfileMenu() {
      view open now. A designer sees all three and comes back to Design freely; anyone else asks for the passphrase. */
   const [locking, setLocking] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
+  /* The wipe playing: true while going empty, false while bringing data back. */
+  const [wipe, setWipe] = useState<boolean | null>(null)
   const roles: Line[] = LINE && HOME_LINE && !FORCED_TESTER ? linesFor(HOME_LINE) : []
   /* On the console, the line names who is signed in; the User Dashboard keeps its end user. The tester deploy has no
      sign-in, so no email: the view's name stands under the role instead. */
@@ -208,7 +215,25 @@ export function ProfileMenu() {
 
             {/* Bring back old policies (owner, 18 Nov 2026): the showcase opens after the migration, so this is the way
                 back to before it, where the migration flow starts. Reloads the console once (migrate/phase.ts). */}
-            {MIGRATION_FIRST && START_AFTER_MIGRATION && migrationStarted && (
+            {/* Go empty / Bring back data (owner, 20 Nov 2026): a review tool, not product (empty-tenant.ts). */}
+            {GO_EMPTY && (
+              <>
+                <span className="bmenu__rule" />
+                <button
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    close(false)
+                    setWipe(!EMPTY_TENANT)
+                  }}
+                >
+                  {EMPTY_TENANT ? <RotateCcw size={14} strokeWidth={1.9} aria-hidden /> : <Eraser size={14} strokeWidth={1.9} aria-hidden />}
+                  {EMPTY_TENANT ? 'Bring back data' : 'Go empty'}
+                </button>
+              </>
+            )}
+
+            {MIGRATION_FIRST && START_AFTER_MIGRATION && migrationStarted && !EMPTY_TENANT && (
               <>
                 <span className="bmenu__rule" />
                 <button
@@ -288,6 +313,7 @@ export function ProfileMenu() {
         />
       )}
       {logOpen && <AccessLog onClose={() => setLogOpen(false)} />}
+      {wipe !== null && <EmptyWipe empty={wipe} />}
     </div>
   )
 }

@@ -6,6 +6,8 @@ import { EmptyState, NoMatches } from '../empty'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
 import { SHOWCASE } from '../showcase'
+import { AppsArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    The end user's landing screen: the apps they can sign in to.
@@ -40,7 +42,7 @@ export function UserApps() {
 
       {apps.length === 0 ? (
         <EmptyState
-          icon={AppWindow}
+          art={NEW_EMPTY_ART && <AppsArt badge="check" />} icon={AppWindow}
           title="No apps yet"
           blurb="Apps your administrator gives you access to appear here."
         />

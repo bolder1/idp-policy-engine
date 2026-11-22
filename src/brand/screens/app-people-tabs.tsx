@@ -34,6 +34,8 @@ import { TESTER } from '../tester'
 import { useTestingSession } from './testing/session-state'
 import { formOf } from './testing/sign-in-form'
 import { UserDrawer } from './UserDrawer'
+import { UsersArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    An application's Users and Groups tabs (spec 10 Oct 2026, §4): the live
@@ -185,7 +187,7 @@ export function AppUsersTab({ appId, group, policy: routePolicy }: { appId: stri
      editing over an unsaved Basic leaves Access checks as it was. */
   const check = (personId: string) => checkAccessFrom(store, () => session.load(formOf({ appId, personId }, store.zones)))
 
-  if (store.users.length === 0) return <EmptyState icon={UserRound} title="No users yet" />
+  if (store.users.length === 0) return <EmptyState art={NEW_EMPTY_ART && <UsersArt />} icon={UserRound} title="No users yet" />
 
   const filtered = groupF !== 'all' || policy !== 'all'
   return (

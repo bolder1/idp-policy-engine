@@ -17,6 +17,8 @@ import { relativeTime } from './sign-in-tests/runs'
 import { DENY_REASON_WORD } from './testing/deny-reason'
 import { useTestingSession } from './testing/session-state'
 import { formOf } from './testing/sign-in-form'
+import { ActivityArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 import './sign-in-tests/sign-in-activity.css'
 
 /* -----------------------------------------------------------------------------
@@ -103,7 +105,7 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
         <PageHead title="Sign-in activity" caption="The week’s sign-ins across every application, and why any were refused." crumb={crumb} />
         <div className="btable-wrap">
           <EmptyState
-            icon={ListChecks}
+            art={NEW_EMPTY_ART && <ActivityArt />} icon={ListChecks}
             title="No sign-ins to show yet"
             blurb="Sign-ins and policy changes appear here once a policy is deciding sign-ins to an application."
             action={

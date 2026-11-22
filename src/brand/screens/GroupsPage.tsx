@@ -47,6 +47,8 @@ import { usePagedList } from './paged-list'
 import { PolicyDetailsDrawer } from './policy-details-drawer'
 import { RowCheck, SelectAll, SliderActions } from './select-rows'
 import { PEOPLE_ROW_H } from './sign-in-tests/library'
+import { GroupsArt, UsersArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    Manage > Groups: the list, and one group's page as the live console has it
@@ -149,7 +151,7 @@ function GroupList() {
       <PageHead title="Groups" caption="Collections of users that policies name." />
 
       {store.groups.length === 0 ? (
-        <EmptyState icon={UsersIcon} title="No groups yet" action={addButton} />
+        <EmptyState art={NEW_EMPTY_ART && <GroupsArt />} icon={UsersIcon} title="No groups yet" action={addButton} />
       ) : (
         <>
           <PageBar left={<SearchBox value={q} onChange={setQ} placeholder="Search groups…" label="Search groups" />} right={addButton} />
@@ -532,7 +534,7 @@ function AssignmentTab({ group }: { group: Group }) {
   return (
     <>
       {members.length === 0 ? (
-        <EmptyState icon={UserRound} title="No users in this group" action={assignButton} />
+        <EmptyState art={NEW_EMPTY_ART && <UsersArt />} icon={UserRound} title="No users in this group" action={assignButton} />
       ) : (
         <>
           {/* The live words: "Filter data by text or value". */}

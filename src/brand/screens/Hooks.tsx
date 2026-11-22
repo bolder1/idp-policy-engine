@@ -23,6 +23,8 @@ import {
   type HookMode,
   type OnFailure,
 } from '../hooks'
+import { HooksArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    External hooks — the library screen.
@@ -91,7 +93,7 @@ export function Hooks() {
 
       {store.hooks.length === 0 ? (
         <EmptyState
-          icon={Webhook}
+          art={NEW_EMPTY_ART && <HooksArt />} icon={Webhook}
           title="No hooks yet"
           blurb="Add a hook to let a rule check an outside system, like a fraud score."
           action={

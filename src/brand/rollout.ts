@@ -48,6 +48,11 @@ export const ROLLOUT = {
   /** All Policies and Post sign-in tables: every policy name one width, cut with an ellipsis (full name on hover), and
    *  fixed columns so they sit in the same place on every tab (20 Nov). Every line, as above. */
   policyNameFit: ALL,
+  /** The empty tenant, from `npm run dev:empty` or the profile menu's Go empty (20 Nov, empty-tenant.ts): every page's
+   *  empty state. A review tool, not product (owner: "will remove it eventually"). Design only. */
+  emptyTenant: ['design'],
+  /** Every page-level empty state drawn like Zones and Device profiles (20 Nov, empty-art.tsx). Design only. */
+  emptyArt: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

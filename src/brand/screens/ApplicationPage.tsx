@@ -69,6 +69,8 @@ import { SHOWCASE } from '../showcase'
 import { portalRoot } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { footerEdge } from '../footer-edge'
+import { PoliciesArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    One application's own page: the live console's app page — Basic, Advanced,
@@ -1213,7 +1215,7 @@ function NewAppPolicies({ appId, onNew, onExisting }: { appId: string; onNew: ()
   return (
     <div className="bapr__frame">
       <EmptyState
-        icon={ShieldPlus}
+        art={NEW_EMPTY_ART && <PoliciesArt badge="shield" />} icon={ShieldPlus}
         title="No policies on this application"
         action={
           <>

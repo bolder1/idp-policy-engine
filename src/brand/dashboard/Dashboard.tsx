@@ -35,6 +35,8 @@ import {
 } from './model'
 import { BLANK_ID, OVERVIEW, XECURIFY_TEMPLATES } from './templates'
 import { THEMES, type ThemeId } from './themes'
+import { DashboardArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    The new Dashboard (rebuilt 18 Nov 2026; rows and themes, 19 Nov).
@@ -372,7 +374,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
       <div className="bdash-layout" data-dash-theme={DASHBOARD_THEMES ? theme : 'mono'}>
         {empty && !editing ? (
           <EmptyState
-            icon={LayoutDashboard}
+            art={NEW_EMPTY_ART && <DashboardArt />} icon={LayoutDashboard}
             title="This dashboard is empty"
             action={
               <Button variant="brand" icon={Plus} onClick={openLibrary}>

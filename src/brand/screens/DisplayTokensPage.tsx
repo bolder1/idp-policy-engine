@@ -66,6 +66,8 @@ import {
   type Assignment,
   type TokenFilter,
 } from './display-tokens-model'
+import { TokensArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    Display tokens — the live console's "Assign Hardware Token To Users" page.
@@ -769,7 +771,7 @@ function AssignmentsTab({
   if (all.length === 0) {
     return assignmentsEmpty(tokens) === 'no-tokens' ? (
       <EmptyState
-        icon={KeyRound}
+        art={NEW_EMPTY_ART && <TokensArt />} icon={KeyRound}
         title="No tokens to assign"
         blurb="Add tokens first, then assign them here."
         action={
@@ -780,7 +782,7 @@ function AssignmentsTab({
       />
     ) : (
       <EmptyState
-        icon={UserRoundCheck}
+        art={NEW_EMPTY_ART && <TokensArt badge="check" />} icon={UserRoundCheck}
         title="No tokens assigned yet"
         blurb="Give each person the token they carry."
         action={
@@ -945,7 +947,7 @@ function TokensTab({
   if (tokens.length === 0) {
     return (
       <EmptyState
-        icon={KeyRound}
+        art={NEW_EMPTY_ART && <TokensArt />} icon={KeyRound}
         title="No tokens yet"
         blurb="Add each token, or upload a CSV of them."
         action={

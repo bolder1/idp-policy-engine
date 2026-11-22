@@ -13,6 +13,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:tester", "--", "--port", "5180", "--strictPort"],
       "port": 5180
+    },
+    {
+      "name": "policy-empty",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:empty"],
+      "port": 5191
     }
   ]
 }

@@ -37,6 +37,8 @@ import {
   type GroupFilter,
 } from './library'
 import { ResolutionAnswer } from './SavedTable'
+import { UsersArt } from '../../empty-art'
+import { NEW_EMPTY_ART } from '../../empty-art-phase'
 import './library.css'
 
 /* -----------------------------------------------------------------------------
@@ -157,7 +159,7 @@ export function PeopleTable({ onTry }: { onTry: (personId: string, appId: string
   if (users.length === 0) {
     return (
       <div className="sitl">
-        <EmptyState icon={Users} title="No people in the directory" />
+        <EmptyState art={NEW_EMPTY_ART && <UsersArt />} icon={Users} title="No people in the directory" />
       </div>
     )
   }

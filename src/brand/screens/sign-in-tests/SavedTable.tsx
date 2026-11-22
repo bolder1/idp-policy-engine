@@ -33,6 +33,8 @@ import {
   type AppFilter,
   type LibraryRow,
 } from './library'
+import { ActivityArt } from '../../empty-art'
+import { NEW_EMPTY_ART } from '../../empty-art-phase'
 import './library.css'
 
 /* -----------------------------------------------------------------------------
@@ -148,7 +150,7 @@ export function SavedTable({ onTry, onNew }: { onTry: (form: SignInForm) => void
     return (
       <div className="sitl">
         <EmptyState
-          icon={BookmarkCheck}
+          art={NEW_EMPTY_ART && <ActivityArt />} icon={BookmarkCheck}
           title="No saved sign-ins"
           action={
             <Button variant="brand" icon={Plus} onClick={onNew}>

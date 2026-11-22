@@ -16,6 +16,8 @@ import { AppLogo } from '../logos/AppLogo'
 import { PolicyFact } from './app-facts'
 import { denyNotice, eventGroups, eventNames, linkChoices, linkIssue, unlinkEvents } from './app-page-model'
 import { PageBar } from './page-bar'
+import { PoliciesArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    An application's Post sign-in tab (spec docs/specs/POST-SIGN-IN-POLICIES.md
@@ -174,7 +176,7 @@ export function AppPostSignInTab({
       {rows.length === 0 ? (
         /* The sign-in tab's frame, filling the page: nothing linked yet. */
         <div className="bapr__frame">
-          <EmptyState icon={Activity} title="No post sign-in policies on this application" action={linkButton} />
+          <EmptyState art={NEW_EMPTY_ART && <PoliciesArt badge="clock" />} icon={Activity} title="No post sign-in policies on this application" action={linkButton} />
         </div>
       ) : (
         <>

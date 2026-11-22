@@ -1,0 +1,71 @@
+/* Go empty / Bring back data (empty-wipe.tsx). A review tool, not product. Tokens only. */
+
+.bwipe {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.bwipe__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-overlay);
+}
+
+.bwipe__card {
+  position: relative;
+  width: min(360px, 100%);
+  padding: 20px 24px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg, 0 20px 50px -20px var(--surface-overlay));
+}
+
+.bwipe__title {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.bwipe__list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bwipe__row {
+  display: grid;
+  grid-template-columns: 128px 1fr 16px;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.bwipe__track {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  background: var(--surface-inset);
+  border-radius: var(--radius-full);
+}
+
+.bwipe__bar {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  border-radius: inherit;
+}
+
+.bwipe__done {
+  display: grid;
+  place-items: center;
+  color: var(--blue);
+}

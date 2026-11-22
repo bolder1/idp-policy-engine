@@ -82,6 +82,8 @@ import './policies-types.css'
 import { FirstVisit } from '../migrate/first-visit'
 import { PolicyStatus } from '../migrate/moved-status'
 import { MARK_LABEL, UNMARK_LABEL } from '../tester'
+import { PoliciesArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -614,14 +616,14 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
       {nothingMoved && canMove && <MigrateEmpty />}
       {nothingMoved && !canMove && origin === 'moved' && (
         <EmptyState
-          icon={ShieldPlus}
+          art={NEW_EMPTY_ART && <PoliciesArt badge="publish" />} icon={ShieldPlus}
           title="Nothing waiting to publish"
           blurb="Policies you publish move to New policies. The old ones stay in the Old policies tab."
         />
       )}
       {noPolicies && (
         <EmptyState
-          icon={ShieldPlus}
+          art={NEW_EMPTY_ART && <PoliciesArt />} icon={ShieldPlus}
           title="No policies yet"
           blurb={`Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
           action={

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "dev:tester": "vite --mode tester",
+    "dev:empty": "vite --mode empty --port 5191 --strictPort",
     "build:tester": "tsc -b && vite build --mode tester",
     "test": "vitest run",
     "test:watch": "vitest",

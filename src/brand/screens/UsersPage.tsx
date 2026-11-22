@@ -19,6 +19,8 @@ import { ACCESS_CHECK } from './sign-in-tests/names'
 import { useTestingSession } from './testing/session-state'
 import { formOf } from './testing/sign-in-form'
 import { UserDrawer } from './UserDrawer'
+import { RolesArt, UsersArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    Manage > Users: the User list and User roles, the two the console's rail
@@ -136,7 +138,7 @@ export function UsersPage({ role: routeRole }: { role?: string }) {
       <PageHead title="User list" caption="People in this tenant's directory." />
 
       {store.users.length === 0 ? (
-        <EmptyState icon={UserRound} title="No users yet" action={addButton} />
+        <EmptyState art={NEW_EMPTY_ART && <UsersArt />} icon={UserRound} title="No users yet" action={addButton} />
       ) : (
         <>
           <PageBar
@@ -255,7 +257,7 @@ export function UserRolesPage() {
       <PageHead title="User roles" />
 
       {roles.length === 0 ? (
-        <EmptyState icon={UserRound} title="No roles yet" action={addButton} />
+        <EmptyState art={NEW_EMPTY_ART && <RolesArt />} icon={UserRound} title="No roles yet" action={addButton} />
       ) : (
         <>
           <PageBar right={addButton} />

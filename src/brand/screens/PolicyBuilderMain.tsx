@@ -58,6 +58,8 @@ import { ImpactArenaDialog, ImpactPip } from './impact-arena-dialog'
 import { DEC_KEY, ThenSection, WhenSection, ruleState } from './rule-form'
 import type { SimEnv } from './simulate'
 import type { Diagnostic } from './diagnostics'
+import { RulesArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    Policy builder v4 — the trail.
@@ -702,7 +704,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                 </ol>
               ) : rules.length === 0 ? (
                 <EmptyState
-                  icon={ListX}
+                  art={NEW_EMPTY_ART && <RulesArt />} icon={ListX}
                   title="No rules yet"
                   blurb="Logins with no matching rule get the default outcome."
                   action={

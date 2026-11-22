@@ -16,6 +16,8 @@ import { PageBar } from './page-bar'
 import { ViewSwitch } from './library-view'
 import { LIB_VIEWS } from './library-view-state'
 import { SHOWCASE } from '../showcase'
+import { AppsArt } from '../empty-art'
+import { NEW_EMPTY_ART } from '../empty-art-phase'
 
 /* -----------------------------------------------------------------------------
    Applications — the console's own Apps page, and the one place an application
@@ -126,7 +128,7 @@ export function Applications() {
 
       {empty ? (
         <EmptyState
-          icon={AppWindow}
+          art={NEW_EMPTY_ART && <AppsArt />} icon={AppWindow}
           title="No applications yet"
           blurb="Connect an application to protect its sign-ins with a policy."
           action={

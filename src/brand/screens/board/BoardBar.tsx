@@ -16,7 +16,11 @@ import { StatusControl } from '../status-control'
 import { BAR_DEMO, BAR_READ, BAR_TOUR } from './bar-tools'
 import { BuilderVersionSwitch } from './BuilderVersionSwitch'
 import { useShows } from './builder-version'
-import { MARK_LABEL } from '../../tester'
+import { MARK_LABEL, UNMARK_LABEL } from '../../tester'
+import { shows } from '../../rollout'
+
+/* No status pill on a new policy nobody has saved (rollout.ts `newPolicyUnsaved`). */
+const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
 
 /* -----------------------------------------------------------------------------
    The board's top row.
@@ -259,7 +263,10 @@ export function BoardBar({
 
         {/* Read from the store, not this bar's copy: the status is switched
             here, and it is not part of the draft. */}
-        <StatusControl policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} turnOnAsk={turnOnAsk} />
+        {/* Not stored yet, so no status: no Draft pill before the first save (rollout.ts `newPolicyUnsaved`). */}
+        {!(NEW_POLICY_UNSAVED && policy.provisional) && (
+          <StatusControl policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} turnOnAsk={turnOnAsk} />
+        )}
         <ChangeState unsaved={unsaved} draft={draftSaved} />
       </nav>
 
@@ -366,6 +373,7 @@ export function BoardBarActions({
   onDiscard,
   onSave,
   onSaveTemplate,
+  templateMarked = false,
   onRollBack,
   onContactSupport,
   onCopyRules,
@@ -418,6 +426,9 @@ export function BoardBarActions({
   /* Save this policy as a template (owner, 27 Oct 2026). Absent where it cannot be: a post sign-in policy, or one with
      no rule on its canvas, so the ⋯ is not drawn with nothing in it. */
   onSaveTemplate?: () => void
+  /* Already a template: the same row reads Remove from templates, as the Policies row does (rollout.ts
+     `builderTemplateToggle`). */
+  templateMarked?: boolean
   /** A migrated, active policy (owner, 17 Nov 2026): back to its old policy. */
   onRollBack?: () => void
   /** A migrated policy, live or rolled back (owner, 18 Nov 2026): help from miniOrange. */
@@ -549,7 +560,7 @@ export function BoardBarActions({
           size="sm"
           items={[
             ...(onCopyRules ? [{ id: 'copy', label: 'Copy rules from a policy', icon: CopyPlus }] : []),
-            ...(onSaveTemplate ? [{ id: 'template', label: MARK_LABEL, icon: TemplateIcon }] : []),
+            ...(onSaveTemplate ? [{ id: 'template', label: templateMarked ? UNMARK_LABEL : MARK_LABEL, icon: TemplateIcon }] : []),
             ...(onRollBack ? [{ id: 'rollback', label: 'Roll back to old policy', icon: Undo2, divide: !!(onSaveTemplate || onCopyRules) }] : []),
             ...(onContactSupport ? [{ id: 'support', label: 'Contact support', icon: Headset, divide: !onRollBack && !!(onSaveTemplate || onCopyRules) }] : []),
           ]}

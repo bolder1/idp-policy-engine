@@ -137,7 +137,8 @@ describe('where it is offered', () => {
     const src = code(boardBuilderSrc)
     expect(src).toContain('const onCanvas: Policy = { ...draft, pendingDraft: undefined }')
     expect(src).toContain('const templateFromCanvas = BAR_TEMPLATE && canSaveAsTemplate(onCanvas)')
-    expect(src).toContain('onSaveTemplate={templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}')
+    /* Marked already, the same row takes it off (rollout.ts `builderTemplateToggle`). */
+    expect(src).toContain('onSaveTemplate={templateMarked ? () => saveTemplate.unmark(onCanvas) : templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}')
     expect(src).toContain('{saveTemplate.dialog}')
     expect(code(barToolsSrc)).toContain('export const BAR_TEMPLATE: boolean = true')
   })

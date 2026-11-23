@@ -1,4 +1,9 @@
 import type { NewPolicyStart, Policy, Rule } from './data'
+import { shows } from './rollout'
+
+/* The default rule is a rule (rollout.ts `defaultRuleSaves`), and Save policy picks the status (`saveMakesActive`). */
+const DEFAULT_RULE_SAVES = shows('defaultRuleSaves')
+export const SAVE_MAKES_ACTIVE = shows('saveMakesActive')
 
 /* Draft mode for policies — the rules both builders share.
 
@@ -43,13 +48,15 @@ export function newPolicy(p: Policy, start: NewPolicyStart = { rules: [] }): Pol
 /** The mark comes off a policy as soon as a save gives it a rule, and only a policy holding the mark can keep it. */
 export function keptOrNew(p: Policy, before: Pick<Policy, 'provisional'> | undefined): Policy {
   if (!p.provisional) return p
-  if (before?.provisional && p.rules.length === 0) return p
+  if (before?.provisional && hasNoRules(p)) return p
   const { provisional: _gone, ...kept } = p
   return kept
 }
 
-/** True when there is nothing to save yet: a policy needs a rule. The Global Default decides by its last row alone. */
-export const hasNoRules = (p: Pick<Policy, 'rules' | 'isSystem'>): boolean => p.rules.length === 0 && !p.isSystem
+/** True when there is nothing to save yet: a policy needs a rule. The Global Default decides by its last row alone,
+ *  and where `defaultRuleSaves` is on so does every policy: "Nothing else matched" is a rule an admin can edit. */
+export const hasNoRules = (p: Pick<Policy, 'rules' | 'isSystem' | 'fallback'>): boolean =>
+  p.rules.length === 0 && !p.isSystem && !(DEFAULT_RULE_SAVES && p.fallback)
 
 /** What a refused save says. */
 export const NO_RULES_REASON = 'Add a rule first'
@@ -117,9 +124,23 @@ const hasApps = (p: Pick<Policy, 'appIds' | 'isSystem'>) => p.isSystem === true 
 /** The policy as Review & save stores it. */
 export function committed(saved: Policy, draft: Policy, intent: CommitIntent = 'keep-off'): Policy {
   const base = published({ ...draft, status: saved.status })
+  /* Save policy never leaves a draft (owner, 23 Nov 2026): a draft goes active when it can and the admin asked for
+     it, inactive otherwise; a policy with no application cannot decide a sign-in, so it is stored inactive. Draft
+     comes only from Save draft. */
+  if (SAVE_MAKES_ACTIVE && !base.isSystem) {
+    if (saved.status === 'draft') return { ...base, status: hasApps(base) && intent === 'turn-on' ? 'active' : 'inactive' }
+    return hasApps(base) ? base : { ...base, status: withoutApps(base.status) }
+  }
   if (!hasApps(base)) return { ...base, status: 'draft' }
   if (saved.status === 'draft') return { ...base, status: intent === 'turn-on' ? 'active' : 'inactive' }
   return base
+}
+
+/** The status a policy takes when its last application goes: a draft, or with `saveMakesActive` inactive (a draft
+ *  stays a draft). Shared by the builder's save, an application's Remove and the Policies apps picker. */
+export function withoutApps(status: Policy['status']): Policy['status'] {
+  if (!SAVE_MAKES_ACTIVE) return 'draft'
+  return status === 'draft' ? 'draft' : 'inactive'
 }
 
 /** Why a policy cannot be switched on, or null when it can. `errors` counts blocking errors on its live rules. */
@@ -162,5 +183,7 @@ export function commitToast(before: Policy, after: Policy): string {
   if (after.status === 'draft') return `${name} saved as a draft`
   if (after.status === before.status) return `${name} saved`
   if (after.status === 'inactive') return `${name} saved. It is inactive.`
+  /* Active / inactive, never turn on (owner, 5 Nov 2026). */
+  if (SAVE_MAKES_ACTIVE && after.status === 'active') return `${name} saved. It is active.`
   return `${name} saved and turned on`
 }

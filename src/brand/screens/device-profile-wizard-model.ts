@@ -2,6 +2,8 @@ import {
   DEFAULT_MAX_DEVICES,
   ITEM_NOUN,
   REGISTRATION_LABEL,
+  registrationMfaText,
+  type RegistrationMfa,
   asksReach,
   attrOf,
   chosenAttributes,
@@ -31,7 +33,7 @@ import {
   type Remediation,
   type Roster,
 } from '../fingerprint'
-import { SIGNALS_STEP } from './device-profile-phase'
+import { LOCKED_SIGNALS, REGISTRATION_MFA, SIGNALS_STEP } from './device-profile-phase'
 import { checkLine } from './profile-aside'
 
 /* -----------------------------------------------------------------------------
@@ -102,6 +104,9 @@ export interface WizardState {
   restrictMobile: boolean
   maxDevices: number | null
   roster: Roster | null
+  /** Trusted device: the MFA to register a device (rollout.ts `registrationMfa`). Absent is the user's active one. */
+  registrationMfa?: RegistrationMfa
+  registrationMfaMethod?: string
   /** Device health only, V1. */
   remediation: Remediation
 }
@@ -206,6 +211,8 @@ export function draftOf(s: WizardState): FingerprintProfile {
     roster: s.registration === 'pre-approved' ? s.roster : null,
     autoRegister: s.autoRegister,
     restrictMobile: s.restrictMobile,
+    /* A trusted device keeps an admin's pick only; the user's active method is the absence of one. */
+    ...(s.mode === 'device' && s.registrationMfa === 'pick' ? { registrationMfa: 'pick' as const, registrationMfaMethod: s.registrationMfaMethod } : {}),
     restrictionSet: asksReach(s.mode),
     /* Only a health profile that shows instructions stores one, so every other draft is the profile it always was. */
     ...(s.mode === 'os' && s.remediation.show ? { remediation: s.remediation } : {}),
@@ -450,14 +457,19 @@ export function reviewSections(s: WizardState, step3: Step3Shape, v1 = false): R
                 : 'None',
             }
           : { label: 'Allowed device registrations', value: String(d.maxDevices ?? DEFAULT_MAX_DEVICES), pill: true },
+        ...(REGISTRATION_MFA && d.mode === 'device' ? [{ label: 'Registration MFA method', value: registrationMfaText(d), pill: true as const }] : []),
         { label: 'Mobile device restriction', value: d.restrictMobile ? 'On' : 'Off', pill: true },
         { label: 'Device auto-registration', value: d.autoRegister ? 'On' : 'Off', pill: true },
       ],
     })
   }
   const noun = ITEM_NOUN[d.mode].many
-  const chosen = chosenAttributes(d)
-  sections.push({
+  /* The always-on signals are nobody's choice, so Review leaves them out (owner, 23 Nov 2026; `LOCKED_SIGNALS`). */
+  const all = chosenAttributes(d)
+  const chosen = all.filter((a) => !(LOCKED_SIGNALS && a.always))
+  /* Only the always-on ones chosen: nothing here was the admin's to pick, so the section is left out rather than
+     reading "No signals" over a profile that has four. */
+  if (chosen.length > 0 || all.length === 0) sections.push({
     step: step3 === 'inline' ? 'items' : 'values',
     title: noun.charAt(0).toUpperCase() + noun.slice(1),
     summary: countLabel(d.mode, chosen.length),

@@ -36,6 +36,7 @@
    -------------------------------------------------------------------------- */
 
 import { nameTaken } from './data'
+import { AUTH_METHODS } from './methods'
 import { allOf, type CondState } from './predicate'
 import type { ReviewLine } from './review-rows'
 import type { DevicePlatform, FactKey, SignInDevice } from './screens/sign-in-facts'
@@ -1079,6 +1080,25 @@ export const REGISTRATION_LABEL: Record<Registration, string> = {
   'pre-approved': 'Pre-approved trusted devices only',
 }
 
+/* The MFA a user completes to register a trusted device (owner, 23 Nov 2026; the dev's `registration_mfa_method`):
+   the method the user already has active, or one the admin picks from the MFA list. Absent means the first. */
+export type RegistrationMfa = 'active' | 'pick'
+
+export const REGISTRATION_MFA_LABEL: Record<RegistrationMfa, string> = {
+  active: "User's active MFA method",
+  pick: 'Select an MFA method',
+}
+
+/** The MFA list an admin picks from: the active second factors (methods.ts). */
+export const registrationMfaMethods = () => AUTH_METHODS.filter((m) => m.use === 'second' && m.active)
+
+/** The answer as one line, for the change list. Empty on a profile that never had the question (a health profile). */
+export function registrationMfaText(p: Pick<FingerprintProfile, 'mode' | 'registrationMfa' | 'registrationMfaMethod'>): string {
+  if (p.mode !== 'device') return ''
+  if (p.registrationMfa !== 'pick') return REGISTRATION_MFA_LABEL.active
+  return AUTH_METHODS.find((m) => m.id === p.registrationMfaMethod)?.name ?? REGISTRATION_MFA_LABEL.pick
+}
+
 /** An uploaded roster of approved devices. Keyed on MAC, so it needs an agent. */
 export interface Roster {
   fileName: string
@@ -1119,6 +1139,10 @@ export interface FingerprintProfile {
   /** Sign-in from a mobile device is refused. The console's "Enable mobile
       device restriction". */
   restrictMobile: boolean
+  /** Trusted device only: the MFA to register a device (rollout.ts `registrationMfa`). Absent is 'active'. */
+  registrationMfa?: RegistrationMfa
+  /** The method the admin picked, with `registrationMfa: 'pick'`. An AUTH_METHODS id. */
+  registrationMfaMethod?: string
   /* Whether anybody has answered these questions yet.
 
      Not derivable from the values: every field above has a working default, so
@@ -1444,6 +1468,7 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
   push('Allowed device registrations', before.maxDevices === null ? '' : String(before.maxDevices), after.maxDevices === null ? '' : String(after.maxDevices), setup)
   const rosterText = (r: Roster | null) => (r ? `${r.fileName}, ${r.rows} devices` : '')
   push('Approved device roster', rosterText(before.roster), rosterText(after.roster), setup)
+  push('Registration MFA method', registrationMfaText(before), registrationMfaText(after), setup)
   push('Mobile device restriction', onOff(before.restrictMobile), onOff(after.restrictMobile), setup)
   push('Device auto-registration', onOff(before.autoRegister), onOff(after.autoRegister), setup)
 
@@ -1489,7 +1514,7 @@ export function profileChangeParts(before: FingerprintProfile, after: Fingerprin
   const parts: string[] = []
   if (before.name !== after.name) parts.push('Name')
   if (before.reach !== after.reach) parts.push('Device restriction type')
-  const enrol = ['registration', 'maxDevices', 'roster', 'restrictMobile', 'autoRegister'] as const
+  const enrol = ['registration', 'maxDevices', 'roster', 'restrictMobile', 'autoRegister', 'registrationMfa', 'registrationMfaMethod'] as const
   if (enrol.some((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))) parts.push('Device registration')
   /* Named only when nothing it covers is already named: "Device restriction type"
      beside "Basic details" says one change twice in a two-item footer. */

@@ -30,6 +30,10 @@ import { normaliseWho } from '../../rule-who'
 import { ruleMenu } from './rule-menu'
 import { PANEL_WIDTH_BUTTON, RULE_ON_OFF } from './bar-tools'
 import { useShows } from './builder-version'
+import { shows } from '../../rollout'
+
+/* The Global Default's last row shows a read-only Who (rollout.ts `globalWho`). */
+const GLOBAL_WHO = shows('globalWho')
 
 /* -----------------------------------------------------------------------------
    The inspector — the right pane, for whatever is selected on the board.
@@ -288,7 +292,7 @@ export function Inspector({
              a selection of `none` into the fallback pane and was saved only by
              the board declining to mount this at all. */
           <motion.div key="fallback" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-            <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} post={post} />
+            <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} post={post} everyone={GLOBAL_WHO && draft.isSystem === true} />
           </motion.div>
         ) : null}
       </div>
@@ -535,7 +539,9 @@ function RuleFindings({ diagnostics }: { diagnostics: Diagnostic[] }) {
    panel mounts one at a time (`WhoEditor`, `WhenEditor`, `WhatEditor`); nothing
    was unique to it except the two-column grid it put them in. */
 
-function FallbackPane({ rule, onPatch, post = false }: { rule: Rule; onPatch: (p: Partial<Rule>) => void; post?: boolean }) {
+/* `everyone`: the Global Default's last row reaches everyone, and says so in a Who it cannot change (rollout.ts
+   `globalWho`, owner 23 Nov 2026). The same mark the start node's audience shows for Everyone. */
+function FallbackPane({ rule, onPatch, post = false, everyone = false }: { rule: Rule; onPatch: (p: Partial<Rule>) => void; post?: boolean; everyone?: boolean }) {
   return (
     <>
       <div className="bb__insphead">
@@ -544,6 +550,19 @@ function FallbackPane({ rule, onPatch, post = false }: { rule: Rule; onPatch: (p
           <p>Applies when no rule above matches. Its name and place are fixed.</p>
         </div>
       </div>
+      {everyone && (
+        <section className="bb__rule">
+          <div className="bb__rulehead">
+            <h3>Who</h3>
+          </div>
+          <div className="bb__rulebody">
+            <p className="bb__aud__all">
+              <Users size={14} strokeWidth={1.9} aria-hidden />
+              Everyone
+            </p>
+          </div>
+        </section>
+      )}
       <section className="bb__rule">
         <div className="bb__rulehead">
           <h3>Then</h3>

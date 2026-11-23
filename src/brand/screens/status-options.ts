@@ -320,9 +320,11 @@ export function statusConfirmCopy(
    monitoring from the menu — so the toast never offers what the pill would not. */
 export function offersMonitorAfterSave(
   before: Pick<Policy, 'status'>,
-  after: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType },
+  after: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType; appIds?: string[] },
   opts: { monitor?: boolean } = {},
 ): boolean {
+  /* No application, nothing to monitor (`monitorBlocker`). */
+  if (after.appIds && after.appIds.length === 0 && !after.isSystem) return false
   return before.status === 'draft' && after.status === 'inactive' && statusOptions(after, opts).some((o) => o.target === 'monitor')
 }
 
@@ -331,8 +333,10 @@ export function offersMonitorAfterSave(
    where the pill's menu would offer Turn on, so the toast never offers what the pill would not. */
 export function offersTurnOnAfterSave(
   before: Pick<Policy, 'status'>,
-  after: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType },
+  after: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType; appIds?: string[] },
   opts: { monitor?: boolean } = {},
 ): boolean {
+  /* Saved inactive for having no application (policy-draft.ts `committed`): Make active would only be refused. */
+  if (after.appIds && after.appIds.length === 0 && !after.isSystem) return false
   return before.status === 'draft' && after.status === 'inactive' && statusOptions(after, opts).some((o) => o.target === 'active')
 }

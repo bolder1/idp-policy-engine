@@ -1,5 +1,6 @@
 import { coversEveryApp, enforces, type App, type Group, type Policy, type User } from '../data'
 import { isPostSignIn } from '../post-sign-in'
+import { withoutApps } from '../policy-draft'
 import { listNames } from '../rule-who'
 /* A cycle, and a harmless one: app-standing reads `policiesForApp` from here
    and `summarise` and the delete lines below read `appStanding` from there,
@@ -436,7 +437,7 @@ export function attachTo(p: Policy, appId: string, apps: App[]): Policy {
 export function detachFrom(p: Policy, appId: string): Policy {
   if (p.isSystem) throw new Error('detachFrom: the tenant default has no application to remove')
   const appIds = p.appIds.filter((id) => id !== appId)
-  return appIds.length === 0 ? { ...p, appIds, status: 'draft' } : { ...p, appIds }
+  return appIds.length === 0 ? { ...p, appIds, status: withoutApps(p.status) } : { ...p, appIds }
 }
 
 

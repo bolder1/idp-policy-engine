@@ -90,6 +90,27 @@ export const ROLLOUT = {
    *  handoff on the owner's word (23 Nov: "For dev hide sign-in activity and hide check access completely"). Tester
    *  withholds them on its own (TESTER), so this entry only decides Dev handoff. */
   activityAndChecks: ['design', 'tester'],
+  /** The default rule ("Nothing else matched") counts as a rule, so a policy whose only change is its default can be
+   *  saved, as a draft or a policy (23 Nov, owner: "by default rule is the first rule"). Every line on the owner's word
+   *  (23 Nov: "change this to all 3 roles"), as are the six below. */
+  defaultRuleSaves: ALL,
+  /** Save policy decides the status (23 Nov, owner: "when the user saves a policy it says draft but it should be
+   *  active"): a draft saved with an application goes active, after the Before turning on checks; with none it is
+   *  stored inactive, not draft. Draft comes only from Save draft. */
+  saveMakesActive: ALL,
+  /** The Global Default's "Nothing else matched" panel shows Who, read-only: Everyone (23 Nov). */
+  globalWho: ALL,
+  /** The builder's ⋯ marks and unmarks a template, the way the Policies row does (23 Nov). */
+  builderTemplateToggle: ALL,
+  /** A new policy is stored only by a save from the builder, never by Create policy (23 Nov, owner). Until then it has
+   *  no status pill, Save draft is ready, the pill says Unsaved changes and leaving asks. */
+  newPolicyUnsaved: ALL,
+  /** Trusted device → Device registration: "Registration MFA method", one dropdown: the user's active MFA or a method
+   *  the admin picks, each with its mark (23 Nov, the dev's `registration_mfa_method`). */
+  registrationMfa: ALL,
+  /** Device profiles: an always-on signal's priority is locked like its tick, and Review does not list the always-on
+   *  signals (23 Nov). */
+  lockedSignals: ALL,
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

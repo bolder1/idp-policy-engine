@@ -48,7 +48,7 @@ import { appsOf, blankPolicy, enforces, type Policy } from '../data'
 import { useBrand } from '../store'
 import { ChangeState } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
-import { newPolicy } from '../policy-draft'
+import { newPolicy, withoutApps } from '../policy-draft'
 import { useNewPolicy } from '../create/use-new-policy'
 import { useMarkedAsTemplate, useSaveAsTemplate } from './save-template'
 import { ConfirmDelete } from './confirm-delete'
@@ -1648,7 +1648,7 @@ function AssignAppsDialog({
        Assigning does not publish in return. */
     const next = { ...policy, appIds: picked }
     onCommit()
-    store.savePolicy(picked.length === 0 ? { ...next, status: 'draft' as const } : next)
+    store.savePolicy(picked.length === 0 ? { ...next, status: withoutApps(policy.status) } : next)
     const n = picked.length
     const count = `${n} application${n === 1 ? '' : 's'}`
     /* "Protects" only for a policy that decides sign-ins. An active policy with

@@ -754,6 +754,13 @@
 .bfp2__chosenctl > .bx-picker,
 .bfp2__chosenctl > .bx-tierpick,
 .bfp2__chosenctl > .bfp2__expr { flex: 1 1 auto; min-width: 0; }
+/* An always-on row's setting, locked (device-profile-phase.ts `LOCKED_SIGNALS`): a bare fieldset that passes the
+   column's width through and dims like the wizard's disabled row. */
+.bfp2__chosenlock { flex: 1 1 auto; display: flex; min-width: 0; margin: 0; padding: 0; border: 0; min-inline-size: 0; }
+.bfp2__chosenlock:disabled { opacity: var(--disabled-opacity); }
+.bfp2__chosenlock > .bx-picker,
+.bfp2__chosenlock > .bx-tierpick,
+.bfp2__chosenlock > .bfp2__expr { flex: 1 1 auto; min-width: 0; }
 .bfp2__chosenctl .bfp2__expr > .bx-picker { flex: 1 1 auto; min-width: 0; }
 /* A TYPED version fills the column too (16 Sep 2026). `.bfp2__exprval` carries
    a 118–180px measure of its own for the inline operator pair, and the wizard's

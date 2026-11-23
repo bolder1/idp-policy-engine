@@ -8,7 +8,7 @@ import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type 
 import { dictionaryOf, type AnswerKey, type DescribeTenant, type RuleIds } from '../../create/describe-model'
 import { checksView, withChecks, type CheckContext } from '../../create/describe-checks'
 import { guardSignIns } from '../../draft-checks'
-import { NO_RULES_REASON, UNNAMED_REASON, commitToast, committed, differsFromLive, hasNoRules, hasUnsavedChanges, isUntitled, openForEditing, type CommitIntent, type RuleSet } from '../../policy-draft'
+import { NO_RULES_REASON, SAVE_MAKES_ACTIVE, UNNAMED_REASON, commitToast, committed, differsFromLive, hasNoRules, hasUnsavedChanges, isUntitled, openForEditing, type CommitIntent, type RuleSet } from '../../policy-draft'
 import { useBrand, useNameLookup } from '../../store'
 import { playCue } from '../../sound'
 import { TemplateSheet } from '../../create/TemplateSheet'
@@ -93,6 +93,10 @@ const NO_RULE_ALERT: boolean = shows('noRuleAlert')
 /* The start chooser's bar: Back and the name, no Save draft, Save policy or ⋯ (owner, 20 Nov 2026). rollout.ts
    `emptyStartBar`. */
 const EMPTY_START_BAR: boolean = shows('emptyStartBar')
+/* The ⋯ marks and unmarks a template (rollout.ts `builderTemplateToggle`). */
+const TEMPLATE_TOGGLE: boolean = shows('builderTemplateToggle')
+/* A new policy is unsaved until a save from the builder (rollout.ts `newPolicyUnsaved`). */
+const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
 import './board.css'
 import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
 import { MovedPanel, MovedWalk, PublishMoved } from '../../migrate/moved-panel'
@@ -620,6 +624,8 @@ export function BoardBuilder({
      sign-in policy with a rule on the canvas (`canSaveAsTemplate`). */
   const onCanvas: Policy = { ...draft, pendingDraft: undefined }
   const templateFromCanvas = BAR_TEMPLATE && canSaveAsTemplate(onCanvas)
+  /* Marked already: the ⋯ takes it off, as the Policies row does (rollout.ts `builderTemplateToggle`). */
+  const templateMarked = BAR_TEMPLATE && TEMPLATE_TOGGLE && saveTemplate.marked(draft.id)
   /* Not for a post sign-in policy, like the template doors beside it. */
   /* Only once the tenant has a policy of its own to reuse (owner, 2 Nov 2026: "if no policy exists or only Global is
      present, hide this … let the user add their first policy, then add this option"). The Global Default alone does not
@@ -854,7 +860,12 @@ export function BoardBuilder({
      decide sign-ins: it drives the readings and, with a never-published policy,
      the publish gate. */
   /* Applications Guided setup chose and nothing has saved yet count as an edit, as its rules do. */
-  const unsaved = !!saved && (hasUnsavedChanges(saved, draft) || !!pending)
+  const edited = !!saved && (hasUnsavedChanges(saved, draft) || !!pending)
+  /* A new policy is stored only by a save from in here (owner, 23 Nov 2026: "only when the user saves the policy from
+     inside, not on Create policy"), so until then it is unsaved as a whole: Save draft is ready, the pill says so and
+     leaving asks. Not on the start chooser, where nothing has been picked yet. rollout.ts `newPolicyUnsaved`. */
+  const neverSaved = NEW_POLICY_UNSAVED && !!saved?.provisional && (draft.rules.length > 0 || !!scratch)
+  const unsaved = edited || neverSaved
   /* A policy needs a rule to be saved at all (owner, 2 Nov 2026: no empty policies), and a new one opened with no form
      needs a name of its own too. The reason is on the buttons and in the leave dialog. */
   const noRules = hasNoRules(draft)
@@ -1223,7 +1234,9 @@ export function BoardBuilder({
        (post-board.ts `saveRefused`). A draft saves as a draft. */
     const refused = post && saved ? saveRefused(saved, draft) : null
     if (refused) return refuse(refused)
-    checkThenPublish('keep-off')
+    /* Save policy makes a draft active where `saveMakesActive` is on (policy-draft.ts `committed`), through Before
+       turning on, as the status pill's own turn on goes. */
+    checkThenPublish(SAVE_MAKES_ACTIVE ? 'turn-on' : 'keep-off')
   }
 
   /* --- Before saving (final spec, D.5) ------------------------------------------
@@ -2415,7 +2428,7 @@ export function BoardBuilder({
             quietSave={testOn && checkPanel === 'form'}
             toPublish={toPublish}
             unsaved={unsaved}
-            canDiscard={unsaved || hasDraft}
+            canDiscard={edited || hasDraft}
             blockers={blockers}
             onSaveDraft={saveDraft}
             onDiscard={discard}
@@ -2424,7 +2437,8 @@ export function BoardBuilder({
             checking={checking}
             post={post}
             onSave={saveNow}
-            onSaveTemplate={templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
+            onSaveTemplate={templateMarked ? () => saveTemplate.unmark(onCanvas) : templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
+            templateMarked={templateMarked}
             onCopyRules={BAR_COPY_RULES && copyOffered ? () => openPicker('policy') : undefined}
             onRollBack={experience === 'today' && !!saved?.movedFrom?.length && saved.status === 'active' ? () => setRollAsk(true) : undefined}
             onContactSupport={experience === 'today' && !!saved?.movedFrom?.length && saved.status !== 'draft' ? contactSupport : undefined}

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 /* The finished wizard, with every hidden part shown (screens/device-profile-phase.ts). */
-vi.mock('./device-profile-phase', () => ({ AGENT_REACH: true, SIGNALS_STEP: true, ENROL_OPTIONS: true }))
+/* The by-line ones (rollout.ts) are off, as they are with no line signed in: these tests read the review without them. */
+vi.mock('./device-profile-phase', () => ({ AGENT_REACH: true, SIGNALS_STEP: true, ENROL_OPTIONS: true, REGISTRATION_MFA: false, LOCKED_SIGNALS: false }))
 
 import {
   OS_ATTRIBUTES,

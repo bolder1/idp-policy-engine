@@ -1666,6 +1666,8 @@ function BasicDetailsForm({
           restrictMobile={profile.restrictMobile}
           maxDevices={profile.maxDevices}
           roster={profile.roster}
+          registrationMfa={profile.registrationMfa}
+          registrationMfaMethod={profile.registrationMfaMethod}
           onChange={onChange}
         />
       </section>

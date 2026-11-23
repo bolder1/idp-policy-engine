@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import { ENROL_OPTIONS } from './device-profile-phase'
+import { ENROL_OPTIONS, LOCKED_SIGNALS, REGISTRATION_MFA } from './device-profile-phase'
+import { METHOD_ICON } from '../method-icons'
 import {
   Activity,
   AlertTriangle,
@@ -7,7 +8,9 @@ import {
   CirclePlus,
   Cpu,
   FileSpreadsheet,
+  KeyRound,
   Lock,
+  UserRound,
   Minus,
   Monitor,
   Network,
@@ -29,6 +32,9 @@ import { useShows } from './board/builder-version'
 import {
   DEFAULT_MAX_DEVICES,
   REGISTRATION_LABEL,
+  REGISTRATION_MFA_LABEL,
+  registrationMfaMethods,
+  type RegistrationMfa,
   TIER_WEIGHT,
   VERSION_OPS,
   blockedAttributes,
@@ -984,7 +990,15 @@ function ChosenRow({
               by opening it. */}
           {slot && (
             <div className="bfp2__chosenctl" title={answer}>
-              {slot}
+              {/* An always-on row has no Remove, and its value is as fixed as that (`LOCKED_SIGNALS`): a `fieldset`
+                  disables the setting inside it natively, as the wizard's row does. */}
+              {LOCKED_SIGNALS && !onRemove ? (
+                <fieldset className="bfp2__chosenlock" disabled>
+                  {slot}
+                </fieldset>
+              ) : (
+                slot
+              )}
             </div>
           )}
         </div>
@@ -1420,6 +1434,9 @@ const REGISTRATION_HELP: Record<Registration, string> = {
   'pre-approved': 'Allow only the devices on the roster you upload to access the application.',
 }
 
+/* The Registration MFA method's first answer, kept apart from every method id. */
+const ACTIVE_MFA = '__active'
+
 export function EnrolmentFields({
   enabled,
   checkMac = true,
@@ -1430,6 +1447,8 @@ export function EnrolmentFields({
   restrictMobile,
   maxDevices,
   roster,
+  registrationMfa = 'active',
+  registrationMfaMethod,
   onChange,
 }: {
   /* The chosen signals, and the only reason this form reads them: whether a
@@ -1446,15 +1465,21 @@ export function EnrolmentFields({
   restrictMobile: boolean
   maxDevices: number | null
   roster: Roster | null
+  /** Trusted device: the MFA to register a device. */
+  registrationMfa?: RegistrationMfa
+  registrationMfaMethod?: string
   onChange: (p: {
     registration?: Registration
     autoRegister?: boolean
     restrictMobile?: boolean
     maxDevices?: number | null
     roster?: Roster | null
+    registrationMfa?: RegistrationMfa
+    registrationMfaMethod?: string
   }) => void
 }) {
   const rosterPossible = mode === 'device' && reach === 'agent'
+  const mfaList = registrationMfaMethods()
   const file = useRef<HTMLInputElement>(null)
   const [fileProblem, setFileProblem] = useState<string | null>(null)
 
@@ -1586,6 +1611,27 @@ export function EnrolmentFields({
             The roster is matched on <b>MAC address</b>. Add MAC address to this profile&apos;s signals.
           </span>
         </p>
+      )}
+
+      {/* The MFA a user completes to register a device (owner, 23 Nov 2026; the dev's `registration_mfa_method`).
+          Trusted device only, above the two checkboxes. One dropdown, as the policy builder's Second factor is (owner,
+          same day: "club this like we did inside the policy builder"): the user's own method first, then the MFA list
+          with each method's mark. */}
+      {REGISTRATION_MFA && mode === 'device' && (
+        <EnrolField label="Registration MFA method" tip="The MFA a user completes to register a new device.">
+          <Picker
+            label="Registration MFA method"
+            width="fill"
+            value={registrationMfa === 'pick' && registrationMfaMethod ? registrationMfaMethod : ACTIVE_MFA}
+            options={[
+              { value: ACTIVE_MFA, label: REGISTRATION_MFA_LABEL.active, meta: 'Whichever method they have set', icon: UserRound },
+              ...mfaList.map((m) => ({ value: m.id, label: m.name, icon: METHOD_ICON[m.name] ?? KeyRound, group: 'MFA methods' })),
+            ]}
+            onChange={(v) =>
+              onChange(v === ACTIVE_MFA ? { registrationMfa: 'active', registrationMfaMethod: undefined } : { registrationMfa: 'pick', registrationMfaMethod: v })
+            }
+          />
+        </EnrolField>
       )}
 
       {/* The two switches are hidden in this version (device-profile-phase.ts). */}

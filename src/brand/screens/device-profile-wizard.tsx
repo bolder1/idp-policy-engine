@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, Check, Lock } from 'lucide-react'
+import { LOCKED_SIGNALS } from './device-profile-phase'
 
 import { Button, Drawer, TipDot, TipMark } from '../kit'
 import { ChangeList, ChangeSection } from '../change-list'
@@ -323,6 +324,8 @@ export function DeviceProfileWizard({
                 restrictMobile={s.restrictMobile}
                 maxDevices={s.maxDevices}
                 roster={s.roster}
+                registrationMfa={s.registrationMfa}
+                registrationMfaMethod={s.registrationMfaMethod}
                 onChange={(p) => update((cur) => ({ ...cur, ...p }))}
               />
               {/* The roster, the one thing this section can leave unanswered. */}
@@ -867,7 +870,8 @@ function InlineRow({
       {control && (
         <fieldset
           className="bfp2__checkslot bdpw__ctl"
-          disabled={!on}
+          /* An always-on signal's value is as fixed as its tick (device-profile-phase.ts `LOCKED_SIGNALS`). */
+          disabled={!on || (LOCKED_SIGNALS && !!attr.always)}
           title={on ? undefined : `Tick ${attr.name} to set it`}
         >
           {control}

@@ -26,6 +26,7 @@ import { isPostSignIn, postSignInRefuses, settledPostSignIn } from './post-sign-
 import { type RiskProfile } from './risk-signals'
 import type { SavedSignIn } from './saved-sign-ins'
 import { leaves } from './predicate'
+import { SAVE_MAKES_ACTIVE, withoutApps } from './policy-draft'
 import {
   showcaseApps,
   showcaseGroups,
@@ -195,6 +196,9 @@ export function settled(p: Policy): Policy {
     return { ...rest, rules: pendingDraft.rules, fallback: pendingDraft.fallback }
   }
   if (p.isSystem || p.appIds.length > 0 || (p.status === 'draft' && !p.pendingDraft)) return p
+  /* With `saveMakesActive` (owner, 23 Nov 2026) a policy with no application may be stored, but only inactive: it
+     cannot decide a sign-in. Draft is what Save draft makes, never what this settles to. */
+  if (SAVE_MAKES_ACTIVE && p.status !== 'draft') return p.status === 'inactive' ? p : { ...p, status: withoutApps(p.status) }
   const { pendingDraft, ...rest } = p
   return pendingDraft
     ? { ...rest, status: 'draft', rules: pendingDraft.rules, fallback: pendingDraft.fallback }
@@ -209,7 +213,7 @@ export function settled(p: Policy): Policy {
    Monitoring is never one of its statuses (owner, 13 Oct 2026). */
 export function refusesStatus(p: Policy, status: PolicyStatus): boolean {
   if (isPostSignIn(p)) return status === 'monitor' || postSignInRefuses(p, status)
-  return p.appIds.length === 0 && status !== 'draft'
+  return p.appIds.length === 0 && status !== 'draft' && !(SAVE_MAKES_ACTIVE && status === 'inactive')
 }
 
 /* The small tenant's stand-ins for apps it does not have. Payroll runs on

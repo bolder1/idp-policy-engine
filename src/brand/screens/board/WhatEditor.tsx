@@ -2,9 +2,6 @@ import { useId, useRef, useState } from 'react'
 import { useEffect } from 'react'
 import {
   AlertTriangle,
-  BellRing,
-  Fingerprint,
-  HelpCircle,
   KeyRound,
   Layers,
   Link2,
@@ -15,8 +12,6 @@ import {
   MessageSquare,
   Minus,
   ShieldAlert,
-  Timer,
-  Usb,
   UserCheck,
   UserCog,
   UserRound,
@@ -32,6 +27,7 @@ import { DENY_ACTION_SUGGESTION, denyReasonOfRule } from '../testing/deny-reason
 import { DEFAULT_DENY_MESSAGE, DENY_ALERT_EVENTS, DENY_EXTRA_MAX, DENY_MESSAGE_MAX, type AccessDecision, type DenyAlertEvent, type Rule } from '../../data'
 import { shows } from '../../rollout'
 import { methodById } from '../../methods'
+import { METHOD_ICON as SHARED_METHOD_ICON } from '../../method-icons'
 import { PUSH_OPTIONS_IN_POLICY } from '../../mfa-settings'
 import { METHODS } from '../rule-form'
 import { METHOD_PREFIX, firstFactorPatch, firstFactorValue } from './first-factor'
@@ -130,21 +126,8 @@ const SECOND: { value: Rule['secondFactor']; label: string; meta: string; icon: 
   { value: 'preferred', label: 'User preference', meta: 'Whichever method they have set', icon: UserRound },
 ]
 
-/* A mark per method, so a list of seven is scanned rather than read. The
-   families are what the marks distinguish: something you are pushed, something
-   you read off a clock, something you plug in or touch, something that arrives
-   as a message. */
-const METHOD_ICON: Record<string, LucideIcon> = {
-  'miniOrange Push': BellRing,
-  'miniOrange OTP': Timer,
-  'Google Authenticator': Timer,
-  'Microsoft Authenticator': Timer,
-  'OTP over SMS': MessageSquare,
-  'OTP over Email': Mail,
-  'FIDO2 / Passkey': Fingerprint,
-  'Yubikey Token': Usb,
-  'Security Questions': HelpCircle,
-}
+/* A mark per method: method-icons.ts, shared with a trusted device's Registration MFA method. */
+const METHOD_ICON: Record<string, LucideIcon> = { ...SHARED_METHOD_ICON }
 /* Magic link starts a session in place of the password, so it is offered as a FIRST factor only, and the second-factor
    lists do not carry it (owner, 26 Oct 2026, with its two options below). Named as the catalogue names it. */
 const MAGIC_LINK = methodById('magic-link')?.name ?? 'Magic link'

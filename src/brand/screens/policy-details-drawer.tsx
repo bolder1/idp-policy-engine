@@ -11,6 +11,7 @@ import { DockPast } from './testing/DockPast'
 import { useTestingSession } from './testing/session-state'
 import type { SignInForm } from './testing/sign-in-form'
 import { policyApps } from './testing/test-dock'
+import { HIDE_CHECKS } from '../tester'
 
 /* -----------------------------------------------------------------------------
    A policy's details, in a slider over the Policies list (owner, 6 Oct 2026:
@@ -88,7 +89,7 @@ export function PolicyDetailsDrawer({
     >
       <div className="insp__page" key={policyId}>
         <PolicyPage policyId={policyId} focus={undefined} plan={null} onEdit={go} onOpenOne={setOpenOne} canvas />
-        {PAST_IN_DETAILS && policy && mine.length > 0 && (
+        {PAST_IN_DETAILS && !HIDE_CHECKS && policy && mine.length > 0 && (
           /* Modelled sign-ins say so wherever they are drawn (test-dock.ts), here too, though the cards above the list are gone. */
           /* Folded: a week of rows at the foot made the slider read as a log. One press unfolds it (owner, 7 Oct 2026). */
           <Block

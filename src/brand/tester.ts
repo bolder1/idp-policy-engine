@@ -19,6 +19,15 @@ import { shows } from './rollout'
 /* 19 Nov 2026: the line the sign-in chose (lines.ts); the tester deploy is always this line. */
 export const TESTER: boolean = LINE === 'tester'
 
+/* Sign-in activity and Check access (Access checks, the builder's Check access, Break-in) are withheld on Tester, as
+   above, and on any line the rollout table's `activityAndChecks` entry leaves out: Dev handoff since 23 Nov 2026 (owner:
+   "For dev hide sign-in activity and hide check access completely. they dont need it now"). Every way in reads this. */
+/* Only where a line is open: with none (the sign-in screen, the test suite) nothing is withheld. */
+export const HIDE_CHECKS: boolean = LINE !== null && !shows('activityAndChecks')
+export const CHECKS_WITHHELD: boolean = TESTER || HIDE_CHECKS
+/* Places that read HIDE_CHECKS rather than CHECKS_WITHHELD (the Dashboard's links, the app page's, the All Policies bar)
+   were never withheld on Tester, and Tester changes only on the owner's check. */
+
 /* -----------------------------------------------------------------------------
    Promoted from the tester build to every build (owner, 18 Nov 2026: "we made some necessary changes in the testing
    part … make sure those changes are reflected on our dev server as well"). Each was born behind TESTER; the owner

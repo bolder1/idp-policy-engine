@@ -1,6 +1,6 @@
 import { Globe, KeyRound, MonitorSmartphone, Power, ScanSearch, type LucideIcon } from 'lucide-react'
 import { useBrand, type BrandScreen } from '../store'
-import { TESTER } from '../tester'
+import { CHECKS_WITHHELD } from '../tester'
 
 /* What to do after a move, in the order THIS tenant needs it (owner, 4 Nov 2026: "guided setup, prioritised based on
    need"): a protection the old console had and the new one does not get back first (the device count), then checking
@@ -33,7 +33,7 @@ export function useSetupSteps() {
     ...(deviceGap
       ? [{ id: 'device', title: 'Replace the device limit', line: 'Old device counts did not carry over. A device profile checks the device itself.', action: 'Create a device profile', to: { name: 'fingerprint' } as BrandScreen, icon: MonitorSmartphone, gap: true }]
       : []),
-    ...(TESTER ? [] : [{ id: 'check' as const, title: 'Check access', line: 'Try a sign-in against a moved policy and see what it decides.', action: 'Check access', to: { name: 'sign-in-tests' } as BrandScreen, icon: ScanSearch }]),
+    ...(CHECKS_WITHHELD ? [] : [{ id: 'check' as const, title: 'Check access', line: 'Try a sign-in against a moved policy and see what it decides.', action: 'Check access', to: { name: 'sign-in-tests' } as BrandScreen, icon: ScanSearch }]),
     ...(zones > 0
       ? [{ id: 'zones', title: zones === 1 ? 'Look over 1 new zone' : `Look over ${zones} new zones`, line: 'Made from your old IP and location checks.', action: 'Open Zones', to: { name: 'zones' } as BrandScreen, icon: Globe }]
       : []),

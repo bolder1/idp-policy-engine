@@ -34,7 +34,7 @@ import { Badge, Button, Chip, Drawer, Note, RowMenu, SplitButton, type MenuItem 
 import { linkedTo } from '../post-sign-in'
 import { normaliseWho } from '../rule-who'
 import { useBrand, useNameLookup, type AppTab } from '../store'
-import { TESTER } from '../tester'
+import { HIDE_CHECKS, TESTER } from '../tester'
 import { AppPolicyFocusOverride } from './app-policy-focus'
 import { AppActivity, AppBreakIn, GlanceActivity } from './app-activity'
 import { HEAD_REPLACE_ON_HOLD, HEAD_SPLIT_EDIT, HEAD_THREE_BUTTONS, rulesLabel } from './app-policies'
@@ -504,11 +504,13 @@ export function PolicyChain({
         <h3 id="apol-rules">Rules</h3>
         <span className="apol__aside">In order</span>
         {figures && <Badge tone="neutral">Sample</Badge>}
-        <span className="apol__push">
-          <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={check}>
-            {ACCESS_CHECK}
-          </Button>
-        </span>
+        {!HIDE_CHECKS && (
+          <span className="apol__push">
+            <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={check}>
+              {ACCESS_CHECK}
+            </Button>
+          </span>
+        )}
       </div>
       {RULES_CANVAS && policy && <ReadOnlyCanvas policy={policy} traced={[]} />}
       {/* The column labels, for the eye: each row's button says its own cells. */}
@@ -1117,11 +1119,13 @@ function RulesPanel({
         <div className="apol__sechead apol__panelhead">
           <h3 id="apol-rules">Rules</h3>
           <span className="apol__aside">In order</span>
-          <span className="apol__push">
-            <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={check}>
-              {ACCESS_CHECK}
-            </Button>
-          </span>
+          {!HIDE_CHECKS && (
+            <span className="apol__push">
+              <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={check}>
+                {ACCESS_CHECK}
+              </Button>
+            </span>
+          )}
         </div>
       )}
       <div className={`btable-wrap apol__frame${strip && policy ? ' has-foot' : ''}`}>
@@ -1362,7 +1366,7 @@ export function AppPolicyView({
                   ...(i.id === 'remove' || i.id === 'delete' ? { danger: true } : null),
                 })),
               /* The two reads, kept behind HEAD_READS (flags are kept, not dead): off, they are not on the menu at all. */
-              ...(FOCUS && HEAD_READS
+              ...(FOCUS && HEAD_READS && !HIDE_CHECKS
                 ? [
                     { id: 'activity', label: 'Sign-in activity', icon: Activity, divide: true, hint: SOON },
                     { id: 'check', label: ACCESS_CHECK, icon: ListChecks, hint: SOON },

@@ -45,7 +45,8 @@ export function SignInRow({
   cells: (toggle: ReactNode) => ReactNode
   colSpan: number
   /** Opens the sign-in in Check access: the caller loads it and moves. */
-  onOpenInChecks: (r: ActivityRow) => void
+  /** Absent where Access checks is withheld (tester.ts HIDE_CHECKS): the detail has no way there. */
+  onOpenInChecks?: (r: ActivityRow) => void
   /** On an application's Policies tab: the device and its risk in the detail, and motion. */
   tab?: boolean
   reduced?: boolean
@@ -90,7 +91,7 @@ export function SignInRow({
   )
 }
 
-function Detail({ row: r, tab, onOpenInChecks }: { row: ActivityRow; tab: boolean; onOpenInChecks: (r: ActivityRow) => void }) {
+function Detail({ row: r, tab, onOpenInChecks }: { row: ActivityRow; tab: boolean; onOpenInChecks?: (r: ActivityRow) => void }) {
   return (
     <div className="sia__panel">
       <dl className="sia__lines">
@@ -130,9 +131,11 @@ function Detail({ row: r, tab, onOpenInChecks }: { row: ActivityRow; tab: boolea
         )}
       </dl>
       <div className="sia__acts">
-        <Button variant="secondary" size="sm" iconRight={ArrowUpRight} onClick={() => onOpenInChecks(r)}>
-          Open in {ACCESS_CHECK}
-        </Button>
+        {onOpenInChecks && (
+          <Button variant="secondary" size="sm" iconRight={ArrowUpRight} onClick={() => onOpenInChecks(r)}>
+            Open in {ACCESS_CHECK}
+          </Button>
+        )}
         <CopyText text={activitySummaryOf(r)} className="bb__act sia__copy" />
       </div>
     </div>

@@ -38,6 +38,7 @@ import { RAMP, figureCaption, fmt, pct, useMigrationOpen } from './format'
 import { viewOf } from './model'
 import { ADMIN_ACTIVITY, CONNECTIONS, DORMANT, LICENSE, REQUESTS, SYNCS, agoWord, answer, registrations, useAnswered } from './seed'
 import { NOW, personAt, pickAt, timeAxis, useActivity, usePolicyFacts } from './sources'
+import { HIDE_CHECKS } from '../tester'
 import { useTile } from './tile-context'
 import { BarList, Clear, Count, Fit, Head, Legend, Mark, More, Row, Table } from './widget-kit'
 
@@ -109,7 +110,7 @@ export function Changes() {
           </Fit>
         )}
       </div>
-      <More onClick={() => store.go({ name: 'sign-in-activity', view: 'changes' })}>All changes</More>
+      {!HIDE_CHECKS && <More onClick={() => store.go({ name: 'sign-in-activity', view: 'changes' })}>All changes</More>}
     </>
   )
 }
@@ -181,7 +182,7 @@ export function CheckAccess() {
           </span>
         </div>
       </div>
-      <More onClick={() => store.go({ name: 'sign-in-tests' })}>Access checks</More>
+      {!HIDE_CHECKS && <More onClick={() => store.go({ name: 'sign-in-tests' })}>Access checks</More>}
     </>
   )
 }
@@ -497,7 +498,7 @@ export function Setup() {
     { key: 'groups', label: 'Add groups', done: store.groups.length > 0, to: { name: 'groups' } },
     { key: 'mfa', label: 'Set up a second method', done: store.methods.some((m) => m.active && m.configured), to: { name: 'methods' } },
     { key: 'policy', label: 'Make a sign-in policy active', done: f.live.length > 0, to: { name: 'policies' } },
-    { key: 'check', label: 'Check access before it decides', done: false, to: { name: 'sign-in-tests' } },
+    ...(HIDE_CHECKS ? [] : [{ key: 'check', label: 'Check access before it decides', done: false, to: { name: 'sign-in-tests' } as BrandScreen }]),
   ]
   const done = steps.filter((s) => s.done).length
   /* What is left comes first: it is the part to act on, and a short tile shows it. */
@@ -549,7 +550,7 @@ export function Shortcuts() {
   const rest: { label: string; icon: LucideIcon; to: BrandScreen }[] = [
     { label: 'Add application', icon: AppWindow, to: { name: 'application-new' } },
     { label: 'Add user', icon: UserPlus, to: { name: 'users' } },
-    { label: 'Check access', icon: ScanSearch, to: { name: 'sign-in-tests' } },
+    ...(HIDE_CHECKS ? [] : [{ label: 'Check access', icon: ScanSearch, to: { name: 'sign-in-tests' } as BrandScreen }]),
     { label: 'Add zone', icon: MapPin, to: { name: 'zones' } },
     { label: 'Add device profile', icon: MonitorSmartphone, to: { name: 'fingerprint' } },
   ]

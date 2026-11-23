@@ -38,6 +38,7 @@ import { relativeTime } from './sign-in-tests/runs'
 import { DENY_REASON_WORD } from './testing/deny-reason'
 import { useTestingSession } from './testing/session-state'
 import { formOf, todayIn } from './testing/sign-in-form'
+import { HIDE_CHECKS } from '../tester'
 
 /* -----------------------------------------------------------------------------
    An application's Policies tab, below its rules (docs/specs/APP-POLICY-TAB.md):
@@ -135,9 +136,11 @@ export function AppActivity({
             <span className={`btoolbar__filter bbar__filter ${result !== 'all' ? 'is-set' : ''}`}>
               <Picker label="Filter by result" size="md" icon={ListFilter} prefix="Result" value={result} options={RESULTS} onChange={(v) => setResult(v as ActivityFilter['result'])} />
             </span>
-            <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={viewAll}>
-              View all<span className="u-sr-only"> sign-ins on {app.name}</span>
-            </Button>
+            {!HIDE_CHECKS && (
+              <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={viewAll}>
+                View all<span className="u-sr-only"> sign-ins on {app.name}</span>
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -151,10 +154,12 @@ export function AppActivity({
                 {p.decider && <span> · {p.decider.name}</span>}
                 {p.reach && <span className="apol__muted"> · {p.reach}</span>}
               </span>
-              <Button variant="secondary" size="sm" onClick={() => checkPerson(p.user.id)}>
-                {ACCESS_CHECK}
-                <span className="u-sr-only"> for {p.user.name}</span>
-              </Button>
+              {!HIDE_CHECKS && (
+                <Button variant="secondary" size="sm" onClick={() => checkPerson(p.user.id)}>
+                  {ACCESS_CHECK}
+                  <span className="u-sr-only"> for {p.user.name}</span>
+                </Button>
+              )}
             </li>
           ))}
         </ul>
@@ -192,7 +197,7 @@ export function AppActivity({
                       onToggle={() => setOpen(on ? null : r.id)}
                       when={whenSaid(r.date, r.facts.when?.time ?? '')}
                       colSpan={5}
-                      onOpenInChecks={openInChecks}
+                      onOpenInChecks={HIDE_CHECKS ? undefined : openInChecks}
                       tab
                       reduced={reduced}
                       cells={(toggle) => (
@@ -384,7 +389,7 @@ export function GlanceActivity({
      way to the rule that decided it. Neither of the first two picks the row. */
   const menuOf = (key: ChainKey | null): MenuItem[] => [
     ...(onShowRule && key ? [{ id: 'rule', label: 'Show rule', icon: Eye }] : []),
-    { id: 'check', label: `Open in ${ACCESS_CHECK}`, icon: LogIn },
+    ...(HIDE_CHECKS ? [] : [{ id: 'check', label: `Open in ${ACCESS_CHECK}`, icon: LogIn }]),
     { id: 'copy', label: 'Copy details', icon: Copy },
   ]
   const act = (r: ActivityRow, id: string) => {
@@ -402,11 +407,13 @@ export function GlanceActivity({
         {sample && (
           <>
             <Badge tone="neutral">Sample</Badge>
-            <span className="apol__push">
-              <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={viewAll}>
-                View all<span className="u-sr-only"> sign-ins on {app.name}</span>
-              </Button>
-            </span>
+            {!HIDE_CHECKS && (
+              <span className="apol__push">
+                <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={viewAll}>
+                  View all<span className="u-sr-only"> sign-ins on {app.name}</span>
+                </Button>
+              </span>
+            )}
           </>
         )}
       </div>
@@ -457,10 +464,12 @@ export function GlanceActivity({
                     {p.decider && <span> · {p.decider.name}</span>}
                     {p.reach && <span className="apol__muted"> · {p.reach}</span>}
                   </span>
-                  <Button variant="secondary" size="sm" onClick={() => checkPerson(p.user.id)}>
-                    {ACCESS_CHECK}
-                    <span className="u-sr-only"> for {p.user.name}</span>
-                  </Button>
+                  {!HIDE_CHECKS && (
+                    <Button variant="secondary" size="sm" onClick={() => checkPerson(p.user.id)}>
+                      {ACCESS_CHECK}
+                      <span className="u-sr-only"> for {p.user.name}</span>
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -616,9 +625,11 @@ export function AppChanges({ policy, appId, onRule }: { policy: Policy; /** The 
     <section className="apol__sec" aria-labelledby="apol-changes">
       <div className="apol__sechead">
         <h3 id="apol-changes">Changes</h3>
-        <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={() => go({ name: 'sign-in-activity', view: 'changes', q: policy.name, from: { appId } })}>
-          View all<span className="u-sr-only"> changes to {policy.name}</span>
-        </Button>
+        {!HIDE_CHECKS && (
+          <Button variant="ghost" size="sm" iconRight={ArrowUpRight} onClick={() => go({ name: 'sign-in-activity', view: 'changes', q: policy.name, from: { appId } })}>
+            View all<span className="u-sr-only"> changes to {policy.name}</span>
+          </Button>
+        )}
       </div>
       {entries.length === 0 ? (
         <p className="apol__quiet">No changes yet.</p>
@@ -661,11 +672,13 @@ export function AppBreakIn({ appId, appName }: { appId: string; appName: string 
     <section className="insp__block" aria-label="Break-in attempts">
       <div className="insp__blockhead">
         <h3>{attemptsOnSaid(appName)}</h3>
-        <span className="insp__secmeta">
-          <Button variant="ghost" size="sm" onClick={() => go({ name: 'sign-in-tests' })}>
-            Open Access checks
-          </Button>
-        </span>
+        {!HIDE_CHECKS && (
+          <span className="insp__secmeta">
+            <Button variant="ghost" size="sm" onClick={() => go({ name: 'sign-in-tests' })}>
+              Open Access checks
+            </Button>
+          </span>
+        )}
       </div>
       <p className="insp__note">
         {holes > 0 ? `${counts.gotThrough + counts.weakerFactor + counts.lessThanAsked} got through or in on less.` : 'None got through.'}

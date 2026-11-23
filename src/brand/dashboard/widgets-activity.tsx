@@ -38,6 +38,7 @@ import { NOW, personAt, pickAt, recentMix, timeAxis, useActivity, usePolicyFacts
 import { pickOf, useTile } from './tile-context'
 import { BarList, Clear, Count, Filter, Fit, Head, Legend, Mark, More, Row, Stat, Table, Trend } from './widget-kit'
 import { shows } from '../rollout'
+import { HIDE_CHECKS } from '../tester'
 
 /** The 22 Nov copy round (rollout.ts dashboardPolish). */
 const POLISH = shows('dashboardPolish')
@@ -311,7 +312,7 @@ export function RiskyUsers() {
           {(p) => <Row key={p.who.id} lead={<Face kind="user" name={p.who.name} decorative />} title={p.who.name} sub={DENY_REASON_WORD[p.reason]} trail={<b className="bdw-num">{fmt(p.count)}</b>} />}
         </Fit>
       </div>
-      <More onClick={() => store.go({ name: 'sign-in-activity', view: 'sign-ins' })}>Sign-in activity</More>
+      {!HIDE_CHECKS && <More onClick={() => store.go({ name: 'sign-in-activity', view: 'sign-ins' })}>Sign-in activity</More>}
     </>
   )
 }
@@ -412,10 +413,10 @@ export function Blocked() {
         </div>
       ) : (
         <div className="bdw-body">
-          <BarList tone="bad" items={parts.map((p) => ({ key: p.key, label: p.label, value: p.value, onClick: preview ? undefined : open }))} />
+          <BarList tone="bad" items={parts.map((p) => ({ key: p.key, label: p.label, value: p.value, onClick: preview || HIDE_CHECKS ? undefined : open }))} />
         </div>
       )}
-      <More onClick={open}>Sign-in activity</More>
+      {!HIDE_CHECKS && <More onClick={open}>Sign-in activity</More>}
     </>
   )
 }
@@ -632,7 +633,7 @@ export function RecentSignIns() {
           }))}
         />
       </div>
-      <More onClick={() => store.go({ name: 'sign-in-activity', view: 'sign-ins' })}>Sign-in activity</More>
+      {!HIDE_CHECKS && <More onClick={() => store.go({ name: 'sign-in-activity', view: 'sign-ins' })}>Sign-in activity</More>}
     </>
   )
 }

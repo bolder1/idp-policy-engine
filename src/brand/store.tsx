@@ -49,7 +49,7 @@ import { normaliseHook, type Hook } from './hooks'
 import { refusesStatus, settled, showcaseTenant, tenantAt, testerTenant, type Tenant } from './fixtures'
 import { SHOWCASE } from './showcase'
 import { EMPTY_TENANT, emptyTenant } from './empty-tenant'
-import { TESTER, testerFeatures } from './tester'
+import { CHECKS_WITHHELD, TESTER, testerFeatures } from './tester'
 import { EMPTY_LEGACY, MIGRATE_SCALE, showcaseLegacy, type DeadlineView, type LegacyEstate } from './migrate/legacy'
 import { scaleApps, scaleLegacy } from './migrate/scale-seed'
 
@@ -1798,8 +1798,8 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
     return () => window.clearInterval(t)
   }, [moveJob?.status, policiesRef, appsRef, setApps, showToast, go])
 
-  /* The phase 1 tester build (tester.ts) withholds Check access, Access checks and Sign-in activity. */
-  const testerView = useMemo<BrandStore>(() => (TESTER ? { ...value, features: testerFeatures(value.features) } : value), [value])
+  /* Tester and Dev handoff (tester.ts CHECKS_WITHHELD) withhold Check access, Access checks and Sign-in activity. */
+  const testerView = useMemo<BrandStore>(() => (CHECKS_WITHHELD ? { ...value, features: testerFeatures(value.features) } : value), [value])
 
   return (
     <Ctx.Provider value={testerView}>

@@ -7,7 +7,7 @@ import { Face, FaceStack } from '../faces'
 import { Picker } from '../picker'
 import { PageHead } from '../Shell'
 import { SHOWCASE } from '../showcase'
-import { TESTER } from '../tester'
+import { CHECKS_WITHHELD } from '../tester'
 import { useBrand } from '../store'
 import type { User } from '../data'
 import { groupNamesOf, notBuilt, rolesOf } from './directory-model'
@@ -49,7 +49,7 @@ const ROLE_ROW_H = 52
 
 const USER_MENU: MenuItem[] = [
   { id: 'details', label: 'View details', icon: PanelRight },
-  ...(TESTER ? [] : [{ id: 'check', label: ACCESS_CHECK, icon: LogIn }]),
+  ...(CHECKS_WITHHELD ? [] : [{ id: 'check', label: ACCESS_CHECK, icon: LogIn }]),
   { id: 'edit', label: 'Edit user', icon: Pencil },
   { id: 'delete', label: 'Delete user', icon: Trash2, danger: true, divide: true },
 ]

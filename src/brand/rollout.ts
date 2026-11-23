@@ -77,6 +77,10 @@ export const ROLLOUT = {
    *  stay in reach below 1120px instead of slipping under the rail, and initials on the board meet the 12px floor.
    *  Design only until the owner has checked it. */
   dashboardPolish: ['design'],
+  /** Deny in the policy builder carries the live console's email alerts: send to administrators and end users, the
+   *  administrator address, and the four events, above the Deny message (23 Nov). Every line, on the owner's word
+   *  ("change this globally ... update all 3 roles"). */
+  denyAlerts: ALL,
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

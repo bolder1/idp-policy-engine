@@ -18,23 +18,29 @@ import {
   Timer,
   Usb,
   UserCheck,
+  UserCog,
   UserRound,
+  Users,
   XCircle,
 } from 'lucide-react'
 
-import { CheckRow } from '../../kit'
+import { CheckRow, Toggle } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import { Picker } from '../../picker'
 import { DENIAL_REASONS } from '../sign-in-tests/phase'
 import { DENY_ACTION_SUGGESTION, denyReasonOfRule } from '../testing/deny-reason'
-import { DEFAULT_DENY_MESSAGE, DENY_EXTRA_MAX, DENY_MESSAGE_MAX, type AccessDecision, type Rule } from '../../data'
+import { DEFAULT_DENY_MESSAGE, DENY_ALERT_EVENTS, DENY_EXTRA_MAX, DENY_MESSAGE_MAX, type AccessDecision, type DenyAlertEvent, type Rule } from '../../data'
+import { shows } from '../../rollout'
 import { methodById } from '../../methods'
 import { PUSH_OPTIONS_IN_POLICY } from '../../mfa-settings'
 import { METHODS } from '../rule-form'
 import { METHOD_PREFIX, firstFactorPatch, firstFactorValue } from './first-factor'
 import { isPristine } from './parts'
-import { Prop } from './Section'
+import { Prop, Seg } from './Section'
 import { useShows } from './builder-version'
+
+/* Deny's email alerts (rollout.ts `denyAlerts`), read once. */
+const DENY_ALERTS = shows('denyAlerts')
 
 /* -----------------------------------------------------------------------------
    THEN — what happens when the rule matches.
@@ -635,6 +641,7 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
   const denyExtras = useShows('denyExtras')
   const id = useId()
   const value = rule.denyMessage ?? ''
+  if (DENY_ALERTS) return <DenyOutcome rule={rule} onPatch={onPatch} />
   return (
     <div className="bb__thenfield bb__deny">
       <label className="bb__thenlabel" htmlFor={id}>
@@ -687,5 +694,188 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
         </>
       )}
     </div>
+  )
+}
+
+/* --- Deny: an Email alerts card, then a Deny message card -----------------------------------
+
+   The live console's "Email Alerts and Custom Error Message" card (Configure Adaptive Policy), brought onto the rule
+   that denies (owner, 23 Nov 2026: "add the whole Email part in the deny"), its fields and order kept.
+
+   Shaped over four looks the same day. Kept: two cards, Email alerts with its switch in the head and Deny message
+   apart ("I like the older toggle one ... segregate both"); inside, the events as the builder's check rows, the way
+   Allow's options are. Redone twice: who is emailed. Plain checks hid what each choice adds; recipient cards that opened
+   were boxes in a box with a check inside a check. Now it is one answer on the builder's segmented control
+   (Administrators, End users, Both): administrators add their address field under it, end users add the last event,
+   "Number of device registrations exceeded allowed count", to the list (owner: "for end user add one last in the
+   row"). The events carry no line under them; their words say it ("self-explanatory enough").
+
+   Switching alerts off clears them from the rule, as Deny clears Allow's factors. Switching on picks administrators,
+   the console's own first box. */
+const ALERTS_OFF: Partial<Rule> = { denyAlertAdmins: undefined, denyAlertUsers: undefined, denyAlertEmail: undefined, denyAlertOn: undefined }
+
+function DenyOutcome({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  return (
+    <div className="bb__thenfield bb__denyx">
+      <DenyAlerts rule={rule} onPatch={onPatch} />
+      <DenyMessageCard rule={rule} onPatch={onPatch} />
+    </div>
+  )
+}
+
+type AlertTo = 'admins' | 'users' | 'both'
+const ALERT_TO: { value: AlertTo; label: string; icon: LucideIcon }[] = [
+  { value: 'admins', label: 'Administrators', icon: UserCog },
+  { value: 'users', label: 'End users', icon: UserRound },
+  { value: 'both', label: 'Both', icon: Users },
+]
+
+function DenyAlerts({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  const id = useId()
+  const on = rule.denyAlertOn ?? []
+  const stored = !!(rule.denyAlertAdmins || rule.denyAlertUsers || rule.denyAlertEmail || on.length)
+  /* On with nothing picked yet is a state the rule cannot hold, so the switch keeps it here until a pick lands. */
+  const [opened, setOpened] = useState(stored)
+  const enabled = stored || opened
+  const setEnabled = (next: boolean) => {
+    setOpened(next)
+    onPatch(next ? { denyAlertAdmins: true } : ALERTS_OFF)
+  }
+  const setEvent = (event: DenyAlertEvent, next: boolean) => {
+    const set = next ? [...on, event] : on.filter((e) => e !== event)
+    const ordered = DENY_ALERT_EVENTS.map((e) => e.id).filter((e) => set.includes(e))
+    onPatch({ denyAlertOn: ordered.length ? ordered : undefined })
+  }
+  const to: AlertTo = rule.denyAlertAdmins && rule.denyAlertUsers ? 'both' : rule.denyAlertUsers ? 'users' : 'admins'
+  /* One answer for who, as the console's two boxes give one between them. Leaving administrators drops their address;
+     leaving end users drops the alert only they get. */
+  const setTo = (next: AlertTo) => {
+    const admins = next !== 'users'
+    const users = next !== 'admins'
+    const kept = users ? on : on.filter((e) => !DENY_ALERT_EVENTS.find((d) => d.id === e)?.endUsers)
+    onPatch({
+      denyAlertAdmins: admins || undefined,
+      denyAlertUsers: users || undefined,
+      denyAlertEmail: admins ? rule.denyAlertEmail : undefined,
+      denyAlertOn: kept.length ? kept : undefined,
+    })
+  }
+  const email = (rule.denyAlertEmail ?? '').trim()
+  const emailBad = email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const events = DENY_ALERT_EVENTS.filter((e) => !e.endUsers || rule.denyAlertUsers)
+  return (
+    <section className="bb__dpanel" aria-labelledby={`${id}-title`}>
+      <header className="bb__dpanel__head">
+        <span className="bb__dpanel__ico" aria-hidden="true">
+          <Mail size={16} />
+        </span>
+        <span className="bb__dpanel__title" id={`${id}-title`}>
+          Email alerts
+        </span>
+        <Toggle size="sm" checked={enabled} onChange={setEnabled} label="Email alerts" />
+      </header>
+      {enabled && (
+        <div className="bb__dpanel__body">
+          <div className="bb__dpanel__group">
+            <span className="bb__thenlabel">Send email alerts to</span>
+            <Seg label="Send email alerts to" value={to} options={ALERT_TO} onChange={setTo} block />
+          </div>
+          {rule.denyAlertAdmins && (
+            <div className="bb__dpanel__group">
+              <label className="bb__thenlabel" htmlFor={`${id}-email`}>
+                Administrator’s email address to receive alerts
+              </label>
+              <input
+                id={`${id}-email`}
+                className="bb__input"
+                type="email"
+                value={rule.denyAlertEmail ?? ''}
+                placeholder="Enter email address"
+                aria-invalid={emailBad}
+                aria-describedby={`${id}-email-help${emailBad ? ` ${id}-email-err` : ''}`}
+                onChange={(e) => onPatch({ denyAlertEmail: e.target.value === '' ? undefined : e.target.value })}
+              />
+              <p className={emailBad ? 'bb__denyy__err' : 'bb__denyhelp'} id={emailBad ? `${id}-email-err` : `${id}-email-help`}>
+                {emailBad ? 'Enter a valid email address.' : 'If empty, the main administrator receives the alerts.'}
+              </p>
+            </div>
+          )}
+          <div className="bb__after bb__dpanel__group">
+            <span className="bb__thenlabel">Send email alerts when</span>
+            <div className="bb__opts">
+              {events.map((e) => (
+                <CheckRow key={e.id} label={e.label} checked={on.includes(e.id)} onChange={(v) => setEvent(e.id, v)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function DenyMessageCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  const denyExtras = useShows('denyExtras')
+  const id = useId()
+  const value = rule.denyMessage ?? ''
+  return (
+    <section className="bb__dpanel" aria-labelledby={`${id}-title`}>
+      <header className="bb__dpanel__head">
+        <span className="bb__dpanel__ico" aria-hidden="true">
+          <MessageSquare size={16} />
+        </span>
+        <label className="bb__dpanel__title" id={`${id}-title`} htmlFor={id}>
+          Deny message
+        </label>
+        <span className="bb__dpanel__meta" id={`${id}-count`}>
+          {value.length}/{DENY_MESSAGE_MAX}
+        </span>
+      </header>
+      <div className="bb__dpanel__body">
+        <p className="bb__denyhelp" id={`${id}-help`}>
+          What the user sees when this rule refuses them. <b>Default:</b> {DEFAULT_DENY_MESSAGE}
+        </p>
+        <textarea
+          id={id}
+          rows={3}
+          maxLength={DENY_MESSAGE_MAX}
+          value={value}
+          placeholder="Leave empty to use the default"
+          aria-describedby={`${id}-help ${id}-count`}
+          onChange={(e) => onPatch({ denyMessage: e.target.value === '' ? undefined : e.target.value })}
+        />
+        {DENIAL_REASONS && denyExtras && (
+          <>
+            <label className="bb__thenlabel" htmlFor={`${id}-action`}>
+              Next step
+            </label>
+            <input
+              id={`${id}-action`}
+              type="text"
+              maxLength={DENY_EXTRA_MAX}
+              value={rule.denyAction ?? ''}
+              placeholder="What they can do, for example connect from the office"
+              onChange={(e) => onPatch({ denyAction: e.target.value === '' ? undefined : e.target.value })}
+            />
+            {!rule.denyAction && (
+              <button type="button" className="bb__denysuggest" onClick={() => onPatch({ denyAction: DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)] })}>
+                Use “{DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)]}”
+              </button>
+            )}
+            <label className="bb__thenlabel" htmlFor={`${id}-contact`}>
+              Contact
+            </label>
+            <input
+              id={`${id}-contact`}
+              type="text"
+              maxLength={DENY_EXTRA_MAX}
+              value={rule.denyContact ?? ''}
+              placeholder="Who to ask, for example the IT help desk"
+              onChange={(e) => onPatch({ denyContact: e.target.value === '' ? undefined : e.target.value })}
+            />
+          </>
+        )}
+      </div>
+    </section>
   )
 }

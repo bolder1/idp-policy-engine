@@ -922,8 +922,8 @@ export function CheckRow({
   more,
 }: {
   label: string
-  /** What ticking it does, in a sentence. */
-  hint: string
+  /** What ticking it does, in a sentence. Left out where the label says it all (Deny's email alert events, 23 Nov 2026). */
+  hint?: string
   /** The longer story, in an info tip beside the label (owner, 18 Nov 2026); also read out with the hint. */
   more?: string
   checked: boolean
@@ -937,7 +937,7 @@ export function CheckRow({
       role="checkbox"
       aria-checked={checked}
       aria-labelledby={`${id}-label`}
-      aria-describedby={`${id}-hint`}
+      aria-describedby={hint || more ? `${id}-hint` : undefined}
       disabled={disabled}
       className={`bx-checkrow${checked ? ' is-on' : ''}`}
       onClick={() => onChange(!checked)}
@@ -949,10 +949,12 @@ export function CheckRow({
         {label}
         {more && <TipMark text={more} />}
       </b>
-      <span id={`${id}-hint`} className="bx-checkrow__hint">
-        {hint}
-        {more && <span className="u-sr-only"> {more}</span>}
-      </span>
+      {(hint || more) && (
+        <span id={`${id}-hint`} className="bx-checkrow__hint">
+          {hint}
+          {more && <span className="u-sr-only"> {more}</span>}
+        </span>
+      )}
     </button>
   )
 }

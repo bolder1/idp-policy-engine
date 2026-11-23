@@ -1,4 +1,4 @@
-import { FALLBACK_NAME, fallbackRule, type Policy, type Rule } from '../data'
+import { FALLBACK_NAME, denyAlertKey, fallbackRule, type Policy, type Rule } from '../data'
 import { DECISION_WORDS } from '../decision-words'
 import { sig } from '../predicate'
 import { whoKey } from '../rule-who'
@@ -65,6 +65,7 @@ function aspects(before: Rule, after: Rule, movedTo: number | null, resolve?: Na
   if (after.decision === '2fa' && secondFactorKey(before) !== secondFactorKey(after)) out.push(`Second factor: ${secondFactorSaid(after)}`)
   if (before.enabled !== after.enabled) out.push(after.enabled ? 'Switched on' : 'Switched off')
   if ((before.denyMessage ?? '') !== (after.denyMessage ?? '')) out.push('Deny message')
+  if (denyAlertKey(before) !== denyAlertKey(after)) out.push('Email alerts')
   if ((before.denyAction ?? '') !== (after.denyAction ?? '')) out.push('Deny next step')
   if ((before.denyContact ?? '') !== (after.denyContact ?? '')) out.push('Deny contact')
   return out

@@ -6,14 +6,16 @@ State as of **20 Nov 2026**. This lists every empty state in the console: where 
 
 The empty tenant is a **review tool, not part of the product**. It will be removed (owner, 20 Nov 2026). There are two ways in, both on the **Design** sign-in only (`ROLLOUT.emptyTenant`). Dev handoff and Tester always open their usual tenants.
 
-1. **Go empty** in the account menu, on any server. A card lists what is cleared, each row drains in turn, then the tab reloads empty. **Bring back data** in the same menu reverses it. The switch is a `sessionStorage` flag, so it holds across reloads in that tab only; other tabs keep their data.
+1. **Show empty states** in the account menu, on any server. A card lists what is cleared, each row drains in turn, then the tab reloads empty. **Hide empty states** in the same menu brings the full design version back. The choice is kept in `sessionStorage`, so it holds across reloads in that tab only; other tabs keep their data.
 2. **The empty server:**
 
    ```
    npm run dev:empty      # http://localhost:5191  (.claude/launch.json: "policy-empty")
    ```
 
-   It is a Vite mode (`--mode empty`), so it always opens empty, and the account menu offers neither switch. `npm run dev`, the build and the deploy never open on it.
+   It is a Vite mode (`--mode empty`), so a tab there starts empty; **Hide empty states** still switches that tab to the full version. `npm run dev`, the build and the deploy never start empty.
+
+The full reference for developers (every type, the drawings, copy formulas, edge cases and a searchable list of every place) is the standalone **empty states book**: `docs/artifacts/empty-states-book.html`, local only, not part of the product.
 
 On the empty tenant the **Dashboard** is one empty state ("Nothing to show yet", Add application, `dashboard/DashboardEmpty.tsx`). Its tiles are modelled sign-ins that would read as real numbers on an empty tenant.
 

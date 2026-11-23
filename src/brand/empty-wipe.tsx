@@ -5,7 +5,7 @@ import { Check } from 'lucide-react'
 import { setEmptyTenant } from './empty-tenant'
 
 /* -----------------------------------------------------------------------------
-   The profile menu's Go empty / Bring back data: a REVIEW TOOL, not product (empty-tenant.ts says how to remove it).
+   The profile menu's Show empty states / Hide empty states: a REVIEW TOOL, not product (empty-tenant.ts says how to remove it).
 
    A card over the console names what is cleared, and each row's bar drains in turn (fills, on the way back) and ends
    in a tick; then the tab reloads on the tenant it asked for. With reduced motion the rows are drawn done at once.

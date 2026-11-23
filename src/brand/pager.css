@@ -1,0 +1,84 @@
+/* The table footer with paging (pager.tsx). Design only: the class exists only where `pagination` is on. */
+
+/* The card clips its corners with `overflow: hidden`, which also makes it the scroll container a sticky footer
+   sticks to, so the footer never moved. `clip` keeps the rounded corners without starting a scroll container. */
+.btable-wrap:has(> .bpager) { overflow: clip; }
+
+.bpager {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-8);
+  padding: var(--space-4) var(--space-6);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+/* Under a list rather than inside a card: it draws the card's own edge. Placed at the page's foot by the
+   `.blist__pager` rules it also carries (screens.css), which these override for look only. */
+.bpager.bpager--alone {
+  justify-content: space-between;
+  margin-top: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.bpager__summary { min-width: 0; color: var(--text-tertiary); }
+.bpager__summary:empty { display: none; }
+.bpager__summary:empty + .bpager__controls { margin-left: auto; }
+
+.bpager__controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-7); }
+.bpager__rows { display: inline-flex; align-items: center; gap: var(--space-4); }
+.bpager__label { white-space: nowrap; }
+.bpager__range { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+
+.bpager__pages { display: inline-flex; align-items: center; gap: var(--space-1); }
+.bpager__page {
+  min-width: var(--ctl-height-sm);
+  height: var(--ctl-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.bpager__page:hover:not(.is-on) { background: var(--surface-inset); color: var(--text-primary); }
+.bpager__page:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* Selection is blue, never orange. The rebrand defines the blues; the current look falls back to its slate. */
+.bpager__page.is-on {
+  background: var(--blue-soft, var(--accent-soft));
+  border-color: var(--blue-soft, var(--accent-soft-border));
+  color: var(--blue-strong, var(--accent-strong));
+  font-weight: 600;
+  cursor: default;
+}
+.bpager__gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-8);
+  color: var(--text-tertiary);
+}
+
+@media (pointer: coarse) {
+  .bpager__page { min-width: var(--space-10); height: var(--space-10); }
+}
+
+@media (max-width: 720px) {
+  .bpager { justify-content: flex-start; }
+  .bpager__label { display: none; }
+}

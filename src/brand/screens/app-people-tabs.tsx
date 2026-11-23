@@ -25,6 +25,7 @@ import {
 import { appStanding } from './app-standing'
 import { checkAccessFrom } from './guarded-moves'
 import { ListPager } from './list-pager'
+import { PAGINATION } from '../pager-state'
 import { PageBar } from './page-bar'
 import { usePagedList } from './paged-list'
 import { PolicyDetailsDrawer } from './policy-details-drawer'
@@ -263,9 +264,10 @@ export function AppUsersTab({ appId, group, policy: routePolicy }: { appId: stri
               </tbody>
             </table>
           </div>
+          {PAGINATION && <ListPager {...paged.pager} label="User pages" alone={false} />}
         </div>
       )}
-      {rows.length > 0 && <ListPager {...paged.pager} label="User pages" />}
+      {!PAGINATION && rows.length > 0 && <ListPager {...paged.pager} label="User pages" />}
 
       {/* Open on this application's Users tab, so its link to this application stays here. */}
       <UserDrawer userId={person} onClose={() => setPerson(null)} appOpen={appId} />
@@ -370,9 +372,10 @@ export function AppGroupsTab({ appId, onShowUsers }: { appId: string; onShowUser
               </tbody>
             </table>
           </div>
+          {PAGINATION && <ListPager {...paged.pager} label="Group pages" alone={false} />}
         </div>
       )}
-      {rows.length > 0 && <ListPager {...paged.pager} label="Group pages" />}
+      {!PAGINATION && rows.length > 0 && <ListPager {...paged.pager} label="Group pages" />}
 
       {details.drawer}
     </>

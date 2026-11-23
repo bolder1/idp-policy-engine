@@ -2,6 +2,8 @@ import { useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { IconButton } from '../kit'
+import { Pager } from '../pager'
+import type { Paged } from '../pager-state'
 
 /* The pager under a library list, the live console's shape: "1–8 of 19" and a
    previous and a next arrow. Both arrows stay in place at the ends, disabled,
@@ -19,7 +21,13 @@ export function ListPager({
   onPrev,
   onNext,
   label = 'Pages',
+  paging,
+  alone = true,
 }: {
+  /** Set by `usePagedList` where rows per page is on (Design, rollout.ts `pagination`): draws the shared pager. */
+  paging?: Paged<unknown>
+  /** The shared pager draws its own edge, under the list; false inside a table card. */
+  alone?: boolean
   start: number
   end: number
   total: number
@@ -31,6 +39,7 @@ export function ListPager({
 }) {
   const nav = useRef<HTMLElement | null>(null)
   if (total === 0) return null
+  if (paging) return <Pager paged={paging} label={label} alone={alone} />
 
   const go = (dir: -1 | 1) => {
     const hadFocus = !!nav.current?.contains(document.activeElement)

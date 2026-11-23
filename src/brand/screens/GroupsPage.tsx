@@ -42,6 +42,7 @@ import {
   whoSaid,
 } from './directory-model'
 import { ListPager } from './list-pager'
+import { PAGINATION } from '../pager-state'
 import { PageBar } from './page-bar'
 import { usePagedList } from './paged-list'
 import { PolicyDetailsDrawer } from './policy-details-drawer'
@@ -203,9 +204,10 @@ function GroupList() {
                   </tbody>
                 </table>
               </div>
+              {PAGINATION && <ListPager {...paged.pager} label="Group pages" alone={false} />}
             </div>
           )}
-          {rows.length > 0 && <ListPager {...paged.pager} label="Group pages" />}
+          {!PAGINATION && rows.length > 0 && <ListPager {...paged.pager} label="Group pages" />}
         </>
       )}
     </div>
@@ -601,8 +603,9 @@ function AssignmentTab({ group }: { group: Group }) {
                     </tbody>
                   </table>
                 </div>
+                {PAGINATION && <ListPager {...paged.pager} label="Member pages" alone={false} />}
               </div>
-              <ListPager {...paged.pager} label="Member pages" />
+              {!PAGINATION && <ListPager {...paged.pager} label="Member pages" />}
             </>
           )}
         </>
@@ -812,8 +815,9 @@ function ApplicationsTab({ group }: { group: Group }) {
                 </tbody>
               </table>
             </div>
+            {PAGINATION && <ListPager {...paged.pager} label="Application pages" alone={false} />}
           </div>
-          <ListPager {...paged.pager} label="Application pages" />
+          {!PAGINATION && <ListPager {...paged.pager} label="Application pages" />}
         </>
       )}
 

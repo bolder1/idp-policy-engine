@@ -81,6 +81,10 @@ export const ROLLOUT = {
    *  administrator address, and the four events, above the Deny message (23 Nov). Every line, on the owner's word
    *  ("change this globally ... update all 3 roles"). */
   denyAlerts: ALL,
+  /** Every table pages: one footer (pager.tsx) with Rows per page, the range and page numbers, stuck to the bottom of
+   *  the window (23 Nov, owner: "add pagination ... globally for all the tabs and tables ... static at the bottom").
+   *  The fit-to-window lists take rows per page too. Design only until the owner has checked it. */
+  pagination: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { Check, LayoutDashboard, LayoutGrid, Moon, Plus, Redo2, RotateCcw, Rows3, Settings2, Shapes, Store, Sun, Undo2, type LucideIcon } from 'lucide-react'
+import { Check, Ellipsis, LayoutDashboard,LayoutGrid, Moon, Plus, Redo2, RotateCcw, Rows3, Settings2, Shapes, Store, Sun, Undo2, type LucideIcon } from 'lucide-react'
 import { PageHead } from '../Shell'
 import { EmptyState } from '../empty'
 import { Button, IconButton, Modal, RowMenu, Tabs, type MenuItem } from '../kit'
@@ -18,6 +18,7 @@ import { Library } from './Library'
 import { ThemePicker } from './ThemeMenus'
 import { DASHBOARD_THEMES } from './phase'
 import { useMigrationOpen } from './format'
+import { BoardLoading, useBoardLoading } from './widget-state'
 import { addToRow, addWidget, allCells, arrange, findCell, fromSpecs, hasWidget, removeCell, removeRow, type ArrangeMode, type Cell, type Row } from './layout'
 import {
   RANGES,
@@ -76,7 +77,8 @@ const GRID = shows('dashboardGrid')
 const POLISH = shows('dashboardPolish')
 type Snap = { rows: Row[]; theme: ThemeId }
 
-const ARRANGED: Record<ArrangeMode, string> = { tidy: 'Tidied up', type: 'Arranged by type', need: 'Arranged by need' }
+/* On Design the widgets' sections are topics (model.ts CATEGORIES), so grouping by them says topic, not need. */
+const ARRANGED: Record<ArrangeMode, string> = { tidy: 'Tidied up', type: 'Arranged by type', need: POLISH ? 'Arranged by topic' : 'Arranged by need' }
 
 export function Dashboard({ switches }: { switches?: ReactNode }) {
   const store = useBrand()
@@ -86,6 +88,8 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   const rows = board.rows
   const theme = board.theme
   const range = prefs.range
+  /* The board looks loading on its first paint and after a Range change (states.tsx, Design only). */
+  const loading = useBoardLoading(range)
   const mig = useMigrationOpen()
   /* While the move is open the Migration strip stays where its dashboard put it: first. */
   const pinnedRow = mig.open && rows[0]?.columns.some((c) => c.cells.some((x) => x.widget === 'migration')) ? rows[0].id : null
@@ -359,10 +363,20 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   const ARRANGE: { mode: ArrangeMode; label: string; icon: LucideIcon }[] = [
     { mode: 'tidy', label: 'Tidy up', icon: LayoutGrid },
     { mode: 'type', label: 'Group by type', icon: Shapes },
-    { mode: 'need', label: 'Group by need', icon: Rows3 },
+    { mode: 'need', label: POLISH ? 'Group by topic' : 'Group by need', icon: Rows3 },
   ]
 
   const empty = rows.length === 0
+
+  /* The dock's More, in a narrow window: what the wide dock shows as Layouts and the three arrange icons. */
+  const dockMore: MenuItem[] = [
+    { id: 'layouts', label: 'Layouts', icon: Store },
+    ...ARRANGE.map((a, i) => ({ id: a.mode, label: a.label, icon: a.icon, disabled: empty, divide: i === 0 })),
+  ]
+  const onDockMore = (id: string) => {
+    if (id === 'layouts') setGallery('layout')
+    else doArrange(id as ArrangeMode)
+  }
   /* Stable for a layout, so the board works out which rows have room once per change, not on every render. */
   const onBoard = useCallback((w: WidgetId) => hasWidget(rows, w), [rows])
   /* The console's own dark theme makes the board dark too; then the board's switch has nothing to do and is not shown. */
@@ -442,6 +456,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
             <span>No widgets yet</span>
           </div>
         ) : (
+          <BoardLoading value={loading}>
           <Board
             ref={boardRef}
             rows={rows}
@@ -464,6 +479,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
             }}
             onBoard={onBoard}
           />
+          </BoardLoading>
         )}
       </div>
 
@@ -481,6 +497,52 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
               exit={still ? { opacity: 0, transition: { duration: 0 } } : { y: 16, opacity: 0, transition: { duration: 0.14 } }}
               transition={{ type: 'spring', stiffness: 520, damping: 38 }}
             >
+              {POLISH ? (
+                /* The dock as three groups on frosted glass (owner, 23 Nov 2026: "try glassmorphism for this bar and
+                   rethink this"): build on the left, arrange and history on one tray, finish on the right. */
+                <>
+                  <span className="bdash-dock__group">
+                    <span className="bdash-dock__add">
+                      <Button variant="neutral" icon={Plus} onClick={openLibrary}>
+                        Add widgets
+                      </Button>
+                    </span>
+                    <span className="bdash-dock__more">
+                      <RowMenu label="More" icon={Ellipsis} size="md" align="start" items={dockMore} onSelect={onDockMore} />
+                    </span>
+                    <span className="bdash-dock__wide">
+                      <Button variant="neutral" icon={Store} onClick={() => setGallery('layout')}>
+                        Layouts
+                      </Button>
+                    </span>
+                    {DASHBOARD_THEMES && <ThemePicker value={theme} brand={prefs.brand} onTheme={setTheme} onBrand={(c) => set((p) => ({ ...p, brand: c }))} />}
+                  </span>
+                  <span className="bdash-dock__tray">
+                    <span className="bdash-dock__wide">
+                      <span className="bdash-dock__set" role="group" aria-label="Arrange">
+                        {ARRANGE.map((a) => (
+                          <IconButton key={a.mode} icon={a.icon} label={a.label} tone="ghost" disabled={empty} onClick={() => doArrange(a.mode)} />
+                        ))}
+                      </span>
+                      <span className="bdash-dock__hair" aria-hidden />
+                    </span>
+                    <span className="bdash-dock__set" role="group" aria-label="History">
+                      <IconButton icon={Undo2} label="Undo (Ctrl+Z)" tone="ghost" disabled={past.current.length === 0} onClick={undo} />
+                      <IconButton icon={Redo2} label="Redo (Ctrl+Y)" tone="ghost" disabled={future.current.length === 0} onClick={redo} />
+                      <IconButton icon={RotateCcw} label={`Reset to ${resetTo.name}`} tone="ghost" onClick={reset} />
+                    </span>
+                  </span>
+                  <span className="bdash-dock__group">
+                    <Button variant="ghost" onClick={cancel}>
+                      Cancel
+                    </Button>
+                    <Button variant="brand" icon={Check} onClick={leave}>
+                      Done
+                    </Button>
+                  </span>
+                </>
+              ) : (
+                <>
               <span className="bdash-dock__add">
                 <Button variant="neutral" icon={Plus} onClick={openLibrary}>
                   Add widgets
@@ -512,6 +574,8 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
               <Button variant="brand" icon={Check} onClick={leave}>
                 Done
               </Button>
+                </>
+              )}
             </motion.div>
           </div>
         )}
@@ -525,6 +589,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
         onRemove={removeWidget}
         onClose={closeLibrary}
         row={slot ? { label: slot.label, fits: (w) => addToRow(rows, slot.id, w) !== null } : null}
+        theme={DASHBOARD_THEMES ? theme : 'mono'}
       />
 
       <p className="u-sr-only" aria-live="polite">

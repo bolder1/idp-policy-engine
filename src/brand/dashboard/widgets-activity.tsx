@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, Globe, KeyRound, ShieldCheck, Target } from 'lucide-react'
-import { Badge, Button } from '../kit'
+import { Badge, Button, Tip } from '../kit'
 import { CANT_TELL } from '../decision-words'
 import { Face } from '../faces'
 import { AppLogo } from '../logos/AppLogo'
@@ -34,7 +34,7 @@ import {
   type ChannelId,
   type SeriesKey,
 } from './seed'
-import { NOW, personAt, pickAt, timeAxis, useActivity, usePolicyFacts, useSignIns } from './sources'
+import { NOW, personAt, pickAt, recentMix, timeAxis, useActivity, usePolicyFacts, useSignIns } from './sources'
 import { pickOf, useTile } from './tile-context'
 import { BarList, Clear, Count, Filter, Fit, Head, Legend, Mark, More, Row, Stat, Table, Trend } from './widget-kit'
 import { shows } from '../rollout'
@@ -572,7 +572,11 @@ export function RecentSignIns() {
   const ctx = useTile()
   const rows = useActivity()
   const pick = pickOf(ctx, ['all', 'allowed', 'blocked'] as const)
-  const shown = rows.filter((r) => pick === 'all' || r.result === pick)
+  /* dashboardPolish: a varied handful, not the newest slot's thirteen rows of the same two people (sources.ts). */
+  const shown = useMemo(() => {
+    const picked = rows.filter((r) => pick === 'all' || r.result === pick)
+    return POLISH ? recentMix(picked) : picked
+  }, [rows, pick])
   return (
     <>
       <Head caption="Who signed in to what, and what decided it">
@@ -606,10 +610,23 @@ export function RecentSignIns() {
               <Badge key="result" tone={r.result === 'allowed' ? 'positive' : r.result === 'blocked' ? 'negative' : 'neutral'}>
                 {r.result === 'allowed' ? 'Allowed' : r.result === 'blocked' ? 'Blocked' : CANT_TELL}
               </Badge>,
-              <span className="bdw-cell" key="by">
-                <span>{r.policyName ?? 'No policy'}</span>
-                {r.ruleLine && <em>{r.ruleLine}</em>}
-              </span>,
+              POLISH ? (
+                /* The policy, whole; the rule that decided it on hover, where it has room. */
+                <span className="bdw-cell" key="by">
+                  {r.ruleLine ? (
+                    <Tip text={r.ruleLine} delay={400}>
+                      <span>{r.policyName ?? 'No policy'}</span>
+                    </Tip>
+                  ) : (
+                    <span>{r.policyName ?? 'No policy'}</span>
+                  )}
+                </span>
+              ) : (
+                <span className="bdw-cell" key="by">
+                  <span>{r.policyName ?? 'No policy'}</span>
+                  {r.ruleLine && <em>{r.ruleLine}</em>}
+                </span>
+              ),
               <span key="when">{r.when}</span>,
             ],
           }))}

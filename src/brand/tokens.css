@@ -622,6 +622,19 @@
   --night-el-low: 0 1px 2px rgba(0, 0, 0, 0.5);
   --night-el-mid: 0 6px 18px -8px rgba(0, 0, 0, 0.7);
   --night-el-high: 0 18px 40px -16px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.04);
+
+  /* Frosted glass, for a bar that floats over content (the Dashboard's Customize dock). Light values; the night board
+     says its own on the element (dashboard.css). */
+  --glass-surface: rgba(255, 255, 255, 0.62);
+  --glass-tray: rgba(241, 243, 245, 0.55);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --glass-rim: rgba(20, 30, 40, 0.08);
+  --glass-filter: blur(18px) saturate(1.7);
+  --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 18px 40px -18px rgba(20, 30, 40, 0.35), 0 2px 8px -4px rgba(20, 30, 40, 0.12);
+  --night-glass-surface: rgba(20, 26, 35, 0.62);
+  --night-glass-tray: rgba(255, 255, 255, 0.05);
+  --night-glass-edge: rgba(255, 255, 255, 0.08);
 }
 
 /* --- Priority ramp -------------------------------------------------------------

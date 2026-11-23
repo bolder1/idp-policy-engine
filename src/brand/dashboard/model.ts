@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { WIDGETS } from './catalog'
+import { shows } from '../rollout'
+import { CATEGORIES as SUBJECTS, WIDGETS } from './catalog'
 import { fromBoxes, fromSpecs, newId, tidyRows, toSpecs, type Box, type Cell, type Column, type Row, type RowSpec } from './layout'
 import { DEFAULT_BRAND, DEFAULT_THEME, isBrandColour, isTheme, type ThemeId } from './themes'
 import { OVERVIEW } from './templates'
@@ -13,7 +14,15 @@ import { OVERVIEW } from './templates'
    Everything here is pure except the store at the end.
    -------------------------------------------------------------------------- */
 
-export { CATEGORIES, WIDGETS, WIDGET_IDS, kindOf, viewOf } from './catalog'
+export { WIDGETS, WIDGET_IDS, kindOf, viewOf } from './catalog'
+
+/* 23 Nov (rollout.ts dashboardPolish, owner's pick): widgets are filed by what they show, layouts by who they are for,
+   and no word is in both lists. On Design the widgets' Posture reads as the plainer Security. catalog.ts stays free of
+   imports, so the rename is made here, where every screen reads the list. */
+const POLISH = shows('dashboardPolish')
+
+/** The widget library's sections: what a widget shows. */
+export const CATEGORIES: typeof SUBJECTS = POLISH ? SUBJECTS.map((c) => (c.value === 'posture' ? { ...c, label: 'Security' } : c)) : SUBJECTS
 export type { Category, Kind, ViewChoice, WidgetId, WidgetMeta } from './catalog'
 
 export interface Board {
@@ -34,6 +43,22 @@ export const NEEDS: { value: TemplateNeed; label: string }[] = [
   { value: 'people', label: 'People' },
   { value: 'start', label: 'Getting started' },
 ]
+
+/* The layout gallery's sections on Design: who a layout is for (owner, 23 Nov 2026). A layout keeps its stored need, so
+   nothing saved changes; the role is read from it, and Operations splits in two (the help desk's day, IT's service). */
+export type LayoutRole = 'any' | 'security' | 'helpdesk' | 'it' | 'policy' | 'audit'
+export const ROLES: { value: LayoutRole; label: string }[] = [
+  { value: 'any', label: 'Any admin' },
+  { value: 'security', label: 'Security team' },
+  { value: 'helpdesk', label: 'Help desk' },
+  { value: 'it', label: 'IT admins' },
+  { value: 'policy', label: 'Policy owners' },
+  { value: 'audit', label: 'Auditors' },
+]
+const ROLE_OF_NEED: Record<TemplateNeed, LayoutRole> = { start: 'any', security: 'security', operations: 'helpdesk', people: 'it', policies: 'policy', compliance: 'audit' }
+
+/** Who a layout is for. Service health is IT's, though it is filed under Operations with the help desk's day. */
+export const roleOf = (t: Pick<DashTemplate, 'id' | 'need'>): LayoutRole => (t.id === 'service' ? 'it' : ROLE_OF_NEED[t.need])
 
 export interface DashTemplate {
   id: string

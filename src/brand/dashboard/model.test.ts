@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { WIDGETS, WIDGET_IDS, kindOf, viewOf } from './catalog'
 import { curve, pct, short } from './format'
 import { allCells, fromSpecs, toSpecs } from './layout'
-import { activeBoard, addBoard, applyTemplate, defaultPrefs, duplicateBoard, freshName, parseDash, removeBoard, renameBoard, saveAsTemplate, withRows, withTheme } from './model'
+import { CATEGORIES, ROLES, activeBoard, addBoard, applyTemplate, defaultPrefs, duplicateBoard, freshName, parseDash, removeBoard, renameBoard, saveAsTemplate, roleOf, withRows, withTheme } from './model'
 import { CHANNELS, METHODS, PLACES, REASON_SHARES, busiest, change, delivery, funnel, previousSeries, registrations, signInSeries, split, totals, typicalWeek } from './seed'
 import { BLANK_ID, OVERVIEW, XECURIFY_TEMPLATES } from './templates'
 import { BRAND_SWATCHES, THEMES, THEME_IDS, isBrandColour, isTheme } from './themes'
@@ -226,5 +226,23 @@ describe('words and curves', () => {
     expect(Math.max(...ys)).toBeLessThanOrEqual(100)
     expect(curve([[0, 5], [10, 9]])).toBe('M0.0,5.0L10.0,9.0')
     expect(curve([])).toBe('')
+  })
+})
+
+describe('layouts by who they are for (model.ts ROLES)', () => {
+  it('gives every built-in layout a role, and every role at least one layout', () => {
+    const roles = new Set(XECURIFY_TEMPLATES.map((t) => roleOf(t)))
+    for (const t of XECURIFY_TEMPLATES) expect(ROLES.map((r) => r.value), t.id).toContain(roleOf(t))
+    for (const r of ROLES) expect(roles.has(r.value), r.label).toBe(true)
+  })
+
+  it('splits Operations: the help desk keeps Daily operations, IT gets Service health', () => {
+    expect(roleOf({ id: 'operations', need: 'operations' })).toBe('helpdesk')
+    expect(roleOf({ id: 'service', need: 'operations' })).toBe('it')
+  })
+
+  it('shares no section name between the widget library and the layout gallery', () => {
+    const widgetWords = new Set(CATEGORIES.map((c) => c.label))
+    expect(ROLES.filter((r) => widgetWords.has(r.label))).toEqual([])
   })
 })

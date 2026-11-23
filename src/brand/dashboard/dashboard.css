@@ -3228,3 +3228,338 @@ button.bdw-bar__row:hover .bdw-bar {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+/* A table's rows share the tile's height instead of leaving a part row of empty space under the last one (Recent
+   sign-ins). The count still comes from the 44 px pitch (widget-kit `Table`); a row only grows, to 56 px at most. */
+.bdash[data-polish] .bdw-table__row {
+  flex: 1 1 44px;
+  height: auto;
+  min-height: 44px;
+  max-height: 56px;
+}
+
+/* A library picture draws its data in the board's theme, not its need's hue (pictures.tsx `WidgetPicture`). The
+   corner tab keeps the need's colour, as in the template store. */
+.wpic[data-dash-theme] {
+  --dash-brand: var(--brand);
+  --tpl: var(--dash-hue);
+}
+
+/* ---- Customize, quieter (22 Nov audit, round 3) ----------------------------------------------------------------------
+   Every tile drew its ⊖ and grip, and every row its margin tools, all the time. With a mouse, a tile's own controls show
+   on the tile under the pointer, in focus or picked up; a row's tools rest faint and come up when the pointer is in that
+   row's margin. A touch screen has no hover, so it keeps them all. */
+@media (hover: hover) {
+  .bdash[data-polish] :is(.bdash-tile__remove, .bdash-tile__grab) {
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-standard);
+  }
+  .bdash[data-polish] .bdash-tile:is(:hover, :focus-within, .is-picked) :is(.bdash-tile__remove, .bdash-tile__grab) {
+    opacity: 1;
+  }
+  .bdash[data-polish] .bdash-row__tools {
+    opacity: 0.55;
+    transition: opacity var(--dur-fast) var(--ease-standard);
+  }
+  .bdash[data-polish] .bdash-band:is(:hover, :focus-within, .is-moving) > .bdash-row__tools,
+  .bdash[data-polish] .bdash-row__tools:has(.is-open, [aria-expanded='true']) {
+    opacity: 1;
+  }
+  /* The row's margin, as something to point at: the band itself lets the pointer through to the widgets. */
+  .bdash[data-polish] .bdash-band::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -40px;
+    width: 40px;
+    pointer-events: auto;
+  }
+}
+
+/* ---- the row handle (23 Nov, dashboardPolish) -------------------------------------------------------------------------
+   A row's layout, grip and Add here were three loose controls at three offsets, and at desktop width the grip ran 2px
+   under the rail. Now they are one rounded handle, centred on the row, 10px left of it. In Customize the board takes a
+   48px gutter at every width (the page's own 32px, or 20px under 1120, plus a margin), so the handle stays clear of the
+   rail. */
+.bdash[data-polish] .bdash-board.is-editing {
+  margin-left: var(--space-6);
+}
+@media (max-width: 1120px) {
+  .bdash[data-polish] .bdash-board.is-editing {
+    margin-left: calc(var(--space-7) + var(--space-4));
+  }
+}
+.bdash[data-polish] .bdash-row__tools {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: -40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  translate: 0 -50%;
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  pointer-events: auto;
+}
+/* Inside the handle each tool is one 24px button in a column: no offsets of their own, no borders of their own. */
+.bdash[data-polish] .bdash-row__tools > :is(.bdash-row__grip, .bdash-row__split, .bdash-row__add) {
+  position: static;
+}
+.bdash[data-polish] .bdash-row__tools :is(.bdash-row__splitbtn, .bdash-row__add, .bdash-row__grip .bx-rowmenu) {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+}
+.bdash[data-polish] .bdash-row__tools .bdash-row__grip .bx-rowmenu {
+  height: 28px;
+}
+.bdash[data-polish] .bdash-row__tools :is(.bdash-row__splitbtn, .bdash-row__add, .bdash-row__grip .bx-rowmenu):hover,
+.bdash[data-polish] .bdash-row__tools :is(.bdash-row__splitbtn[aria-expanded='true'], .bdash-row__grip .bx-rowmenu.is-open) {
+  background: var(--state-hover-bg);
+  color: var(--text-primary);
+}
+/* Pointing at the grip outlines the row it moves, as before; the grip now sits inside the handle. */
+.bdash[data-polish] .bdash-band:has(.bdash-row__tools .bdash-row__grip:hover)::after,
+.bdash[data-polish] .bdash-band:has(.bdash-row__tools .bdash-row__grip .is-open)::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: var(--bw-default) solid var(--accent);
+  border-radius: calc(var(--radius-xl) + 6px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* The dock in a narrow window: Layouts and the arrange icons fold into More (Dashboard.tsx), so it keeps to one line. */
+.bdash-dock__wide {
+  display: contents;
+}
+.bdash-dock__more {
+  display: none;
+}
+@media (max-width: 1119px) {
+  .bdash[data-polish] .bdash-dock__wide {
+    display: none;
+  }
+  .bdash[data-polish] .bdash-dock__more {
+    display: inline-flex;
+  }
+}
+
+/* ---- the dock on frosted glass (23 Nov, dashboardPolish) -----------------------------------------------------------
+   Owner, 23 Nov 2026: "try glassmorphism for this bar and rethink this". The board shows through, blurred, as the dock
+   rides over it. Three groups instead of one run of separators: build (Add widgets, Layouts, Theme), one tray for
+   arranging and history (Reset is an icon there, named by its tip), and finish (Cancel, Done). */
+.bdash[data-polish] .bdash-dock__bar {
+  gap: var(--space-5);
+  padding: var(--space-3);
+  border: var(--bw-thin) solid var(--glass-edge);
+  border-radius: var(--radius-2xl);
+  background: var(--glass-surface);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    var(--glass-shine),
+    0 0 0 var(--bw-thin) var(--glass-rim),
+    var(--glass-shadow);
+}
+.bdash[data-polish] .bdash-dock__group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bdash[data-polish] .bdash-dock__tray {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-xl);
+  background: var(--glass-tray);
+  box-shadow: inset 0 0 0 var(--bw-thin) var(--glass-rim);
+}
+.bdash[data-polish] .bdash-dock__set {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.bdash[data-polish] .bdash-dock__hair {
+  flex: none;
+  width: var(--bw-thin);
+  height: 20px;
+  margin: 0 var(--space-3);
+  background: var(--glass-rim);
+}
+.bdash[data-polish] .bdash-dock__tray .bx-iconbtn:not(:disabled):hover {
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+/* Layouts and Theme sit on the glass as lighter panes of it, not as solid white blocks. */
+.bdash[data-polish] .bdash-dock__group > :not(.bdash-dock__add) .bx-btn--neutral,
+.bdash[data-polish] .bdash-dock__group > .bx-btn--neutral {
+  border-color: var(--glass-edge);
+  background: var(--glass-tray);
+}
+.bdash[data-polish] .bdash-dock__group > :not(.bdash-dock__add) .bx-btn--neutral:not(:disabled):hover {
+  background: var(--surface-raised);
+}
+.bdash[data-polish][data-look='dark'] .bdash-dock__bar {
+  --glass-surface: var(--night-glass-surface);
+  --glass-tray: var(--night-glass-tray);
+  --glass-edge: var(--night-glass-edge);
+  --glass-rim: var(--night-edge);
+  --glass-shine: inset 0 1px 0 var(--night-shine);
+  --glass-shadow: var(--night-el-high);
+}
+/* Too narrow to arrange: the board's "Widen the window" line sits above it, and since the head became one band (round
+   2) it ran into the tabs. In Customize the stacked board makes room for it. */
+.bdash[data-polish] .bdash-board.is-editing.is-stacked {
+  margin-top: var(--space-8);
+}
+
+/* Asked for less see-through (a system setting): the dock is solid again. */
+@media (prefers-reduced-transparency: reduce) {
+  .bdash[data-polish] .bdash-dock__bar {
+    background: var(--surface-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* The night board in the light console: an edge and a soft shadow, so it reads as a panel set in the page rather than
+   a hole cut in it. */
+.bdash[data-polish][data-look='dark']::before {
+  box-shadow:
+    0 0 0 var(--bw-thin) var(--night-edge-strong),
+    var(--night-shadow);
+}
+
+/* ---- widget states (22 Nov audit #12, states.tsx) --------------------------------------------------------------------
+   Loading is a skeleton in the widget's own shape, with a slow sheen that stops under reduced motion. Empty and
+   Couldn't load sit in the middle of the widget: a quiet mark, a few words, and for an error, Retry. Only Design draws
+   them (states.tsx reads dashboardPolish), so the rules need no scope of their own. */
+.bdw-state {
+  position: relative;
+}
+.bdw-state__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.bdw-skel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+.bdw-skel.is-ring {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-8);
+}
+.bdw-skel__bar,
+.bdw-skel__col,
+.bdw-skel__ring {
+  background: var(--dash-bar);
+  background-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface-raised) 70%, transparent), transparent);
+  background-repeat: no-repeat;
+  background-size: 50% 100%;
+  animation: bdw-sheen 1.4s var(--ease-standard) infinite;
+}
+.bdw-skel__bar {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-sm);
+}
+.bdw-skel__bar.is-num {
+  width: 40%;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.bdw-skel__bar.is-line {
+  width: 70%;
+}
+.bdw-skel__bar.is-short {
+  width: 45%;
+}
+.bdw-skel__bar.is-row {
+  height: 28px;
+  border-radius: var(--radius-md);
+}
+.bdw-skel__bar.is-head {
+  height: 20px;
+  opacity: 0.6;
+}
+.bdw-skel__rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.bdw-skel__plot {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  gap: var(--space-3);
+  min-height: 0;
+}
+.bdw-skel__col {
+  flex: 1;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.bdw-skel__ring {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+}
+@keyframes bdw-sheen {
+  from {
+    background-position: -100% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bdw-skel__bar,
+  .bdw-skel__col,
+  .bdw-skel__ring {
+    background-image: none;
+    animation: none;
+  }
+}
+.bdw-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+.bdw-empty p {
+  margin: 0;
+}
+/* A short widget (the Migration strip) puts the mark, the words and Retry in one line, so nothing is cut off. */
+.bdw-state {
+  container-type: size;
+}
+@container (max-height: 120px) {
+  .bdw-empty {
+    flex-direction: row;
+  }
+}

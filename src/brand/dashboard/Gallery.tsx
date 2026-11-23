@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
 import { Store, Trash2 } from 'lucide-react'
 import { Button, Chip, RowMenu } from '../kit'
+import { shows } from '../rollout'
 import { allCells, fromSpecs } from './layout'
 import { Market } from './Market'
 import { MiniRows } from './mini'
-import { NEEDS, WIDGETS, type DashTemplate, type TemplateNeed } from './model'
+import { NEEDS, ROLES, WIDGETS, roleOf, type DashTemplate, type LayoutRole, type TemplateNeed } from './model'
 import { XECURIFY_TEMPLATES } from './templates'
 
 /* -----------------------------------------------------------------------------
@@ -22,6 +23,10 @@ import { XECURIFY_TEMPLATES } from './templates'
 
 export type GalleryMode = 'first' | 'new' | 'layout'
 
+/* 22 Nov audit (rollout.ts dashboardPolish): the first visit's Not now said twice, once as the header's close (its
+   label) and once floating on the chip row. The header's close is the one that stays. */
+const POLISH = shows('dashboardPolish')
+
 const WORDS: Record<GalleryMode, { title: string; by: string; go: string; close: string }> = {
   first: { title: 'Choose a starting point', by: 'Every layout can be changed afterwards', go: 'Use this layout', close: 'Not now' },
   new: { title: 'New dashboard', by: 'Start from a layout, or from nothing', go: 'Create dashboard', close: 'Close' },
@@ -31,7 +36,15 @@ const WORDS: Record<GalleryMode, { title: string; by: string; go: string; close:
 /** A need's colour, from the template store's set (create.css `.bgcard.is-cat-*`). */
 const HUE: Record<TemplateNeed, string> = { security: 'risk', operations: 'device', policies: 'quick', compliance: 'compliance', people: 'reuse', start: 'neutral' }
 
-type Shelf = TemplateNeed | 'all' | 'own'
+/** A role's colour on Design, from the same set. */
+const ROLE_HUE: Record<LayoutRole, string> = { any: 'neutral', security: 'risk', helpdesk: 'device', it: 'reuse', policy: 'quick', audit: 'compliance' }
+
+/* The gallery's sections: who a layout is for on Design (model.ts ROLES), its need elsewhere. */
+const SECTIONS: { value: TemplateNeed | LayoutRole; label: string }[] = POLISH ? ROLES : NEEDS
+const sectionOf = (t: DashTemplate): TemplateNeed | LayoutRole => (POLISH ? roleOf(t) : t.need)
+const hueOf = (t: DashTemplate): string => (t.own ? 'neutral' : POLISH ? ROLE_HUE[roleOf(t)] : HUE[t.need])
+
+type Shelf = TemplateNeed | LayoutRole | 'all' | 'own'
 
 export function Gallery({
   mode,
@@ -52,8 +65,8 @@ export function Gallery({
   /* What each layout holds, for the search: its widgets' names as well as its own words. */
   const said = useMemo(() => new Map(all.map((t) => [t.id, `${t.name} ${t.blurb} ${allCells(fromSpecs(t.rows)).map((x) => WIDGETS[x.widget].name).join(' ')}`.toLowerCase()])), [all])
   const words = q.trim().toLowerCase()
-  const shown = all.filter((t) => (shelf === 'all' || (shelf === 'own' ? t.own : !t.own && t.need === shelf)) && (!words || (said.get(t.id) ?? '').includes(words)))
-  const shelves: { value: Shelf; label: string }[] = [{ value: 'all', label: 'All layouts' }, ...NEEDS, ...(own.length ? [{ value: 'own' as const, label: 'Yours' }] : [])]
+  const shown = all.filter((t) => (shelf === 'all' || (shelf === 'own' ? t.own : !t.own && sectionOf(t) === shelf)) && (!words || (said.get(t.id) ?? '').includes(words)))
+  const shelves: { value: Shelf; label: string }[] = [{ value: 'all', label: 'All layouts' }, ...SECTIONS, ...(own.length ? [{ value: 'own' as const, label: 'Yours' }] : [])]
   /* The words it opened with, kept while it closes. */
   const last = useRef<GalleryMode>('layout')
   if (mode) last.current = mode
@@ -62,14 +75,14 @@ export function Gallery({
   return (
     <Market open={mode !== null} title={w.title} by={w.by} icon={Store} query={q} onQuery={setQ} placeholder="Search layouts" closeLabel={w.close} onClose={onClose}>
       <div className="bdash-market__top">
-        <div className="bmarket__chips" role="group" aria-label="Layouts by need">
+        <div className="bmarket__chips" role="group" aria-label={POLISH ? 'Layouts by who they are for' : 'Layouts by need'}>
           {shelves.map((s) => (
             <Chip key={s.value} active={shelf === s.value} onClick={() => setShelf(s.value)}>
               {s.label}
             </Chip>
           ))}
         </div>
-        {mode === 'first' && (
+        {mode === 'first' && !POLISH && (
           <Button variant="ghost" onClick={onClose}>
             Not now
           </Button>
@@ -86,9 +99,9 @@ export function Gallery({
 }
 
 function LayoutCard({ t, go, onUse, onRemove }: { t: DashTemplate; go: string; onUse: (t: DashTemplate) => void; onRemove?: (t: DashTemplate) => void }) {
-  const need = t.own ? 'Yours' : (NEEDS.find((n) => n.value === t.need)?.label ?? '')
+  const need = t.own ? 'Yours' : (SECTIONS.find((n) => n.value === sectionOf(t))?.label ?? '')
   return (
-    <article className={`bgcard bdash-lcard is-cat-${t.own ? 'neutral' : HUE[t.need]}`}>
+    <article className={`bgcard bdash-lcard is-cat-${hueOf(t)}`}>
       <span className="bgcard__cat">{need}</span>
       <div className="bgcard__in">
         <div className="bgcard__canvas is-picture">

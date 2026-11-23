@@ -2,6 +2,8 @@ import type { ComponentType } from 'react'
 import { WIDGETS, type Range, type WidgetId } from './model'
 import type { Cell } from './layout'
 import { TileContext } from './tile-context'
+import { StateFace } from './states'
+import { useWidgetState } from './widget-state'
 import {
   ActivePolicies,
   AppsWithout,
@@ -95,10 +97,13 @@ const NOTHING = () => {}
 /** One widget drawn for a tile. `preview` draws it to be looked at: inert, never orange, not animating. */
 export function WidgetBody({ tile, range, preview = false, onPatch = NOTHING }: { tile: Pick<Cell, 'widget' | 'view' | 'pick'>; range: Range; preview?: boolean; onPatch?: (p: Partial<Pick<Cell, 'view' | 'pick'>>) => void }) {
   const View = VIEW[tile.widget]
+  const kind = WIDGETS[tile.widget].kind
+  /* Loading, empty or couldn't load (states.tsx, Design only); a picture is always ready. */
+  const { state, retry } = useWidgetState(preview)
   return (
     <TileContext value={{ tile, meta: WIDGETS[tile.widget], range, preview, patch: onPatch }}>
-      <div className={`bdw is-${WIDGETS[tile.widget].kind}`}>
-        <View />
+      <div className={`bdw is-${kind}${state !== 'ready' ? ` is-state-${state}` : ''}`}>
+        {state === 'ready' ? <View /> : <StateFace state={state} kind={kind} onRetry={retry} />}
       </div>
     </TileContext>
   )

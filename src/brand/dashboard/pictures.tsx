@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Activity, Check, ListChecks, Plus, Settings2, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
+import { shows } from '../rollout'
 import { WIDGETS, type Category, type WidgetId } from './catalog'
+import type { ThemeId } from './themes'
 
 /* -----------------------------------------------------------------------------
    A widget's picture in Add widgets: a small panel of the widget itself, with
@@ -17,6 +19,10 @@ import { WIDGETS, type Category, type WidgetId } from './catalog'
    -------------------------------------------------------------------------- */
 
 const CAT_ICON: Record<Category, LucideIcon> = { posture: ShieldCheck, activity: Activity, engine: ListChecks, people: Users, admin: Settings2 }
+
+/* 22 Nov audit (rollout.ts dashboardPolish): a picture says what the widget on the board says. Stat cards on the board
+   carry no sparkline, Policy health runs its own checks, and the data takes the board's theme, not the need's hue. */
+const POLISH = shows('dashboardPolish')
 
 const at = (i: number, more: CSSProperties = {}): CSSProperties => ({ ['--i' as string]: i, ...more })
 
@@ -100,7 +106,8 @@ const FEED: Partial<Record<WidgetId, string[]>> = {
 }
 
 const CHECKS: Partial<Record<WidgetId, string[]>> = {
-  health: ['Every app has a policy', 'No rule is hidden by another', 'MFA on admin apps'],
+  /* The board's Health (widgets-activity.tsx), as it reads when its checks pass. */
+  health: POLISH ? ['No drafts waiting', 'No inactive policies', 'No app has two active policies'] : ['Every app has a policy', 'No rule is hidden by another', 'MFA on admin apps'],
   setup: ['Add your applications', 'Connect a directory', 'Turn on a sign-in policy'],
 }
 
@@ -132,9 +139,11 @@ function Stat({ widget }: { widget: WidgetId }) {
         </strong>
         <span className={`wpic__chip is-${s.tone}`}>{s.trend}</span>
       </span>
-      <svg className="wpic__spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden>
-        <path className="wpic__line" pathLength={1} d="M0 22 C 14 18, 24 25, 38 17 S 62 9, 78 14 S 104 5, 120 4" />
-      </svg>
+      {!POLISH && (
+        <svg className="wpic__spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden>
+          <path className="wpic__line" pathLength={1} d="M0 22 C 14 18, 24 25, 38 17 S 62 9, 78 14 S 104 5, 120 4" />
+        </svg>
+      )}
     </>
   )
 }
@@ -513,7 +522,7 @@ function Note() {
 }
 
 /** The picture of one widget, by how it shows its data. Decorative: the card's own words name it. */
-export function WidgetPicture({ widget }: { widget: WidgetId }) {
+export function WidgetPicture({ widget, theme }: { widget: WidgetId; theme?: ThemeId }) {
   const m = WIDGETS[widget]
   const Icon = CAT_ICON[m.category]
   const body = (() => {
@@ -561,7 +570,7 @@ export function WidgetPicture({ widget }: { widget: WidgetId }) {
     }
   })()
   return (
-    <span className={`bgviz wpic is-${m.kind}`} aria-hidden>
+    <span className={`bgviz wpic is-${m.kind}`} data-dash-theme={POLISH ? theme : undefined} aria-hidden>
       <span className="bgviz__head">
         <span className="bgviz__icon">
           <Icon size={13} strokeWidth={2} />

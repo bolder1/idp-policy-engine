@@ -64,10 +64,42 @@ export function useActivity(): ActivityRow[] {
   const store = useBrand()
   const env = useSimEnv()
   return useMemo(
-    () => [...signInActivity(store.policies, env, SAMPLE_DAY, store.apps)].sort((a, b) => b.date.localeCompare(a.date) || b.when.localeCompare(a.when)),
+    () => [...signInActivity(store.policies, env, SAMPLE_DAY, store.apps)].sort(newestFirst),
     [store.policies, env, store.apps],
   )
 }
+
+/**
+ * Recent sign-ins as the dashboard shows them (dashboardPolish): a varied handful from the newest-first week.
+ *
+ * `rows` is newest first. In the seed every application shares the same twelve time slots, so the newest slot
+ * alone is 13 rows, mostly Sanjay Bhatt and Arun Patel, all Allowed. Return the rows in the order the table should
+ * show them; the table shows only as many from the top as fit (4 to 8), so the first few matter most. Pure.
+ */
+export function recentMix(rows: readonly ActivityRow[]): ActivityRow[] {
+  /* Each person's newest sign-in, newest people first: nobody repeats until everyone has had a row. */
+  const seen = new Set<string>()
+  const spread = rows.filter((r) => !seen.has(r.who) && !!seen.add(r.who))
+  const head = spread.slice(0, MIX_HEAD)
+  /* A refusal in the top rows when the week has one: it takes its own person's place, or the last place. */
+  const blocked = rows.find((r) => r.result === 'blocked')
+  if (blocked && !head.some((r) => r.result === 'blocked')) {
+    const own = head.findIndex((r) => r.who === blocked.who)
+    head.splice(own >= 0 ? own : head.length - 1, 1, blocked)
+  }
+  head.sort(newestFirst)
+  /* Then the other people, from where the top rows end, so When keeps reading down in time; then everything else. */
+  const last = head.at(-1)
+  const people = new Set(head.map((r) => r.who))
+  const next = last ? rows.filter((r) => newestFirst(last, r) <= 0 && !head.includes(r) && !people.has(r.who) && !!people.add(r.who)) : []
+  const used = new Set([...head, ...next].map((r) => r.id))
+  return [...head, ...next, ...rows.filter((r) => !used.has(r.id))]
+}
+
+/** How many rows `recentMix` arranges: the fewest a Recent sign-ins tile shows at its smallest. */
+const MIX_HEAD = 4
+
+const newestFirst = (a: ActivityRow, b: ActivityRow) => b.date.localeCompare(a.date) || b.when.localeCompare(a.when)
 
 /** The person at a position in the directory, wrapping round: sample data names nobody itself. */
 export const personAt = (users: readonly User[], n: number): User | undefined => (users.length ? users[n % users.length] : undefined)

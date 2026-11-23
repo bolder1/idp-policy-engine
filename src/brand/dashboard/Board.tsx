@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'motion/react'
-import { GripVertical, Plus } from 'lucide-react'
+import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, ChevronsDownUp, ChevronsUpDown, Columns3, GripVertical, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { RowMenu, type MenuItem } from '../kit'
 import { appRoot } from '../dialog-chrome'
 import { pct, useSize } from './format'
@@ -90,6 +90,8 @@ interface Drop {
 /** The drop previews live: once the pointer rests on a place, the board makes room there and the widget's slot moves to
     it, so what is let go is what was seen (owner, 20 Nov 2026: "like a preview"). Design only (rollout.ts). */
 const LIVE = shows('dashboardGrid')
+/* 23 Nov (rollout.ts dashboardPolish): a row's tools are one handle beside it, and its menu does more. */
+const POLISH = shows('dashboardPolish')
 /** How long the pointer rests on a place before the board makes room there: long enough that sweeping across the board
     does not shuffle it, short enough to feel immediate. */
 const DWELL_MS = 90
@@ -974,7 +976,24 @@ export function Board({
 
   /* ---- rows ---- */
 
-  const rowMenu = (row: Row, index: number): MenuItem[] => [
+  const rowMenu = (row: Row, index: number): MenuItem[] => {
+    const top = pinnedRow !== null && rows[0]?.id === pinnedRow ? 1 : 0
+    if (POLISH)
+      return [
+        ...(roomy.has(row.id) ? [{ id: 'add', label: 'Add a widget here', icon: Plus }] : []),
+        { id: 'even', label: 'Even out widths', icon: Columns3, disabled: row.columns.length < 2, divide: roomy.has(row.id) },
+        { id: 'short', label: 'Make shortest', icon: ChevronsDownUp, disabled: row.height <= rowMinH(row), divide: true },
+        { id: 'tall', label: 'Make tallest', icon: ChevronsUpDown, disabled: row.height >= rowMaxH(row) },
+        { id: 'height', label: 'Reset height', icon: RotateCcw, disabled: row.height === rowNaturalH(row) },
+        { id: 'top', label: 'Move to top', icon: ArrowUpToLine, disabled: index <= top, divide: true },
+        { id: 'up', label: 'Move up', icon: ArrowUp, disabled: index <= top },
+        { id: 'down', label: 'Move down', icon: ArrowDown, disabled: index === rows.length - 1 },
+        { id: 'bottom', label: 'Move to bottom', icon: ArrowDownToLine, disabled: index === rows.length - 1 },
+        { id: 'remove', label: 'Remove row', icon: Trash2, divide: true },
+      ]
+    return rowMenuBefore(row, index)
+  }
+  const rowMenuBefore = (row: Row, index: number): MenuItem[] => [
     { id: 'even', label: 'Even out widths', disabled: row.columns.length < 2 },
     { id: 'height', label: 'Reset height', disabled: row.height === rowNaturalH(row) },
     { id: 'up', label: 'Move up', disabled: index === 0 || (pinnedRow !== null && rows[0]?.id === pinnedRow && index === 1), divide: true },
@@ -987,6 +1006,11 @@ export function Board({
     else if (id === 'up') onCommit(moveRow(rows, index, index - 1), 'Row moved up')
     else if (id === 'down') onCommit(moveRow(rows, index, index + 1), 'Row moved down')
     else if (id === 'remove') onRemoveRow(row)
+    else if (id === 'add') onAddHere?.(row, index)
+    else if (id === 'short') onCommit(rows.map((r) => (r.id === row.id ? setRowHeight(r, rowMinH(r)) : r)), 'Row made shortest')
+    else if (id === 'tall') onCommit(rows.map((r) => (r.id === row.id ? setRowHeight(r, rowMaxH(r)) : r)), 'Row made tallest')
+    else if (id === 'top') onCommit(moveRow(rows, index, pinnedRow !== null && rows[0]?.id === pinnedRow ? 1 : 0), 'Row moved to the top')
+    else if (id === 'bottom') onCommit(moveRow(rows, index, rows.length - 1), 'Row moved to the bottom')
   }
 
   const edit = editing && !stacked
@@ -1014,6 +1038,42 @@ export function Board({
         !sizing &&
         geo.rows.map((rb, ri) => {
           const row = shown[ri]
+          const grip = row.id !== pinnedRow && (
+            <span
+              className="bdash-row__grip"
+              data-chrome
+              onPointerDown={(e) => {
+                if (e.button !== 0) return
+                begin('row', row.id, e, { x: 0, y: 0 })
+              }}
+              onClickCapture={(e) => {
+                /* A grip that was dragged does not also open its menu. */
+                if (dragged.current) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }
+              }}
+            >
+              <RowMenu label={`Row ${ri + 1}`} icon={GripVertical} items={rowMenu(row, ri)} onSelect={onRowMenu(row, ri)} align="start" />
+            </span>
+          )
+          /* Row splits: the row's layouts as small diagrams (splits.ts, owner 20 Nov 2026). */
+          const split = LIVE && row.id !== pinnedRow && !dock && (
+            <SplitPicker
+              row={row}
+              index={ri}
+              onSplit={(spans, name) => {
+                const next = applySplit(row, spans)
+                if (next) onCommit(rows.map((r) => (r.id === row.id ? next : r)), `Row ${ri + 1} set to ${name.toLowerCase()}`)
+              }}
+            />
+          )
+          /* Add here: a widget straight into this row, from the widgets that fit it (owner, 20 Nov 2026). */
+          const addHere = roomy.has(row.id) && !dock && (
+            <button type="button" className="bdash-row__add" data-chrome aria-label={`Add a widget to row ${ri + 1}`} title="Add a widget to this row" onClick={() => onAddHere?.(row, ri)}>
+              <Plus size={14} strokeWidth={2.4} aria-hidden />
+            </button>
+          )
           return (
             <div
               key={row.id}
@@ -1021,41 +1081,20 @@ export function Board({
               className={`bdash-band${row.id === pinnedRow ? ' is-pinned' : ''}${movingRow === row.id ? ' is-moving' : ''}`}
               style={{ transform: `translateY(${rb.y}px)`, height: rb.h }}
             >
-              {row.id !== pinnedRow && (
-                <span
-                  className="bdash-row__grip"
-                  data-chrome
-                  onPointerDown={(e) => {
-                    if (e.button !== 0) return
-                    begin('row', row.id, e, { x: 0, y: 0 })
-                  }}
-                  onClickCapture={(e) => {
-                    /* A grip that was dragged does not also open its menu. */
-                    if (dragged.current) {
-                      e.preventDefault()
-                      e.stopPropagation()
-                    }
-                  }}
-                >
-                  <RowMenu label={`Row ${ri + 1}`} icon={GripVertical} items={rowMenu(row, ri)} onSelect={onRowMenu(row, ri)} align="start" />
-                </span>
-              )}
-              {/* Row splits: the row's layouts as small diagrams (splits.ts, owner 20 Nov 2026). */}
-              {LIVE && row.id !== pinnedRow && !dock && (
-                <SplitPicker
-                  row={row}
-                  index={ri}
-                  onSplit={(spans, name) => {
-                    const next = applySplit(row, spans)
-                    if (next) onCommit(rows.map((r) => (r.id === row.id ? next : r)), `Row ${ri + 1} set to ${name.toLowerCase()}`)
-                  }}
-                />
-              )}
-              {/* Add here: a widget straight into this row, from the widgets that fit it (owner, 20 Nov 2026). */}
-              {roomy.has(row.id) && !dock && (
-                <button type="button" className="bdash-row__add" data-chrome aria-label={`Add a widget to row ${ri + 1}`} title="Add a widget to this row" onClick={() => onAddHere?.(row, ri)}>
-                  <Plus size={14} strokeWidth={2.4} aria-hidden />
-                </button>
+              {POLISH ? (
+                (grip || split || addHere) && (
+                  <div className="bdash-row__tools" role="group" aria-label={`Row ${ri + 1}`}>
+                    {split}
+                    {grip}
+                    {addHere}
+                  </div>
+                )
+              ) : (
+                <>
+                  {grip}
+                  {split}
+                  {addHere}
+                </>
               )}
             </div>
           )

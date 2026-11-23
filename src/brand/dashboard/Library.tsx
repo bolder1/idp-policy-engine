@@ -5,6 +5,7 @@ import { CATEGORIES, WIDGETS, WIDGET_IDS, type Category, type WidgetId } from '.
 import { Market } from './Market'
 import { WidgetPicture } from './pictures'
 import { SUGGESTED } from './templates'
+import type { ThemeId } from './themes'
 
 /* -----------------------------------------------------------------------------
    Add widgets: the dashboard's library, in a popup over it (owner, 19 Nov
@@ -35,6 +36,7 @@ export function Library({
   onRemove,
   onClose,
   row = null,
+  theme,
 }: {
   open: boolean
   has: (w: WidgetId) => boolean
@@ -45,6 +47,8 @@ export function Library({
   onClose: () => void
   /** Opened from a row's Add here: only what fits that row and is not on the dashboard yet. */
   row?: { label: string; fits: (w: WidgetId) => boolean } | null
+  /** The board's theme, so a picture's data is in the colours it will have on the board (dashboardPolish). */
+  theme?: ThemeId
 }) {
   const [q, setQ] = useState('')
   const [shelf, setShelf] = useState<Shelf>('all')
@@ -98,7 +102,7 @@ export function Library({
           <h3 className="bgal__section">{s.label}</h3>
           <div className="bgal__grid">
             {s.widgets.map((w) => (
-              <WidgetCard key={`${s.key}${w}`} widget={w} on={has(w)} onAdd={onAdd} onRemove={onRemove} />
+              <WidgetCard key={`${s.key}${w}`} widget={w} on={has(w)} theme={theme} onAdd={onAdd} onRemove={onRemove} />
             ))}
           </div>
         </section>
@@ -110,7 +114,7 @@ export function Library({
   )
 }
 
-function WidgetCard({ widget, on, onAdd, onRemove }: { widget: WidgetId; on: boolean; onAdd: (w: WidgetId) => void; onRemove: (w: WidgetId) => void }) {
+function WidgetCard({ widget, on, theme, onAdd, onRemove }: { widget: WidgetId; on: boolean; theme?: ThemeId; onAdd: (w: WidgetId) => void; onRemove: (w: WidgetId) => void }) {
   const m = WIDGETS[widget]
   const need = CATEGORIES.find((c) => c.value === m.category)?.label ?? ''
   return (
@@ -118,7 +122,7 @@ function WidgetCard({ widget, on, onAdd, onRemove }: { widget: WidgetId; on: boo
       <span className="bgcard__cat">{need}</span>
       <div className="bgcard__in">
         <div className="bgcard__canvas is-picture">
-          <WidgetPicture widget={widget} />
+          <WidgetPicture widget={widget} theme={theme} />
         </div>
         <div className="bgcard__body">
           <div className="bgcard__head">

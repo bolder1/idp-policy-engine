@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { ArrowRight, ChartArea, ChartBarBig, ChartColumn, ChartPie, Check, LayoutGrid, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react'
+import { ArrowRight, ChartArea, ChartBarBig, ChartColumn, ChartPie, Check, Inbox, LayoutGrid, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react'
 import { Counter } from '../kit'
 import { FilterTabs } from '../screens/page-bar'
 import { ViewSwitch } from '../screens/library-view'
@@ -8,6 +8,32 @@ import type { Part } from './charts'
 import { fmt, pct, useRows } from './format'
 import { viewOf, type Kind } from './model'
 import { useTile } from './tile-context'
+import { shows } from '../rollout'
+import type { WidgetId } from './catalog'
+
+/* 22 Nov audit #12 (rollout.ts dashboardPolish): a list or table a filter leaves empty says so (states.tsx). */
+const STATES = shows('dashboardPolish')
+
+/** What an empty widget says, where the general words would be wrong. */
+const EMPTY_WORDS: Partial<Record<WidgetId, string>> = {
+  'recent-sign-ins': 'No sign-ins match',
+  approvals: 'No requests waiting',
+  expiring: 'Nothing expiring soon',
+  'apps-without': 'Every app has a policy',
+}
+
+/** Nothing to show: a quiet mark and a few words, in the middle of the widget. */
+export function Empty() {
+  const { tile, meta } = useTile()
+  /* Only what follows the board's range says so; a widget that does not (Quick actions, MFA coverage) has nothing to show. */
+  const general = meta.category === 'activity' ? 'Nothing in this range' : 'Nothing to show'
+  return (
+    <div className="bdw-empty">
+      <Mark icon={Inbox} />
+      <p>{EMPTY_WORDS[tile.widget as WidgetId] ?? general}</p>
+    </div>
+  )
+}
 
 /* -----------------------------------------------------------------------------
    What the Dashboard's widgets are made of. One anatomy per kind of content,
@@ -210,6 +236,7 @@ export function BarList({ items, format = fmt, tone }: { items: BarItem[]; forma
   const { preview } = useTile()
   const reduce = useReducedMotion() === true || preview
   const max = Math.max(1, ...items.map((i) => i.value))
+  if (STATES && items.every((i) => i.value === 0)) return <Empty />
   return (
     <Fit items={items} pitch={40} className={`bdw-barlist${tone ? ` is-${tone}` : ''}`}>
       {(i) => {
@@ -299,6 +326,7 @@ export interface Column {
 export function Table({ columns, rows, label }: { columns: Column[]; rows: { key: string; cells: ReactNode[] }[]; label: string }) {
   const [ref, fit] = useRows<HTMLDivElement>(44, 2)
   const shown = rows.slice(0, Math.max(1, fit - 1))
+  if (STATES && rows.length === 0) return <Empty />
   const template = columns.map((c) => `minmax(0, ${c.grow ?? 1}fr)`).join(' ')
   return (
     <div className="bdw-table" ref={ref} role="table" aria-label={label}>

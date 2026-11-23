@@ -31,7 +31,7 @@ describe('a new page size', () => {
 })
 
 describe('the rollout', () => {
-  it('ships paging to Design only until the owner has checked it', () => {
-    expect(ROLLOUT.pagination).toEqual(['design'])
+  it('ships paging to every line, on the owner’s word (23 Nov)', () => {
+    expect(ROLLOUT.pagination).toEqual(['design', 'handoff', 'tester'])
   })
 })

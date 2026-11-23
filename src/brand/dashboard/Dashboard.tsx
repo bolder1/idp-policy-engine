@@ -20,6 +20,7 @@ import { DASHBOARD_THEMES } from './phase'
 import { useMigrationOpen } from './format'
 import { BoardLoading, useBoardLoading } from './widget-state'
 import { addToRow, addWidget, allCells, arrange, findCell, fromSpecs, hasWidget, removeCell, removeRow, type ArrangeMode, type Cell, type Row } from './layout'
+import { withoutWithheld } from './withheld'
 import {
   RANGES,
   WIDGETS,
@@ -85,7 +86,8 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   const still = useReducedMotion() === true
   const [prefs, set] = useDash()
   const board = activeBoard(prefs)
-  const rows = board.rows
+  /* Same array back when nothing is withheld, so memos keyed on rows still hold (withheld.ts). */
+  const rows = withoutWithheld(board.rows)
   const theme = board.theme
   const range = prefs.range
   /* The board looks loading on its first paint and after a Range change (states.tsx, Design only). */

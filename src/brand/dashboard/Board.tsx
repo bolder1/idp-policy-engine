@@ -36,6 +36,7 @@ import {
 } from './layout'
 import { geometry, type Geometry } from './geometry'
 import { WIDGETS, WIDGET_IDS, type Range, type WidgetId } from './model'
+import { offered } from './withheld'
 import type { ThemeId } from './themes'
 import { CellLift, Tile, type CellHandlers } from './Tile'
 import { resolveTarget, targetKey, type DragPhase } from './drag'
@@ -1018,7 +1019,7 @@ export function Board({
   /* Rows with room for one more widget, which show an Add here. Worked out once per layout, not per frame. */
   const roomy = useMemo(() => {
     if (!edit || !LIVE || !onAddHere) return new Set<string>()
-    const free = WIDGET_IDS.filter((w) => !onBoard?.(w))
+    const free = WIDGET_IDS.filter((w) => offered(w) && !onBoard?.(w))
     return new Set(rows.filter((r) => r.id !== pinnedRow && fitsRow(rows, r.id, free).length > 0).map((r) => r.id))
   }, [edit, rows, pinnedRow, onAddHere, onBoard])
   const movingRow = dock?.kind === 'row' ? dock.id : null

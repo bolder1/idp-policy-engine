@@ -584,7 +584,7 @@ export function WhatsNew() {
   /* The three facts HomeHub's card already gives about the new builder, word for word. */
   const facts: { icon: LucideIcon; line: string }[] = [
     { icon: Shapes, line: 'Zones, device profiles and risk signals, built once and used in any rule' },
-    { icon: ScanSearch, line: 'Check access shows who gets in, before a policy is on' },
+    ...(HIDE_CHECKS ? [] : [{ icon: ScanSearch, line: 'Check access shows who gets in, before a policy is on' }]),
     { icon: ShieldCheck, line: 'Moved policies arrive as drafts, so nothing changes until you make them active' },
   ]
   return (

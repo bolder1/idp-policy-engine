@@ -83,8 +83,8 @@ export const ROLLOUT = {
   denyAlerts: ALL,
   /** Every table pages: one footer (pager.tsx) with Rows per page, the range and page numbers, stuck to the bottom of
    *  the window (23 Nov, owner: "add pagination ... globally for all the tabs and tables ... static at the bottom").
-   *  The fit-to-window lists take rows per page too. Design only until the owner has checked it. */
-  pagination: ['design'],
+   *  The fit-to-window lists take rows per page too. Every line on the owner's word (23 Nov: "pagination for all 3"). */
+  pagination: ALL,
   /** Sign-in activity and Check access, every way in: the All Policies bar, the rail and search, Home and Dashboard
    *  shortcuts, the app page's links, the user drawer and the builder (tester.ts `CHECKS_WITHHELD`). Taken off Dev
    *  handoff on the owner's word (23 Nov: "For dev hide sign-in activity and hide check access completely"). Tester

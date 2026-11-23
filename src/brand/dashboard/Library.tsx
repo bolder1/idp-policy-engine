@@ -6,6 +6,11 @@ import { Market } from './Market'
 import { WidgetPicture } from './pictures'
 import { SUGGESTED } from './templates'
 import type { ThemeId } from './themes'
+import { HIDE_CHECKS } from '../tester'
+import { offered } from './withheld'
+
+/* Where Check access is withheld (Dev handoff, rollout.ts activityAndChecks), Quick actions doesn't promise it. */
+const blurbOf = (w: WidgetId): string => (HIDE_CHECKS && w === 'shortcuts' ? 'New policy, add an app, add a user' : WIDGETS[w].blurb)
 
 /* -----------------------------------------------------------------------------
    Add widgets: the dashboard's library, in a popup over it (owner, 19 Nov
@@ -68,8 +73,9 @@ export function Library({
   const sections = useMemo(() => {
     const match = (w: WidgetId) => {
       const m = WIDGETS[w]
+      if (!offered(w)) return false
       if (row && (has(w) || !row.fits(w))) return false
-      return !words || `${m.name} ${m.blurb} ${m.words ?? ''}`.toLowerCase().includes(words)
+      return !words || `${m.name} ${blurbOf(w)} ${m.words ?? ''}`.toLowerCase().includes(words)
     }
     const out: { key: string; label: string; widgets: WidgetId[] }[] = []
     if (shelf === 'on') {
@@ -130,7 +136,7 @@ function WidgetCard({ widget, on, theme, onAdd, onRemove }: { widget: WidgetId; 
               {m.name}
             </h3>
           </div>
-          <p className="bgcard__sub">{m.blurb}</p>
+          <p className="bgcard__sub">{blurbOf(widget)}</p>
           <div className="bgcard__go">
             {on && (
               <span className="bgcard__done">

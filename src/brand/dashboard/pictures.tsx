@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Activity, Check, ListChecks, Plus, Settings2, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
 import { shows } from '../rollout'
+import { HIDE_CHECKS } from '../tester'
 import { WIDGETS, type Category, type WidgetId } from './catalog'
 import type { ThemeId } from './themes'
 
@@ -456,7 +457,7 @@ function Tiles({ widget }: { widget: WidgetId }) {
 function Actions() {
   return (
     <span className="wpic__rows">
-      {['New sign-in policy', 'Add an application', 'Check access'].map((text, i) => (
+      {['New sign-in policy', 'Add an application', HIDE_CHECKS ? 'Add a user' : 'Check access'].map((text, i) => (
         <span key={text} className="wpic__action" style={at(i)}>
           <Plus size={12} strokeWidth={2.4} aria-hidden />
           {text}

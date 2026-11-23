@@ -12,6 +12,7 @@ import { useBrand } from '../store'
 import type { User } from '../data'
 import { groupNamesOf, notBuilt, rolesOf } from './directory-model'
 import { ListPager } from './list-pager'
+import { PAGINATION } from '../pager-state'
 import { PageBar } from './page-bar'
 import { usePagedList } from './paged-list'
 import { PEOPLE_ROW_H, directoryRows, groupFilterOptions, type GroupFilter } from './sign-in-tests/library'
@@ -201,9 +202,10 @@ export function UsersPage({ role: routeRole }: { role?: string }) {
                   </tbody>
                 </table>
               </div>
+              {PAGINATION && <ListPager {...paged.pager} label="User pages" alone={false} />}
             </div>
           )}
-          {rows.length > 0 && <ListPager {...paged.pager} label="User pages" />}
+          {!PAGINATION && rows.length > 0 && <ListPager {...paged.pager} label="User pages" />}
         </>
       )}
 
@@ -298,8 +300,9 @@ export function UserRolesPage() {
                 </tbody>
               </table>
             </div>
+            {PAGINATION && <ListPager {...paged.pager} label="Role pages" alone={false} />}
           </div>
-          <ListPager {...paged.pager} label="Role pages" />
+          {!PAGINATION && <ListPager {...paged.pager} label="Role pages" />}
         </>
       )}
     </div>

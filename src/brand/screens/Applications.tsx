@@ -11,6 +11,7 @@ import { ownerOf, summarise, type AppSummary } from './app-policies'
 import { compareUpdated } from './applications-model'
 import { AppProtection } from './AppProtection'
 import { ListPager } from './list-pager'
+import { PAGINATION } from '../pager-state'
 import { usePagedList } from './paged-list'
 import { PageBar } from './page-bar'
 import { ViewSwitch } from './library-view'
@@ -193,11 +194,12 @@ export function Applications() {
                   </tbody>
                 </table>
               </div>
+              {PAGINATION && <ListPager {...paged.pager} label="Application pages" alone={false} />}
             </div>
           )}
           {/* At the bottom of the page, as on every paged page — it was the
               table's footer, and so sat wherever the table happened to end. */}
-          {total > 0 && (
+          {!PAGINATION && total > 0 && (
             <ListPager {...paged.pager} label="Application pages" />
           )}
         </>

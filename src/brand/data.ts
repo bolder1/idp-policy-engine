@@ -683,6 +683,22 @@ export const DECISION_LABEL: Record<AccessDecision, string> = {
 
 /** What a denied user sees when the rule sets no message of its own. */
 export const DEFAULT_DENY_MESSAGE = 'You are not permitted to log in. Please contact your administrator.'
+/** The events a Deny rule can email about, in the console's order (owner, 23 Nov 2026). */
+export type DenyAlertEvent = 'unknown' | 'registered' | 'unregistered' | 'failed' | 'deviceLimit'
+/* `endUsers`: offered only while end users are picked, last in the list (owner, 23 Nov 2026: "For End user add one
+   last in the row"). Unpicking end users drops it from the rule. */
+export const DENY_ALERT_EVENTS: readonly { id: DenyAlertEvent; label: string; endUsers?: true }[] = [
+  { id: 'unknown', label: 'Users sign in from unknown IP addresses, devices, locations or outside the allowed time' },
+  { id: 'registered', label: 'Challenge completed and device registered' },
+  { id: 'unregistered', label: 'Challenge completed but device not registered' },
+  { id: 'failed', label: 'Challenge failed' },
+  { id: 'deviceLimit', label: 'Number of device registrations exceeded allowed count', endUsers: true },
+]
+/** A Deny rule's email alerts as one comparable string, for the review lists. Absent and off read the same. */
+export function denyAlertKey(r: Pick<Rule, 'denyAlertAdmins' | 'denyAlertUsers' | 'denyAlertEmail' | 'denyAlertOn'>): string {
+  const on = DENY_ALERT_EVENTS.filter((e) => r.denyAlertOn?.includes(e.id)).map((e) => e.id)
+  return [r.denyAlertAdmins ? 'a' : '', r.denyAlertUsers ? 'u' : '', (r.denyAlertEmail ?? '').trim(), on.join(',')].join('|')
+}
 /** The longest deny message the console accepts. */
 export const DENY_MESSAGE_MAX = 200
 /** The longest next step or contact a rule adds to its deny message (docs/specs/DENIAL-REASONS.md). */
@@ -786,6 +802,14 @@ export interface Rule {
      nothing is added; an empty string is never stored. */
   denyAction?: string
   denyContact?: string
+  /* Email alerts on the rule that denies (owner, 23 Nov 2026, over the live console's "Email Alerts and Custom Error
+     Message" card on Configure Adaptive Policy): who is emailed, the administrator address, and on which events. ABSENT
+     means off, as the console's unticked boxes are; an empty address means the main administrator. Kept while the rule
+     is an Allow, like the message, so switching back to Deny brings them back. */
+  denyAlertAdmins?: boolean
+  denyAlertUsers?: boolean
+  denyAlertEmail?: string
+  denyAlertOn?: DenyAlertEvent[]
   /* Temporary access (docs/specs/DENIAL-NEXT.md, P0 item 3): a rule granted to one person until a date, with who gave it and
      why. Once the sign-in's date is after `until` the rule is switched off by itself — nobody has to remember to remove it.
      ABSENT on every ordinary rule. */

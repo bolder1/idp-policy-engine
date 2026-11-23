@@ -49,7 +49,7 @@ export const ROLLOUT = {
   /** All Policies and Post sign-in tables: every policy name one width, cut with an ellipsis (full name on hover), and
    *  fixed columns so they sit in the same place on every tab (20 Nov). Every line, as above. */
   policyNameFit: ALL,
-  /** The empty tenant, from `npm run dev:empty` or the profile menu's Go empty (20 Nov, empty-tenant.ts): every page's
+  /** The empty tenant, from `npm run dev:empty` or the profile menu's Show / Hide empty states (20 and 23 Nov, empty-tenant.ts): every page's
    *  empty state. A review tool, not product (owner: "will remove it eventually"). Design only. */
   emptyTenant: ['design'],
   /** Every page-level empty state drawn like Zones and Device profiles (20 Nov, empty-art.tsx). Design only. */
@@ -77,6 +77,14 @@ export const ROLLOUT = {
    *  stay in reach below 1120px instead of slipping under the rail, and initials on the board meet the 12px floor.
    *  Design only until the owner has checked it. */
   dashboardPolish: ['design'],
+  /** Deny in the policy builder carries the live console's email alerts: send to administrators and end users, the
+   *  administrator address, and the four events, above the Deny message (23 Nov). Every line, on the owner's word
+   *  ("change this globally ... update all 3 roles"). */
+  denyAlerts: ALL,
+  /** Every table pages: one footer (pager.tsx) with Rows per page, the range and page numbers, stuck to the bottom of
+   *  the window (23 Nov, owner: "add pagination ... globally for all the tabs and tables ... static at the bottom").
+   *  The fit-to-window lists take rows per page too. Design only until the owner has checked it. */
+  pagination: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

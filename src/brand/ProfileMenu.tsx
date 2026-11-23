@@ -1,7 +1,7 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, Eraser, History, LayoutGrid, Lock, LogOut, RotateCcw, ScrollText, UserRound } from 'lucide-react'
+import { Check, Eye, EyeOff, History, LayoutGrid, Lock, LogOut, ScrollText, UserRound } from 'lucide-react'
 
 import { Tip } from './kit'
 import { DesignLock } from './DesignLock'
@@ -13,15 +13,14 @@ import { useBrand } from './store'
 import { SHOWCASE } from './showcase'
 import { shows } from './rollout'
 import { RoleAvatar } from './role-avatar'
-import { EMPTY_BY_MODE, EMPTY_TENANT } from './empty-tenant'
+import { EMPTY_TENANT } from './empty-tenant'
 import { EmptyWipe } from './empty-wipe'
 import { ROLE_ACCOUNT } from './role-account'
 
 /* The admin's name and badge follow the line (rollout.ts `roleIdentity`), with the sign-in's email under the name. */
 const ROLE_IDENTITY: boolean = shows('roleIdentity')
-/* Go empty / Bring back data: a review tool, not product (empty-tenant.ts). Design only; not on the empty server, which
-   has no way out. */
-const GO_EMPTY: boolean = shows('emptyTenant') && !EMPTY_BY_MODE
+/* Show / Hide empty states: a review tool, not product (empty-tenant.ts). Design only, on every server. */
+const GO_EMPTY: boolean = shows('emptyTenant')
 
 /* -----------------------------------------------------------------------------
    The account menu, and the only way between the two sides.
@@ -215,7 +214,7 @@ export function ProfileMenu() {
 
             {/* Bring back old policies (owner, 18 Nov 2026): the showcase opens after the migration, so this is the way
                 back to before it, where the migration flow starts. Reloads the console once (migrate/phase.ts). */}
-            {/* Go empty / Bring back data (owner, 20 Nov 2026): a review tool, not product (empty-tenant.ts). */}
+            {/* Show / Hide empty states (owner, 20 and 23 Nov 2026): a review tool, not product (empty-tenant.ts). */}
             {GO_EMPTY && (
               <>
                 <span className="bmenu__rule" />
@@ -227,8 +226,8 @@ export function ProfileMenu() {
                     setWipe(!EMPTY_TENANT)
                   }}
                 >
-                  {EMPTY_TENANT ? <RotateCcw size={14} strokeWidth={1.9} aria-hidden /> : <Eraser size={14} strokeWidth={1.9} aria-hidden />}
-                  {EMPTY_TENANT ? 'Bring back data' : 'Go empty'}
+                  {EMPTY_TENANT ? <EyeOff size={14} strokeWidth={1.9} aria-hidden /> : <Eye size={14} strokeWidth={1.9} aria-hidden />}
+                  {EMPTY_TENANT ? 'Hide empty states' : 'Show empty states'}
                 </button>
               </>
             )}

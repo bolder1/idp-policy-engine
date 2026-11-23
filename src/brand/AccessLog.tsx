@@ -3,6 +3,8 @@ import { motion } from 'motion/react'
 
 import { Button } from './kit'
 import { LINE_NAMES, clearLog, readLog } from './lines'
+import { Pager } from './pager'
+import { usePaged } from './pager-state'
 import './design-lock.css'
 
 /* -----------------------------------------------------------------------------
@@ -14,6 +16,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
 
 export function AccessLog({ onClose }: { onClose: () => void }) {
   const [log, setLog] = useState(readLog)
+  const paged = usePaged(log)
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -49,7 +52,7 @@ export function AccessLog({ onClose }: { onClose: () => void }) {
               </tr>
             </thead>
             <tbody>
-              {log.map((a) => (
+              {paged.items.map((a) => (
                 <tr key={a.at}>
                   <td>{when.format(a.at)}</td>
                   <td>{a.email || 'Unknown'}</td>
@@ -60,6 +63,7 @@ export function AccessLog({ onClose }: { onClose: () => void }) {
             </tbody>
           </table>
         )}
+        {log.length > 0 && <Pager paged={paged} label="Access log pages" />}
         <div className="bdl__actions">
           {log.length > 0 && (
             <Button

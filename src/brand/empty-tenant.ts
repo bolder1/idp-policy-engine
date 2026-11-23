@@ -7,10 +7,11 @@ import { shows } from './rollout'
    not a part of the product so will remove it eventually"). To take it out: delete this file, empty-wipe.tsx,
    DashboardEmpty.tsx and their call sites (store.tsx, ProfileMenu.tsx, BrandApp.tsx), and the two ROLLOUT entries.
 
-   Two ways in, both Design only (ROLLOUT.emptyTenant):
-     - `npm run dev:empty` (vite --mode empty, http://localhost:5191) always opens empty;
-     - the profile menu's Go empty, on any server: it wipes this tab (empty-wipe.tsx) and reloads empty. The flag is
-       in sessionStorage, so it holds across reloads in this tab only, and Bring back data clears it.
+   Design only (ROLLOUT.emptyTenant). The profile menu's Show empty states / Hide empty states switches this tab
+   between the empty tenant and the full design version, on any server (owner, 23 Nov 2026: "a button for show and
+   hide empty state ... by hide we showcase the old state, the full design version"). It plays the wipe
+   (empty-wipe.tsx) and reloads. The choice is in sessionStorage, so it holds across reloads in this tab only.
+   `npm run dev:empty` (vite --mode empty, http://localhost:5191) only changes where a tab starts: empty.
 
    What a tenant has on its first morning stays, because the product ships it: the Global Default ("Baseline access"),
    the Authentication methods catalogue, Xecurify's templates and the shipped risk signal profile. Everything a tenant
@@ -19,25 +20,26 @@ import { shows } from './rollout'
 
 const KEY = 'idp.empty-tenant'
 
-/** The empty server: no way out from inside, so the menu offers neither switch there. */
-export const EMPTY_BY_MODE: boolean = import.meta.env.MODE === 'empty'
+/** The empty server: a tab there starts empty until Hide empty states. */
+const EMPTY_BY_MODE: boolean = import.meta.env.MODE === 'empty'
 
-function flagged(): boolean {
+/** This tab's choice: '1' empty, '0' full, null = where this server starts. */
+function choice(): string | null {
   try {
-    return sessionStorage.getItem(KEY) === '1'
+    return sessionStorage.getItem(KEY)
   } catch {
-    return false
+    return null
   }
 }
 
 /** Read once, when the module loads: the store seeds from it, so changing it means a reload. */
-export const EMPTY_TENANT: boolean = shows('emptyTenant') && (EMPTY_BY_MODE || flagged())
+export const EMPTY_TENANT: boolean = shows('emptyTenant') && (choice() === '1' || (EMPTY_BY_MODE && choice() !== '0'))
 
-/** Go empty (true) or Bring back data (false): sets this tab's flag and reloads. */
+/** Show empty states (true) or Hide empty states (false): sets this tab's choice and reloads. */
 export function setEmptyTenant(on: boolean): void {
   try {
-    if (on) sessionStorage.setItem(KEY, '1')
-    else sessionStorage.removeItem(KEY)
+    if (on === EMPTY_BY_MODE) sessionStorage.removeItem(KEY)
+    else sessionStorage.setItem(KEY, on ? '1' : '0')
   } catch {
     /* without storage the reload opens as it was; nothing breaks */
   }

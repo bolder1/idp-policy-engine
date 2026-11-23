@@ -1,4 +1,4 @@
-import { DECISION_LABEL, FALLBACK_NAME, fallbackRule, groups as seedGroups, users as seedUsers, type App, type Group, type Policy, type Rule, type User } from '../data'
+import { DECISION_LABEL, FALLBACK_NAME, denyAlertKey, fallbackRule, groups as seedGroups, users as seedUsers, type App, type Group, type Policy, type Rule, type User } from '../data'
 import { leafCount, sig } from '../predicate'
 import { hasWho, normaliseWho, whoKey, type WhoList } from '../rule-who'
 
@@ -141,6 +141,7 @@ export function describeChanges(
     if (factorKey(before) !== factorKey(r)) out.push(`Authentication settings changed on “${r.name}”`)
     if ((before.denyMessage ?? '') !== (r.denyMessage ?? '')) out.push(`Deny message changed on “${r.name}”`)
     if ((before.denyAction ?? '') !== (r.denyAction ?? '') || (before.denyContact ?? '') !== (r.denyContact ?? '')) out.push(`Deny next step changed on “${r.name}”`)
+    if (denyAlertKey(before) !== denyAlertKey(r)) out.push(`Email alerts changed on “${r.name}”`)
   })
 
   /* The last rule decides every sign-in no rule above catches, so a change to it
@@ -151,6 +152,7 @@ export function describeChanges(
     out.push(`“${FALLBACK_NAME}” now ${DECISION_LABEL[fbAfter.decision]} instead of ${DECISION_LABEL[fbBefore.decision]}`)
   else if (factorKey(fbBefore) !== factorKey(fbAfter)) out.push(`Authentication settings changed on “${FALLBACK_NAME}”`)
   if ((fbBefore.denyMessage ?? '') !== (fbAfter.denyMessage ?? '')) out.push(`Deny message changed on “${FALLBACK_NAME}”`)
+  if (denyAlertKey(fbBefore) !== denyAlertKey(fbAfter)) out.push(`Email alerts changed on “${FALLBACK_NAME}”`)
 
   /* Named, not counted. "Now applies to 1 app" was true and useless; which
      applications a policy gained or lost is the whole of what changed — and

@@ -20,6 +20,8 @@ import { formOf } from './testing/sign-in-form'
 import { ActivityArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
 import './sign-in-tests/sign-in-activity.css'
+import { Pager } from '../pager'
+import { PAGE_SIZES, PAGINATION, usePaged } from '../pager-state'
 
 /* -----------------------------------------------------------------------------
    Sign-in activity: the week's sign-ins across every application, and why any
@@ -86,6 +88,9 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
     return changeLog.filter((c) => !needle || `${c.policyName} ${c.by} ${c.lines.join(' ')}`.toLowerCase().includes(needle))
   }, [changeLog, filter.q])
   const set = (p: Partial<ActivityFilter>) => setFilter((f) => ({ ...f, ...p }))
+  /* Both tabs page (pager.tsx, Design only); a new search or filter starts at page 1. */
+  const pagedSignIns = usePaged(shown, PAGE_SIZES[0], filter)
+  const pagedChanges = usePaged(changes, PAGE_SIZES[0], filter.q)
 
   const appOptions: PickerOption[] = useMemo(
     () => [{ value: 'all', label: 'All applications' }, ...apps.filter((a) => rows.some((r) => r.appId === a.id)).map((a) => ({ value: a.id, label: a.name }))],
@@ -180,7 +185,7 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
                   </tr>
                 </thead>
                 <tbody>
-                  {changes.map((c) => (
+                  {pagedChanges.items.map((c) => (
                     <tr key={c.id}>
                       <td className="sia__when">{relativeTime(c.at, new Date())}</td>
                       <td>{c.policyName}</td>
@@ -194,6 +199,7 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
           ) : (
             <EmptyState compact icon={History} title="No changes yet" />
           )}
+          {changes.length > 0 && <Pager paged={pagedChanges} label="Change pages" />}
         </div>
       )}
 
@@ -213,7 +219,7 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
                 </tr>
               </thead>
               <tbody>
-                {shown.map((r) => {
+                {pagedSignIns.items.map((r) => {
                   const on = open === r.id
                   return (
                     <SignInRow
@@ -248,7 +254,15 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
         ) : (
           <EmptyState compact icon={History} title="No sign-ins match" />
         )}
-        <footer className="btable__foot">{shown.length === rows.length ? `${rows.length} sign-ins` : `${shown.length} of ${rows.length} sign-ins`}</footer>
+        {/* With paging the range says how many match, so the footer's own line says only the week's total, and only
+            when a filter has narrowed it: each number once. */}
+        <Pager paged={pagedSignIns} label="Sign-in pages">
+          {PAGINATION
+            ? shown.length !== rows.length && `${rows.length} sign-ins this week`
+            : shown.length === rows.length
+              ? `${rows.length} sign-ins`
+              : `${shown.length} of ${rows.length} sign-ins`}
+        </Pager>
       </div>
       )}
     </div>

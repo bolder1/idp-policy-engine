@@ -84,6 +84,8 @@ import { PolicyStatus } from '../migrate/moved-status'
 import { MARK_LABEL, UNMARK_LABEL } from '../tester'
 import { PoliciesArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
+import { Pager } from '../pager'
+import { PAGE_SIZES, PAGINATION, usePaged } from '../pager-state'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -527,6 +529,12 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
      review first, then the policies made here, system default included. With no drafts waiting there is one plain list. */
   const toReview = sectioned && origin === 'all' ? rows.filter(waitingMoved) : []
   const nextStep = rows.some((p) => !!p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
+  /* Paged as one list (pager.tsx, Design only): the two sections in the order they are drawn, then split again per page,
+     so page 2 can end the migrated drafts and start the policies made here. */
+  const twoSections = toReview.length > 0
+  const paged = usePaged(twoSections ? [...toReview, ...rows.filter((p) => !waitingMoved(p))] : rows, PAGE_SIZES[0], [query, status, more, origin, sort])
+  const pageReview = twoSections ? paged.items.filter(waitingMoved) : []
+  const pageMine = twoSections ? paged.items.filter((p) => !waitingMoved(p)) : paged.items
   const reviewFacts = useReviewFacts()
   const bulkExperience = useExperience()
   const pickedMoved = pickable.filter((p) => picked.has(p.id) && p.movedFrom?.length && p.status === 'draft' && p.appIds.length > 0)
@@ -880,16 +888,18 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
       </Confirm>
       {!isCoverage && libView === 'table' && (
         <div className="btable-wrap">
-          {rows.length > 0 && (sectioned && origin === 'all' && toReview.length > 0 ? (
+          {rows.length > 0 && (twoSections ? (
             <>
-              {renderTable(toReview, 'review')}
-              {rows.length > toReview.length && renderTable(rows.filter((p) => !waitingMoved(p)), 'mine')}
+              {pageReview.length > 0 && renderTable(pageReview, 'review')}
+              {pageMine.length > 0 && renderTable(pageMine, 'mine')}
             </>
           ) : (
-            renderTable(rows, 'all')
+            renderTable(paged.items, 'all')
           ))}
           {empty}
-          <footer className="btable__foot">{summary}</footer>
+          <Pager paged={paged} label="Policy pages">
+            {summary}
+          </Pager>
         </div>
       )}
 
@@ -903,7 +913,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
               view={libView}
               listRef={setBody}
               columns={[]}
-              rows={rows.map(
+              rows={paged.items.map(
                 (p): LibRow => ({
                   id: p.id,
                   name: p.name,
@@ -931,7 +941,13 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
             />
           )}
           {empty}
-          <p className="bpol__foot">{summary}</p>
+          {PAGINATION ? (
+            <Pager paged={paged} label="Policy pages" alone>
+              {summary}
+            </Pager>
+          ) : (
+            <p className="bpol__foot">{summary}</p>
+          )}
         </>
       )}
       </>
@@ -1058,6 +1074,7 @@ function PostSignInPolicies() {
   }, [all, filtered, status, q, sort])
 
   const live = useMemo(() => all.filter((p) => p.status === 'active').length, [all])
+  const paged = usePaged(rows, PAGE_SIZES[0], [query, status, sort])
 
   const { setBody, searchRef, markLeaving } = useLeavingFocus(rows)
   const statusChange = useStatusChange({ onChange: (p) => markLeaving(p.id) })
@@ -1147,7 +1164,7 @@ function PostSignInPolicies() {
                 </tr>
               </thead>
               <tbody ref={setBody}>
-                {rows.map((p) => (
+                {paged.items.map((p) => (
                   <tr key={p.id}>
                     <td>
                       <div className="btable__primary">
@@ -1200,9 +1217,9 @@ function PostSignInPolicies() {
           )
         )}
         {all.length > 0 && (
-          <footer className="btable__foot">
+          <Pager paged={paged} label="Policy pages">
             {live} {live === 1 ? 'policy' : 'policies'} acting after sign-in
-          </footer>
+          </Pager>
         )}
       </div>
 

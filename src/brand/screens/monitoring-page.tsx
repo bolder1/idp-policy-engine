@@ -12,6 +12,8 @@ import { fromCell, ifOnCell, orderRows, showWhyLabel, todayCell, whyOf, type Why
 import type { SimEnv } from './simulate'
 import { CONDITION_WORDS, lineText, type EvidenceLine } from './testing/evidence'
 
+import { Pager } from '../pager'
+import { usePaged } from '../pager-state'
 import './monitoring-page.css'
 
 /* -----------------------------------------------------------------------------
@@ -134,8 +136,10 @@ function MonitorTable({ policy, rows, env }: { policy: Policy; rows: readonly Mo
       if (!next.delete(id)) next.add(id)
       return next
     })
+  const paged = usePaged(rows)
 
   return (
+    <>
     <table className="btable bmon__table">
       <caption className="u-sr-only">Modelled sign-ins for {policy.name}</caption>
       <colgroup>
@@ -161,7 +165,7 @@ function MonitorTable({ policy, rows, env }: { policy: Policy; rows: readonly Mo
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => {
+        {paged.items.map((row) => {
           const id = row.sample.id
           const isOpen = opened.has(id)
           const whyId = `${baseId}-why-${id}`
@@ -206,6 +210,8 @@ function MonitorTable({ policy, rows, env }: { policy: Policy; rows: readonly Mo
         })}
       </tbody>
     </table>
+    <Pager paged={paged} label="Sign-in pages" />
+    </>
   )
 }
 

@@ -11,6 +11,8 @@ import { Picker } from '../picker'
 import { MoveBanner } from './move-banner'
 import { MIGRATION_FIRST } from './phase'
 import { PolicyStatus } from './moved-status'
+import { Pager } from '../pager'
+import { usePaged } from '../pager-state'
 import '../screens.css'
 import './old-policies.css'
 
@@ -107,6 +109,7 @@ export function OldLoginTable({ rows: shown, viewOnly = false }: { rows: LegacyP
   const store = useBrand()
   const { ctx, stateOf } = useOldEstate()
   const appName = (id: string) => ctx.apps.find((a) => a.id === id)?.name ?? id
+  const paged = usePaged(shown)
   return (
     <div className="btable-wrap">
       <div className="btable__scroll">
@@ -131,7 +134,7 @@ export function OldLoginTable({ rows: shown, viewOnly = false }: { rows: LegacyP
             </tr>
           </thead>
           <tbody>
-            {shown.map((lp) => {
+            {paged.items.map((lp) => {
               const state = stateOf(lp)
               const moved = state.kind === 'moved' ? store.policyById(state.policyId) : undefined
               return (
@@ -163,6 +166,7 @@ export function OldLoginTable({ rows: shown, viewOnly = false }: { rows: LegacyP
         </table>
       </div>
       {shown.length === 0 && <p className="bold__empty">No policies match</p>}
+      {shown.length > 0 && <Pager paged={paged} label="Policy pages" />}
     </div>
   )
 }
@@ -206,6 +210,7 @@ export function OldLoginPolicies() {
 export function OldAdaptivePolicies() {
   const store = useBrand()
   const { stateOf, rows } = useOldEstate()
+  const paged = usePaged(store.legacy.adaptive)
   return (
     <div className="bpage bold">
       <PageHead title="Adaptive Access Policies" docs preview={<TimeLeftPicker />} />
@@ -229,7 +234,7 @@ export function OldAdaptivePolicies() {
               </tr>
             </thead>
             <tbody>
-              {store.legacy.adaptive.map((ad) => {
+              {paged.items.map((ad) => {
                 const using = rows.filter((lp) => lp.adaptive?.policyId === ad.id)
                 const left = using.filter((lp) => stateOf(lp).kind === 'old')
                 const first = using.map(stateOf).find((s) => s.kind === 'moved')
@@ -255,6 +260,7 @@ export function OldAdaptivePolicies() {
             </tbody>
           </table>
         </div>
+        {paged.total > 0 && <Pager paged={paged} label="Policy pages" />}
       </div>
     </div>
   )

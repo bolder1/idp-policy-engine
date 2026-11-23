@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
+import { shows } from '../rollout'
+
+/* Design (rollout.ts `pagination`, 23 Nov 2026): a list that is not a card grid takes the admin's rows per page
+   (10 to start) instead of what fits the window, and its pager is the shared one (pager.tsx). Read here, not from
+   pager.tsx, which imports this file. */
+const ROWS_PER_PAGE: boolean = shows('pagination')
+
 /* -----------------------------------------------------------------------------
    A library list that fits the window.
 
@@ -154,7 +161,8 @@ export function usePagedList<T>(
 ) {
   const nodeRef = useRef<HTMLElement | null>(null)
   const [node, setNode] = useState<HTMLElement | null>(null)
-  const [size, setSize] = useState(8)
+  const chosen = ROWS_PER_PAGE && !opts.grid
+  const [size, setSize] = useState(chosen ? 10 : 8)
   const [page, setPage] = useState(1)
 
   /* A callback ref, so a list that mounts later — after an empty state or a
@@ -175,7 +183,7 @@ export function usePagedList<T>(
 
   const measure = useCallback(() => {
     const list = nodeRef.current
-    if (!list) return
+    if (!list || chosen) return
     const column = list.closest('.bshell__main') as HTMLElement | null
     const bottom = column ? column.getBoundingClientRect().bottom : window.innerHeight
     /* From where the list sits with the column scrolled to the top, so a page
@@ -194,7 +202,7 @@ export function usePagedList<T>(
     const nextPage = pageForRow((pageRef.current - 1) * was, next)
     pageRef.current = nextPage
     setPage(nextPage)
-  }, [opts.rowHeight, opts.grid, opts.minRows])
+  }, [opts.rowHeight, opts.grid, opts.minRows, chosen])
 
   useLayoutEffect(() => {
     measure()
@@ -229,6 +237,15 @@ export function usePagedList<T>(
   const pageCount = slice.pageCount
   const prev = useCallback(() => setPage((p) => Math.max(1, p - 1)), [])
   const next = useCallback(() => setPage((p) => Math.min(pageCount, p + 1)), [pageCount])
+  const goTo = useCallback((p: number) => setPage(Math.min(pageCount, Math.max(1, Math.floor(p)))), [pageCount])
+  /* A new page size keeps the first row on screen in view. */
+  const resize = useCallback(
+    (n: number) => {
+      setPage(pageForRow((slice.page - 1) * size, n))
+      setSize(n)
+    },
+    [slice.page, size],
+  )
 
   return {
     /** Attach to the list element: `<ul ref={paged.listRef}>`. */
@@ -248,6 +265,21 @@ export function usePagedList<T>(
       pageCount: slice.pageCount,
       onPrev: prev,
       onNext: next,
+      /** The shared pager's view of this list (pager.tsx), where rows per page is on; ListPager draws it. */
+      paging: chosen
+        ? {
+            items: slice.rows,
+            total: slice.total,
+            page: slice.page,
+            pages: slice.pageCount,
+            size,
+            start: slice.start,
+            end: slice.end,
+            setPage: goTo,
+            setSize: resize,
+            on: true,
+          }
+        : undefined,
     },
   }
 }

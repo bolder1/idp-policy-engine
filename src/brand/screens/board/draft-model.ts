@@ -54,7 +54,9 @@ export const LIVE_PANEL = 'Live version'
 export const NOTHING_LIVE = 'Nothing is live yet'
 /** Show live version waits for a change, as Save draft and Save policy do (owner, 25 Nov 2026). */
 export const NO_CHANGE_YET = 'No changes yet'
-export const SAVE_ASK = 'Save this policy?'
+/** Activate policy's confirm and toast name the press, not a save (rollout.ts `simpleActivateWords`, 26 Nov 2026). */
+const ACTIVATE_WORDS: boolean = shows('simpleActivateWords')
+export const SAVE_ASK = ACTIVATE_WORDS ? 'Activate this policy?' : 'Save this policy?'
 /** Simple, Activate policy with no application: what happens, and the way to active (owner, 25 Nov 2026). */
 export const NO_APP_ASK = 'No application chosen'
 export const NO_APP_BODY = 'This policy will be saved as inactive. Add an application to make it active.'
@@ -63,6 +65,7 @@ export const SIMPLE_DRAFT_TOAST = 'Draft saved. The live version is unchanged.'
 /** Simple's toast after Save policy. With no application it says how the policy becomes active. */
 export function simpleSaveToast(before: Pick<Policy, 'status'>, after: Pick<Policy, 'name' | 'status' | 'appIds' | 'isSystem'>): string {
   if (after.status === 'inactive' && !after.isSystem && after.appIds.length === 0) return `${after.name} saved. It is inactive until it has an application.`
+  if (ACTIVATE_WORDS && after.status === 'active') return `${after.name} is active`
   if (after.status === before.status) return `${after.name} saved`
   if (after.status === 'active') return `${after.name} saved. It is active.`
   if (after.status === 'inactive') return `${after.name} saved. It is inactive.`

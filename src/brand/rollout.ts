@@ -294,6 +294,10 @@ export const ROLLOUT = {
    *  no policy covers is Blocked, said "No policy · Blocked" (25 Nov evening, owner: "remove global policy, completely
    *  not a concept any more", then "Blocked", "everywhere on Design"). Design only. */
   noGlobalDefault: ['design'],
+  /** Simple's Activate policy says what it does after the press too: the confirm reads "Activate this policy?" (was "Save
+   *  this policy?" above an Activate policy button) and the toast "<name> is active" (was "<name> saved"). Found in the
+   *  26 Nov capture run; owner: "fix both". Design only. */
+  simpleActivateWords: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

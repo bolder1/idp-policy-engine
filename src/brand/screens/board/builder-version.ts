@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { shows } from '../../rollout'
 import { ARRANGE_TOOLS } from '../../tester'
 
 /* -----------------------------------------------------------------------------
@@ -79,6 +80,54 @@ function readUnlocked(): boolean {
 let current: BuilderVersion = read()
 let unlocked = readUnlocked()
 
+/* -----------------------------------------------------------------------------
+   HIDDEN (owner, 25 Nov 2026: "add a option to hide we only have lock … a
+   shortcut for hide and show", "should hide and reveal together").
+
+   Unlocked but hidden: the bar's switches, Draft model and Builder version, are
+   put away together, and every pick stays in force. The version on screen and
+   the draft model are what they were, so a walkthrough runs on V2 with View and
+   edit and nothing on the bar says so. Lock is still the way back to V0: it
+   clears this, so the next unlock shows the switches. Kept in localStorage, so a
+   reload mid-walkthrough does not bring them back. Design only (rollout.ts
+   `hideSwitches`); elsewhere unlocked means shown, as before.
+   -------------------------------------------------------------------------- */
+const HIDE_SWITCHES: boolean = shows('hideSwitches')
+const HIDDEN_KEY = 'idp.builder.switchesHidden'
+
+/** The keys that hide the switches and show them again. Ctrl, not ⌘, on every platform, as Ctrl+P is. */
+export const HIDE_KEYS = 'Ctrl+Shift+P'
+
+function readHidden(): boolean {
+  try {
+    return localStorage.getItem(HIDDEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+let hidden = readHidden()
+
+function storeHidden(next: boolean) {
+  hidden = next
+  try {
+    if (next) localStorage.setItem(HIDDEN_KEY, '1')
+    else localStorage.removeItem(HIDDEN_KEY)
+  } catch {
+    /* Hidden or shown for this load. */
+  }
+}
+
+/** Whether this line can hide the switches at all (Hide in the dropdown, and the keys). */
+export const canHideSwitches = (): boolean => HIDE_SWITCHES
+
+/** Hides the switches, or shows them again. Only while unlocked: locked, there is nothing on the bar to hide. */
+export function toggleSwitchesHidden() {
+  if (!HIDE_SWITCHES || !unlocked) return
+  storeHidden(!hidden)
+  emit()
+}
+
 const emit = () => listeners.forEach((l) => l())
 
 export function setBuilderVersion(v: BuilderVersion) {
@@ -141,6 +190,8 @@ export function lockBuilder() {
   } catch {
     /* Locked for this load. */
   }
+  /* The next unlock shows the switches: a door that opens onto nothing would read as a wrong password. */
+  storeHidden(false)
   emit()
 }
 
@@ -157,6 +208,15 @@ const snapshot = (): BuilderVersion => (unlocked ? current : 'v0')
 export const useBuilderVersion = (): BuilderVersion => useSyncExternalStore(subscribe, snapshot, () => 'full')
 
 export const useBuilderUnlocked = (): boolean => useSyncExternalStore(subscribe, () => unlocked, () => true)
+
+/** The bar's switches are drawn: unlocked and not hidden. What is IN FORCE reads `useBuilderUnlocked`, never this, so
+ *  hiding changes nothing but the bar. Server render: shown, as the switch is. */
+export const useSwitchesShown = (): boolean =>
+  useSyncExternalStore(
+    subscribe,
+    () => unlocked && !(HIDE_SWITCHES && hidden),
+    () => true,
+  )
 
 /* tester.ts ARRANGE_TOOLS adds three pieces to whatever version is on screen (owner, 18 Nov 2026: "add
    the up-down here as of now", "add the full tool set"): Move up and Move down, fit and zoom, undo and redo. */

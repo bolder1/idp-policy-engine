@@ -17,6 +17,7 @@ import { replaceFacts, replaceTone } from './applications-model'
 import { ReplaceCard } from './replace-dialog'
 import { SliderActions } from './select-rows'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
+import { useViewEdit } from './board/draft-model'
 
 /* -----------------------------------------------------------------------------
    Add existing policy, from an application's Policies tab.
@@ -108,6 +109,9 @@ export function AddExistingPolicy({
   inline?: boolean
 }) {
   const store = useBrand()
+  /* "View and edit" (board/draft-model.ts): the pick's line in active / inactive words (5 Nov ruling), and its status as
+     the head will show it once added. */
+  const viewEdit = useViewEdit()
   const { apps, groups, users } = store
   /* Replace as one popup, not a slider with a confirm over it (`REPLACE_IN_POPUP`). */
   const popup = (asPopup ?? REPLACE_IN_POPUP) && !!replacing && !REPLACE_MAKES_DRAFT
@@ -210,7 +214,7 @@ export function AddExistingPolicy({
       if (row.state === 'decides') return { pill: 'Decides', text: 'Takes effect on the next sign-in', tip: null }
       const next = ((row.state === 'never' ? row.lostTo[0]?.to : undefined) ?? standing.everyoneElse ?? standing.fallback)?.name ?? 'the tenant default'
       if (row.state === 'never') return { pill: 'Never decides', text: `Sign-ins go to ${next}`, tip: rowTip(row, groups, users) }
-      return { pill: OFF_PILL[row.state], text: `Sign-ins go to ${next} until it is turned on`, tip: null }
+      return { pill: OFF_PILL[row.state], text: `Sign-ins go to ${next} until it is ${viewEdit ? 'active' : 'turned on'}`, tip: null }
     }
     if (row.state === 'decides') {
       /* Every policy somebody leaves for it, people in two groups included:
@@ -221,8 +225,9 @@ export function AddExistingPolicy({
     }
     if (row.state === 'never') return { pill: 'Never decides', text: '', tip: rowTip(row, groups, users) }
     if (row.state === 'monitor') return { pill: 'Monitoring', text: 'Watches sign-ins, decides none', tip: null }
+    if (viewEdit) return { pill: picked.status === 'draft' ? 'Draft' : 'Inactive', text: 'Decides nothing until it is active', tip: null }
     return { pill: 'Not on', text: 'Decides nothing until turned on', tip: null }
-  }, [picked, policies, app.id, apps, users, groups, replacing])
+  }, [picked, policies, app.id, apps, users, groups, replacing, viewEdit])
 
   /* The popup's context: the facts the second confirm used to say, read from the live tenant (the policy being
      replaced is still the application's here), and the tone that decides whether Replace is red. */

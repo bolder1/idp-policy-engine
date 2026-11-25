@@ -4,7 +4,7 @@ import { AlignLeft, Headset, Undo2, ChevronRight, CopyPlus, GraduationCap, LogIn
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { DemoButton } from '../../tour/DemoButton'
-import { Button, IconButton, NameField, RowMenu } from '../../kit'
+import { Button, IconButton, NameField, RowMenu, type MenuItem } from '../../kit'
 import type { Policy } from '../../data'
 import { ChangeState } from '../../leave-guard'
 import { isUntitled, type RuleSet } from '../../policy-draft'
@@ -15,12 +15,18 @@ import { ACCESS_CHECK } from '../sign-in-tests/names'
 import { StatusControl } from '../status-control'
 import { BAR_DEMO, BAR_READ, BAR_TOUR } from './bar-tools'
 import { BuilderVersionSwitch } from './BuilderVersionSwitch'
+import { DraftModelSwitch } from './draft-fix'
+import { PolicyCard } from './policy-card'
 import { useShows } from './builder-version'
 import { MARK_LABEL, UNMARK_LABEL } from '../../tester'
 import { shows } from '../../rollout'
 
 /* No status pill on a new policy nobody has saved (rollout.ts `newPolicyUnsaved`). */
 const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
+/* The pill is a plain status and the switches are in the ⋯ (rollout.ts `statusInMenu`). */
+const STATUS_IN_MENU: boolean = shows('statusInMenu')
+/* The policy's details card on its name, where Policies' details slider was (rollout.ts `directOpen`). */
+const POLICY_CARD: boolean = shows('directOpen')
 
 /* -----------------------------------------------------------------------------
    The board's top row.
@@ -64,6 +70,9 @@ const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
 
 export function BoardBar({
   policy,
+  hideStatus = false,
+  noRename = false,
+  onRename,
   unsaved = false,
   draftSaved = false,
   edits,
@@ -74,8 +83,14 @@ export function BoardBar({
   actions,
   onLearn,
   onWatchDemo,
+  chip,
+  beside,
 }: {
   policy: Policy
+  /** The Draft model's Fix chip, drawn in place of the change-state pill (draft-model.ts). */
+  chip?: ReactNode
+  /** After the chip: the Fix model's Live / Draft switch. */
+  beside?: ReactNode
   /* The change-state pill beside the status: edits since the last save, or a
      saved draft that is not live yet. */
   unsaved?: boolean
@@ -107,6 +122,12 @@ export function BoardBar({
      inside it: watching and doing are two answers to one question, and burying
      one of them a click behind the other makes the product pick for you. */
   onWatchDemo?: () => void
+  /** No status pill: the start chooser is on the canvas (rollout.ts `statusInMenu`). */
+  hideStatus?: boolean
+  /** No rename pencil: the "View and edit" view reads only, and Edit is the way to change anything (view-edit.tsx). */
+  noRename?: boolean
+  /** The new name goes to the builder's draft instead of the stored policy ("View and edit", a published policy in draft mode). */
+  onRename?: (name: string) => void
 }) {
   const store = useBrand()
   /* Renaming in place, as on the library pages: the heading and an
@@ -148,7 +169,13 @@ export function BoardBar({
   const keepName = () => {
     const saved = store.policyById(policy.id)
     const trimmed = name.trim()
-    if (!saved || problem || trimmed === saved.name) return
+    if (!saved || problem) return
+    /* "View and edit": a published policy's name is an edit to its draft, held until Save and publish (view-edit.tsx). */
+    if (onRename) {
+      if (trimmed !== policy.name) onRename(trimmed)
+      return
+    }
+    if (trimmed === saved.name) return
     store.savePolicy({ ...saved, name: trimmed })
     store.showToast('Name saved')
   }
@@ -242,10 +269,18 @@ export function BoardBar({
             {/* A copy nobody has finished says so on its name: highlighted (owner, 23 Oct 2026: "add a highlighter on the
                 policy name so the user gets it that it is copied"; the Copy tag beside it was removed the same day). It goes
                 when the copy is turned on. */}
-            <h1 className={policy.copiedFrom && policy.status === 'draft' ? 'bbtop__title is-copy' : 'bbtop__title'} title={policy.name}>
-              {policy.name}
-            </h1>
-            <span className="bbtop__pencil" ref={pencil}>
+            {/* The details card opens on the name (policy-card.tsx, rollout.ts `directOpen`): it shows the whole name, so
+                the native title goes. */}
+            {POLICY_CARD ? (
+              <PolicyCard policy={store.policyById(policy.id) ?? policy}>
+                <h1 className={policy.copiedFrom && policy.status === 'draft' ? 'bbtop__title is-copy' : 'bbtop__title'}>{policy.name}</h1>
+              </PolicyCard>
+            ) : (
+              <h1 className={policy.copiedFrom && policy.status === 'draft' ? 'bbtop__title is-copy' : 'bbtop__title'} title={policy.name}>
+                {policy.name}
+              </h1>
+            )}
+            {!noRename && <span className="bbtop__pencil" ref={pencil}>
               <IconButton
                 icon={Pencil}
                 size="sm"
@@ -257,17 +292,19 @@ export function BoardBar({
                   setRenaming(true)
                 }}
               />
-            </span>
+            </span>}
           </>
         )}
 
         {/* Read from the store, not this bar's copy: the status is switched
             here, and it is not part of the draft. */}
         {/* Not stored yet, so no status: no Draft pill before the first save (rollout.ts `newPolicyUnsaved`). */}
-        {!(NEW_POLICY_UNSAVED && policy.provisional) && (
-          <StatusControl policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} turnOnAsk={turnOnAsk} />
+        {/* The STORED policy's mark: the builder's copy keeps it after the first save takes it off. */}
+        {!hideStatus && !(NEW_POLICY_UNSAVED && (store.policyById(policy.id) ?? policy).provisional) && (
+          <StatusControl still={STATUS_IN_MENU} policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} turnOnAsk={turnOnAsk} />
         )}
-        <ChangeState unsaved={unsaved} draft={draftSaved} />
+        {chip !== undefined ? chip : <ChangeState unsaved={unsaved} draft={draftSaved} />}
+        {beside}
       </nav>
 
       {/* Who it governs stood here — a glyph, a phrase, a count and a hover
@@ -292,6 +329,7 @@ export function BoardBar({
             <GraduationCap size={16} strokeWidth={1.9} aria-hidden />
           </button>
         )}
+        <DraftModelSwitch />
         <BuilderVersionSwitch />
         {actions}
       </div>
@@ -374,11 +412,27 @@ export function BoardBarActions({
   onSave,
   onSaveTemplate,
   templateMarked = false,
+  templateHold = null,
+  statusItems = [],
+  onStatus,
   onRollBack,
   onContactSupport,
   onCopyRules,
   publish,
+  saveLabel,
+  viewOnly = false,
+  modeActions,
+  noDiscard = false,
 }: {
+  /* A read-only view of the policy is on screen (Fix's Published, rollout.ts `versionBar`): nothing on it to save, so
+     Discard, Save draft and the save are not drawn. The ⋯ stays: the policy's own actions are what that view is for. */
+  viewOnly?: boolean
+  /** "View and edit" (view-edit.tsx `ViewEditActions`): Edit and Make active in the view, Show published policy and Done in draft mode, before the saves. */
+  modeActions?: ReactNode
+  /** No Discard at all, whatever the builder version (owner, 24 Nov 2026: Discard stays out of "View and edit"). */
+  noDiscard?: boolean
+  /** Another name for the policy's save, for a draft model that needs one (V3's Publish, draft-model.ts). Fix kept Save policy on 23 Nov 2026 and is "Save and publish" since 24 Nov (rollout.ts `saveAndPublish`, Design only). */
+  saveLabel?: string
   /** A moved draft's Publish (migrate/moved-panel.tsx): beside it the save steps down to a secondary. */
   publish?: ReactNode
   /** Read as text is open in the panel's slot. */
@@ -429,6 +483,11 @@ export function BoardBarActions({
   /* Already a template: the same row reads Remove from templates, as the Policies row does (rollout.ts
      `builderTemplateToggle`). */
   templateMarked?: boolean
+  /** Why the canvas cannot be a template yet, as the row's pill; the row is greyed (status-options.ts `templateHold`). */
+  templateHold?: string | null
+  /** The status switches, first in the ⋯ (rollout.ts `statusInMenu`); the pill beside the name is then plain. */
+  statusItems?: MenuItem[]
+  onStatus?: (id: string) => void
   /** A migrated, active policy (owner, 17 Nov 2026): back to its old policy. */
   onRollBack?: () => void
   /** A migrated policy, live or rolled back (owner, 18 Nov 2026): help from miniOrange. */
@@ -487,10 +546,11 @@ export function BoardBarActions({
           stays neutral and the red is inside its confirm: secondary, as the
           kit SaveBar's Discard is (23 Oct 2026). */}
       {/* A moved draft is read here, not edited: its Approve and Approve and publish stand alone (owner, 6 Nov 2026). */}
-      {!publish && discard && <Button variant="secondary" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
+      {!publish && modeActions}
+      {!publish && !viewOnly && discard && !noDiscard && <Button variant="secondary" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
         Discard
       </Button>}
-      {!publish && <Button variant="secondary" size="sm" disabled={!unsaved} blocked={stop && unsaved ? stop : undefined} title={!unsaved ? 'No changes to save' : (stop ?? undefined)} onClick={onSaveDraft}>
+      {!publish && !viewOnly && <Button variant="secondary" size="sm" disabled={!unsaved} blocked={stop && unsaved ? stop : undefined} title={!unsaved ? 'No changes to save' : (stop ?? undefined)} onClick={onSaveDraft}>
         Save draft
       </Button>}
       {/* One word, and it does that word (owner, 23 Sep 2026: "make it save
@@ -516,7 +576,7 @@ export function BoardBarActions({
           whose last step lights nothing is exactly the failure the anchor tests
           exist to catch. The span is `display: contents`-free on purpose: it
           needs a real box for the spotlight to measure. */}
-      {!publish && (
+      {!publish && !viewOnly && (
       <span className="bbtop__reviewwrap" data-tour="review">
         <Button
           variant={quietSave || publish ? 'secondary' : 'brand'}
@@ -546,7 +606,7 @@ export function BoardBarActions({
               picks one of the two rather than choosing between twins. */}
           {/* While the checks before saving run (about 150 ms on the showcase),
               the button says so and takes no second press. */}
-          {checking ? 'Checking…' : features.publish ? 'Publish policy' : 'Save policy'}
+          {checking ? 'Checking…' : (saveLabel ?? (features.publish ? 'Publish policy' : 'Save policy'))}
         </Button>
       </span>
       )}
@@ -554,17 +614,21 @@ export function BoardBarActions({
       {/* The policy's other doors, after the verbs that end a draft, the way an application's head ends in its ⋯: Save as
           template (owner, 27 Oct 2026: "add an option for save as template"). Not for a post sign-in policy, which
           decides no sign-in and so has nothing to reuse, and not with no rule on the canvas. */}
-      {(onSaveTemplate || onCopyRules || onRollBack || onContactSupport) && !post && (
+      {(onSaveTemplate || onCopyRules || onRollBack || onContactSupport || statusItems.length > 0) && (!post || statusItems.length > 0) && (
         <RowMenu
           label="More for this policy"
           size="sm"
           items={[
-            ...(onCopyRules ? [{ id: 'copy', label: 'Copy rules from a policy', icon: CopyPlus }] : []),
-            ...(onSaveTemplate ? [{ id: 'template', label: templateMarked ? UNMARK_LABEL : MARK_LABEL, icon: TemplateIcon }] : []),
+            /* Status first, as on the Policies row's ⋯; a rule after them when anything follows. */
+            ...statusItems,
+            ...(onCopyRules && !post ? [{ id: 'copy', label: 'Copy rules from a policy', icon: CopyPlus, divide: statusItems.length > 0 }] : []),
+            ...(onSaveTemplate && !post
+              ? [{ id: 'template', label: templateMarked ? UNMARK_LABEL : MARK_LABEL, icon: TemplateIcon, divide: statusItems.length > 0 && !onCopyRules, ...(templateHold && !templateMarked ? { disabled: true, pill: templateHold } : null) }]
+              : []),
             ...(onRollBack ? [{ id: 'rollback', label: 'Roll back to old policy', icon: Undo2, divide: !!(onSaveTemplate || onCopyRules) }] : []),
             ...(onContactSupport ? [{ id: 'support', label: 'Contact support', icon: Headset, divide: !onRollBack && !!(onSaveTemplate || onCopyRules) }] : []),
           ]}
-          onSelect={(id) => (id === 'copy' ? onCopyRules?.() : id === 'rollback' ? onRollBack?.() : id === 'support' ? onContactSupport?.() : onSaveTemplate?.())}
+          onSelect={(id) => (id.startsWith('status:') ? onStatus?.(id) : id === 'copy' ? onCopyRules?.() : id === 'rollback' ? onRollBack?.() : id === 'support' ? onContactSupport?.() : onSaveTemplate?.())}
         />
       )}
     </>

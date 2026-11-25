@@ -152,6 +152,7 @@ export function rowsRead(policies: readonly Policy[], draft: Policy | null, appI
           rows.add('when').add('time-track')
           break
         case 'day':
+        case 'schedule':
           rows.add('when')
           break
         case 'device-risk':

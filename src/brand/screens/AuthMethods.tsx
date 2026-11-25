@@ -27,8 +27,8 @@ import {
 } from 'lucide-react'
 
 import { Badge, Button, Callout, Confirm, Drawer, IconButton, MenuButton, Note, SearchBox, TipDot, Toggle } from '../kit'
-import { AUTH_GENERAL_SEED, VERIFICATION_RULES_DRAWER, type AuthGeneral } from './auth-general'
-import { GeneralSettings, GeneralSettingsDrawer } from './auth-general-settings'
+import { AUTH_GENERAL_SEED, GENERAL_SAVE, VERIFICATION_RULES_DRAWER, type AuthGeneral } from './auth-general'
+import { GeneralSettings, GeneralSettingsDrawer, GeneralSettingsTab } from './auth-general-settings'
 import { MethodsTour } from '../tour/MethodsTour'
 import { NEW_LAYOUT, SETTING_WAS } from '../tour/methods-tour'
 import { methodBlocker, type AuthMethod } from '../methods'
@@ -651,8 +651,14 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
               data-tour={`methods-tab-${t.id}`}
               className={`bm8__tab ${tab === t.id ? 'is-on' : ''}`}
               onClick={() => {
-                setTab(t.id)
-                closePanel()
+                const open = () => {
+                  setTab(t.id)
+                  closePanel()
+                }
+                /* General settings' typed values may be waiting for Save (GENERAL_SAVE): another tab unmounts them, so
+                   it asks first, as the rail does. Every other tab switch is as it was. */
+                if (GENERAL_SAVE && tab === 'general' && t.id !== 'general') store.requestLeave(open)
+                else open()
               }}
             >
               <t.icon size={14} strokeWidth={1.9} aria-hidden />
@@ -671,10 +677,11 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
       )}
 
       {/* The same rows the slide-over holds, inline on the page: a column, so a switch never ends up a page's width
-          from the label it belongs to. Each one saves as it is flicked (auth-general-settings.tsx). */}
+          from the label it belongs to. Each switch saves as it is flicked; with GENERAL_SAVE the two typed values wait
+          for the footer's Save (auth-general-settings.tsx). */}
       {tab === 'general' && !isUser && (
         <div className="bm8__genpane">
-          <GeneralSettings value={general} onChange={setGeneral} />
+          {GENERAL_SAVE ? <GeneralSettingsTab value={general} onSave={setGeneral} /> : <GeneralSettings value={general} onChange={setGeneral} />}
         </div>
       )}
 

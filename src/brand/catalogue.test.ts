@@ -118,8 +118,11 @@ describe('the condition catalogue', () => {
     }
     // And between them they account for the whole catalogue: nothing is in it
     // for no reason, and nothing has been quietly orphaned. A post sign-in
-    // policy's own attributes are offered on its If (13 Oct 2026).
-    const accounted = new Set([...WHEN_CONDITIONS.map((c) => c.id), ...POST_WHEN_CONDITIONS.map((c) => c.id), ...WHO_TYPES])
+    // policy's own attributes are offered on its If (13 Oct 2026). Sign-in time
+    // is offered by line — on Design, in place of Sign-in hours and Sign-in days
+    // (schedule.ts) — and the suite runs with no line.
+    const BY_LINE = ['schedule']
+    const accounted = new Set([...WHEN_CONDITIONS.map((c) => c.id), ...POST_WHEN_CONDITIONS.map((c) => c.id), ...WHO_TYPES, ...BY_LINE])
     expect(CONDITION_CATALOGUE.filter((c) => !accounted.has(c.id))).toEqual([])
     for (const t of WHO_TYPES) expect(POST_WHEN_CONDITIONS.some((c) => c.id === t), `${t} must not be offered`).toBe(false)
   })

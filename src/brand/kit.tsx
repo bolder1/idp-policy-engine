@@ -2929,6 +2929,7 @@ export function SaveBar({
   review,
   guard,
   onDiscard,
+  discardLabel = 'Discard',
 }: {
   open: boolean
   /** Short names for what changed. No longer drawn in the footer (it carries no words now); callers still say it. */
@@ -2946,6 +2947,9 @@ export function SaveBar({
   guard?: () => ReviewGuard | null
   /** Throws the unsaved edits away: the footer's Discard, beside the save (owner, 23 Oct 2026). */
   onDiscard?: () => void
+  /** That button's word. Cancel where the page is settings rather than a thing being made (owner, 25 Nov 2026, General
+      settings: "a footer with save and cancel button"). */
+  discardLabel?: string
 }) {
   const [reviewing, setReviewing] = useState(false)
   const bar = useRef<HTMLDivElement | null>(null)
@@ -3023,7 +3027,7 @@ says why a field is wrong where the field is, the page head's pill says somethin
 what changed. What is left is two buttons: throw it away, or save it. */}
           {onDiscard && (
             <Button variant="secondary" onClick={onDiscard}>
-              Discard
+              {discardLabel}
             </Button>
           )}
           {/* Blocked with a reason, the save is `blocked` rather than `disabled` (Confirm's rule): reachable by Tab and

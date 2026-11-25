@@ -1,0 +1,142 @@
+/* "View and edit" on the builder (view-edit.tsx). Scoped to its own classes: stylesheets load for every line. */
+
+/* Draft mode's chip, where Fix's Live / Draft switch stands: the stage's top-left corner, sharing its grid cell,
+   placed with justify-self (Motion owns this element's transform). */
+.bve-chip {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: start;
+  z-index: 6;
+  margin: var(--space-6) 0 0 var(--space-6);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.bve-chip b { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bve-chip__meta { color: var(--text-tertiary); }
+
+/* Draft mode's two buttons on the bar (view-edit.tsx `ViewEditActions`). Under 900, where the console takes its compact
+   layout, they keep their icons and drop their words, so Save draft and Save and publish stay on screen; the words
+   remain the accessible name. */
+.bve-acts { display: inline-flex; align-items: center; gap: var(--space-3); flex: none; }
+/* The crumbs give way to the verbs (board.css), and with the review pickers on the bar they can give way to nothing:
+   clipped then, rather than drawn under the pickers. Only on a bar with this model's buttons. */
+/* The review pickers (Draft model, Builder version: Ctrl+P only) keep their value and drop their prefix when narrow,
+   so the crumbs and the way back keep their room. */
+@media (max-width: 900px) {
+  .bbtop:has(.bve-acts) .bbtop__acts .bx-picker__prefix { display: none; }
+}
+.bbtop:has(.bve-acts) .bbtop__crumbs {
+  overflow: hidden;
+  /* Room inside the clip for the back button, which hangs left of the crumbs (board.css `.bbtop__back`), and its focus ring. */
+  padding: var(--space-2) 0 var(--space-2) var(--space-4);
+  margin-left: calc(var(--space-4) * -1);
+}
+@media (max-width: 900px) {
+  .bve-acts .bve-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Show published policy in the published colour (view-edit.tsx `PublishedButton`, rollout.ts `publishedLook`): the
+   Active pill's green, drifting slowly between its two tints. Hover sends a light across it and raises a soft green
+   halo; open, it holds still on the deeper tint. Motion owns the button's press and the mark's rings, so nothing here
+   transforms. The light is painted under the words (the button isolates, the light sits at z -1). */
+.bve-pubbtn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--fb-positive-fg);
+  border-color: var(--fb-positive-border);
+  background: linear-gradient(115deg, var(--fb-positive-bg) 0%, var(--fb-positive-strong-bg) 50%, var(--fb-positive-bg) 100%) 0% 50% / 220% 100%;
+  animation: bve-pub-drift 6s ease-in-out infinite alternate;
+  transition:
+    color var(--dur-normal) var(--ease-standard),
+    border-color var(--dur-normal) var(--ease-standard),
+    box-shadow var(--dur-normal) var(--ease-standard);
+}
+.bve-pubbtn > svg { flex: none; overflow: visible; }
+.bve-pubbtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--surface-raised) 85%, transparent) 50%, transparent 62%) 140% 0 / 260% 100% no-repeat;
+}
+.bve-pubbtn:hover {
+  color: var(--fb-positive-strong-fg);
+  border-color: var(--fb-positive-strong-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fb-positive-dot) 16%, transparent);
+}
+/* Once per hover: the light only travels on the way in, and snaps back unseen on the way out. */
+.bve-pubbtn:hover::after {
+  background-position: -40% 0;
+  transition: background-position 700ms var(--ease-standard);
+}
+.bve-pubbtn[aria-pressed='true'] {
+  animation: none;
+  background: var(--fb-positive-strong-bg);
+  color: var(--fb-positive-strong-fg);
+  border-color: var(--fb-positive-strong-border);
+  box-shadow: inset 0 0 0 1px var(--fb-positive-strong-border);
+}
+.bve-pubbtn[aria-pressed='true']:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--fb-positive-strong-border),
+    0 0 0 3px color-mix(in srgb, var(--fb-positive-dot) 16%, transparent);
+}
+@keyframes bve-pub-drift {
+  to { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bve-pubbtn { animation: none; }
+  .bve-pubbtn::after { display: none; }
+}
+
+/* The published version, read only, in the inspector's slot. Its canvas scrolls inside the panel. */
+.bve-pub { display: flex; flex-direction: column; min-height: 0; }
+.bve-pub__body { flex: 1; min-height: 0; overflow: auto; padding: var(--space-5); }
+.bve-pub .brat__barend { display: inline-flex; align-items: center; gap: var(--space-3); }
+/* On the left (BoardBuilder `PUBLISHED_LEFT`, rollout.ts `publishedLeft`): the board's leading track, the one Guided
+   setup takes, so the rule editor keeps the right-hand track and both are used at once. Narrower than the editor, since
+   it only reads. It slides in from the left edge, by opacity and the `translate` property: nothing here is a motion
+   element. */
+.bb.is-pub-left { --bb-left: min(400px, 30%); }
+.bve-pub.is-left {
+  grid-column: 1;
+  margin: var(--space-5) 0 var(--space-5) var(--space-5);
+  animation-name: bve-pub-in-left;
+}
+@keyframes bve-pub-in-left {
+  from { opacity: 0; translate: -16px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+/* Below 900 the board stacks (board.css): two rows, the canvas over the lower half, as Guided setup has. There is room for
+   one panel there, so a rule's editor takes it while it is open and the published version waits under it. */
+@media (max-width: 900px) {
+  .bb.is-pub-left,
+  .bb.is-pub-left.is-insp-closed { grid-template-rows: minmax(0, 1fr) 54%; }
+  .bve-pub.is-left { grid-column: 1; grid-row: 2; margin: 0 var(--space-5) var(--space-5); }
+  .bb.is-pub-left:not(.is-insp-closed) .bve-pub.is-left { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bve-pub.is-left { animation: none; }
+}
+/* What people sign in with is read, not worked on: no editing states on its cards (as Fix's Live, draft-fix.css). */
+.bve-pub .bb__state.is-ready,
+.bve-pub .bb__state.is-setup,
+.bve-pub .bb__state.is-warn { display: none; }

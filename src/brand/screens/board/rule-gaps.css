@@ -1,0 +1,15 @@
+/* A refused save's reason, under the field it is about (rule-gaps.ts). The wizard's in-form reason (`.bdpw__said`,
+   26 Sep 2026) at the 12px floor, and focusable so a refused save can land on the first one. */
+.bb__gap {
+  display: block;
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 1.45;
+  color: var(--fb-notice-fg);
+}
+.bb__gap:focus { outline: none; }
+.bb__gap:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); border-radius: var(--radius-sm); }
+
+/* A Then nobody answered, on the card: said in the card's own blank style, not as an outcome it does not have. */
+.bb__ifkw.is-open { color: var(--fb-notice-fg); }

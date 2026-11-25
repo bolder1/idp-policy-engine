@@ -770,6 +770,12 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
   position: relative;
   z-index: 2;
 }
+/* The table's sticky footer (pager.css `.bpager`) is also z-index 2 and comes later on the page, so it drew over the
+   More filters dropdown (which opens inside the bar; the Status menu portals out) once a filter left the table short
+   (24 Nov). One step above the footer is enough; the shell's top bar
+   (60) and the rail overlay (70) stay above it. Design only: Policies.tsx adds .is-bar-over where rollout.ts
+   `barOverPager` shows. */
+.bpol__main.is-one-line.is-bar-over > .bbar { z-index: 3; }
 .bpol__main.is-one-line > .bbar .bbar__left { flex-wrap: nowrap; }
 .bpol__main.is-one-line > .bbar .bx-search { flex: 0 1 300px; min-width: 160px; }
 .bpol__main.is-one-line > .bbar :is(.bbar__filter, .bmf__trigger, .bbar__right .bx-btn) { flex: none; white-space: nowrap; }

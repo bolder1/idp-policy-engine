@@ -106,3 +106,169 @@
 .bmf__opt small { font-size: var(--fs-xs); color: var(--text-tertiary); }
 .bmf__none { margin: 0; color: var(--text-tertiary); font-size: var(--fs-sm); }
 .bmf .bmf__reset { align-self: flex-start; padding-left: 0; }
+
+/* --- Compact (more-filters.tsx `COMPACT`, rollout `moreFiltersCompact`, 23 Nov 2026) ------------------------------
+   Every rule below hangs off `.is-compact` or a class only the compact dropdown and chip draw, so the other lines'
+   More filters is untouched. */
+
+/* The chip: the field quiet, the operator and the values in the chip's weight. */
+.bmf .bx-chip .bmf__sumkey { font-weight: var(--fw-regular); }
+.bmf .bx-chip .bmf__summark { font-weight: var(--fw-semibold); }
+
+.bmf__pop.is-compact {
+  /* minmax(0, …): a long name ellipsizes rather than widening the pane past the box (and focus scrolling it). */
+  grid-template-columns: 148px minmax(0, 1fr);
+  width: 456px;
+  max-width: calc(100vw - var(--space-9));
+  height: 320px;
+}
+
+/* Fields: an icon, the name, and a tick once applied. */
+.bmf__pop.is-compact .bmf__keys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2);
+}
+.bmf .bmf__pop.is-compact .bmf__key {
+  gap: var(--space-4);
+  justify-content: flex-start;
+  min-height: var(--space-9);
+  padding: 0 var(--space-4);
+  font-size: var(--fs-md);
+}
+.bmf .bmf__pop.is-compact .bmf__key .bmf__keyicon { flex: none; color: var(--text-tertiary); }
+.bmf .bmf__pop.is-compact .bmf__key.is-on .bmf__keyicon { color: var(--text-primary); }
+.bmf__pop.is-compact .bmf__keyname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bmf__pop.is-compact .bmf__pane { gap: var(--space-3); min-width: 0; padding: var(--space-4); }
+.bmf__head { display: flex; align-items: center; gap: var(--space-3); }
+
+/* = / ≠: the trigger and its small menu. */
+.bmf__opwrap { position: relative; flex: none; }
+.bmf .bmf__op {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--ctl-height-sm);
+  padding: 0 var(--space-3) 0 var(--space-3);
+  border: var(--bw-thin) solid var(--ctl-border);
+  border-radius: var(--ctl-radius);
+  background: var(--ctl-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-md);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bmf .bmf__op:hover,
+.bmf .bmf__op.is-open { border-color: var(--ctl-border-hover); }
+.bmf .bmf__op > svg { color: var(--text-tertiary); }
+.bmf__mark {
+  display: inline-grid;
+  place-items: center;
+  width: var(--space-6);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+.bmf__opmenu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 1;
+  min-width: 148px;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+  box-shadow: var(--el-high, var(--el-mid));
+}
+.bmf .bmf__opmenu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--space-9);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: left;
+  cursor: pointer;
+}
+.bmf .bmf__opmenu button:hover { background: var(--surface-sunken); }
+.bmf .bmf__opmenu button.is-on { font-weight: var(--fw-medium); }
+.bmf .bmf__opmenu button > svg { margin-left: auto; color: var(--accent-strong); }
+
+/* The search shares the operator's row and height. */
+.bmf__find { flex: 1; min-width: 0; }
+.bmf__find .bx-search { height: var(--ctl-height-sm); }
+
+/* The list: tick, mark, name (and email). */
+.bmf__rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-2);
+}
+.bmf .bmf__row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: var(--space-9);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: left;
+  cursor: pointer;
+}
+.bmf .bmf__row:hover { background: var(--surface-sunken); }
+.bmf__art { flex: none; display: inline-grid; place-items: center; width: var(--space-8); height: var(--space-8); }
+.bmf__art .bx-face { width: var(--space-8); height: var(--space-8); font-size: var(--fs-sm); box-shadow: none; }
+.bmf__text { display: flex; flex-direction: column; min-width: 0; }
+.bmf__text b,
+.bmf__text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmf__text b { font-weight: var(--fw-regular); }
+.bmf__row.is-on .bmf__text b { font-weight: var(--fw-medium); }
+.bmf__text small { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* A rule outcome's mark: its icon on a round of its tone, as the builder draws a decision. */
+.bmf__dmark {
+  display: inline-grid;
+  place-items: center;
+  width: var(--space-7);
+  height: var(--space-7);
+  border-radius: var(--radius-full);
+}
+.bmf__dmark.is-positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bmf__dmark.is-positive-strong { background: var(--fb-positive-strong-bg); color: var(--fb-positive-strong-fg); }
+.bmf__dmark.is-negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+/* Last changed is one choice: a radio mark in the tick's column. */
+.bmf__radio {
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  border: var(--bw-thin) solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+}
+.bmf__row.is-on .bmf__radio { border: 5px solid var(--accent-strong); }
+
+.bmf__pop.is-compact .bmf__none { padding: var(--space-3); }
+.bmf__pop.is-compact .bmf__reset { padding: var(--space-1) 0; }

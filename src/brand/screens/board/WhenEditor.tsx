@@ -15,9 +15,11 @@ import { MenuButton } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import * as ops from '../../when-ops'
 import { hasWho } from '../../rule-who'
+import { scheduleSummary } from '../../schedule'
 import { useBrand, useNameLookup } from '../../store'
 import { ConditionDraft, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
 import { conditionTone } from './tones'
+import { gapText, useRuleGaps } from './rule-gaps'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -60,6 +62,9 @@ export function WhenEditor({
   const store = useBrand()
   const resolve = useNameLookup()
   const cards = rule.when.cards
+  /* The reasons a refused save left under this rule's conditions and groups (rule-gaps.ts). */
+  const shownGaps = useRuleGaps()
+  const condGap = (id: string) => gapText(shownGaps, rule.id, 'condition', id)
   /* `'loose'` adds a condition at the top level, `'group'` starts a new group,
      and an id adds into that card. Three destinations, because there are three
      things a person can mean by "add". */
@@ -357,6 +362,7 @@ export function WhenEditor({
                   onKey={(k) => write(ops.setKey(rule.when, m.c.id, k))}
                   onTz={(tz) => write(ops.setTz(rule.when, m.c.id, tz))}
                   onRemove={() => removeCondition(m.c.id)}
+                  gap={condGap(m.c.id)}
                   /* Gated on the same predicate the writer uses. The two used to
                      disagree — the button was drawn on every row while the
                      writer bailed whenever the row was the only one — so the
@@ -365,6 +371,8 @@ export function WhenEditor({
               ) : (
                 <GroupMember
                   k={m.card}
+                  gapOf={condGap}
+                  groupGap={gapText(shownGaps, rule.id, 'group', m.card.id)}
                   letter={cardLetter(m.index)}
                   rows={m.card.conditions}
                   fresh={fresh}
@@ -500,6 +508,8 @@ function PendingGroup({
    linter and the change log already use for it. */
 function GroupMember({
   k,
+  gapOf,
+  groupGap,
   letter,
   rows,
   fresh,
@@ -522,6 +532,10 @@ function GroupMember({
   setTz,
 }: {
   k: ConditionCard
+  /** The reason under one of its conditions, if a refused save left one (rule-gaps.ts). */
+  gapOf: (id: string) => string | null
+  /** The reason under the group itself: it holds no condition. */
+  groupGap: string | null
   letter: string
   rows: Condition[]
   fresh: string | null
@@ -587,6 +601,7 @@ function GroupMember({
             onKey={(k) => setKey(c.id, k)}
             onTz={(tz) => setTz(c.id, tz)}
             onRemove={() => removeCondition(c.id)}
+            gap={gapOf(c.id)}
           />
           </Fragment>
         ))}
@@ -601,6 +616,11 @@ function GroupMember({
             <Plus size={12} strokeWidth={2.4} aria-hidden />
             Choose a condition
           </button>
+        )}
+        {groupGap && (
+          <p className="bb__gap" role="alert" tabIndex={-1}>
+            {groupGap}
+          </p>
         )}
 
         {/* Inside the frame, above the foot, as the group's next row: a group
@@ -797,7 +817,10 @@ function ConditionRow({
   onKey,
   onTz,
   onRemove,
+  gap = null,
 }: {
+  /** The reason under this row, if a refused save left one: it has no value (rule-gaps.ts). */
+  gap?: string | null
   c: Condition
   fresh: boolean
   dupe: boolean
@@ -834,7 +857,8 @@ function ConditionRow({
      that happen to match are not the same choice made twice. A value this row
      already holds stays pickable, so it can be taken off; one another row holds
      is shown and refused, with the reason on the row. */
-  const listed = t.valueKind !== 'time' && t.valueKind !== 'range' && t.valueKind !== 'text' && t.valueKind !== 'number'
+  const listed =
+    t.valueKind !== 'time' && t.valueKind !== 'range' && t.valueKind !== 'text' && t.valueKind !== 'number' && t.valueKind !== 'schedule'
   /* Only a value chosen FROM a list can name something that is gone. A typed
      one — "12:00", a score of 70, "FTE" — is on no list, so it always read as
      missing: every time window and risk threshold drew the red "unset" frame
@@ -858,7 +882,9 @@ function ConditionRow({
   const clashNames = clash.map((v) => options.find((o) => o.value === v)?.label ?? v)
 
   const summary =
-    t.valueKind === 'time'
+    t.valueKind === 'schedule'
+      ? scheduleSummary(values, c.tz)
+      : t.valueKind === 'time'
       ? `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`
       : t.valueKind === 'range'
         ? values[0]
@@ -896,6 +922,11 @@ function ConditionRow({
           footer={footer}
           onFooter={onFooter}
         />
+        {gap && (
+          <span className="bb__gap" role="alert" tabIndex={-1}>
+            {gap}
+          </span>
+        )}
         {/* Conflict and duplicate captions are off in the showcase, with the
             panel's other findings (owner, 22 Sep 2026). The dropdown still
             refuses a value another condition holds. */}

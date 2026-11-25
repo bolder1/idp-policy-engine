@@ -111,6 +111,110 @@ export const ROLLOUT = {
   /** Device profiles: an always-on signal's priority is locked like its tick, and Review does not list the always-on
    *  signals (23 Nov). */
   lockedSignals: ALL,
+  /** Six applications no policy protects, on every tenant from the start, so a new policy has one to take
+   *  (spare-apps.ts; 23 Nov, owner: "add some more apps which are not used … for all 3 roles"). */
+  spareApps: ALL,
+  /** The builder bar's status is a plain pill, and Make active / Make inactive / Monitor / View monitoring move into
+   *  the bar's ⋯ (23 Nov, owner: "move it to the three dots … a static active and inactive pill only"). Design only
+   *  since 24 Nov: it had reached every line without his word for the other two (owner: "Design only, fix wording"). Every line
+   *  again on his word (25 Nov: "Groups A and B"), as are activeWords, templateNeedsRules, barOverPager and
+   *  zonesHitsOverBar. */
+  statusInMenu: ALL,
+  /** The builder's Draft model switch, Today / Fix (23 Nov, owner: "only for me … inside the policy builder, I need a
+   *  dropdown"; draft-model.ts). Fix: status kept apart from saving, Live / Draft view, a confirm before live changes.
+   *  V3: publish, review and versions. Design only. */
+  draftModels: ['design'],
+  /** Fix's Live / Draft moves off the bar onto the canvas (24 Nov, owner: remove "Unsaved changes", put Live / Draft on
+   *  the canvas, and drop the blue Live look). The bar's change pill goes; once the policy differs from live, the
+   *  canvas's top-left chip is the switch ("Draft ▾" / "Live ▾", no app name: the start node says it), and Live keeps the board's own ground with
+   *  the dots off. Fix only; V3 keeps its bar switch (draft-fix.tsx `CanvasViewPick`). Design only. */
+  fixViewOnCanvas: ['design'],
+  /** Fix's save is "Save and publish", not "Save policy" (24 Nov, owner: "change the button name to save and publish"):
+   *  the bar's orange button, ⌘↵ in the command menu and the shortcuts sheet, the checks page's button and the "Update
+   *  live policy?" confirm. Fix only; Today keeps Save policy, V3 its Publish. Design only. */
+  saveAndPublish: ['design'],
+  /** Fix's bar follows the version on screen (24 Nov, owner: "draft can't be active inactive but published can"; chose
+   *  option A). The draft has no status: on it the status pill and Make active / inactive / Monitor leave the bar and
+   *  the ⋯, and a never-published policy shows none. Published (the canvas chip's word for Live, with its status beside
+   *  it in the menu) is read only: the pill and status rows, no saves, no Copy rules. "Update live policy?" reads
+   *  "Publish this draft?" and the toasts say published. A first publish stays inactive; Discard stays out. With
+   *  `fixViewOnCanvas`, Fix only. Design only. */
+  versionBar: ['design'],
+  /** The Draft model switch's fourth choice, "View and edit" (24 Nov, the stakeholders through the owner; artifact
+   *  "Policy lifecycle states", round 2). A published policy, or a saved draft, opens view-only and Edit enters draft
+   *  mode. Make active / inactive live only outside draft mode: the view, the Policies row and the application's head,
+   *  where Make active sits beside Open policy until the policy is active. Applications join the draft. A policy with
+   *  no application can only be saved as a draft. A first publish arrives Inactive. Show published policy opens the
+   *  live version in a right-hand panel. Removing the only application, or deleting, is refused while active. Built on
+   *  Fix (draft-model.ts `useViewEdit`). Design only. */
+  viewEdit: ['design'],
+  /** A rule with an empty part cannot be saved (board/rule-gaps.ts): Save policy and Save rule refuse and say why under
+   *  the field; a new rule's Then starts unanswered. Every line, on the owner's word (23 Nov: "this specific part is for
+   *  everywhere, for all three roles … a global change"). */
+  ruleGaps: ALL,
+  /** Migration makes one policy per application, never one shared by applications whose old settings match: the merge
+   *  offer is gone (migrate/plan.ts). The admin adds or removes applications afterwards. Every line, on the owner's word
+   *  (23 Nov: "in the migration policy, there cannot be two applications coupled … every policy should be coupled with
+   *  only one … a global change for all three roles"). */
+  oneAppMoves: ALL,
+  /** The status confirms in active / inactive words: "Make this policy active?" / "Make active", "Make this policy
+   *  inactive?", "Can't make this policy active", "Before making it active" (status-options.ts `ACTIVE_WORDS`), never Turn on
+   *  / Turn off (5 Nov ruling). Design only (24 Nov, owner: "Design only, fix wording"). */
+  activeWords: ALL,
+  /** All Policies → More filters, compact: = / ≠ (is / is not) per field, app logos, faces and outcome marks in the
+   *  lists, and the operator in the chip (23 Nov 2026, owner: "just like Jira … = and ≠ … in a dropdown"). Design only. */
+  moreFiltersCompact: ['design'],
+  /** All Policies: the one-line bar sits one layer above the table's sticky footer, so the More filters dropdown opens
+   *  over the footer rather than under it (24 Nov, screens.css `.is-bar-over`). The Status menu portals out and was never
+   *  under it. Design only. */
+  barOverPager: ALL,
+  /** Sign-in hours and Sign-in days as one condition, Sign-in time (Event time after sign-in): a summary line that opens
+   *  a picker with each day's hours and the time zone; an overnight window belongs to the day it starts; seeded pairs
+   *  read as one where that is exact (24 Nov, owner: "combine this together as one thing", schedule.ts). Design only. */
+  signInTime: ['design'],
+  /** The builder bar's preview switches (Draft model and Builder version) hide and come back together, with every pick
+   *  kept in force: Hide in the version dropdown, and Ctrl+Shift+P both ways (25 Nov, owner: "add a option to hide we
+   *  only have lock … a shortcut for hide and show", "should hide and reveal together"; builder-version.ts). Design only. */
+  hideSwitches: ['design'],
+  /** View and edit's Show published policy wears the published colour: the Active pill's green drifting between its two
+   *  tints, a broadcast mark for the eye, and on hover a light across it and the signal going out (25 Nov, owner: "make it
+   *  color animated, should feel like published, add a better icon, give the hover a cool interaction"). Design only. */
+  publishedLook: ['design'],
+  /** Mark as template only for a policy with something to hand on: no rule yet, or a rule not finished, greys the row in
+   *  every ⋯ (builder, Policies row, application's Policies tab) with why in its pill, and the row's star stays away
+   *  (25 Nov, owner: "this cannot be a template … maybe disable it … let the user know"). Narrows `draftTemplates` on
+   *  Design. Design only. */
+  templateNeedsRules: ALL,
+  /** View and edit's mode buttons: "Edit policy" in the view, always secondary, and "Exit edit mode" in place of Done
+   *  (25 Nov, owner: "don't call it Edit, call it something related to mode … Edit should be secondary in both ways",
+   *  then "we can call it Edit Policy"; Make active unchanged). Design only. */
+  modeButtons: ['design'],
+  /** Show published policy opens on the left, in the board's leading track, and stays open while a rule's editor opens
+   *  on the right: read the live version while editing the draft (25 Nov, owner: "this live policy should come from the
+   *  left … the user can edit while checking the previous policy"). Design only. */
+  publishedLeft: ['design'],
+  /** All Policies: a policy's name opens the builder directly, with no Policy details slider, and the details card moves
+   *  onto the builder bar's name, shown on hover or focus (25 Nov, owner: "I don't think we need this any more, go
+   *  inside directly, and the policy card should move inside with the top bar, where on hover on the name we can see
+   *  the card details"; BoardBar.tsx `PolicyCard`). The slider stays for an application's page. Design only. */
+  directOpen: ['design'],
+  /** "Nothing else matched" turns with the first rule: Allow while a policy has no rules, Deny once it has one, Allow
+   *  again when the last is deleted, only while nobody has chosen it by hand. The card's colour changes in place, a ring
+   *  runs round it, and a note beside it says what changed and why, with Allow instead (25 Nov, owner: "whenever I add my
+   *  first rule … goes to Deny by default … the user should know why it's happening and how the transition works";
+   *  board/default-flip.ts). Design only. */
+  defaultFlips: ['design'],
+  /** View and edit: a policy never published opens in draft mode; Active and the other published policies open in their
+   *  view with Edit policy (25 Nov, owner: "Draft policy should open in draft mode. Active policy should open in view only
+   *  with edit button"). Migrated drafts keep their review. Design only. */
+  draftOpensEditing: ['design'],
+  /** Zones → Locations: the Add location results open over the sticky Discard / Review & save bar, not under it
+   *  (25 Nov, zones-final.css `.is-over-bar`). Every line, on the owner's word (25 Nov: "Groups A and B"). */
+  zonesHitsOverBar: ALL,
+  /** Authentication methods → General settings: Mobile issuer name and Device profile expiry wait for a footer's Cancel
+   *  and Save; the switches still save as they are flicked (25 Nov, owner: "to store this two value we need a footer
+   *  with save and cancel button"). Every line, on his word ("for all designers devs and testers"). */
+  generalSave: ALL,
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

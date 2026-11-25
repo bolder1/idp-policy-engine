@@ -82,7 +82,9 @@ describe('a policy cannot be saved with no rules', () => {
   it('refuses at both saves, and says why on the buttons and when leaving', () => {
     const src = code(boardBuilderSrc)
     expect(src).toContain('const stop = noRules ? NO_RULES_REASON : unnamed ? UNNAMED_REASON : null')
-    expect(src).toContain('const saveNow = () => {\n    if (stop) return store.showToast(stop)')
+    /* Save policy goes through commitSave, which says the stop first (rule-gaps.ts adds its own refusal after it). */
+    expect(src).toContain('const saveNow = () => commitSave(false)')
+    expect(src).toContain('const commitSave = (asked: boolean) => {\n    if (stop) return store.showToast(stop)')
     expect(src).toMatch(/const saveDraft = \(\) => \{\n\s+if \(!saved\) return false\n\s+if \(stop\) \{/)
     expect(src).toContain('blocked: stop, noRule: noRuleLeave })')
     expect(boardBarSrc).toContain('blocked={stop && toPublish ? stop : undefined}')

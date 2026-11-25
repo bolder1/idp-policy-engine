@@ -48,6 +48,31 @@ export const DEVICE_PROFILE_EXPIRY: boolean = shows('deviceProfileExpiry')
 export const MOBILE_ISSUER: boolean = shows('mobileIssuer')
 export const USERS_2FA_ROW: boolean = !MOBILE_ISSUER
 
+/* The two typed values, Mobile issuer name and Device profile expiry, wait for Save in a footer with Cancel beside it
+   (owner, 25 Nov 2026: "to store this two value we need a footer with save and cancel button"). The rollout table's
+   `generalSave` entry; a line without it saves them as they are typed, as before. */
+export const GENERAL_SAVE: boolean = shows('generalSave')
+
+/** The fields that wait for Save. Everything else on the tab is picked, and a pick saves as it is made. */
+export const TYPED_GENERAL = ['mobileIssuer', 'deviceExpiryDays'] as const
+export type TypedGeneral = Pick<AuthGeneral, (typeof TYPED_GENERAL)[number]>
+
+export const typedGeneral = (g: AuthGeneral): TypedGeneral => ({ mobileIssuer: g.mobileIssuer, deviceExpiryDays: g.deviceExpiryDays })
+
+/** Device profile expiry's bounds, the number field's own min and max. */
+export const EXPIRY_DAYS = { min: 1, max: 3650 } as const
+
+/** What is wrong with each typed value, said under its question; nothing for a value that can be saved. */
+export function typedIssues(t: TypedGeneral): Partial<Record<keyof TypedGeneral, string>> {
+  const out: Partial<Record<keyof TypedGeneral, string>> = {}
+  if (!t.mobileIssuer.trim()) out.mobileIssuer = 'Enter a mobile issuer name'
+  const days = Number(t.deviceExpiryDays)
+  if (t.deviceExpiryDays === '' || !Number.isInteger(days) || days < EXPIRY_DAYS.min || days > EXPIRY_DAYS.max) {
+    out.deviceExpiryDays = `Enter a number of days from ${EXPIRY_DAYS.min} to ${EXPIRY_DAYS.max}`
+  }
+  return out
+}
+
 /* The Verification rules slide-over: the button beside the page's heading and the panel it opens
    (auth-general-settings.tsx). Off (owner, 21 Oct 2026: "hide this for now"). The same rows are on the page's own
    General settings tab, which is the other half of the comparison he asked for — "add a general settings tab side by

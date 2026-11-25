@@ -299,11 +299,14 @@ export type StatusMenuId = 'active' | 'monitor' | 'inactive' | 'view-monitoring'
    the whole policy, so on a shared one each carries a hint naming the other
    applications ("With Dropbox"); Remove changes this application only. No item
    is `danger`: red is the confirm's. */
+/* `viewEdit` ("View and edit", board/draft-model.ts, owner 24 Nov 2026): the head carries Make active as its own button
+   (app-policy-view.tsx `activates`), so the menu does not offer it a second time, and the switch it does offer is the
+   verb, Make inactive. Remove and Delete draft are as they are. */
 export function statusMenu(
   policy: Policy,
   app: Pick<App, 'id' | 'name'>,
   apps: readonly App[],
-  opts: { monitor: boolean; deletable: boolean },
+  opts: { monitor: boolean; deletable: boolean; viewEdit?: boolean },
 ): MenuItem[] {
   if (policy.isSystem || policy.status === 'always-on') return []
   const remove: MenuItem = { id: 'remove', label: `Remove from ${app.name}` }
@@ -324,11 +327,13 @@ export function statusMenu(
      application the distinction does not exist, and the labels stay plain. */
   const shared = others.length > 0
   const alsoOn = `${listPhrase(others.map((a) => a.name))} too`
-  const switches: MenuItem[] = statusOptions(policy, { monitor: opts.monitor }).map((o) => ({
-    id: o.target,
-    label: shared ? `${o.label} everywhere` : o.label,
-    ...(shared ? { hint: alsoOn } : null),
-  }))
+  const switches: MenuItem[] = statusOptions(policy, { monitor: opts.monitor })
+    .filter((o) => !opts.viewEdit || o.target !== 'active')
+    .map((o) => ({
+      id: o.target,
+      label: opts.viewEdit && o.target === 'inactive' ? 'Make inactive' : shared ? `${o.label} everywhere` : o.label,
+      ...(shared ? { hint: alsoOn } : null),
+    }))
   if (shared) remove.hint = `Only ${app.name}; the rest keep it`
   /* Monitoring is off for now (owner, 22 Oct 2026: "Monitor should go to coming soon ... just add coming soon and
      hide the function"), and the edition flag that hides it is `monitorMode` in edition.ts. It stays on the menu,

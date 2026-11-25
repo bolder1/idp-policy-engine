@@ -17,6 +17,7 @@ import { seedProfiles } from '../fingerprint'
 import { seedHooks } from '../hooks'
 import { cardLetter, leafCount } from '../predicate'
 import { hasWho, listNames, whoSummary } from '../rule-who'
+import { scheduleSummary } from '../schedule'
 
 /* -----------------------------------------------------------------------------
    The rule, read back as English. One implementation.
@@ -148,6 +149,8 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
     const window = raw.length === 2 ? `${raw[0]} and ${raw[1]}` : value
     return `${t.label} ${c.operator} ${window}${c.tz ? ` (${c.tz})` : ''}`
   }
+  /* Sign-in time: its summary, the zone always said (schedule.ts). */
+  if (t.valueKind === 'schedule') return `${t.label} ${c.operator} ${scheduleSummary(raw, c.tz)}`
   /* WHICH attribute, said. "User attribute is FTE" is not a question until it
      names the field — the same gap `key` was added to the model to close
      (22-G1), left open in the one place an admin reads the rule back. */

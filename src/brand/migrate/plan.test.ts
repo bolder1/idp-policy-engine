@@ -93,6 +93,15 @@ describe('Move policies: the plan', () => {
     expect(merged.policies.filter((p) => !p.into)).toHaveLength(3)
     expect(policyFor('zoom', ['workday+zoom']).policy).toMatchObject({ name: 'Workday and Zoom sign-in', appIds: ['workday', 'zoom'] })
   })
+
+  it('with one application per moved policy (oneAppMoves), offers no merge and ignores one already taken', () => {
+    expect(mergeOffers(movable, ctx, true)).toEqual([])
+    const p = planMove(movable, showcaseLegacy, ctx, ['workday+zoom'], true)
+    const made = p.policies.filter((x) => !x.into)
+    expect(made.map((x) => x.appIds)).toEqual([['salesforce'], ['servicenow'], ['workday'], ['zoom']])
+    for (const x of made) expect(x.policy.appIds).toHaveLength(1)
+    expect(made.map((x) => x.policy.name)).toContain('Workday sign-in')
+  })
 })
 
 describe('Old policies: the deadline', () => {

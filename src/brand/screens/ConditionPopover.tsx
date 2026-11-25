@@ -13,7 +13,9 @@ import {
   EqualNot,
   Fingerprint,
   Building2,
+  CalendarCheck,
   CalendarClock,
+  CalendarX,
   FileText,
   Globe,
   Hourglass,
@@ -66,6 +68,9 @@ const OPERATOR_ICON: Record<string, LucideIcon> = {
   'returns false': CircleX,
   in: Equal,
   'not in': EqualNot,
+  /* Sign-in time (schedule.ts): inside the week or outside it. */
+  within: CalendarCheck,
+  outside: CalendarX,
 }
 const operatorIcon = (o: string): LucideIcon =>
   OPERATOR_ICON[o] ?? (o.includes('not') ? Ban : o === 'between' ? ArrowLeftRight : CircleCheck)
@@ -76,9 +81,9 @@ const operatorIcon = (o: string): LucideIcon =>
    hook's negative answer without the word "not" in it, so it is named (owner,
    the same day: "why are both the same colour?"). */
 const operatorTone = (o: string): string =>
-  o.includes('not') || o === 'returns false'
+  o.includes('not') || o === 'returns false' || o === 'outside'
     ? 'negative'
-    : o === 'between' || o === 'above' || o === 'below'
+    : o === 'between' || o === 'above' || o === 'below' || o === 'within'
       ? 'info'
       : 'positive'
 
@@ -107,6 +112,8 @@ import {
   type ZoneScope,
   attrLabel,
 } from '../data'
+import { SIGN_IN_TIME, scheduleSummary } from '../schedule'
+import { SchedulePicker } from './schedule-picker'
 
 import './condition-popover.css'
 
@@ -447,13 +454,15 @@ export function ConditionPopover({
      knowing strictly less than the chips already say to everybody else — and
      what the label announces would depend on how wide the panel happened to be,
      which is not a thing an accessible name may depend on. */
+  /* Sign-in time is one answer however many days it holds, and its summary already says all of it (schedule.ts). */
+  const scheduled = t.valueKind === 'schedule'
   const valueLabel = `Change what ${tLabel} is compared against. Currently ${
-    unset && !names.length ? 'nothing chosen' : spoken(names.length ? names : values) || summary
+    scheduled ? summary : unset && !names.length ? 'nothing chosen' : spoken(names.length ? names : values) || summary
   }.`
 
   /* The same summary the pill prints, split so the count can outlive the
      truncation — see `summariseParts`. */
-  const summaryParts = summariseParts(names.length ? names : values.filter(Boolean), summary)
+  const summaryParts = scheduled ? { lead: summary, more: 0 } : summariseParts(names.length ? names : values.filter(Boolean), summary)
 
   /* Which half of a zone, when it is narrower than the zone as written. Absent
      for "both", because that is what the zone means already. */
@@ -789,6 +798,7 @@ export function ConditionPopover({
               toggle={toggle}
               onValues={onValues}
               onScope={onScope}
+              onTz={onTz}
               footer={footer}
               onFooter={onFooter}
               close={close}
@@ -900,6 +910,7 @@ const KIND_OF: Record<string, NonNullable<ValueOption['kind']> | null> = {
   webhook: null,
   time: KINDS.time,
   day: KINDS.time,
+  schedule: KINDS.time,
   'user-attr': KINDS.user,
   'custom-attr': KINDS.custom,
   'device-risk': KINDS.risk,
@@ -954,6 +965,7 @@ const MENU_ORDER = [
   'destination',
   'amount',
   'volume',
+  'schedule',
   'time',
   'day',
   'user-attr',
@@ -1304,6 +1316,9 @@ function Pop({
     const onDown = (e: MouseEvent) => {
       const n = e.target as Node
       if (anchor.current?.contains(n) || pop.current?.contains(n)) return
+      /* A kit Picker opened from inside the panel (Sign-in time's time zone) portals its list to the app root, so a
+         pick in it is not a click away from the panel. */
+      if (SIGN_IN_TIME && (n as Element).closest?.('.bx-picker__pop')) return
       onClose()
     }
     document.addEventListener('mousedown', onDown)
@@ -1354,8 +1369,8 @@ function Pop({
           if (!all.length || document.activeElement === edge) onClose()
           return
         }
-        /* The zone halves are a radio group with arrow keys of their own. */
-        if ((e.target as HTMLElement).closest?.('[role="radiogroup"]')) return
+        /* The zone halves are a radio group with arrow keys of their own; so are Sign-in time's time fields. */
+        if ((e.target as HTMLElement).closest?.('[role="radiogroup"], .sp')) return
         /* The arrows walk the rows. Prevented, so the board's own arrow keys
            (which select the next rule) stay out of it. Not from the search
            field's caret keys — only up, down, Home and End. */
@@ -1738,6 +1753,7 @@ function ValueBody({
   toggle,
   onValues,
   onScope,
+  onTz,
   footer,
   onFooter,
   close,
@@ -1750,6 +1766,8 @@ function ValueBody({
   toggle: (v: string) => void
   onValues: (v: string[]) => void
   onScope: (zoneId: string, s: 'both' | ZoneScope) => void
+  /** The zone a Sign-in time is read in; `''` is the tenant's. */
+  onTz?: (tz: string) => void
   footer?: string
   onFooter?: () => void
   close: () => void
@@ -1768,6 +1786,11 @@ function ValueBody({
     if (!el || armed.current) return
     armed.current = true
     el.focus()
+  }
+
+  /* Sign-in time: each day's hours and the time zone, in one picker (schedule-picker.tsx). */
+  if (t.valueKind === 'schedule') {
+    return <SchedulePicker values={c.values} tz={c.tz} onValues={onValues} onTz={(tz) => onTz?.(tz)} />
   }
 
   if (t.valueKind === 'time') {
@@ -1926,6 +1949,7 @@ function emptyLibrary(kind: ConditionType['valueKind'], hookCount: number): { ic
 
 export function condSummary(t: ConditionType, c: Condition, names: string[]): string {
   const values = c.values.filter(Boolean)
+  if (t.valueKind === 'schedule') return scheduleSummary(values, c.tz)
   if (t.valueKind === 'time') return `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`
   if (t.valueKind === 'range')
     return values[0] ? `${values[0]} ${t.id === 'trust-age' ? 'days' : t.id === 'coords' ? 'km' : ''}`.trim() : 'Choose…'
@@ -1944,6 +1968,8 @@ export function valueSource(
   store: BrandStore,
   resolve: NameLookup,
 ): { options: ValueOption[]; names: string[]; single?: boolean; footer?: string; onFooter?: () => void } {
+  /* Sign-in time is set in its own picker and named by its summary, never by its stored day strings. */
+  if (t.valueKind === 'schedule') return { options: [], names: [] }
   /* The two library kinds, and they are the only way to say what they say.
 
      A zone and a device profile are no longer one option among several for

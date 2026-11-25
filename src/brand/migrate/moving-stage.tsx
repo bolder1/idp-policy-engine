@@ -4,14 +4,15 @@ import { ArrowRight, CheckCircle2, Minimize2 } from 'lucide-react'
 import { Button, StatusPill } from '../kit'
 import { useBrand } from '../store'
 import { AppTile } from './parts'
+import { ONE_APP_MOVES } from './plan'
 
 /* -----------------------------------------------------------------------------
    Move: the store's background job, told as a story (owner, 4 Nov 2026: "in a skeleton
    way ... how your old policy converts into the new policy ... generic, no need to show
    all the data").
 
-   Left, three beats on a loop, drawn in skeleton shapes — the old rows are read; apps
-   with the same settings come together, and an app that has a policy keeps it; each
+   Left, three beats on a loop, drawn in skeleton shapes — the old rows are read; each app
+   gets a policy of its own (`oneAppMoves`), and an app that has a policy keeps it; each
    group becomes a rule; the policy lands as a draft. Right, what is actually
    happening: how far along, what moved, what was shared or joined, the zones, the
    changes and what was left out, and the latest to land. Minimize leaves it running (the
@@ -142,7 +143,8 @@ export function MovingStage({ onReview }: { onReview: () => void }) {
     ['Old policies moved', `${rowsDone} of ${rows}`],
     ['New policies', done.filter((q) => !q.joins).length],
     ['Joined a policy', done.filter((q) => q.joins).length],
-    ['Shared by apps', done.filter((q) => !q.joins && q.appIds.length > 1).length],
+    /* No moved policy is shared by applications since `oneAppMoves` (plan.ts), so the line goes with it. */
+    ...(ONE_APP_MOVES ? [] : [['Shared by apps', done.filter((q) => !q.joins && q.appIds.length > 1).length] as [string, number]]),
     ['Zones made', job.zones],
     ['Changes', infos.reduce((n, m) => n + m.changes.length, 0)],
     ['Left out', infos.reduce((n, m) => n + m.leftOut.length, 0)],

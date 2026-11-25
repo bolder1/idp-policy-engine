@@ -4,6 +4,7 @@ import { AppLogo } from '../logos/AppLogo'
 import { PolicyFact } from './app-facts'
 import { Button, Modal } from '../kit'
 import type { App, Policy } from '../data'
+import { ACTIVE_WORDS } from './status-options'
 
 /* -----------------------------------------------------------------------------
    TURNING A SHARED POLICY OFF (owner, 23 Oct 2026: "remove this sub heading, and
@@ -54,7 +55,7 @@ export function StatusScopeDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title="Turn off this policy?"
+      title={ACTIVE_WORDS ? 'Make this policy inactive?' : 'Turn off this policy?'}
       width={480}
       footer={
         <>

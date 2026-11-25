@@ -1,7 +1,7 @@
 import { appsOf, lastUpdatedAt, type App, type Group, type Policy, type User } from '../data'
 import type { BrandStore } from '../store'
 import type { ToastTone } from '../toast-tone'
-import { attachTo, detachFrom } from './app-policies'
+import { attachTo, detachFrom, detachViewEdit } from './app-policies'
 import { appStanding, deciderChanges, engineDecides, visibleMoves, type RowState } from './app-standing'
 
 /* -----------------------------------------------------------------------------
@@ -67,12 +67,21 @@ function undoTo(store: PolicyWriter, before: Policy, saved: Policy | undefined) 
    at the moment of the write, never from a render: `savePolicy` replaces the
    whole record, so writing a stale copy would revert edits made elsewhere.
    False when the policy no longer exists. */
-export function removeFromApp(store: PolicyWriter, policyId: string, app: Pick<App, 'id' | 'name'>): boolean {
+/* `viewEdit` ("View and edit", board/draft-model.ts, owner 24 Nov 2026): the write is `detachViewEdit`. It refuses to
+   take the last application off an active policy (false, nothing written: the caller has already said why), and off an
+   inactive one the policy is a draft again, so "It is now a draft." is what happened. Under the other models the store
+   keeps such a policy inactive (`detachFrom`, `withoutApps`) and the toast is as it was. */
+export function removeFromApp(store: PolicyWriter, policyId: string, app: Pick<App, 'id' | 'name'>, opts: { viewEdit?: boolean } = {}): boolean {
   const before = store.policyById(policyId)
   if (!before || before.isSystem) return false
-  store.savePolicy(detachFrom(before, app.id))
+  const after = opts.viewEdit ? detachViewEdit(before, app.id) : detachFrom(before, app.id)
+  if (!after) return false
+  store.savePolicy(after)
   const saved = store.policyById(policyId)
-  store.showToast(removeToast(before.name, app.name, remainingApps(before, app.id), before.status === 'draft'), {
+  /* "Now a draft" only where it became one: a draft already, or (under the model) a post sign-in policy, which keeps
+     its status with no application, says it has none. */
+  const noNewDraft = before.status === 'draft' || (opts.viewEdit === true && after.status !== 'draft')
+  store.showToast(removeToast(before.name, app.name, remainingApps(before, app.id), noNewDraft), {
     label: 'Undo',
     run: () => undoTo(store, before, saved),
   })

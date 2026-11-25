@@ -1,8 +1,21 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 
-import { Drawer, Toggle } from '../kit'
+import { Drawer, SaveBar, Toggle } from '../kit'
+import { useLeaveGuard } from '../leave-guard'
 import { Picker } from '../picker'
-import { DEVICE_PROFILE_EXPIRY, MOBILE_ISSUER, MORE_GENERAL_SETTINGS, USERS_2FA_ROW, type AuthGeneral } from './auth-general'
+import { useBrand } from '../store'
+import {
+  DEVICE_PROFILE_EXPIRY,
+  EXPIRY_DAYS,
+  MOBILE_ISSUER,
+  MORE_GENERAL_SETTINGS,
+  TYPED_GENERAL,
+  USERS_2FA_ROW,
+  typedGeneral,
+  typedIssues,
+  type AuthGeneral,
+  type TypedGeneral,
+} from './auth-general'
 
 /* -----------------------------------------------------------------------------
    GENERAL SETTINGS of Authentication methods (owner, 21 Oct 2026: "a general settings for authentication methods, so the
@@ -22,6 +35,12 @@ import { DEVICE_PROFILE_EXPIRY, MOBILE_ISSUER, MORE_GENERAL_SETTINGS, USERS_2FA_
    What it draws today is TWO SWITCHES — Users and Additional admins — with the rest behind MORE_GENERAL_SETTINGS
    (owner, 22 Oct 2026). The heading stays: "Users" and "Additional admins" are not settings on their own, and
    "Two-step verification is required for" is the verb that makes the two switches mean something.
+
+   EXCEPT WHAT IS TYPED (owner, 25 Nov 2026: "to store this two value we need a footer with save and cancel button").
+   Mobile issuer name and Device profile expiry are typed, not picked, and a value saved on every keystroke is a half
+   name in somebody's authenticator app. On the page's tab (`GeneralSettingsTab`, behind GENERAL_SAVE) those two wait
+   in a draft for the kit's footer: Cancel and Save. The switches still save as they are flicked, so the footer is
+   only ever about the two fields above it.
    -------------------------------------------------------------------------- */
 
 const REMEMBER = [
@@ -42,12 +61,19 @@ const LOCK = [
   { value: '10', label: '10 attempts' },
 ]
 
-function Row({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+/* A typed value that cannot be saved says why under its question, not in the footer (23 Oct 2026 ruling: reasons
+   belong under the field). */
+function Row({ title, hint, error, errorId, children }: { title: string; hint: string; error?: string; errorId?: string; children: React.ReactNode }) {
   return (
     <div className="bm8__grow">
       <div className="bm8__gtext">
         <b>{title}</b>
         <span>{hint}</span>
+        {error && (
+          <p className="bm8__gerr" id={errorId} role="alert">
+            {error}
+          </p>
+        )}
       </div>
       <div className="bm8__gctl">{children}</div>
     </div>
@@ -55,7 +81,16 @@ function Row({ title, hint, children }: { title: string; hint: string; children:
 }
 
 /** The rows themselves, in their sections. Both placements render this, so neither can drift from the other. */
-export function GeneralSettings({ value, onChange }: { value: AuthGeneral; onChange: (v: AuthGeneral) => void }) {
+export function GeneralSettings({
+  value,
+  onChange,
+  issues = {},
+}: {
+  value: AuthGeneral
+  onChange: (v: AuthGeneral) => void
+  /** Why a typed value cannot be saved yet, shown under its row. */
+  issues?: Partial<Record<keyof TypedGeneral, string>>
+}) {
   /* The section headings name their own lists. Generated, because the page's tab and the slide-over can be mounted at
      the same time while the owner compares them, and a hand-written id would then be in the document twice. */
   const id = useId()
@@ -79,13 +114,15 @@ export function GeneralSettings({ value, onChange }: { value: AuthGeneral; onCha
         </Row>
         {/* Owner, 19 Nov 2026: "add mobile issuer name after additional admin". */}
         {MOBILE_ISSUER && (
-          <Row title="Mobile issuer name" hint="Shown above the code in authenticator apps.">
+          <Row title="Mobile issuer name" hint="Shown above the code in authenticator apps." error={issues.mobileIssuer} errorId={`${id}-issuer-err`}>
             <input
               className="bm8__gtext-input"
               type="text"
               value={value.mobileIssuer}
               onChange={(e) => set('mobileIssuer', e.target.value)}
               aria-label="Mobile issuer name"
+              aria-invalid={issues.mobileIssuer ? true : undefined}
+              aria-describedby={issues.mobileIssuer ? `${id}-issuer-err` : undefined}
               spellCheck={false}
             />
           </Row>
@@ -99,17 +136,24 @@ export function GeneralSettings({ value, onChange }: { value: AuthGeneral; onCha
           <h3 id={`${id}-dev`}>Devices</h3>
           {/* A number the admin types, not a list of choices (owner, 20 Nov 2026: "a textbox with number … we don't
               provide dropdown for this, treat it like custom"). The same width as Mobile issuer name, so the ends line up. */}
-          <Row title="Device profile expiry" hint="A trusted device must be verified again after this many days.">
-            <span className="bm8__gnum">
+          <Row
+            title="Device profile expiry"
+            hint="A trusted device must be verified again after this many days."
+            error={issues.deviceExpiryDays}
+            errorId={`${id}-expiry-err`}
+          >
+            <span className={`bm8__gnum ${issues.deviceExpiryDays ? 'is-invalid' : ''}`}>
               <input
                 type="number"
                 inputMode="numeric"
-                min={1}
-                max={3650}
+                min={EXPIRY_DAYS.min}
+                max={EXPIRY_DAYS.max}
                 step={1}
                 value={value.deviceExpiryDays}
                 onChange={(e) => set('deviceExpiryDays', e.target.value.replace(/\D/g, ''))}
                 aria-label="Device profile expiry in days"
+                aria-invalid={issues.deviceExpiryDays ? true : undefined}
+                aria-describedby={issues.deviceExpiryDays ? `${id}-expiry-err` : undefined}
               />
               <span aria-hidden>days</span>
             </span>
@@ -147,6 +191,61 @@ export function GeneralSettings({ value, onChange }: { value: AuthGeneral; onCha
       </section>
       )}
     </div>
+  )
+}
+
+/* The page's own tab with the typed values held back for the footer (GENERAL_SAVE). `value` is what is saved and
+   `onSave` stores a whole AuthGeneral: the setter the tab used to call on every change.
+
+   Only the two typed fields live in the draft. A switch flicked while the footer is up saves at once, with the SAVED
+   typed values under it, so it neither saves the half-typed name nor throws it away. Leaving with the draft open asks
+   first (leave-guard.ts), from the rail and from the page's other tabs alike. */
+export function GeneralSettingsTab({ value, onSave }: { value: AuthGeneral; onSave: (v: AuthGeneral) => void }) {
+  const store = useBrand()
+  const saved = typedGeneral(value)
+  const [typed, setTyped] = useState<TypedGeneral>(saved)
+  const dirty = TYPED_GENERAL.some((k) => typed[k] !== saved[k])
+  const issues = typedIssues(typed)
+  const blocked = issues.mobileIssuer ?? issues.deviceExpiryDays ?? null
+
+  const save = () => {
+    if (blocked) return false
+    const next: TypedGeneral = { mobileIssuer: typed.mobileIssuer.trim(), deviceExpiryDays: String(Number(typed.deviceExpiryDays)) }
+    onSave({ ...value, ...next })
+    setTyped(next)
+    store.showToast('General settings saved')
+    return true
+  }
+  /* With Undo in the toast, as every other footer's Discard has (owner, 23 Oct 2026). */
+  const cancel = () => {
+    const was = typed
+    setTyped(saved)
+    store.showToast('Changes discarded', { label: 'Undo', run: () => setTyped(was) })
+  }
+
+  useLeaveGuard({ dirty, save, saveLabel: 'Save', blocked })
+
+  return (
+    <>
+      <GeneralSettings
+        value={{ ...value, ...typed }}
+        issues={issues}
+        onChange={(next) => {
+          setTyped(typedGeneral(next))
+          const picked: AuthGeneral = { ...next, ...saved }
+          if ((Object.keys(picked) as (keyof AuthGeneral)[]).some((k) => picked[k] !== value[k])) onSave(picked)
+        }}
+      />
+      <SaveBar
+        open={dirty}
+        onSave={save}
+        saveLabel="Save"
+        blocked={!!blocked}
+        blockedReason={blocked ?? undefined}
+        onDiscard={cancel}
+        discardLabel="Cancel"
+      />
+    </>
   )
 }
 

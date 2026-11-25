@@ -57,6 +57,8 @@ export function AnchoredPopover({
   align = 'start',
   className,
   focusFirst = true,
+  follow = false,
+  beside = false,
 }: {
   /** The control it hangs from. Focus returns here on Escape. */
   anchor: RefObject<HTMLElement | null>
@@ -72,6 +74,11 @@ export function AnchoredPopover({
   className?: string
   /** Move focus to the first control inside on open. */
   focusFirst?: boolean
+  /** Keep to an anchor that moves on its own, such as a card on the board's canvas. Off: placed on open, scroll and resize. */
+  follow?: boolean
+  /** A note that leaves the page's keys alone: drawn as a labelled group rather than a dialog, so the board's key
+   *  handler does not take it for a layer over the board. Off: a popup layer, as above. */
+  beside?: boolean
 }) {
   const pop = useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState<{ top: number; left: number; maxH: number; side: 'top' | 'bottom' } | null>(null)
@@ -138,6 +145,25 @@ export function AnchoredPopover({
       document.removeEventListener('mousedown', onDown)
     }
   }, [open, place, onClose, anchor])
+
+  /* With `follow`, it keeps to an anchor that moves without a scroll: a card on the board's canvas, which springs into
+     place after an edit and moves with every pan and zoom. Re-placed only on the frames the anchor's box changed. */
+  useEffect(() => {
+    if (!open || !follow) return
+    let frame = 0
+    let last = ''
+    const tick = () => {
+      const a = anchor.current?.getBoundingClientRect()
+      const key = a ? `${a.left}|${a.top}|${a.width}|${a.height}` : ''
+      if (key !== last) {
+        last = key
+        place()
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [open, follow, place, anchor])
 
   /* First control inside, once it is placed — focusing before placement
      scrolls the window to the unplaced panel at the top of the page. */
@@ -214,7 +240,9 @@ export function AnchoredPopover({
   return createPortal(
     <div
       ref={pop}
-      role="dialog"
+      /* A note beside the work is a labelled group, not a dialog: the board's key handler treats any dialog as a layer
+         over it, and this one should leave every key to the board. */
+      role={beside ? 'group' : 'dialog'}
       aria-label={label}
       className={`bx-apop is-${pos?.side ?? 'bottom'}${className ? ` ${className}` : ''}`}
       style={{

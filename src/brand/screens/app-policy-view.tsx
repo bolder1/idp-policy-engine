@@ -1,4 +1,4 @@
-import { canSaveAsTemplate, monitorOffered } from './status-options'
+import { canSaveAsTemplate, monitorOffered, policyTemplateHold, statusOptions } from './status-options'
 import { useSaveAsTemplate } from './save-template'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from 'react'
@@ -63,6 +63,7 @@ import { AppsPeek } from './apps-peek'
 import { SharedPolicyFork } from './shared-policy-fork'
 import { StatusScopeDialog } from './status-scope-dialog'
 import { STATUS_WORD, storedVersions } from './board/read-as-text'
+import { useViewEdit } from './board/draft-model'
 import { useDraftDiff } from './board/use-lines'
 import { checkAccessFrom } from './guarded-moves'
 import { SAMPLE_DAY, monitorRows, monitorSamples, planLine, planOf } from './monitor-sample'
@@ -1253,15 +1254,29 @@ export function AppPolicyView({
   const versions = useMemo(() => storedVersions(policy), [policy])
   const diff = useDraftDiff(versions)
   const plan = useMemo(() => (policy.status === 'monitor' ? planLine(planOf(monitorRows(policy, policies, env, monitorSamples(policy, env, SAMPLE_DAY)))) : null), [policy, policies, env])
-  const notice = tabNotice(row, others, diff, plan)
+  /* "View and edit" (board/draft-model.ts, owner and stakeholders, 24 Nov 2026): the builder opens view-only and has its
+     own Edit, and a status changes only outside draft mode, this head among those places. So the head says the state
+     and carries the way to change it: Make active while the policy is not active, Make inactive in the ⋯ once it is. */
+  const viewEdit = useViewEdit()
+  /* Make active where the policy can be made active, a draft on this application included: one confirm publishes it and
+     makes it active (use-status-change.tsx `draftActivates`). Through `onMenu`, so it is the page's own status change
+     and its dialogs. */
+  const activates =
+    viewEdit && policy.status !== 'active' && statusOptions(policy, { monitor: monitorOffered(features), draftActivates: true }).some((o) => o.target === 'active')
+  /* The head says the state now, so the state Note under it ("Inactive", "Draft": "It decides no sign-ins.", with its
+     Turn on link) would say it twice. The other notes say something the head does not, and stay. */
+  const anyNotice = tabNotice(row, others, diff, plan)
+  const notice = viewEdit && (anyNotice?.kind === 'draft' || anyNotice?.kind === 'inactive') ? null : anyNotice
   const coverage = useMemo(() => coverageOf(app.id, policy, policies, users, groups), [app.id, policy, policies, users, groups])
-  const menu = statusMenu(policy, app, apps, { monitor: monitorOffered(features), deletable })
+  const menu = statusMenu(policy, app, apps, { monitor: monitorOffered(features), deletable, viewEdit })
   /* Save as template, between the switches and Remove, so the red one stays last (owner, 27 Oct 2026). The policy as
      stored: what a builder would open, a saved draft if there is one (template-from-policy.ts). */
   const withTemplateRow = (items: MenuItem[]): MenuItem[] => {
     if (!canSaveAsTemplate(policy)) return items
     const at = items.findIndex((i) => i.id === 'remove' || i.id === 'delete')
-    const row: MenuItem = { id: 'template', label: MARK_LABEL, icon: TemplateIcon, ...(at !== 0 ? { divide: true } : null) }
+    /* Greyed, with why, while there is nothing to hand on (status-options.ts `templateHold`). */
+    const hold = policyTemplateHold(policy)
+    const row: MenuItem = { id: 'template', label: MARK_LABEL, icon: TemplateIcon, ...(at !== 0 ? { divide: true } : null), ...(hold ? { disabled: true, pill: hold } : null) }
     return at === -1 ? [...items, row] : [...items.slice(0, at), row, ...items.slice(at)]
   }
 
@@ -1301,6 +1316,12 @@ export function AppPolicyView({
               the policy is on this application, Replace, is the secondary; the status switches, the two reads
               and Remove are in the ⋯. The page's save bar holds the view's one orange button while it is up,
               so the head stands down then. */}
+          {/* "View and edit": the one orange button while the policy is not active, so the split stays a secondary. */}
+          {activates && (
+            <Button variant={saving ? 'secondary' : 'brand'} icon={Power} onClick={() => onMenu('active')}>
+              Make active
+            </Button>
+          )}
           {HEAD_SPLIT_EDIT ? (
             <>
               {/* One split button (`HEAD_SPLIT_EDIT`, owner, 27 Oct 2026; Edit all moved into it the same day: "move this
@@ -1309,21 +1330,27 @@ export function AppPolicyView({
                   every application the policy is on, and Replace policy, on hold for now (`HEAD_REPLACE_ON_HOLD`):
                   disabled, with a pill that says so. A policy this application has to itself has no "all" and no copy
                   to make: Edit all is not on the menu, and the action is Edit policy straight to the builder. */}
+              {/* "View and edit": the press only opens the builder, which opens view-only with its own Edit, so it says
+                  Open policy, shared or not. Opening reaches nobody; the builder's "Publish this draft?" names every
+                  application a change reaches. On a shared policy the copy for this application is the menu's row. */}
               <SplitButton
-                label={shared ? 'Edit for this app' : 'Edit policy'}
-                icon={Pencil}
+                label={viewEdit ? 'Open policy' : shared ? 'Edit for this app' : 'Edit policy'}
+                icon={viewEdit ? ArrowUpRight : Pencil}
                 /* A secondary, not the orange (owner, 3 Nov 2026: "we might not want to promote this button so much"): this
                    tab is for reading what protects the application, and an edit here changes live sign-ins (on a shared
                    policy it makes a copy). The page's save bar, when one is up, keeps the orange. */
                 variant="secondary"
-                onPress={() => (shared ? openFork('duplicate') : toBoard(policy.id))}
+                onPress={() => (shared && !viewEdit ? openFork('duplicate') : toBoard(policy.id))}
                 menuLabel="More ways to change this policy"
                 items={[
+                  /* "View and edit": the copy for this application takes the "all" row's place (Open policy is the press). */
+                  ...(shared && viewEdit ? [{ id: 'copy', label: 'Copy for this app', icon: Copy }] : []),
                   ...(shared ? [{ id: 'edit-all', label: editAllLabel, icon: Layers }] : []),
                   { id: 'replace', label: 'Replace policy', icon: Replace, ...(HEAD_REPLACE_ON_HOLD ? { pill: 'On hold', disabled: true } : null) },
-                ]}
+                ].filter((i) => !(viewEdit && i.id === 'edit-all'))}
                 onSelect={(id) => {
                   if (id === 'edit-all') openFork('edit')
+                  else if (id === 'copy') openFork('duplicate')
                   else if (id === 'replace') onReplace()
                 }}
               />
@@ -1331,11 +1358,11 @@ export function AppPolicyView({
           ) : (
             <>
               <Button
-                variant={saving ? 'secondary' : 'brand'}
-                icon={Pencil}
+                variant={saving || activates ? 'secondary' : 'brand'}
+                icon={!shared && viewEdit ? ArrowUpRight : Pencil}
                 onClick={() => (shared ? openFork(HEAD_THREE_BUTTONS ? 'edit' : undefined) : toBoard(policy.id))}
               >
-                Edit policy
+                {!shared && viewEdit ? 'Open policy' : 'Edit policy'}
               </Button>
               {/* Three buttons, one popup each (`HEAD_THREE_BUTTONS`, owner, 26 Oct 2026): the choice between editing
                   for everyone and a copy for this application is made here, in the head, and not in a popup. */}
@@ -1360,8 +1387,9 @@ export function AppPolicyView({
                 .filter((i) => !i.disabled)
                 .map(({ hint: _hint, ...i }) => ({
                   ...i,
-                  /* The dialog asks where, so the row says only what (owner: "show only Inactive"). */
-                  ...(i.id === 'inactive' && policy.appIds.length > 1 ? { label: 'Inactive' } : null),
+                  /* The dialog asks where, so the row says only what (owner: "show only Inactive"). Under "View and
+                     edit" the row is the verb, Make inactive, shared or not (statusMenu). */
+                  ...(i.id === 'inactive' && policy.appIds.length > 1 && !viewEdit ? { label: 'Inactive' } : null),
                   icon: STATUS_ICON[i.id as StatusMenuId],
                   ...(i.id === 'remove' || i.id === 'delete' ? { danger: true } : null),
                 })),
@@ -1485,6 +1513,7 @@ export function AppPolicyView({
         onDuplicate={onDuplicate}
         only={HEAD_THREE_BUTTONS || HEAD_SPLIT_EDIT ? forkWay : undefined}
         split={HEAD_SPLIT_EDIT}
+        viewEdit={viewEdit}
       />
       {saveTemplate.dialog}
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Pencil, ShieldPlus, Unlink } from 'lucide-react'
+import { ArrowUpRight, Pencil, ShieldPlus, Unlink } from 'lucide-react'
 
 import { Badge, Button, Callout, Confirm, Drawer, Note, RowMenu, StatusPill, TipDot, type MenuItem } from '../kit'
 import { EmptyState } from '../empty'
@@ -17,10 +17,12 @@ import { newPolicy } from '../policy-draft'
 import { freeName } from '../policy-name'
 import { DECISION_WORDS } from '../decision-words'
 import { isPostSignIn } from '../post-sign-in'
-import { REMOVE_RUNS_CHECKS, attachKind, attachTo, attachableTo, detachFrom, rulesLabel } from './app-policies'
+import { REMOVE_RUNS_CHECKS, attachKind, attachTo, attachableTo, detachFrom, detachViewEdit, rulesLabel } from './app-policies'
 import { appStanding, deciderChanges, keyName, rowTip, visibleMoves, whoLabel, type Key, type StandRow } from './app-standing'
 import { addToApp, attachNote, existingHint, removeCopy, removeFromApp } from './applications-model'
 import { useAppsGuard } from './board/apps-guard'
+import { ONLY_APP_TITLE, useViewEdit } from './board/draft-model'
+import { useStatusChange } from './use-status-change'
 import { GuardDrawer } from './guard-page'
 import { policyOption } from './policy-option'
 import { fallbackOf } from './simulate'
@@ -58,12 +60,17 @@ export function AppProtection({
   const store = useBrand()
   const appsGuard = useAppsGuard()
   const newOne = useNewPolicy()
+  /* "View and edit" (board/draft-model.ts): the refusal's Make inactive is a status change like any other. */
+  const viewEdit = useViewEdit()
+  const statusChange = useStatusChange()
 
   const [choice, setChoice] = useState<'new' | 'existing' | null>(null)
   const [pickId, setPickId] = useState<string | null>(null)
   const [tried, setTried] = useState(false)
   const [gone, setGone] = useState(false)
   const [removing, setRemoving] = useState<Policy | null>(null)
+  /* "Can't remove the only application", kept while it animates out. */
+  const [refusing, setRefusing] = useState<{ policy: Policy; open: boolean } | null>(null)
   /* The row an attach from this form just put on. An object, so attaching the
      same policy again after taking it off is a new flash and moves focus again. */
   const [flash, setFlash] = useState<{ id: string } | null>(null)
@@ -79,6 +86,7 @@ export function AppProtection({
     setTried(false)
     setGone(false)
     setFlash(null)
+    setRefusing(null)
     /* And the checks' page with it. Its state outlives the panel (this
        component stays mounted, closed), so a page left open would otherwise
        come up over the next application's panel. */
@@ -129,7 +137,16 @@ export function AppProtection({
     setFlash({ id: policyId })
   }
   const takeOff = (policyId: string) => {
-    if (app) removeFromApp(store, policyId, app)
+    if (app) removeFromApp(store, policyId, app, { viewEdit })
+  }
+  /* "View and edit" (owner, 24 Nov 2026): an active policy keeps its application, so taking its only one off is refused
+     before the Remove confirm, as the application page's Remove is. True when it refused. */
+  const refusesRemove = (policyId: string): boolean => {
+    if (!viewEdit || !app) return false
+    const live = store.policyById(policyId)
+    if (!live || live.isSystem || detachViewEdit(live, app.id) !== null) return false
+    setRefusing({ policy: live, open: true })
+    return true
   }
 
   /* Write a new policy: the one popup (create/NewPolicyDialog.tsx), then the board, carrying this application. It stood
@@ -167,6 +184,7 @@ export function AppProtection({
     if (!app) return
     const live = store.policyById(policyId)
     if (!live || live.isSystem) return
+    if (refusesRemove(policyId)) return
     /* Same gesture as the Policies tab's Remove, so the same answer (app-policies.ts `REMOVE_RUNS_CHECKS`):
        the confirm has named who moves where, and the press writes. */
     if (!REMOVE_RUNS_CHECKS || !appsGuard.guards(live)) return takeOff(policyId)
@@ -204,13 +222,14 @@ export function AppProtection({
      Policies tab with the policy lit (BoardBar.tsx), not on All Policies
      (spec APP-CREATE-AND-ACCESS.md §5). */
   const menu: MenuItem[] = [
-    { id: 'edit', label: 'Edit policy', icon: Pencil },
+    /* "View and edit": the builder opens view-only, so this only opens it (owner, 24 Nov 2026: "only the Edit button"). */
+    { id: 'edit', label: viewEdit ? 'Open policy' : 'Edit policy', icon: viewEdit ? ArrowUpRight : Pencil },
     { id: 'remove', label: `Remove from ${app.name}`, icon: Unlink, danger: true, divide: true },
   ]
   const toBoard = (policyId: string) => store.go({ name: 'board', policyId, from: { appId: app.id } })
   const onMenu = (p: Policy) => (id: string) => {
     if (id === 'edit') toBoard(p.id)
-    if (id === 'remove') setRemoving(p)
+    if (id === 'remove' && !refusesRemove(p.id)) setRemoving(p)
   }
 
   /* The checks' page names its write by the applications it read: with this
@@ -410,6 +429,14 @@ export function AppProtection({
           setRemoving(null)
         }}
       />
+      <OnlyAppRefusal
+        policy={refusing?.policy ?? null}
+        open={!!refusing?.open}
+        app={app}
+        onClose={() => setRefusing((r) => (r ? { ...r, open: false } : r))}
+        onMakeInactive={(p) => statusChange.request(p, 'inactive')}
+      />
+      {statusChange.dialog}
       {/* Portalled to the app root, after this panel, so it opens over it. It
           joins the dialog stack last (dialog-chrome.ts): Escape and Keep editing
           close it alone, Tab stays inside it, and focus goes back to the button
@@ -618,6 +645,61 @@ export function RemoveDialog({
               </dl>
             </div>
           )}
+        </div>
+      )}
+    </Confirm>
+  )
+}
+
+/* "Can't remove the only application" ("View and edit", board/draft-model.ts; owner and stakeholders, 24 Nov 2026: a
+   sign-in policy with no application is only ever a draft, so an active policy keeps its application). Asked before the
+   Remove confirm, never after it, from the application page's Remove and from this panel's. The kit's Confirm as the
+   other refusals are (use-status-change.tsx, "Can't make this policy active"): the policy named once, why in one line,
+   Close, and the next step as the one primary. Make inactive is the page's own status change, so it asks as every
+   switch does; once the policy is inactive, Remove takes the application off and the policy is a draft again. */
+export function OnlyAppRefusal({
+  policy,
+  open,
+  app,
+  onClose,
+  onMakeInactive,
+}: {
+  /** Kept while it animates out, so the card keeps its words. */
+  policy: Policy | null
+  open: boolean
+  app: { id: string; name: string }
+  onClose: () => void
+  onMakeInactive: (policy: Policy) => void
+}) {
+  return (
+    <Confirm
+      open={open && !!policy}
+      onClose={onClose}
+      tone="error"
+      shape="hero"
+      title={ONLY_APP_TITLE}
+      cancelLabel="Close"
+      destructive={false}
+      confirmLabel="Make inactive"
+      onConfirm={() => {
+        onClose()
+        if (policy) onMakeInactive(policy)
+      }}
+    >
+      {policy && (
+        <div className="bapr__confirm is-card">
+          <p>
+            <PolicyFact name={policy.name} />
+          </p>
+          <p>
+            {/* Its status in words, as the Policies list's refusal says it. */}
+            It is {policy.status === 'monitor' ? 'monitoring' : 'active'} on{' '}
+            <span className="bx-confirm__fact">
+              <AppLogo appId={app.id} name="" size={16} />
+              {app.name}
+            </span>
+            . Make it inactive first.
+          </p>
         </div>
       )}
     </Confirm>

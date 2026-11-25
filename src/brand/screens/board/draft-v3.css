@@ -1,0 +1,247 @@
+/* The Draft model's V3 pieces (draft-v3.tsx, version-compare.tsx). Scoped to their own classes: stylesheets load
+   for every line. */
+
+/* Beside the name only Unsaved changes; the version and its state are on the bar's button (owner, 24 Nov 2026:
+   "too many pills together … move it [into] the button"). */
+.bv3-chipwrap { display: inline-flex; align-items: center; gap: var(--space-3); }
+
+/* The strips above the bar, as the rolled-back note is (migrate/moved-status.css `.bmroll`). */
+.bv3-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: var(--bw-thin) solid var(--fb-info-border);
+  background: var(--fb-info-bg);
+  color: var(--text-primary);
+}
+.bv3-banner.is-review { background: var(--fb-notice-bg); border-bottom-color: var(--fb-notice-border); }
+.bv3-banner.is-rejected { background: var(--fb-negative-bg); border-bottom-color: var(--fb-negative-border); }
+.bv3-banner__words { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-sm); }
+.bv3-banner__words b { font-weight: var(--fw-semibold); }
+.bv3-banner__note { color: var(--text-secondary); }
+
+/* --- Version history, in the board's right-hand slot (`.bb__insp`, as Read as text and Fixes) ----------------------
+
+   As Figma keeps it (owner, 24 Nov 2026: "Think how smartly Figma is actually doing it … the live part is always
+   there … then all the draft part together … the earlier version in a different way, the draft part in a different
+   way"). Three parts, each drawn as what it is:
+     Live     pinned under the title, outside the scroll: a mark in the live green, where it is active, who and when;
+     Draft    the working copy, its entry outlined dashed, as work not yet decided;
+     Earlier  a timeline on one thin rail, folded under its heading: the time in bold and the version's number, the
+              person with their face, the note.
+   A picked entry is the selection, a blue ground over all of it, and opens inside that ground: what it changed, and
+   its own actions (owner: "manage this button inside a card, so it actually looks like it is a part of the card"). */
+
+/* Live, pinned. */
+.bv3h__live {
+  flex: none;
+  padding: var(--space-3);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+.bv3h__livehead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bv3h__livehead:hover { background: var(--surface-sunken); }
+.bv3h__live.is-on .bv3h__livehead { background: var(--blue-soft); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.bv3h__live.is-on .bv3h__detail { background: var(--blue-soft); border-radius: 0 0 var(--radius-lg) var(--radius-lg); max-height: 40vh; overflow-y: auto; }
+.bv3h__livemark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--space-10);
+  height: var(--space-10);
+  border-radius: var(--radius-full);
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+}
+.bv3h__livemark.is-live { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bv3h__livetext { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
+
+/* The lines every entry shares. */
+.bv3h__line { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.bv3h__when { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bv3h__tag { margin-left: auto; font-size: var(--fs-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.bv3h__by { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bv3h__note { font-size: var(--fs-sm); color: var(--text-body); }
+.bv3h__meta { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+
+/* The scrolling parts. */
+.bv3h__body { gap: var(--space-6); }
+.bv3h__part { align-self: stretch; display: grid; gap: var(--space-2); }
+.bv3h__partname { margin: 0; padding-left: var(--space-4); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bv3h__fold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.bv3h__fold svg { transition: transform var(--dur-fast) var(--ease-standard); }
+.bv3h__fold svg.is-shut { transform: rotate(-90deg); }
+.bv3h__entries { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+
+.bv3h__entry { border-radius: var(--radius-lg); }
+.bv3h__entry.is-on { background: var(--blue-soft); }
+.bv3h__pick {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bv3h__entry:not(.is-on) .bv3h__pick:hover { background: var(--surface-sunken); }
+.bv3h__pick:focus-visible,
+.bv3h__livehead:focus-visible { outline: none; box-shadow: 0 0 0 var(--space-1) var(--focus-halo); }
+
+/* The draft: work not yet decided, outlined dashed. */
+.bv3h__part.is-draft .bv3h__entry { border: var(--bw-thin) dashed var(--border-default); }
+.bv3h__part.is-draft .bv3h__entry.is-on { border-style: solid; border-color: var(--blue-strong); }
+.bv3h__empty { margin: 0; padding: var(--space-3) var(--space-4); border: var(--bw-thin) dashed var(--border-subtle); border-radius: var(--radius-lg); font-size: var(--fs-sm); color: var(--text-secondary); }
+
+/* Earlier versions: one thin rail down the left, Figma's line, no dots on it. */
+.bv3h__rail { position: relative; padding-left: var(--space-5); }
+.bv3h__rail::before {
+  content: '';
+  position: absolute;
+  top: var(--space-3);
+  bottom: var(--space-3);
+  left: var(--space-4);
+  border-left: var(--bw-thin) solid var(--border-default);
+}
+
+/* What a picked entry changed, and what can be done to it, inside its ground. */
+.bv3h__detail { display: grid; gap: var(--space-4); padding: 0 var(--space-4) var(--space-4); }
+.bv3h__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* The comparison's pressed side in blue, as Fix's Live / Draft switch (draft-fix.css `.bdm-view`). */
+.bv3h .bb__seg button.is-on { background: var(--blue-soft); color: var(--blue-strong); }
+
+/* The review demo's setting sits at the panel's foot, on the left: it is a setting, not the panel's action. */
+.bv3h__setting { justify-content: flex-start; }
+
+/* The tenant's approval setting (with the review demo, policy-versions.ts `REVIEW_DEMO`). */
+.bv3-approval { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-primary); cursor: pointer; }
+
+/* A note or a reason, label over field. */
+.bv3-field { display: grid; gap: var(--space-2); margin-top: var(--space-4); text-align: left; }
+.bv3-field textarea { width: 100%; }
+
+/* "Viewing v2" over the canvas: the Live tag's place and shape (draft-fix.css `.bdm-live`). */
+.bv3-viewtag { gap: var(--space-4); padding-right: var(--space-3); }
+.bv3-viewtag b { font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* --- Compare, side by side (version-compare.tsx) -------------------------------------------------------------
+
+   Over the whole board, every track of `.bb`, so the two versions have the room. Placed by the grid, never by a CSS
+   transform: Motion owns this element's transform (CLAUDE.md, Motion). Two equal columns, A on the left and B on the
+   right; one row per rule, so a rule's two sides sit level. The cards are the canvas's own (RuleCard, TerminalCard):
+   this sheet only places them, gives a changed card an edge in its kind's ink, and draws the dashed slot where a side
+   does not have the rule. */
+.bv3c {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-sunken);
+  outline: none;
+}
+.bv3c__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+.bv3c__title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bv3c__pickers { display: inline-flex; align-items: center; gap: var(--space-2); }
+.bv3c__only { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-primary); cursor: pointer; }
+.bv3c__end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-3); }
+
+.bv3c__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.bv3c__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--space-10);
+  row-gap: var(--space-4);
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 var(--space-6) var(--space-12);
+}
+.bv3c__colhead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) 0 var(--space-3);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.bv3c__colhead b { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bv3c__policy {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+.bv3c__policy ul { margin: 0; padding-left: var(--space-6); font-size: var(--fs-sm); color: var(--text-body); }
+
+/* One rule, both sides. `display: contents` would lose the row's layout animation, so the row is its own grid on
+   the same two columns. */
+.bv3c__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: start; }
+.bv3c__cell { display: grid; gap: var(--space-2); min-width: 0; }
+/* What became of the rule, one quiet line under the right-hand card. */
+.bv3c__note { margin: 0 0 0 var(--space-5); font-size: var(--fs-sm); color: var(--text-secondary); }
+/* The change, on the canvas's card: an edge in the kind's ink. Through `.bb` so it outranks the read-only view's
+   resting edge (draft-fix.css `.bb.is-live-view .bb__card`). */
+/* The kind's middle tone, not its pale border: on the canvas card's white the pale one read as no edge at all. */
+.bb .bv3c__cell.is-added .bb__card { border-color: var(--fb-positive-dot); }
+.bb .bv3c__cell.is-changed .bb__card { border-color: var(--fb-info-dot); }
+.bb .bv3c__cell.is-removed .bb__card { border-color: var(--fb-negative-dot); opacity: 0.72; }
+.bv3c__slot {
+  display: grid;
+  place-items: center;
+  min-height: var(--space-14);
+  border: var(--bw-thin) dashed var(--border-default);
+  border-radius: var(--radius-xl);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.bv3c__row.is-last { margin-top: var(--space-3); }
+.bv3c__none { grid-column: 1 / -1; margin: var(--space-8) 0; text-align: center; font-size: var(--fs-md); color: var(--text-secondary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bv3h__fold svg { transition: none; }
+}

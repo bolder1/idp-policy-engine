@@ -10,6 +10,7 @@ import { useBrand, useNameLookup } from '../../store'
 import { outsideAudience } from '../../audience-ops'
 import { normaliseWho, type WhoKind, type WhoList } from '../../rule-who'
 import { useShows } from './builder-version'
+import { gapText, useRuleGaps } from './rule-gaps'
 
 /* -----------------------------------------------------------------------------
    WHO — the people a rule applies to.
@@ -90,8 +91,16 @@ export function WhoEditor({
 
   const base: RuleWho = normaliseWho(rule.who) ?? { groupIds: [], userIds: [] }
   const ids = (kind: WhoKind): string[] => base[FIELD[kind]] ?? []
-  /* Spread, so an exception a rule arrived with survives an edit here. */
-  const write = (kind: WhoKind, next: string[]) => onPatch({ who: normaliseWho({ ...base, [FIELD[kind]]: next }) })
+  /* Spread, so an exception a rule arrived with survives an edit here. A name chosen here comes off the exceptions,
+     though: this surface neither shows nor edits them, and one held both ways made the rule cover nobody (23 Nov 2026
+     audit, rule-gaps.ts `who`). */
+  const EXCEPT = { group: 'exceptGroupIds', user: 'exceptUserIds' } as const
+  const write = (kind: WhoKind, next: string[]) => {
+    const except = (base[EXCEPT[kind]] ?? []).filter((id) => !next.includes(id))
+    onPatch({ who: normaliseWho({ ...base, [FIELD[kind]]: next, [EXCEPT[kind]]: except }) })
+  }
+  /* A refused save's reason under the Who, when the rule covers nobody (rule-gaps.ts). */
+  const whoGap = gapText(useRuleGaps(), rule.id, 'who')
 
   const named = ids('group').length + ids('user').length
   const outside = outsideAudience(audience, ids('group'), ids('user'), store.users)
@@ -167,6 +176,11 @@ export function WhoEditor({
   return (
     <div className="bb__who" ref={box} tabIndex={-1} onClickCapture={keepFocus}>
       {pair}
+      {whoGap && (
+        <p className="bb__gap" role="alert" tabIndex={-1}>
+          {whoGap}
+        </p>
+      )}
 
       {/* Copy, not link: the same people and groups as another rule, then this rule's own to change. */}
       {others.length > 0 && copyWho && (

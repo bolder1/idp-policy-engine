@@ -1,0 +1,90 @@
+/* The Draft model's Fix pieces (draft-fix.tsx). Scoped to their own classes: stylesheets load for every line. */
+
+.bdm-chip { display: inline-flex; }
+
+.bdm-view { display: inline-flex; margin-left: var(--space-3); }
+.bdm-view .bb__seg button.is-on { background: var(--blue-soft); color: var(--blue-strong); }
+
+/* Live reads only: the same controls the migrated draft's view hides (board.css `.bb.is-moved-view`). */
+.bb.is-live-view .bb__link__add,
+.bb.is-live-view .bb__link__hint,
+.bb.is-live-view .bb__acts > :not(.bb__fold__btn),
+.bb.is-live-view .bb__idx__grip { display: none; }
+.bb.is-live-view .bb__idx { pointer-events: none; }
+/* Live's cards are read, not worked on (owner, 23 Nov 2026: "fix the visuals for the card here"): they stand off the
+   blue ground with a firmer edge and a lift of their own, hold it on hover rather than reacting to it, and drop the
+   editing states (Complete / Incomplete / a warning), which are about a draft, not about what people sign in with. */
+.bb.is-live-view .bb__card,
+.bb.is-live-view .bb__card:hover {
+  cursor: default;
+  border-color: var(--border-default);
+  box-shadow: var(--el-mid);
+}
+.bb.is-live-view .bb__state.is-ready,
+.bb.is-live-view .bb__state.is-setup,
+.bb.is-live-view .bb__state.is-warn { display: none; }
+
+/* The ground turns blue while Live shows, so the whole canvas reads as a view, not only the tag: the board's own
+   `--bb-stage` (board.css), so the dots and every surface drawn on the ground follow. The cards keep their colours. */
+.bb.is-live-view:not(.is-view-pick) { --bb-stage: var(--blue-soft); }
+
+/* With the switch on the canvas (rollout.ts `fixViewOnCanvas`): no blue (owner, 24 Nov 2026). Live keeps the board's
+   own ground and loses its dots, the grid you arrange rules on, so the canvas reads as a page to look at. The cards
+   keep the firmer edge and lift above, and the chip says which copy this is. */
+.bb.is-live-view.is-view-pick { --bb-dot: transparent; }
+/* Nothing lands on Live, so a connector does not take the brand under the pointer (board.css `.bb__link:hover`). */
+.bb.is-live-view.is-view-pick .bb__link:not(.is-dead):hover::before { background: var(--bb-link); }
+
+/* The switch itself, where the "Active on <app>" tag stood: the stage's top-left corner, sharing its grid cell, placed
+   with justify-self (Motion owns this element's transform). The Picker inside is dressed as that chip: a raised
+   pill, the answer in ink. Its list is the Picker's own. */
+.bdm-pick {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: start;
+  z-index: 6;
+  margin: var(--space-6) 0 0 var(--space-6);
+  display: inline-flex;
+}
+.bdm-pick .bx-picker__trigger {
+  height: auto;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+  color: var(--text-secondary);
+}
+.bdm-pick .bx-picker__trigger:hover { border-color: var(--ctl-border-hover); }
+.bdm-pick .bx-picker__icon { margin-right: 0; }
+.bdm-pick .bx-picker__value { font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* A first publish's status choice (draft-fix.tsx `FirstPublishAsk`): the label over the choice, and what it does under. */
+.bdm-first { display: grid; gap: var(--space-3); justify-items: center; }
+.bdm-first p { margin: 0; }
+
+/* "Active on <app>" in the stage's top-left corner, clear of the chain, which is centred. One fact, one pill. It shares
+   the stage's grid cell rather than floating over the region, and is placed with justify-self, never a CSS transform:
+   Motion owns this element's transform (CLAUDE.md, Motion). */
+.bdm-live {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: start;
+  z-index: 6;
+  margin: var(--space-6) 0 0 var(--space-6);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
+}
+.bdm-live b { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bdm-live__more { font-size: var(--fs-sm); color: var(--text-muted); }

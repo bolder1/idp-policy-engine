@@ -30,6 +30,7 @@ import type { AuthMethod } from '../methods'
 import { sameName, type PlaceKind } from '../places'
 import { allOf, anyOf, blame, cardJoin, cardName, credit, leaves, notState, predicatePasses, predicateState, topJoin, type CondState } from '../predicate'
 import { hasWho, normaliseWho, whoPasses, type WhoPerson } from '../rule-who'
+import { WEEKDAYS, holdsAt, holdsAtSomeDay, readSchedule, scheduleSummary, type Weekday } from '../schedule'
 import {
   CHIP_DEVICES,
   RISK_SCORE,
@@ -345,7 +346,9 @@ function shownValues(c: Condition, env: SimEnv): string {
       ? vals.map((v) => (env.hasFingerprint && !env.hasFingerprint(v) ? 'a deleted device profile' : env.fingerprintName(v))).join(', ')
       : t.valueKind === 'time'
         ? `${vals[0] ?? '—'}–${vals[1] ?? '—'}`
-        : vals.join(', ')
+        : t.valueKind === 'schedule'
+          ? scheduleSummary(vals, c.tz)
+          : vals.join(', ')
 }
 
 export function condPhrase(c: Condition, env: SimEnv): string {
@@ -357,7 +360,7 @@ export function condPhrase(c: Condition, env: SimEnv): string {
    context explicit facts. Everything else — who the person is, the legacy
    directory conditions, the ones nothing can settle — keeps reading the chip
    context, which carries the same person. */
-const FROM_FACTS = new Set(['zone', 'fingerprint', 'device-risk', 'time', 'day', 'country', 'state', 'city'])
+const FROM_FACTS = new Set(['zone', 'fingerprint', 'device-risk', 'time', 'day', 'schedule', 'country', 'state', 'city'])
 
 type CondVerdict = { state: CondState; detail: string }
 
@@ -605,6 +608,19 @@ function legacyCond(c: Condition, ctx: SimContext, env?: SimEnv): CondVerdict {
       const inside = from <= to ? local >= from && local <= to : local >= from || local <= to
       const onStandard = c.tz !== undefined && c.tz !== TENANT_TZ ? ' (standard time)' : ''
       return decide(inside, c.tz ? `it is ${clock(local)} in ${c.tz}${onStandard}` : `it is ${clock(ctx.nowMinutes)} right now`)
+    }
+
+    /* Sign-in time on the chip clock, which has an hour and no day (schedule.ts). The hours still answer whenever the
+       day cannot change the answer — 03:00 against Mon–Fri 09:00–18:00 fails on any day — and only an hour some days
+       hold and others do not is undecided. `outside` is the negation; it has no "not" in it for `decide` to find. */
+    case 'schedule': {
+      const shift = c.tz ? (TZ_OFFSET[c.tz] ?? 0) - (TZ_OFFSET[TENANT_TZ] ?? 0) : 0
+      const local = ((ctx.nowMinutes + shift) % 1440 + 1440) % 1440
+      const held = holdsAtSomeDay(readSchedule(vals), local)
+      const state = c.operator === 'outside' ? notState(held) : held
+      const onStandard = c.tz !== undefined && c.tz !== TENANT_TZ ? ' (standard time)' : ''
+      const at = c.tz ? `it is ${clock(local)} in ${c.tz}${onStandard}` : `it is ${clock(ctx.nowMinutes)} right now`
+      return { state, detail: held === 'unknown' ? `${at}, and the day is not known` : at }
     }
 
     default:
@@ -1472,6 +1488,42 @@ export function evalCondition(c: Condition, facts: SignInFacts, env: SimEnv, car
       const wall = at === null ? null : wallClock(at, target)
       if (!wall) return unknown(`${when.date} ${when.time} in ${when.timeZone} is not a time this model can read`)
       return result(flip(vals.includes(wall.weekday) ? 'pass' : 'fail'), `${wall.weekday} in ${target}`, `it is ${wall.weekday} in ${target}`)
+    }
+
+    /* Sign-in time (schedule.ts): the day and the hour, both read on the condition's clock, so "Monday 02:00 in
+       Kolkata" is asked of a Kolkata schedule whatever zone the sign-in was stated in. With a date, the real instant
+       decides the weekday and the hour, daylight saving included. With only a time, the standard-time table gives the
+       hour and the schedule answers when the day cannot matter (`holdsAtSomeDay`); otherwise it asks for the date. */
+    case 'schedule': {
+      const target = c.tz ?? TENANT_TZ
+      const days = readSchedule(vals)
+      const asked = `${c.operator} ${scheduleSummary(vals, c.tz)}`
+      const out = (s: CondState): CondState => (c.operator === 'outside' ? notState(s) : s)
+      const when = facts.when
+      if (!when?.time) return unknown('no time was given', when?.date ? ['time'] : ['date', 'time'], { required: asked })
+      if (when.date) {
+        const at = instantOf(when.date, when.time, when.timeZone)
+        const wall = at === null ? null : wallClock(at, target)
+        if (!wall || !(WEEKDAYS as readonly string[]).includes(wall.weekday))
+          return unknown(`${when.date} ${when.time} in ${when.timeZone} is not a time this model can read`, [], { required: asked })
+        const held = holdsAt(days, wall.weekday as Weekday, wall.minutes)
+        return result(out(held ? 'pass' : 'fail'), `${wall.weekday} ${clock(wall.minutes)} in ${target}`, `it is ${wall.weekday} ${clock(wall.minutes)} in ${target}`, {
+          required: asked,
+        })
+      }
+      const a = TZ_OFFSET[target]
+      const b = TZ_OFFSET[when.timeZone]
+      if (!TIME_TEXT.test(when.time)) return unknown(`${when.time} is not a time of day`, [], { required: asked })
+      if (a === undefined || b === undefined)
+        return unknown('no date was given, and the standard-time table does not hold this time zone', ['date'], { required: asked })
+      const local = (((toMinutes(when.time) + a - b) % 1440) + 1440) % 1440
+      const held = holdsAtSomeDay(days, local)
+      if (held === 'unknown')
+        return unknown(`it is ${clock(local)} in ${target}, and without a date the day is not known`, ['date'], { required: asked })
+      return result(out(held), `${clock(local)} in ${target}`, `it is ${clock(local)} in ${target}`, {
+        required: asked,
+        ...(target !== when.timeZone ? { caveat: 'No date was given, so standard time is used.' } : null),
+      })
     }
 
     /* The legacy place conditions, by name, aliases included — the same

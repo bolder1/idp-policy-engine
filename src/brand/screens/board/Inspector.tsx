@@ -65,6 +65,7 @@ export function Inspector({
   onPatchFallback,
   onRemoved,
   onAppsSaved,
+  appsDraft,
   onClose,
   wide,
   onToggleWidth,
@@ -90,6 +91,8 @@ export function Inspector({
   onRemoved?: (what: string) => void
   /** The Applications pane saved; the board closes the panel. */
   onAppsSaved?: () => void
+  /** "View and edit": the pane edits the draft's applications instead of saving the policy (AppsPane `toDraft`). */
+  appsDraft?: { appIds: string[]; apply: (ids: string[]) => void }
   onClose: () => void
   /** Whether the panel is at its full width, and the way to change that. */
   wide: boolean
@@ -285,7 +288,7 @@ export function Inspector({
           </>
         ) : selection.kind === 'apps' ? (
           <motion.div key="apps" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-            <AppsPane policyId={draft.id} onSaved={onAppsSaved} onCancel={onClose} />
+            <AppsPane policyId={draft.id} onSaved={onAppsSaved} onCancel={onClose} toDraft={appsDraft} />
           </motion.div>
         ) : selection.kind === 'fallback' ? (
           /* Branching on `kind`, not on `rule` being truthy. The old test sent

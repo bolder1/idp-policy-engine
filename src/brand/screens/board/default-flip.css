@@ -1,0 +1,31 @@
+/* The default's turn (default-flip.ts, default-flip-note.tsx; rollout.ts `defaultFlips`). Scoped to its own classes:
+   stylesheets load for every line. The card is a motion element, so the ring is a box-shadow and nothing transforms. */
+
+/* The builder's own card, not one in a read-only canvas nested in a panel: the stage that is the board's direct child.
+   Its colour crosses over rather than snapping, and a ring in the new tone runs round it twice. */
+.bb.is-default-flip > .bb__stage .bb__card.is-terminal {
+  transition:
+    background-color 480ms var(--ease-standard),
+    border-color 480ms var(--ease-standard),
+    color 480ms var(--ease-standard);
+  animation: bdf-ring 1100ms var(--ease-standard) 2;
+}
+.bb.is-default-flip > .bb__stage .bb__card.is-terminal.is-deny { --bdf-ring: var(--fb-negative-border); }
+.bb.is-default-flip > .bb__stage .bb__card.is-terminal.is-allow { --bdf-ring: var(--fb-positive-border); }
+@keyframes bdf-ring {
+  from { box-shadow: 0 0 0 0 var(--bdf-ring, var(--border-strong)); }
+  to { box-shadow: 0 0 0 10px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bb.is-default-flip > .bb__stage .bb__card.is-terminal { transition: none; animation: none; }
+}
+
+/* The note. */
+.bdf { padding: var(--space-5); }
+.bdf__swap { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.bdf__was { display: inline-flex; opacity: 0.55; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.bdf__arrow { color: var(--text-tertiary); flex: none; }
+.bdf__now { display: inline-flex; transform-origin: left center; }
+.bdf__title { margin: 0 0 var(--space-2); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bdf__line { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--text-secondary); }
+.bdf__acts { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5); }

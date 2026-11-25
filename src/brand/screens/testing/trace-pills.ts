@@ -2,6 +2,7 @@ import { conditionType, type AccessDecision, type Condition, type Group, type Po
 import { CANT_TELL, DECISION_WORDS } from '../../decision-words'
 import { leaves } from '../../predicate'
 import { normaliseWho } from '../../rule-who'
+import { scheduleWords } from '../../schedule'
 import type { ColumnView, DecisionView } from '../board/try-sign-in'
 import type { NameLookup, RefKind } from '../predicate-prose'
 import { fallbackOf } from '../simulate'
@@ -139,7 +140,8 @@ const keyWords = (key: string): string => {
   return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s
 }
 
-const negated = (c: Pick<Condition, 'operator'>): boolean => c.operator.includes('not') || c.operator === 'returns false'
+const negated = (c: Pick<Condition, 'operator'>): boolean =>
+  c.operator.includes('not') || c.operator === 'returns false' || c.operator === 'outside'
 
 // --- One line, one pill -----------------------------------------------------------
 
@@ -215,6 +217,9 @@ function conditionSaid(c: Condition, line: EvidenceLine, names: NameLookup): Sai
       return { category: 'time', text: not ? `Outside ${windowText(c)}` : windowText(c) }
     case 'day':
       return { category: 'time', text: not ? `Not ${dayText(values)}` : dayText(values) }
+    /* Sign-in time (schedule.ts): its days and hours, short, with no zone — the pill is a reading, not the rule. */
+    case 'schedule':
+      return { category: 'time', text: not ? `Outside ${scheduleWords(values)}` : scheduleWords(values) }
     case 'device-risk':
       return { category: 'risk', text: `Risk ${c.operator} ${values[0]}` }
     case 'ml-risk':
@@ -362,6 +367,7 @@ export function conditionRequirement(c: Condition, names: NameLookup): Requireme
   if (c.typeId === 'device-risk') return { category: 'risk', text: said.text, core: `${c.operator} ${values[0]}`, negated: false }
   if (c.typeId === 'time') return { category: 'time', text: said.text, core: windowText(c), negated: not }
   if (c.typeId === 'day') return { category: 'time', text: said.text, core: dayText(values), negated: not }
+  if (c.typeId === 'schedule') return { category: 'time', text: said.text, core: scheduleWords(values), negated: not }
   const core = not ? said.text.replace(/^(Not in |Not |Outside )/, '') : said.text
   return { category: said.category, text: said.text, core, negated: not && core !== said.text }
 }

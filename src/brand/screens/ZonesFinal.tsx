@@ -79,6 +79,10 @@ import { libRowHeight, useLibView, type LibView } from './library-view-state'
 import { SHOWCASE } from '../showcase'
 import { TESTER } from '../tester'
 import { ZonesArt } from '../empty-art'
+import { shows } from '../rollout'
+
+/** The place results open over the sticky save bar (rollout `zonesHitsOverBar`). */
+const HITS_OVER_BAR = shows('zonesHitsOverBar')
 
 /* -----------------------------------------------------------------------------
    Zones.
@@ -1895,7 +1899,7 @@ export function PlaceSection({
     const showHits = s.q.trim() !== ''
     return (
       <div className="bz7__fieldline">
-        <div className="bz7__combo">
+        <div className={HITS_OVER_BAR ? 'bz7__combo is-over-bar' : 'bz7__combo'}>
           {/* The whole label reads as the field, but only the input takes focus: a
               mousedown on the icon or the padding would blur the input, and a blur
               closes the search before the label's click could hand focus back. */}

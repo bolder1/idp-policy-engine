@@ -138,7 +138,9 @@ describe('where it is offered', () => {
     expect(src).toContain('const onCanvas: Policy = { ...draft, pendingDraft: undefined }')
     expect(src).toContain('const templateFromCanvas = BAR_TEMPLATE && canSaveAsTemplate(onCanvas)')
     /* Marked already, the same row takes it off (rollout.ts `builderTemplateToggle`). */
-    expect(src).toContain('onSaveTemplate={templateMarked ? () => saveTemplate.unmark(onCanvas) : templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}')
+    /* A rule with an empty part refuses first (rule-gaps.ts); otherwise the canvas is what the template is made from. */
+    /* Fix's read-only Published view makes it from the published version on screen instead (rollout.ts `versionBar`). */
+    expect(src).toContain('onSaveTemplate={templateMarked ? () => saveTemplate.unmark(onCanvas) : fromPublished ? (canSaveAsTemplate(fromPublished) ? () => saveTemplate.open(fromPublished) : undefined) : templateFromCanvas ? () => (gaps.length > 0 ? refuseGaps(gaps) : saveTemplate.open(onCanvas)) : undefined}')
     expect(src).toContain('{saveTemplate.dialog}')
     expect(code(barToolsSrc)).toContain('export const BAR_TEMPLATE: boolean = true')
   })

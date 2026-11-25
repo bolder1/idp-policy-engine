@@ -49,6 +49,8 @@ import { normaliseHook, type Hook } from './hooks'
 import { refusesStatus, settled, showcaseTenant, tenantAt, testerTenant, type Tenant } from './fixtures'
 import { SHOWCASE } from './showcase'
 import { EMPTY_TENANT, emptyTenant } from './empty-tenant'
+import { withSpareApps } from './spare-apps'
+import { SIGN_IN_TIME, withSignInTime } from './schedule'
 import { CHECKS_WITHHELD, TESTER, testerFeatures } from './tester'
 import { EMPTY_LEGACY, MIGRATE_SCALE, showcaseLegacy, type DeadlineView, type LegacyEstate } from './migrate/legacy'
 import { scaleApps, scaleLegacy } from './migrate/scale-seed'
@@ -574,7 +576,7 @@ export interface BrandStore {
      rules go on deciding sign-ins. Publishing clears it — callers pass
      `pendingDraft: undefined` to `savePolicy`. `checks` (Describe it's) are
      kept on a policy still in draft, beside the rules they were tried on. */
-  saveDraft: (policyId: string, d: { rules: Rule[]; fallback?: Rule; checks?: Policy['checks'] }) => void
+  saveDraft: (policyId: string, d: { rules: Rule[]; fallback?: Rule; checks?: Policy['checks']; appIds?: string[]; name?: string }) => void
   /** Switches a published policy on, off or to monitoring. Leaves its rules and any saved draft alone. Ignored for the system policy, for any status but draft on a sign-in policy with no applications or a post sign-in policy not yet complete, and for Monitoring on a post sign-in policy (`refusesStatus`). */
   setPolicyStatus: (id: string, status: PolicyStatus) => void
   discardDraft: (policyId: string) => void
@@ -791,7 +793,13 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
      tenant (showcase-seed.ts); every other build loads the Security IT
      Manager's, which is the default persona below. Chosen once, lazily, and
      read by every initialiser that follows. */
-  const [seed] = useState<Tenant>(() => (EMPTY_TENANT ? emptyTenant() : TESTER ? testerTenant() : SHOWCASE ? showcaseTenant() : tenantAt('medium')))
+  /* Every line also gets the applications no policy holds, so a new policy has one to take (spare-apps.ts). */
+  /* On Design, a seeded Sign-in hours + Sign-in days pair reads as one Sign-in time wherever that is exact
+     (schedule.ts `withSignInTime`); every other line opens on the seed byte for byte. */
+  const [seed] = useState<Tenant>(() => {
+    const t = withSpareApps(EMPTY_TENANT ? emptyTenant() : TESTER ? testerTenant() : SHOWCASE ? showcaseTenant() : tenantAt('medium'))
+    return SIGN_IN_TIME ? { ...t, policies: t.policies.map(withSignInTime) } : t
+  })
   /* `fresh` (the app passes it, tests do not): the new builder as a tenant first meets it, with no sign-in policies
      of its own yet, so the move from the old builder starts on an empty page (owner, 3 Nov 2026). */
   const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)

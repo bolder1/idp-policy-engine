@@ -8,6 +8,7 @@ import { MigrationResults } from '../migrate/migration-results'
 import {
   AlignLeft,
   AppWindow,
+  ArrowUpRight,
   CopyPlus,
   Eye,
   Grid3x3,
@@ -44,7 +45,7 @@ import { MoreFilters } from './more-filters'
 import { shows } from '../rollout'
 import { NO_FILTERS, anySet, policyMatches, type PolicyFilters } from './more-filters-model'
 import { Picker } from '../picker'
-import { appsOf, blankPolicy, enforces, type Policy } from '../data'
+import { appsOf, blankPolicy, enforces, evaluates, type Policy } from '../data'
 import { useBrand } from '../store'
 import { ChangeState } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
@@ -53,11 +54,12 @@ import { useNewPolicy } from '../create/use-new-policy'
 import { useMarkedAsTemplate, useSaveAsTemplate } from './save-template'
 import { ConfirmDelete } from './confirm-delete'
 import { AppTransfer } from './app-transfer'
-import { decidesFor, deleteFacts, ownerOf } from './app-policies'
+import { decidesFor, deleteFacts, ownerOf, withAppsViewEdit } from './app-policies'
+import { ONLY_APP_TITLE, useViewEdit } from './board/draft-model'
 import { AppFacts, DeleteFactsLine, PolicyFact } from './app-facts'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
-import { canSaveAsTemplate, rowMenu, statusOptions, type RowMenuId, monitorOffered, MONITOR_MODE } from './status-options'
+import { canSaveAsTemplate, policyTemplateHold, rowMenu, statusOptions, type RowMenuId, type RowMenuItem, monitorOffered, MONITOR_MODE } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { BulkBar } from '../bulk-bar'
 import { SHOWCASE } from '../showcase'
@@ -125,9 +127,14 @@ const POLICY_KINDS: { value: PolicyKind; label: string }[] = MIGRATION_FIRST
 const MORE_FILTERS: boolean = shows('moreFilters')
 /* The bar on one line, its buttons dropping to icons as it narrows (19 Nov): Design only (rollout.ts `oneLineBar`). */
 const ONE_LINE_BAR: boolean = shows('oneLineBar')
+/* The bar's menus open over the table's sticky footer (24 Nov): Design only (rollout.ts `barOverPager`). */
+const BAR_OVER_PAGER: boolean = shows('barOverPager')
+const MAIN_CLASS = ONE_LINE_BAR ? `bpol__main is-one-line${BAR_OVER_PAGER ? ' is-bar-over' : ''}` : 'bpol__main'
 /* Policy names one width in every row, cut with an ellipsis, and the columns fixed so they sit in the same place on
    every tab (owner, 20 Nov 2026). rollout.ts `policyNameFit`; screens.css `.btable--names`. */
 const NAME_FIT: boolean = shows('policyNameFit')
+/* A policy's name opens the builder itself, not the Policies details slider (rollout.ts `directOpen`). */
+const DIRECT_OPEN: boolean = shows('directOpen')
 const TABLE_CLASS = NAME_FIT ? 'btable btable--names' : 'btable'
 
 const KIND_KEY = 'brand-policies-type'
@@ -156,6 +163,9 @@ type SortKey = 'name' | 'modified' | 'exposure' | 'activity'
 type StatusFilter = 'all' | 'draft' | 'active' | 'monitor' | 'inactive'
 type RowAction = RowMenuId | 'assign'
 type RowDialog = { kind: 'delete' | 'assign' | 'template' | 'text'; policy: Policy }
+/* View and edit's two refusals on this page (draft-model.ts): the last application off an active policy, and a delete
+   of one. */
+type Refusal = { kind: 'only-app' | 'delete'; policy: Policy }
 
 /* -----------------------------------------------------------------------------
    Exposure — withheld in every edition since M4.
@@ -265,7 +275,7 @@ export function Policies() {
     return (
       <div className="bpage">
         <PageHead title="Policies" caption="Every sign-in is checked against these policies." docs />
-        <div className={ONE_LINE_BAR ? 'bpol__main is-one-line' : 'bpol__main'}>
+        <div className={MAIN_CLASS}>
           <SignInPolicies key="new" origin="new" />
         </div>
       </div>
@@ -306,7 +316,7 @@ export function Policies() {
       {/* Each tab brings its own bar and list; a fragment, so they stay rows of
           the page grid as they were before the tabs. */}
       {shown === 'sign-in' ? (
-        <div className={ONE_LINE_BAR ? 'bpol__main is-one-line' : 'bpol__main'}>
+        <div className={MAIN_CLASS}>
           {/* Live and In review (owner, 12 Nov 2026: "segregate both types of policies inside the new policy"): a segment
               control over two lists. It appears once something has migrated; before that there is one list. */}
           {hasMoved && <Tabs<NewSub> className="bpol__sub" name="Policies by state" value={sub} onChange={setSub} options={isBuilt(experience) ? NEW_SUBS : NEW_SUBS_REVIEW} />}
@@ -375,6 +385,15 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
     setDialogOpen(true)
   }
   const closeDialog = () => setDialogOpen(false)
+  /* "View and edit" (draft-model.ts, owner 24 Nov 2026). Today, Fix and V3 never set a refusal, so the page is as it was. */
+  const viewEdit = useViewEdit()
+  /* Kept while the refusal animates out, as `dialog` is. */
+  const [refusal, setRefusal] = useState<Refusal | null>(null)
+  const [refusalOpen, setRefusalOpen] = useState(false)
+  const refuse = (kind: Refusal['kind'], policy: Policy) => {
+    setRefusal({ kind, policy })
+    setRefusalOpen(true)
+  }
 
   /* New policy, the way a design tool makes a new file (owner, 23 Sep 2026:
      "by default it should open in draft mode with an untitled name — how Figma
@@ -582,13 +601,22 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
         if (markTemplate.marked(policy.id)) markTemplate.unmark(policy)
         else markTemplate.open(policy)
         break
+      /* View and edit (Q6, owner 24 Nov 2026): a policy that decides sign-ins is made inactive before it is deleted, so
+         the refusal comes before the typed DELETE. Drafts and inactive policies delete as they always have. */
       case 'delete':
+        if (viewEdit && !policy.isSystem && !isPostSignIn(policy) && evaluates(policy)) refuse('delete', policy)
+        else openDialog(action, policy)
+        break
       case 'assign':
       case 'text':
         openDialog(action, policy)
         break
     }
   }
+
+  /* A policy's name opens the policy. With `directOpen` it goes straight into the builder, whose bar carries the details
+     card on its name (BoardBar.tsx `PolicyCard`), where the Policy details slider stood between them. */
+  const openPolicy = (p: Policy) => (DIRECT_OPEN || p.movedFrom?.length ? store.go({ name: 'board', policyId: p.id }) : setDetails({ id: p.id, open: true }))
 
   function head(key: SortKey, label: string, extra?: string) {
     return (
@@ -728,7 +756,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   activity={review ? `${p.movedFrom?.length ?? 0} old ${p.movedFrom?.length === 1 ? 'policy' : 'policies'}` : activityLabel(lastActivity(p, store.activity, now), now)}
                   monitor={monitorOffered(store.features)}
                   trySignIn={store.features.trySignIn}
-                  onOpen={() => (p.movedFrom?.length ? store.go({ name: 'board', policyId: p.id }) : setDetails({ id: p.id, open: true }))}
+                  onOpen={() => openPolicy(p)}
                   onAction={(a) => act(p, a)}
                   onPublish={() => setPublishAsk([p.id])}
                   onRollBack={() => setRollAsk(p)}
@@ -920,7 +948,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   tile: <ShieldCheck size={18} strokeWidth={1.8} />,
                   tileClass: 'bpol__tile',
                   badge: <PolicyMarks policy={p} />,
-                  onOpen: () => setDetails({ id: p.id, open: true }),
+                  onOpen: () => (DIRECT_OPEN ? openPolicy(p) : setDetails({ id: p.id, open: true })),
                   facts: [
                     { label: 'Apps', value: <PolicyApps policy={p} onAssign={() => act(p, 'assign')} /> },
                     { label: 'Status', value: <span className="btable__marks"><PolicyStatus policy={p} /></span> },
@@ -932,7 +960,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   menu: (
                     <RowMenu
                       label={`Actions for ${p.name}`}
-                      items={policyMenu(p, { monitor: monitorOffered(store.features), trySignIn: store.features.trySignIn, marked: markTemplate.marked(p.id) })}
+                      items={policyMenu(p, { monitor: monitorOffered(store.features), trySignIn: store.features.trySignIn, marked: markTemplate.marked(p.id), viewEdit })}
                       onSelect={(id) => act(p, id as RowAction)}
                     />
                   ),
@@ -978,6 +1006,21 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
           policy={current}
           onClose={closeDialog}
           onCommit={() => markLeaving(current.id)}
+          onRefused={(p) => refuse('only-app', p)}
+        />
+      )}
+      {refusal && (
+        <ActiveRefusal
+          open={refusalOpen}
+          refusal={refusal}
+          onClose={() => setRefusalOpen(false)}
+          onMakeInactive={() => {
+            const p = store.policyById(refusal.policy.id) ?? refusal.policy
+            setRefusalOpen(false)
+            /* On the next tick, as the Monitoring page's own switches are (use-status-change.tsx `switchFromPage`): the
+               refusal gives focus back first, so Make inactive's confirm, or Before turning off, returns it to the row. */
+            window.setTimeout(() => statusChange.request(p, 'inactive'), 0)
+          }}
         />
       )}
       {/* Read as text: the whole policy as numbered sentences, in a drawer —
@@ -1327,12 +1370,40 @@ const ROW_ICON: Record<RowMenuId, LucideIcon> = {
    `rowMenu`'s, where a test pins them. Try a sign-in is the one testing item,
    directly under Edit policy (final spec, E3); the older trail builder is not
    in the showcase build, where the board is the one builder (see showcase.ts). */
-function policyMenu(policy: Policy, { monitor, trySignIn, marked = false }: { monitor: boolean; trySignIn: boolean; marked?: boolean }): MenuItem[] {
-  return rowMenu(policy, { monitor, trySignIn, trail: !SHOWCASE, marked }).map((item) => ({
+function policyMenu(
+  policy: Policy,
+  { monitor, trySignIn, marked = false, viewEdit = false }: { monitor: boolean; trySignIn: boolean; marked?: boolean; /** "View and edit" is the model in force. */ viewEdit?: boolean },
+): MenuItem[] {
+  const items = rowMenu(policy, { monitor, trySignIn, trail: !SHOWCASE, marked })
+  return (viewEdit ? withViewEditSwitches(items, policy, monitor) : items).map((item) => ({
     ...item,
+    /* "View and edit": the builder opens view-only, with Edit inside it (owner, 24 Nov 2026: "only the Edit button"),
+       so the row's door only opens it. */
     icon: ROW_ICON[item.id],
+    /* The arrow the application's head draws on its Open policy. */
+    ...(viewEdit && item.id === 'edit' ? { label: 'Open policy', icon: ArrowUpRight } : null),
     ...(item.id === 'delete' ? { danger: true, divide: true } : {}),
   }))
+}
+
+const SWITCH_IDS: ReadonlySet<RowMenuId> = new Set<RowMenuId>(['active', 'inactive', 'monitor'])
+
+/* "View and edit" (draft-model.ts, owner 24 Nov 2026): the row's switches, in rowMenu's place for them. A sign-in draft
+   on an application offers Active, which publishes it and makes it active in one confirm (use-status-change.tsx
+   `draftActivates`). A sign-in policy with no application has no Make active at all ("only ever a Draft"), whatever its
+   status, so nothing here is offered only to be refused. */
+function withViewEditSwitches(items: RowMenuItem[], policy: Policy, monitor: boolean): RowMenuItem[] {
+  const hasApps = policy.isSystem || isPostSignIn(policy) || policy.appIds.length > 0
+  const switches = statusOptions(policy, { monitor, draftActivates: true })
+    .filter((s) => s.target !== 'active' || hasApps)
+    /* Verbs, as the application's ⋯ and the builder's say them (5 Nov ruling: active / inactive, never turn on). */
+    .map((s) => ({ id: s.target, label: s.target === 'active' ? 'Make active' : s.target === 'inactive' ? 'Make inactive' : s.label }))
+  const rest = items.filter((i) => !SWITCH_IDS.has(i.id))
+  /* Where rowMenu put them, or straight after Edit policy and the testing item when it put none (a draft). */
+  const first = items.findIndex((i) => SWITCH_IDS.has(i.id))
+  const after = rest.findIndex((i) => i.id !== 'edit' && i.id !== 'test')
+  const at = first >= 0 ? first : after >= 0 ? after : rest.length
+  return [...rest.slice(0, at), ...switches, ...rest.slice(at)]
 }
 
 /* A migrated draft's menu (owner, 17 Nov 2026): it is in review, so only review actions. No edit, read as text,
@@ -1439,7 +1510,8 @@ function TemplateMark({ policy }: { policy: Policy }) {
   const marked = useMarkedAsTemplate(policy.id)
   const mark = useSaveAsTemplate()
   /* A migrated draft is in review, and its menu has no template item (owner, 17 Nov 2026), so no star either. */
-  if (!marked && (!canSaveAsTemplate(policy) || waitingMoved(policy))) return null
+  /* Nor while it has nothing to hand on (status-options.ts `templateHold`): the ⋯ says why, the star stays away. */
+  if (!marked && (!canSaveAsTemplate(policy) || waitingMoved(policy) || policyTemplateHold(policy))) return null
   const label = marked ? UNMARK_LABEL : MARK_LABEL
   return (
     <Tip text={marked ? 'Marked as template' : label}>
@@ -1520,6 +1592,7 @@ function PolicyRow({
   /* Laid in by Add to Policies, or just made active: one light sweep (finale.css). */
   const lands = landing.includes(policy.id)
   const asTemplate = useMarkedAsTemplate(policy.id)
+  const viewEdit = useViewEdit()
   return (
     <tr data-from-old={policy.movedFrom ? 'true' : undefined} className={`${policy.isSystem ? 'is-system' : ''}${at >= 0 && !lands ? ' is-arrived' : ''}${lands ? ' is-landing' : ''}`} style={at >= 0 ? { ['--arrive' as string]: Math.min(at, 12) } : undefined}>
       {/* The row's layout lives on a wrapper INSIDE the cell. `.btable__primary`
@@ -1584,7 +1657,7 @@ function PolicyRow({
         <RowMenu
           label={`Actions for ${policy.name}`}
           items={review ? reviewMenu(review) : [
-            ...policyMenu(policy, { monitor, trySignIn, marked: asTemplate }),
+            ...policyMenu(policy, { monitor, trySignIn, marked: asTemplate, viewEdit }),
             ...(migrated && policy.status === 'active' && onRollBack ? [{ id: 'rollback', label: 'Roll back to old policy', icon: Undo2, divide: true }] : []),
             /* A migrated policy once live or rolled back (owner, 18 Nov 2026): help from miniOrange. Drafts in review reach
                support from the migration card only. */
@@ -1621,14 +1694,18 @@ function AssignAppsDialog({
   policy,
   onClose,
   onCommit,
+  onRefused,
 }: {
   open: boolean
   policy: Policy
   onClose: () => void
   /** Called just before the assignment is written. */
   onCommit: () => void
+  /** "View and edit": the save would leave an active policy with no application, so nothing was written. */
+  onRefused?: (policy: Policy) => void
 }) {
   const store = useBrand()
+  const viewEdit = useViewEdit()
   const [picked, setPicked] = useState<string[]>(policy.appIds)
 
   /* The seed as a string, so the effect re-seeds only when the assignment
@@ -1646,9 +1723,17 @@ function AssignAppsDialog({
   const save = () => {
     /* Unfinished means draft: a policy left with no application becomes one.
        Assigning does not publish in return. */
-    const next = { ...policy, appIds: picked }
+    const listed = { ...policy, appIds: picked }
+    /* "View and edit" (owner, 24 Nov 2026): an active policy keeps its application, so emptying it is refused (null)
+       and the refusal names the way out; an inactive one emptied goes back to being a draft (app-policies.ts). */
+    const next = viewEdit ? withAppsViewEdit(policy, picked) : picked.length === 0 ? { ...listed, status: withoutApps(policy.status) } : listed
+    if (!next) {
+      onClose()
+      onRefused?.(policy)
+      return
+    }
     onCommit()
-    store.savePolicy(picked.length === 0 ? { ...next, status: withoutApps(policy.status) } : next)
+    store.savePolicy(next)
     const n = picked.length
     const count = `${n} application${n === 1 ? '' : 's'}`
     /* "Protects" only for a policy that decides sign-ins. An active policy with
@@ -1727,9 +1812,47 @@ function AssignAppsDialog({
             emptyNote={
               policy.status !== 'draft' ? <p className="bassign__foot">With no applications, this policy becomes a draft.</p> : undefined
             }
+            /* In "View and edit" the line is true of an inactive policy only. An active one is refused on Save and the
+               refusal says why, so the dialog says nothing for it. */
+            {...(viewEdit && policy.status !== 'inactive' ? { emptyNote: undefined } : {})}
           />
         )}
       </div>
     </Modal>
+  )
+}
+
+/* --- "View and edit"'s refusals --------------------------------------------------
+
+   Two things an active policy does not do in this model (draft-model.ts, owner 24 Nov 2026): lose its only
+   application, and be deleted. Each is refused with the kit Confirm, drawn as the status Can't dialog draws a refusal
+   (use-status-change.tsx): the policy named once, why, and the next step as the one primary. Make inactive asks its own
+   confirm, which is where the red is. */
+const REFUSALS: Record<Refusal['kind'], { title: string; body: (p: Policy) => string }> = {
+  'only-app': { title: ONLY_APP_TITLE, body: (p) => `It is ${p.status === 'monitor' ? 'monitoring' : 'active'}. Make it inactive first.` },
+  delete: { title: "Can't delete an active policy", body: () => 'Make it inactive first.' },
+}
+
+function ActiveRefusal({ open, refusal, onClose, onMakeInactive }: { open: boolean; refusal: Refusal; onClose: () => void; onMakeInactive: () => void }) {
+  const said = REFUSALS[refusal.kind]
+  return (
+    <Confirm
+      open={open}
+      onClose={onClose}
+      tone="error"
+      shape="hero"
+      title={said.title}
+      cancelLabel="Close"
+      destructive={false}
+      confirmLabel="Make inactive"
+      onConfirm={onMakeInactive}
+    >
+      <div className="bapr__confirm is-card">
+        <p>
+          <PolicyFact name={refusal.policy.name} />
+        </p>
+        <p>{said.body(refusal.policy)}</p>
+      </div>
+    </Confirm>
   )
 }

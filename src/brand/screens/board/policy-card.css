@@ -1,0 +1,34 @@
+/* The policy's details card on the builder bar's name (policy-card.tsx, rollout.ts `directOpen`). Scoped to its own
+   classes: stylesheets load for every line. The card is a motion element, so nothing here transforms it. */
+
+/* The name reads as something to open: a hairline under it on hover and focus, and the pointer says so. */
+.bpc-name {
+  display: inline-flex;
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  cursor: default;
+  outline: none;
+}
+.bpc-name > .bbtop__title {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: transparent;
+  text-underline-offset: 4px;
+  transition: text-decoration-color var(--dur-fast) var(--ease-standard);
+}
+.bpc-name:hover > .bbtop__title,
+.bpc-name.is-open > .bbtop__title { text-decoration-color: var(--border-strong); }
+.bpc-name:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
+
+.bpc-card {
+  position: fixed;
+  z-index: 60;
+  width: min(440px, calc(100vw - 16px));
+  transform-origin: top left;
+  border-radius: var(--radius-lg);
+  outline: none;
+}
+/* Reached from the keyboard (Enter on the name): the ring round the card says where focus went. */
+.bpc-card:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Lifted off the bar, where in Policy details it sat in the page. */
+.bpc-card .insp__hero { box-shadow: var(--el-mid); }

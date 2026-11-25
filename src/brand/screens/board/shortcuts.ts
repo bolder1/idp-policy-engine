@@ -41,6 +41,8 @@ export interface ShortcutOptions {
   testing: boolean
   /** There is a publish step; Lite saves. */
   publish: boolean
+  /** The save's own name where a draft model gives it one (draft-model.ts `SAVE_AND_PUBLISH`); wins over `publish`. */
+  saveLabel?: string
   /* The builder's version and flags hide pieces at their doors (builder-version.ts, bar-tools.ts), and the keys are
      doors too, so the sheet lists a key only where it does something: ⌥↑ / ⌥↓ from V1 (`arrange`), undo and redo
      from V1 (`history`), and E only while the rule on/off switch is shown (`RULE_ON_OFF`, hidden 23 Oct 2026). */
@@ -66,7 +68,7 @@ export function boardShortcuts(o: ShortcutOptions): [string, string][] {
     ...when(o.testing, ['T', ACCESS_CHECK]),
     ...when(o.commands, [c(['mod'], 'K'), 'Command palette']),
     /* In the bar's words: ⌘↵ saves at once, as the bar's button does. */
-    [c(['mod'], 'Enter'), o.publish ? 'Publish policy' : 'Save policy'],
+    [c(['mod'], 'Enter'), o.saveLabel ?? (o.publish ? 'Publish policy' : 'Save policy')],
     [c(['mod'], '\\'), 'Show or hide the panel'],
     ...when(o.history, [`${c(['mod'], 'Z')} ${c(['mod', 'shift'], 'Z')}`, 'Undo, redo']),
     ['Esc', o.testing ? `Close ${ACCESS_CHECK}, then clear the selection` : 'Clear the selection'],

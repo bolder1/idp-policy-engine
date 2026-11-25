@@ -5,7 +5,9 @@
    The mapping (owner's plan, 3 Nov 2026):
 
    - One new policy per application (one app, one policy, 14 Oct). Applications whose
-     old rows are identical can share one, when the admin takes the merge offer.
+     old rows are identical could share one through a merge offer; where `oneAppMoves` is on
+     (rollout.ts, every line since 23 Nov 2026) there is no offer and every new policy holds
+     exactly one application — the admin adds or removes applications afterwards.
    - Each group row becomes a rule whose Who is that group. The DEFAULT row becomes the
      last row, Nothing else matched. With no DEFAULT row, the last row denies, because
      the old console gives no access to someone outside the assigned groups.
@@ -41,7 +43,13 @@ import {
 } from '../data'
 import { POLICY_NAME_MAX, freeName } from '../policy-name'
 import { blankProfile, type FingerprintProfile } from '../fingerprint'
+import { shows } from '../rollout'
 import { DEFAULT_GROUP, DEFAULT_METHOD, type LegacyAdaptive, type LegacyCheck, type LegacyEstate, type LegacyPolicy } from './legacy'
+
+/* One application per moved policy (rollout.ts `oneAppMoves`; owner, 23 Nov 2026: "there has to be a single policy for a
+   single application for the migration"). Read once; the planner's functions take it as a parameter so tests can ask
+   both ways. */
+export const ONE_APP_MOVES: boolean = shows('oneAppMoves')
 
 export interface MoveContext {
   apps: readonly App[]
@@ -157,7 +165,9 @@ function byApp(rows: readonly LegacyPolicy[]): Map<string, LegacyPolicy[]> {
 
 /** Applications among the selected rows whose old settings are identical, and that have no policy yet: an application
     that already has one is joining it, so it is not free to share a new one. */
-export function mergeOffers(selected: readonly LegacyPolicy[], ctx?: Pick<MoveContext, 'policies'>): MergeOffer[] {
+export function mergeOffers(selected: readonly LegacyPolicy[], ctx?: Pick<MoveContext, 'policies'>, oneApp: boolean = ONE_APP_MOVES): MergeOffer[] {
+  /* One application per moved policy: nothing to offer. */
+  if (oneApp) return []
   const shapes = new Map<string, string[]>()
   for (const [appId, rows] of byApp(selected)) {
     if (ctx && existingPolicyFor(appId, ctx)) continue
@@ -220,7 +230,13 @@ const strictness = (lp: LegacyPolicy, estate: LegacyEstate) => {
 /* --- The plan ---------------------------------------------------------------- */
 
 /** `merged`: the merge offers the admin took, by key. */
-export function planMove(selected: readonly LegacyPolicy[], estate: LegacyEstate, ctx: MoveContext, merged: readonly string[] = []): MovePlan {
+export function planMove(
+  selected: readonly LegacyPolicy[],
+  estate: LegacyEstate,
+  ctx: MoveContext,
+  merged: readonly string[] = [],
+  oneApp: boolean = ONE_APP_MOVES,
+): MovePlan {
   const apps = byApp(selected)
   const zones: Zone[] = []
   const zoneFor = new Map<string, { id: string; reused?: Zone }>()
@@ -297,7 +313,8 @@ export function planMove(selected: readonly LegacyPolicy[], estate: LegacyEstate
     taken.add(id)
   }
   units.push(...[...joins.values()].map((j) => ({ appIds: j.appIds, into: j.into })))
-  for (const key of merged) {
+  /* A merge taken before the offer went is not honoured either: one application, one new policy. */
+  for (const key of oneApp ? [] : merged) {
     const ids = key.split('+')
     if (ids.every((id) => apps.has(id) && !taken.has(id))) {
       units.push({ appIds: ids })

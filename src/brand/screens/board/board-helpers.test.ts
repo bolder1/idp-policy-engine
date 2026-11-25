@@ -236,6 +236,12 @@ describe('the keyboard sheet', () => {
     expect(full.some(([, v]) => v === 'Publish policy')).toBe(true)
   })
 
+  /* The Fix draft model names its save "Save and publish" (rollout.ts `saveAndPublish`), and the sheet says the same. */
+  it('names ⌘↵ by the save’s own name when a draft model gives one', () => {
+    const fix = boardShortcuts({ mac: false, commands: false, testing: false, publish: true, saveLabel: 'Save and publish', ...ALL })
+    expect(fix.find(([k]) => k === 'Ctrl+Enter')?.[1]).toBe('Save and publish')
+  })
+
   it('lists no T, and a plain Escape, where there is no Try a sign-in', () => {
     const without = boardShortcuts({ mac: false, commands: false, testing: false, publish: false, ...ALL })
     expect(without.some(([k]) => k === 'T')).toBe(false)

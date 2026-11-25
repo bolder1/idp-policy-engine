@@ -291,7 +291,8 @@ describe('Sign-in tests — the builder’s layout (§14.1)', () => {
     expect(bar).not.toContain('aria-label="Rename"')
     /* Additive: the builder's own bar is as it was, beside the plain one. */
     expect(boardBarSrc).toContain('export function BoardBarPlain({ title, actions }: { title: string; actions?: ReactNode })')
-    expect(boardBarSrc).toContain('<StatusControl policyId={policy.id}')
+    /* A plain pill where the switches moved to the ⋯ (rollout.ts `statusInMenu`). */
+    expect(boardBarSrc).toContain('<StatusControl still={STATUS_IN_MENU} policyId={policy.id}')
     expect(pageSrc).toContain('<BoardBarPlain')
   })
 

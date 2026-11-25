@@ -109,6 +109,8 @@ const NEGATIONS: Record<string, string> = {
   'does not match': 'matches',
   'not between': 'between',
   'not in': 'in',
+  /* Sign-in time (schedule.ts): its negation carries no "not". */
+  outside: 'within',
 }
 
 /* `audienceCovers` is gone.

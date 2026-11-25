@@ -43,6 +43,7 @@ const OF_CONDITION: Record<string, DenyReason> = {
   'device-risk': 'risk',
   time: 'time',
   day: 'time',
+  schedule: 'time',
 }
 
 /** The reason a rule refuses, from what it asks: its first condition that is not about who, else who, else the rule itself. The last row says no rule let them in. Read from the rule alone, so a list of past sign-ins (sign-in-tests/activity.ts) can say it without a run. */

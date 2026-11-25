@@ -9,6 +9,7 @@ import { AppLogo } from '../logos/AppLogo'
 import { FilterTabs } from './page-bar'
 import { APP_PICKER_COMPARE, useAppPickerView, type AppPickerView } from './app-picker-view'
 import { chipKey, fieldKey, listKey, pickInto, takeOut, tokenRows } from './app-tokens'
+import { useViewEdit } from './board/draft-model'
 import './app-transfer.css'
 
 /* The picks and the search as ONE field (owner, 24 Oct 2026: "merge both so one place where we show the added and
@@ -380,6 +381,10 @@ function AppTokens({ apps, picked, onChange, takenBy, emptyNote, openInUse }: Pi
   /* Folded while nothing is typed: a search shows what it found, even there. */
   const folded = FOLD_IN_USE && !typed
   const usedOpen = !folded || showUsed
+  /* "View and edit" (draft-model.ts, owner 24 Nov 2026): with nothing left to add and nothing typed, the list was only
+     the folded line, so one line above it says why it is empty. */
+  const viewEdit = useViewEdit()
+  const allHeld = viewEdit && !typed && free.length === 0 && used.length > 0
   /* What Enter adds while words are typed, marked in the list so the key is never a guess. */
   const next = typed ? free[0]?.id : undefined
   const nameOf = (appId: string) => apps.find((a) => a.id === appId)?.name ?? appId
@@ -597,6 +602,7 @@ function AppTokens({ apps, picked, onChange, takenBy, emptyNote, openInUse }: Pi
               </button>
             </li>
           ))}
+          {allHeld && <li className="bxt__none">Every application has a policy.</li>}
           {used.length > 0 &&
             (folded ? (
               <li className="bxt__sep is-fold">

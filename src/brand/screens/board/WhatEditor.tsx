@@ -34,6 +34,7 @@ import { METHOD_PREFIX, firstFactorPatch, firstFactorValue } from './first-facto
 import { isPristine } from './parts'
 import { Prop, Seg } from './Section'
 import { useShows } from './builder-version'
+import { gapText, useRuleGaps } from './rule-gaps'
 
 /* Deny's email alerts (rollout.ts `denyAlerts`), read once. */
 const DENY_ALERTS = shows('denyAlerts')
@@ -213,6 +214,8 @@ export function WhatEditor({
      which is a looser rule than the one they left. Held here, for this visit. */
   const beforeDeny = useRef<Partial<Rule> | null>(null)
 
+  /* Pressing an outcome answers it: the new rule's open Then is closed with the same patch (rule-gaps.ts). */
+  const answer = rule.outcomeOpen ? { outcomeOpen: undefined } : {}
   const pick = (id: AccessDecision) => {
     if (id === 'deny') {
       /* Nothing chosen yet, so nothing to come back to: Allow afterwards is Allow. */
@@ -233,15 +236,15 @@ export function WhatEditor({
           pushNumberMatching: rule.pushNumberMatching,
         }
       }
-      return onPatch({ decision: 'deny', ...noSecondStep })
+      return onPatch({ decision: 'deny', ...noSecondStep, ...answer })
     }
     /* A new rule holds `2fa` without anybody having chosen it; Allow on it
        means Allow, and a second factor is added below. */
-    if (!answered) return onPatch({ decision: '1fa' })
+    if (!answered) return onPatch({ decision: '1fa', ...answer })
     /* Allow returns whichever Allow this rule last was, with its settings. */
     const restore = rule.decision === 'deny' ? beforeDeny.current : null
     beforeDeny.current = null
-    onPatch({ decision: lastAllow.current, ...(restore ?? {}) })
+    onPatch({ decision: lastAllow.current, ...(restore ?? {}), ...answer })
   }
 
   const unsatisfiable = twoStep && rule.secondFactor === 'specific' && methods.length === 0
@@ -298,7 +301,18 @@ export function WhatEditor({
      real, and the honest fix is an optional `decision`, which is a change to
      what a rule IS. */
   /* The default at the foot of the chain always has an outcome; it is never "new". */
-  const [answered, setAnswered] = useState(() => !!terminal || !isPristine(rule))
+  /* A new rule's Then stays open until Allow or Deny is pressed, whatever else is set on it (`outcomeOpen`, rule-gaps.ts):
+     the optional decision the note above asks for, as a flag beside `decision`. */
+  /* Derived, not only remembered: an undo that brings `outcomeOpen` back closes the tiles again (23 Nov 2026 audit). */
+  const [pressed, setPressed] = useState(() => !!terminal || !isPristine(rule))
+  const answered = !!terminal || (!rule.outcomeOpen && pressed)
+  /* The reasons a refused save left under this rule's fields (rule-gaps.ts). */
+  const shownGaps = useRuleGaps()
+  const at = terminal ? 'fallback' : rule.id
+  const outcomeGap = gapText(shownGaps, at, 'outcome')
+  const firstGap = gapText(shownGaps, at, 'first-factor')
+  const methodsGap = gapText(shownGaps, at, 'methods')
+
 
 
   return (
@@ -338,7 +352,7 @@ export function WhatEditor({
                 className={`bb__outcard is-${t.tone}${on ? ' is-on' : ''}`}
                 onClick={() => {
                   pick(t.id)
-                  setAnswered(true)
+                  setPressed(true)
                 }}
               >
                 <span className="bb__outcard__ico" aria-hidden>
@@ -352,6 +366,11 @@ export function WhatEditor({
             )
           })}
         </div>
+        {outcomeGap && (
+          <p className="bb__gap" role="alert" tabIndex={-1}>
+            {outcomeGap}
+          </p>
+        )}
       </div>
 
       {/* Nothing under the tiles until one is pressed (owner, 22 Sep 2026: "don't
@@ -365,7 +384,7 @@ export function WhatEditor({
       {!answered ? null : !walksFactors ? (
         /* The card above already says what Deny does; the message is what is
            left to set. */
-        <DenyMessage rule={rule} onPatch={onPatch} />
+        <DenyMessage rule={rule} onPatch={onPatch} at={at} />
       ) : (
         <>
           <div className="bb__thenfield">
@@ -393,6 +412,11 @@ export function WhatEditor({
                 onPatch({ ...firstFactorPatch(v), ...(pushFirst && !pushSecond ? { pushBiometric: undefined, pushNumberMatching: undefined } : {}) })
               }
             />
+            {firstGap && (
+              <p className="bb__gap" role="alert" tabIndex={-1}>
+                {firstGap}
+              </p>
+            )}
             {PUSH_OPTIONS_IN_POLICY && pushFirst && pushOptions}
             {rule.firstFactor === 'Specific' && rule.firstFactorMethod === MAGIC_LINK && (
               <div className="bb__opts">
@@ -469,6 +493,11 @@ export function WhatEditor({
                   })
                 }
               />
+              {methodsGap && (
+                <p className="bb__gap" role="alert" tabIndex={-1}>
+                  {methodsGap}
+                </p>
+              )}
               {/* Hidden in the showcase, with the panel's other findings. */}
               {!SHOWCASE && unsatisfiable && (
                 <p className="bb__diag is-error" role="alert">
@@ -620,11 +649,11 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
    Empty is the default, said under the label in full so nobody has to guess
    what a blank field sends; typing replaces it. Written as typed, like the
    rule's name, and an emptied field stores nothing rather than "". */
-function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+function DenyMessage({ rule, onPatch, at }: { rule: Rule; onPatch: (p: Partial<Rule>) => void; at: string }) {
   const denyExtras = useShows('denyExtras')
   const id = useId()
   const value = rule.denyMessage ?? ''
-  if (DENY_ALERTS) return <DenyOutcome rule={rule} onPatch={onPatch} />
+  if (DENY_ALERTS) return <DenyOutcome rule={rule} onPatch={onPatch} at={at} />
   return (
     <div className="bb__thenfield bb__deny">
       <label className="bb__thenlabel" htmlFor={id}>
@@ -640,7 +669,7 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
         value={value}
         placeholder="Leave empty to use the default"
         aria-describedby={`${id}-help ${id}-count`}
-        onChange={(e) => onPatch({ denyMessage: e.target.value === '' ? undefined : e.target.value })}
+        onChange={(e) => onPatch({ denyMessage: e.target.value.trim() === '' ? undefined : e.target.value })}
       />
       <span className="bb__denycount" id={`${id}-count`}>
         {value.length}/{DENY_MESSAGE_MAX}
@@ -656,7 +685,7 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
             maxLength={DENY_EXTRA_MAX}
             value={rule.denyAction ?? ''}
             placeholder="What they can do, for example connect from the office"
-            onChange={(e) => onPatch({ denyAction: e.target.value === '' ? undefined : e.target.value })}
+            onChange={(e) => onPatch({ denyAction: e.target.value.trim() === '' ? undefined : e.target.value })}
           />
           {!rule.denyAction && (
             <button type="button" className="bb__denysuggest" onClick={() => onPatch({ denyAction: DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)] })}>
@@ -672,7 +701,7 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
             maxLength={DENY_EXTRA_MAX}
             value={rule.denyContact ?? ''}
             placeholder="Who to ask, for example the IT help desk"
-            onChange={(e) => onPatch({ denyContact: e.target.value === '' ? undefined : e.target.value })}
+            onChange={(e) => onPatch({ denyContact: e.target.value.trim() === '' ? undefined : e.target.value })}
           />
         </>
       )}
@@ -697,10 +726,10 @@ function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>
    the console's own first box. */
 const ALERTS_OFF: Partial<Rule> = { denyAlertAdmins: undefined, denyAlertUsers: undefined, denyAlertEmail: undefined, denyAlertOn: undefined }
 
-function DenyOutcome({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+function DenyOutcome({ rule, onPatch, at }: { rule: Rule; onPatch: (p: Partial<Rule>) => void; at: string }) {
   return (
     <div className="bb__thenfield bb__denyx">
-      <DenyAlerts rule={rule} onPatch={onPatch} />
+      <DenyAlerts rule={rule} onPatch={onPatch} at={at} />
       <DenyMessageCard rule={rule} onPatch={onPatch} />
     </div>
   )
@@ -713,7 +742,9 @@ const ALERT_TO: { value: AlertTo; label: string; icon: LucideIcon }[] = [
   { value: 'both', label: 'Both', icon: Users },
 ]
 
-function DenyAlerts({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+function DenyAlerts({ rule, onPatch, at }: { rule: Rule; onPatch: (p: Partial<Rule>) => void; at: string }) {
+  /* A refused save's reason under the events, when alerts are on with none ticked (rule-gaps.ts). */
+  const eventsGap = gapText(useRuleGaps(), at, 'alerts')
   const id = useId()
   const on = rule.denyAlertOn ?? []
   const stored = !!(rule.denyAlertAdmins || rule.denyAlertUsers || rule.denyAlertEmail || on.length)
@@ -776,7 +807,7 @@ function DenyAlerts({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>)
                 placeholder="Enter email address"
                 aria-invalid={emailBad}
                 aria-describedby={`${id}-email-help${emailBad ? ` ${id}-email-err` : ''}`}
-                onChange={(e) => onPatch({ denyAlertEmail: e.target.value === '' ? undefined : e.target.value })}
+                onChange={(e) => onPatch({ denyAlertEmail: e.target.value.trim() === '' ? undefined : e.target.value })}
               />
               <p className={emailBad ? 'bb__denyy__err' : 'bb__denyhelp'} id={emailBad ? `${id}-email-err` : `${id}-email-help`}>
                 {emailBad ? 'Enter a valid email address.' : 'If empty, the main administrator receives the alerts.'}
@@ -790,6 +821,11 @@ function DenyAlerts({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>)
                 <CheckRow key={e.id} label={e.label} checked={on.includes(e.id)} onChange={(v) => setEvent(e.id, v)} />
               ))}
             </div>
+            {eventsGap && (
+              <p className="bb__gap" role="alert" tabIndex={-1}>
+                {eventsGap}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -825,7 +861,7 @@ function DenyMessageCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<R
           value={value}
           placeholder="Leave empty to use the default"
           aria-describedby={`${id}-help ${id}-count`}
-          onChange={(e) => onPatch({ denyMessage: e.target.value === '' ? undefined : e.target.value })}
+          onChange={(e) => onPatch({ denyMessage: e.target.value.trim() === '' ? undefined : e.target.value })}
         />
         {DENIAL_REASONS && denyExtras && (
           <>
@@ -838,7 +874,7 @@ function DenyMessageCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<R
               maxLength={DENY_EXTRA_MAX}
               value={rule.denyAction ?? ''}
               placeholder="What they can do, for example connect from the office"
-              onChange={(e) => onPatch({ denyAction: e.target.value === '' ? undefined : e.target.value })}
+              onChange={(e) => onPatch({ denyAction: e.target.value.trim() === '' ? undefined : e.target.value })}
             />
             {!rule.denyAction && (
               <button type="button" className="bb__denysuggest" onClick={() => onPatch({ denyAction: DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)] })}>
@@ -854,7 +890,7 @@ function DenyMessageCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<R
               maxLength={DENY_EXTRA_MAX}
               value={rule.denyContact ?? ''}
               placeholder="Who to ask, for example the IT help desk"
-              onChange={(e) => onPatch({ denyContact: e.target.value === '' ? undefined : e.target.value })}
+              onChange={(e) => onPatch({ denyContact: e.target.value.trim() === '' ? undefined : e.target.value })}
             />
           </>
         )}

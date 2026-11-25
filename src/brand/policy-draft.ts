@@ -25,8 +25,19 @@ const ruleSet = (p: Pick<Policy, 'rules' | 'fallback'>): RuleSet => ({ rules: p.
 /** The policy as a builder should open it: the saved draft if there is one, otherwise the live rules. */
 export function openForEditing(p: Policy): Policy {
   if (p.provisional) return { ...p, rules: p.provisional.rules }
-  return p.pendingDraft ? { ...p, rules: p.pendingDraft.rules, fallback: p.pendingDraft.fallback } : p
+  /* A draft that holds its own applications ("View and edit", draft-model.ts) opens on them too. */
+  return p.pendingDraft
+    ? {
+        ...p,
+        rules: p.pendingDraft.rules,
+        fallback: p.pendingDraft.fallback,
+        ...(p.pendingDraft.appIds ? { appIds: p.pendingDraft.appIds } : null),
+        ...(p.pendingDraft.name ? { name: p.pendingDraft.name } : null),
+      }
+    : p
 }
+
+const sameApps = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x))
 
 /* --- A new policy, held until it has a rule ---------------------------------------
 
@@ -72,7 +83,10 @@ export function lastSaved(p: Policy): RuleSet {
   return p.pendingDraft ? { rules: p.pendingDraft.rules, fallback: p.pendingDraft.fallback } : ruleSet(p)
 }
 
-const same = (a: RuleSet, b: RuleSet) => JSON.stringify({ r: a.rules, f: a.fallback }) === JSON.stringify({ r: b.rules, f: b.fallback })
+/* `setBy` says who last set "Nothing else matched" (board/default-flip.ts), not what it does: an edit put back as it was
+   is no change, whoever made it. */
+const noMarks = (key: string, value: unknown) => (key === 'setBy' ? undefined : value)
+const same = (a: RuleSet, b: RuleSet) => JSON.stringify({ r: a.rules, f: a.fallback }, noMarks) === JSON.stringify({ r: b.rules, f: b.fallback }, noMarks)
 
 /** The same rules and last row: by reference when it can tell, by content when it can't. */
 export const sameRules = (a: RuleSet, b: RuleSet): boolean => (a.rules === b.rules && a.fallback === b.fallback) || same(a, b)
@@ -91,13 +105,27 @@ export function differsFromLive(saved: Policy, draft: RuleSet): boolean {
    `pendingDraft` once it is published. A draft keeps the checks Describe it
    tried its rules with, when they are passed; a published policy's saved
    draft holds rules only, and its checks stay as they were stored. */
-export function withSavedDraft(p: Policy, d: RuleSet & { checks?: Policy['checks'] }, who = 'You', when = 'Just now'): Policy {
+export function withSavedDraft(p: Policy, d: RuleSet & { checks?: Policy['checks']; appIds?: string[]; name?: string }, who = 'You', when = 'Just now'): Policy {
+  /* `appIds` and `name` only where they join the draft ("View and edit", draft-model.ts). A draft policy takes them as
+     its own; a published one keeps them beside its live ones until a publish. */
   if (p.status === 'draft') {
-    return { ...p, rules: d.rules, fallback: d.fallback, ...('checks' in d ? { checks: d.checks } : null), pendingDraft: undefined, lastModified: when, modifiedBy: who }
+    return { ...p, rules: d.rules, fallback: d.fallback, ...(d.appIds ? { appIds: [...d.appIds] } : null), ...(d.name ? { name: d.name } : null), ...('checks' in d ? { checks: d.checks } : null), pendingDraft: undefined, lastModified: when, modifiedBy: who }
   }
+  const appsMove = !!d.appIds && !sameApps(d.appIds, p.appIds)
+  const nameMoves = !!d.name && d.name !== p.name
   /* Saving a draft identical to what is live keeps nothing worth keeping. */
-  if (same(ruleSet(p), d)) return { ...p, pendingDraft: undefined }
-  return { ...p, pendingDraft: { rules: d.rules, fallback: d.fallback, savedAt: when, savedBy: who } }
+  if (same(ruleSet(p), d) && !appsMove && !nameMoves) return { ...p, pendingDraft: undefined }
+  return {
+    ...p,
+    pendingDraft: {
+      rules: d.rules,
+      fallback: d.fallback,
+      ...(appsMove && d.appIds ? { appIds: [...d.appIds] } : null),
+      ...(nameMoves ? { name: d.name } : null),
+      savedAt: when,
+      savedBy: who,
+    },
+  }
 }
 
 /** Publishing makes the draft live and ends it. */

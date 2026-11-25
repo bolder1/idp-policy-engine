@@ -231,8 +231,9 @@ The builder is drawn as one of five builds, each the one before plus a named pie
 - `SINCE` names the first version of each piece, and `useShows(feature)` reads it where the piece's door is. Nothing is removed from the code: a higher version brings the piece back as it was.
 - **Locked, it is V0.** Whatever was stored, a locked builder is V0 and the switch is not drawn, so nothing on screen says there are versions (owner: "don't let the developer know what the current version is").
 - **Ctrl+P** asks for a password. Once it is right, a Builder version dropdown sits in the bar (`BuilderVersionSwitch.tsx`, mounted in `BoardBar.tsx`). Its last row, **Lock again**, goes back to V0 and hides the switch, and Ctrl+P does the same.
+- **Hide** (Design only, rollout.ts `hideSwitches`), the row above Lock again, puts the Draft model and Builder version switches away together and keeps every pick in force. **Ctrl+Shift+P** hides them and brings them back. Locking clears it, so the next unlock shows the switches.
 - Only the password's SHA-256 is in the repository, which is public. Never write the password into a tracked file. It is a door for a walkthrough, not security.
-- The choice and the lock are kept in localStorage (`idp.builder.version`, `idp.builder.unlocked`). Restore both after a browser check.
+- The choice, the lock and Hide are kept in localStorage (`idp.builder.version`, `idp.builder.unlocked`, `idp.builder.switchesHidden`). Restore all three after a browser check.
 - **The server render is Full, unlocked**, so the tests (static markup) see the whole builder and the switch.
 
 ### Screens and popups

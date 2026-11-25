@@ -30,7 +30,11 @@ export function StatusControl({
   onRevealRule,
   onOpenBreakIn,
   turnOnAsk,
+  still = false,
 }: {
+  /** A plain pill, no menu: the switches are in the builder's ⋯ (rollout.ts `statusInMenu`). The dialog stays, for the
+      toast's Make active (`turnOnAsk`). */
+  still?: boolean
   policyId: string
   edits?: RuleSet
   /** The board: counts up each time the toast after a first save is pressed on Turn on. It asks for the same switch the menu's row does. */
@@ -113,6 +117,14 @@ export function StatusControl({
   if (!policy) return null
   if (movedState.review) return <ReviewBadge review={movedState.review} />
   if (options.length === 0) return <StatusPill status={policy.status} />
+  if (still)
+    return (
+      <>
+        <StatusPill status={policy.status} />
+        {movedState.rolledBack && <RolledBackBadge />}
+        {dialog}
+      </>
+    )
 
   const onMenuKey = (e: React.KeyboardEvent) => {
     const list = items()

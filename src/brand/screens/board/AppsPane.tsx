@@ -59,16 +59,20 @@ export function AppsPane({
   policyId,
   onSaved,
   onCancel,
+  toDraft,
 }: {
   policyId: string
   /** After a save: the board closes the pane. */
   onSaved?: () => void
   /** Cancel: the picks are dropped and the board closes the pane, as its × does. */
   onCancel?: () => void
+  /* "View and edit" (draft-model.ts, owner 24 Nov 2026): the applications join the draft. The pane edits the draft's
+     list and saves nothing; Save draft and Save and publish do, and the checks run at the publish. */
+  toDraft?: { appIds: string[]; apply: (ids: string[]) => void }
 }) {
   const store = useBrand()
   const saved = store.policyById(policyId)
-  const [picked, setPicked] = useState<string[]>(saved?.appIds ?? [])
+  const [picked, setPicked] = useState<string[]>(toDraft?.appIds ?? saved?.appIds ?? [])
   const [aud, setAud] = useState<Audience | null>(null)
   const appsGuard = useAppsGuard()
   /* Undo on a ready fix's toast. It runs after later renders, so it reads the
@@ -112,6 +116,50 @@ export function AppsPane({
         }}
       />
     )
+
+  if (toDraft) {
+    const same = picked.length === toDraft.appIds.length && picked.every((id) => toDraft.appIds.includes(id))
+    return (
+      <div className="bb__apps">
+        <section className="bb__sec bb__apps__sec" aria-label="Applications">
+          <div className="bb__sec__body bb__apps__body">
+            <AppTransfer
+              apps={store.apps}
+              picked={picked}
+              onChange={setPicked}
+              takenBy={(id) => (picked.includes(id) ? undefined : ownerOf(id, store.policies, saved.id)?.name)}
+              /* The reason under the field (owner, 24 Nov 2026: no application, draft only). */
+              emptyNote={picked.length === 0 ? <p className="bb__apps__note">A policy with no application can only be saved as a draft.</p> : null}
+            />
+          </div>
+        </section>
+        <div className="bb__apps__foot">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setPicked(toDraft.appIds)
+              onCancel?.()
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={same}
+            title={same ? 'No changes' : undefined}
+            onClick={() => {
+              toDraft.apply(picked)
+              onSaved?.()
+            }}
+          >
+            Apply
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   const appName = (id: string) => store.appById(id).name
   const audience = aud ?? saved.audience

@@ -7,6 +7,7 @@ import { FaceStack, type FaceItem } from '../../faces'
 import { conditionName, conditionType, zoneScopeOf, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import { postActionLabel } from '../../post-sign-in'
+import { daysWords, hoursWords, scheduleGroups, zoneWords } from '../../schedule'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
 import { isPristine } from './parts'
@@ -196,6 +197,13 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
   const vals = c.values.filter(Boolean)
   if (vals.length === 0) return [{ text: 'no value', unset: true }]
   if (t.valueKind === 'time') return [{ text: `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`, unset: false }]
+  /* Sign-in time: a chip per set of days that share hours, then the zone — which the hours chip above never showed, so
+     a Kolkata window and a Berlin one read the same (schedule.ts). */
+  if (t.valueKind === 'schedule')
+    return [
+      ...scheduleGroups(vals).map((g) => ({ text: `${daysWords(g.days)} ${hoursWords(g.hours)}`, unset: false })),
+      { text: zoneWords(c.tz), unset: false },
+    ]
   /* A typed number, with what it counts: "8 hours", "1000 records". */
   if (t.valueKind === 'number') return [{ text: `${vals[0]}${t.unit ? ` ${t.unit}` : ''}`, unset: false }]
   if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'group' || t.valueKind === 'user')
@@ -323,7 +331,8 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
           agrees with it. `pristine` is cleared by the first `decision` patch,
           so this line goes the moment a tile is pressed. The default at the
           foot of the chain never carries the flag, and `control` is its editor. */}
-      {rule.pristine === true && !control ? (
+      {/* `outcomeOpen` too (rule-gaps.ts): it outlives a who or a condition, and only an outcome pressed clears it. */}
+      {(rule.pristine === true || rule.outcomeOpen === true) && !control ? (
         <IfSub className="bb__ifaction">
           {token}
           <span className="bb__ifkw is-blank">Outcome not chosen yet</span>

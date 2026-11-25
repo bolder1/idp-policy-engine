@@ -1,6 +1,7 @@
 import {
   Activity,
   Banknote,
+  CalendarClock,
   CalendarDays,
   ChartColumn,
   Clock,
@@ -96,6 +97,8 @@ const COND_ICON: Record<string, LucideIcon> = {
      the pair most easily mistaken for one another; two clocks made the list
      read as one attribute drawn twice. */
   day: CalendarDays,
+  /* The two as one (schedule.ts): the day and the clock in one mark, as the Access time family pill draws it. */
+  schedule: CalendarClock,
   'user-attr': Tag,
   'custom-attr': ListFilter,
   'device-risk': Gauge,
@@ -148,6 +151,7 @@ const COND_TONE: Record<string, string> = {
   webhook: 'magenta',
   time: 'notice',
   day: 'notice',
+  schedule: 'notice',
   'user-attr': 'lime',
   'custom-attr': 'lime',
   'device-risk': 'positive',

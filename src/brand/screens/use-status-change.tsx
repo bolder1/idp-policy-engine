@@ -1,10 +1,11 @@
-import { monitorOffered } from './status-options'
+import { ACTIVE_WORDS, monitorOffered } from './status-options'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 import { Confirm } from '../kit'
 import { appsOf, enforces, type Policy, type PolicyStatus } from '../data'
 import { guardSignIns } from '../draft-checks'
+import { RULE_GAPS, policyGaps, type RuleGap } from './board/rule-gaps'
 import { commitToast, lastSaved, monitorBlocker, published, sameRules, turnOnBlocker, type RuleSet } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
 import { isPostSignIn, turnOnIssue } from '../post-sign-in'
@@ -16,6 +17,7 @@ import { editsTip, isStale, overridePatch, patchSignIns, tryRunGuard, guardOpens
 import { SAMPLE_DAY, monitorRows, monitorSamples, planOf, type MonitorPlan } from './monitor-sample'
 import { MonitoringPage } from './monitoring-page'
 import { useSimEnv } from './sim-env'
+import { useViewEdit } from './board/draft-model'
 import {
   asksFirst,
   guardFor,
@@ -119,9 +121,18 @@ export interface StatusChangeOptions {
   /* The board: the Break-in row's Open pushes
      the test inside the board's own test panel (final spec, D.3). */
   onOpenBreakIn?: () => void
+  /* The board: Make active refused because a rule has an empty part (board/rule-gaps.ts). The board says each reason
+     under its field; elsewhere a toast names the policy with Open policy. */
+  onGaps?: (gaps: readonly RuleGap[]) => void
 }
 
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
+
+/** "View and edit": Make active on a sign-in draft with an application publishes it (draft-model.ts `useViewEdit`). */
+export function draftActivates(p: Pick<Policy, 'status' | 'isSystem' | 'appIds' | 'type' | 'movedFrom'>, target: StatusTarget, viewEdit: boolean): boolean {
+  /* Not a migrated draft in review: Publish waits for Approve there. */
+  return viewEdit && target === 'active' && p.status === 'draft' && !p.isSystem && p.type !== 'Session' && !p.movedFrom?.length && p.appIds.length > 0
+}
 
 /* `confirmed`: the admin has already answered this switch in a dialog of the caller's own (the shared policy's scope
    dialog, status-scope-dialog.tsx), so the one-line confirm is not asked a second time. Nothing else is skipped: a
@@ -141,6 +152,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
   const store = useBrand()
   const env = useSimEnv()
   const resolve = useNameLookup()
+  const viewEdit = useViewEdit()
   const [ask, setAsk] = useState<Ask | null>(null)
   /* Separate from `ask`, so the dialog keeps its words while it animates out. */
   const [open, setOpen] = useState(false)
@@ -176,7 +188,9 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
     else store.setPolicyStatus(policy.id, target)
     if (target === 'active') playCue('publish')
     const { text, undo } = statusToast(policy.name, policy.status, target)
-    store.showToast(text, undo ? { label: 'Undo', run: () => store.setPolicyStatus(policy.id, undo) } : undefined)
+    /* Active and inactive in words where "View and edit" is on (5 Nov ruling); the other models keep their toast. */
+    const said = viewEdit && target !== 'monitor' ? `${policy.name} is ${target === 'active' ? 'active' : 'inactive'}` : text
+    store.showToast(said, undo ? { label: 'Undo', run: () => store.setPolicyStatus(policy.id, undo) } : undefined)
   }
 
   /* Blocking errors on a version's rules, counted on the rules that run. */
@@ -213,7 +227,9 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
   const editsNow = (policy: Policy, given?: RuleSet): Pick<GuardAsk, 'edits' | 'editsFrom' | 'fixes'> => {
     const draft = policy.pendingDraft
     if (given) return { edits: given, editsFrom: 'board', fixes: 0 }
-    if (draft) return { edits: { rules: draft.rules, fallback: draft.fallback }, editsFrom: 'draft', fixes: 0 }
+    /* "View and edit": Make active is pressed in the view, on the published version; the saved draft waits for its own
+       Save and publish (owner, 24 Nov 2026), so it is not offered as the version to make active. */
+    if (draft && !viewEdit) return { edits: { rules: draft.rules, fallback: draft.fallback }, editsFrom: 'draft', fixes: 0 }
     return { edits: null, editsFrom: null, fixes: 0 }
   }
 
@@ -240,9 +256,29 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
     }
   }
 
+  /* What a rule leaves empty in the version that would go live: the board's edits, else a saved draft, else the
+     stored rules (board/rule-gaps.ts, every line). Make active never puts one live (23 Nov 2026 audit). */
+  const gapsToGoLive = (policy: Policy, rules: RuleSet | null): RuleGap[] =>
+    RULE_GAPS ? policyGaps(rules ?? { rules: policy.rules, fallback: policy.fallback }, isPostSignIn(policy)) : []
+  const refuseGaps = (policy: Policy, gaps: readonly RuleGap[]) => {
+    if (options.onGaps) return options.onGaps(gaps)
+    const screen = store.screen
+    const here = (screen.name === 'board' || screen.name === 'builder') && screen.policyId === policy.id
+    const open = { label: 'Open policy', run: () => store.go({ name: 'board', policyId: policy.id }) }
+    store.showToast(`${policy.name} has a rule that is not finished.`, here ? undefined : open, { tone: 'warning' })
+  }
+
   const request = (given: Policy, target: StatusTarget, opts: StatusRequestOptions = {}) => {
-    const policy = store.policyById(given.id) ?? given
+    const stored = store.policyById(given.id) ?? given
+    /* "View and edit" (draft-model.ts, owner 24 Nov 2026): Make active on a sign-in draft that has an application
+       publishes it and makes it active in one confirm. It meets every check an inactive policy meets on the way, so it
+       goes the same way as one; the store writes the draft straight to active. */
+    const policy: Policy = draftActivates(stored, target, viewEdit) ? { ...stored, status: 'inactive' } : stored
     const unsaved = options.unsaved === true
+    if (target === 'active') {
+      const left = gapsToGoLive(policy, editsNow(policy, opts.edits ?? options.edits).edits)
+      if (left.length > 0) return refuseGaps(policy, left)
+    }
 
     /* A post sign-in policy (post-sign-in.ts) has no sign-in checks to run.
        Turning it on with a rule or "Nothing else matched" left without an
@@ -397,7 +433,7 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
           onClose={close}
           tone="error"
           shape="hero"
-          title={target === 'monitor' ? "Can't monitor this policy" : "Can't turn on this policy"}
+          title={target === 'monitor' ? "Can't monitor this policy" : ACTIVE_WORDS ? "Can't make this policy active" : "Can't turn on this policy"}
           blocked={!fixIt}
           cancelLabel="Close"
           destructive={false}
@@ -496,6 +532,9 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
       shut()
       if (g.kind === 'turn-off') return commit(stored, 'inactive')
       if (g.kind === 'to-monitor') return commit(stored, 'monitor')
+      /* Again at the press: the rules can have changed under the page (a toast's Undo, a fix taken back). */
+      const left = gapsToGoLive(stored, g.version === 'edits' ? g.edits : null)
+      if (left.length > 0) return refuseGaps(stored, left)
       if (g.version === 'edits' && g.edits) {
         /* With the edits: saved and turned on in one write. A saved draft ends
            with it when it is what turned on; a fix made on the stored version

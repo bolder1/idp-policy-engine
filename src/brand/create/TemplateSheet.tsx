@@ -16,7 +16,7 @@ import { useBrand, useNameLookup } from '../store'
 import { copySources } from '../screens/board/copy-rules'
 import { scenarioFromPolicy } from '../template-from-policy'
 import { TEMPLATES_MANAGED } from '../template-phase'
-import { canSaveAsTemplate } from '../screens/status-options'
+import { canSaveAsTemplate, policyTemplateHold } from '../screens/status-options'
 import { buildTemplate, type TemplateLibrary } from '../screens/board/apply-template'
 import type { WhoDirectory } from '../rule-who'
 import { TEMPLATE_CATEGORIES } from '../template-phase'
@@ -137,6 +137,8 @@ export function TemplateSheet({
   const savedOf = (p: Policy) => {
     if (!canSaveAsTemplate(p)) return undefined
     const own = store.scenarios.find((s) => !s.provided && s.fromPolicy === p.id)
+    /* Nothing to hand on yet (status-options.ts `templateHold`): no save toggle, unless it is a template already. */
+    if (!own && policyTemplateHold(p)) return undefined
     const toggle = () => {
       if (own) {
         store.removeScenario(own.id)

@@ -14,6 +14,7 @@ import { CardWord, CheckPills, DecidesPill, OutcomeNode, RuleOutcome, StartSignI
 import { cardTone, checkPills, outcomeOf } from '../testing/trace-pills'
 import type { Selection } from './model'
 import { UNREACHABLE_CODES } from './parts'
+import { RULE_GAPS, gapsOf } from './rule-gaps'
 import type { CardHighlight } from './card-highlight'
 import { RuleCard, TerminalCard, type CardRoute, type RunCard } from './RuleCard'
 import { WhichGate } from './RouteGate'
@@ -797,7 +798,8 @@ export function Board({
      come from, and a rule with no action yet needs setup — it keeps the
      policy a draft (post-sign-in.ts `turnOnIssue`). */
   const post = usePostBoard().on
-  const stateOf = (r: Rule, i: number) => (post && r.enabled && !r.action ? 'setup' : ruleState(diagsFor(i)))
+  /* A rule a save would refuse for an empty part is Incomplete, never Complete (rule-gaps.ts; 23 Nov 2026 audit). */
+  const stateOf = (r: Rule, i: number) => (post && r.enabled && !r.action ? 'setup' : RULE_GAPS && gapsOf(r, r.id, false, post).length > 0 ? 'setup' : ruleState(diagsFor(i)))
   const noteOf = (r: Rule, i: number) =>
     post && r.enabled && !r.action
       ? 'No action chosen'

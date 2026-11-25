@@ -193,3 +193,11 @@
 .bxc__list .bxl__row.is-used:hover { background: none; }
 .bxc__list .bxl__row.is-used em { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bxl__list > li.bxt__miss { border-bottom: 0; }
+/* "View and edit" (owner, 24 Nov 2026): every application has a policy, so the list is this one muted line and the fold
+   under it. The picker's empty words (`.bxc__none`), in line with the rows' logos. */
+.bxl__list > li.bxt__none {
+  padding: var(--space-4) var(--space-4) 0;
+  border-bottom: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}

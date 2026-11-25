@@ -1,5 +1,7 @@
 import { cond, splitPick, emptyGroup, pruneScopes, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
+import { shows } from './rollout'
 import { cardJoin, ckey, drawsAsBracket, topJoin } from './predicate'
+import { DEFAULT_SCHEDULE, SCHEDULE } from './schedule'
 import type { Joiner } from './data'
 
 /* -----------------------------------------------------------------------------
@@ -137,7 +139,9 @@ export function retypeCondition(w: Predicate, conditionId: string, typeId: strin
      does not own cannot survive by being forgotten here. */
   const { typeId: id, key } = splitPick(typeId)
   if (isLegacyWhoType(id)) return w
-  return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId: id, operator: firstOperator, values: [], ...(key ? { key } : {}) } : c))
+  /* Sign-in time arrives holding the week its row shows (schedule.ts), as it does when it is added. */
+  const values = id === SCHEDULE ? [...DEFAULT_SCHEDULE] : []
+  return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId: id, operator: firstOperator, values, ...(key ? { key } : {}) } : c))
 }
 
 /* Which half of ONE of its zones a condition tests. The one writer for
@@ -389,9 +393,14 @@ export function setOuterJoin(w: Predicate, join: Joiner): Predicate {
   return next
 }
 
+/* A new Sign-in hours window holds the times its row shows, 09:00 to 17:00, where `ruleGaps` is on (rule-gaps.ts): it
+   was stored empty while the row printed those two defaults, so the save refused a window that looked filled in
+   (23 Nov 2026 audit). */
+const SEED_TIME = shows('ruleGaps')
+
 /** A fresh, unset condition of a type — what every "add" route inserts. */
 export const freshCondition = (typeId: string, firstOperator: string) => {
   const { typeId: id, key } = splitPick(typeId)
-  const c = cond(id, firstOperator, [])
+  const c = cond(id, firstOperator, SEED_TIME && id === 'time' ? ['09:00', '17:00'] : id === SCHEDULE ? [...DEFAULT_SCHEDULE] : [])
   return key ? { ...c, key } : c
 }

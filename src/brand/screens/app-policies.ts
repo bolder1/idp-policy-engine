@@ -1,6 +1,7 @@
 import { coversEveryApp, enforces, type App, type Group, type Policy, type User } from '../data'
 import { isPostSignIn } from '../post-sign-in'
-import { withoutApps } from '../policy-draft'
+import { asStored, withoutApps } from '../policy-draft'
+import { removeLeavesActiveEmpty } from './board/draft-model'
 import { listNames } from '../rule-who'
 /* A cycle, and a harmless one: app-standing reads `policiesForApp` from here
    and `summarise` and the delete lines below read `appStanding` from there,
@@ -438,6 +439,37 @@ export function detachFrom(p: Policy, appId: string): Policy {
   if (p.isSystem) throw new Error('detachFrom: the tenant default has no application to remove')
   const appIds = p.appIds.filter((id) => id !== appId)
   return appIds.length === 0 ? { ...p, appIds, status: withoutApps(p.status) } : { ...p, appIds }
+}
+
+/* "View and edit" (draft-model.ts, owner 24 Nov 2026): a policy with no application is only ever a draft, and an active
+   policy keeps its application. So taking the last one off is refused while the policy is active (null: make it
+   inactive first), and off an inactive one the policy goes back to being a draft, its saved draft folded in as
+   `asStored` does. A post sign-in policy is independent of applications and keeps its status. */
+export function detachViewEdit(p: Policy, appId: string): Policy | null {
+  if (p.isSystem) throw new Error('detachViewEdit: the tenant default has no application to remove')
+  if (removeLeavesActiveEmpty(p, appId)) return null
+  return withAppsViewEdit(p, p.appIds.filter((id) => id !== appId))
+}
+
+/** The same rule for a whole new list (the Policies page's Applications dialog): null when it would empty an active policy. */
+export function withAppsViewEdit(p: Policy, appIds: string[]): Policy | null {
+  const next = { ...p, appIds, pendingDraft: draftAppsFollow(p, appIds) }
+  if (p.isSystem || isPostSignIn(p) || appIds.length > 0) return next
+  if (p.appIds.length > 0 && (p.status === 'active' || p.status === 'monitor' || p.status === 'always-on')) return null
+  /* A policy that becomes a draft has no applications of its own any more, and its saved draft's list goes with them. */
+  return asStored({ ...next, status: 'draft', pendingDraft: next.pendingDraft && { ...next.pendingDraft, appIds: undefined } })
+}
+
+/* A saved draft that holds its own applications ("View and edit") follows a change made outside it: what was taken off
+   the policy comes off the draft's list, and what was added goes on it. A list that ends as the policy's own is dropped. */
+function draftAppsFollow(p: Policy, appIds: string[]): Policy['pendingDraft'] {
+  const d = p.pendingDraft
+  if (!d?.appIds) return d
+  const removed = p.appIds.filter((id) => !appIds.includes(id))
+  const added = appIds.filter((id) => !p.appIds.includes(id))
+  const mine = [...d.appIds.filter((id) => !removed.includes(id)), ...added.filter((id) => !d.appIds?.includes(id))]
+  const same = mine.length === appIds.length && mine.every((id) => appIds.includes(id))
+  return { ...d, appIds: same ? undefined : mine }
 }
 
 

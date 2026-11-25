@@ -369,6 +369,8 @@ fieldset.bz7__rangecol:has(.bx-picker__trigger.is-open) {
   border: 1px solid var(--border-default); border-radius: var(--radius-md);
   box-shadow: var(--el-high);
 }
+/* Over the sticky save bar (z 20), under popovers and dialogs (rollout `zonesHitsOverBar`). */
+.bz7__combo.is-over-bar > .bz7__hits { z-index: var(--z-dropdown); }
 .bz7__hit {
   display: flex; align-items: center; gap: 9px; width: 100%;
   padding: 7px 9px; border-radius: var(--radius-sm);

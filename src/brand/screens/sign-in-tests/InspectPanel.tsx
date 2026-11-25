@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { DEFAULT_DENY_MESSAGE, TENANT_DENY_CONTACT, audienceSummary, blankPolicy, type AccessDecision, type Policy, type Rule } from '../../data'
+import { DEFAULT_DENY_MESSAGE, TENANT_DENY_CONTACT, blankPolicy, type AccessDecision, type Policy, type Rule } from '../../data'
 import { GRANT_ENDED, dateSaid } from './temp-access'
 import { DecisionBadge } from '../../decision-badge'
 import { DECISION_WORDS } from '../../decision-words'
@@ -32,13 +32,13 @@ import type { Selection } from '../board/model'
 import { IfBlock } from '../board/IfBlock'
 import { useDraftDiff } from '../board/use-lines'
 import { containWhileScrolling } from '../scroll-contain'
-import { readFoot, storedVersions } from '../board/read-as-text'
+import { storedVersions } from '../board/read-as-text'
 import type { EngineRun } from './engine-run'
 import { FATE_WORDS, PEEK_FALLBACK, SEE_TITLE, evidenceOf, isPeek, ruleList, ruleOf, targetLabel, type Evidence, type InspectTarget, type PeekTarget, type RuleFate, type RuleListRow, type SeeRun } from './inspect-model'
 import { factsOf } from './inspect-facts'
 import { objectsOfRule, peekNames, PEEK_LIBRARY } from './peek-model'
-import { AppsPeek } from '../apps-peek'
-import { Block, CountTip, Facts, Hero, KindMark, PeekPage } from './PeekViews'
+import { Block, Facts, Hero, KindMark, PeekPage } from './PeekViews'
+import { policyFacts } from './policy-facts'
 import { PANEL_SLIDE as SLIDE } from './sign-in-card'
 import { seeSteps } from './see-model'
 import { Face } from '../../faces'
@@ -281,6 +281,21 @@ const rowKey = (id: string | null) => id ?? 'last'
 /** No run on screen (the Policies list's details panel): no rule has a fate, and nothing is said about a sign-in. */
 const NO_RUN: Pick<EngineRun, 'decider' | 'rules'> = { decider: null, rules: [] }
 
+/** The overview card alone: Policy details' head, without a run (BoardBar.tsx `PolicyCard` draws it on the name).
+ *  `status` false leaves the pill off, where the status is said beside it already. */
+export function PolicyHero({ policy, onApps, status = true }: { policy: Policy; onApps?: () => void; status?: boolean }) {
+  const brand = useBrand()
+  return (
+    <Hero
+      target={{ kind: 'policy', policyId: policy.id }}
+      kicker={policy.isSystem ? 'Default policy' : 'Policy'}
+      name={policy.name}
+      badge={status ? <StatusPill status={policy.status} /> : undefined}
+      facts={policyFacts(policy, brand, onApps)}
+    />
+  )
+}
+
 /* The policy's page. `plan` null is the page without a sign-in — the Policies list's details panel (owner, 6 Oct 2026:
    "add the Policy details view here as well, with an Open in builder"): the overview card and the rules, no verdict. */
 export function PolicyPage({
@@ -329,31 +344,8 @@ export function PolicyPage({
     onOpenOne(ids.length === 1 ? (ids[0] === 'last' ? null : ids[0]) : undefined)
   }, [open, onOpenOne])
   if (!policy) return <p className="insp__gone">This policy is no longer there.</p>
-  const audience = policy.isSystem ? 'Everyone' : audienceSummary(policy.audience, groups, users).label || 'Nobody'
-  /* Its groups and people by name, under the pointer (`CountTip`); everyone has no list. */
-  const audienceLists =
-    policy.isSystem || policy.audience.everyone
-      ? []
-      : [
-          { kind: 'Groups', names: policy.audience.groupIds.map((id) => groups.find((g) => g.id === id)?.name ?? 'A deleted group') },
-          { kind: 'People', names: policy.audience.userIds.map((id) => users.find((u) => u.id === id)?.name ?? 'A deleted person') },
-        ]
   const decided = plan?.decider?.id === policy.id
   const by = decided && !depends ? list.find((r) => r.fate === 'decided') : undefined
-  const changed = readFoot(policy).split(' · ').slice(1).join(' · ')
-  const appsSaid = policy.isSystem ? (
-    'Every application'
-  ) : policy.appIds.length === 0 ? (
-    'None'
-  ) : (
-    /* One: its name. More: the Policies table's marks and list under the pointer (owner, 7 Oct 2026). */
-    <AppsPeek
-      apps={policy.appIds.flatMap((id) => apps.find((x) => x.id === id) ?? [])}
-      policyName={policy.name}
-      onEdit={onEdit && !preview ? () => onEdit({ kind: 'policy', policyId: policy.id }) : undefined}
-    />
-  )
-  const audienceNames = audienceLists.flatMap((l) => l.names)
   const toggle = (k: string) =>
     setOpen((cur) => {
       const next = new Set(cur)
@@ -368,11 +360,7 @@ export function PolicyPage({
         kicker={policy.isSystem ? 'Default policy' : 'Policy'}
         name={policy.name}
         badge={<StatusPill status={policy.status} />}
-        facts={[
-          { label: 'Applications', value: appsSaid, },
-          { label: 'Audience', value: audienceNames.length === 1 ? audienceNames[0] : <CountTip label={audience} lists={audienceLists} /> },
-          ...(changed ? [{ label: 'Last change', value: changed, wide: true }] : []),
-        ]}
+        facts={policyFacts(policy, { apps, groups, users }, onEdit && !preview ? () => onEdit({ kind: 'policy', policyId: policy.id }) : undefined)}
         strip={
           !plan ? undefined : depends ? (
             <Verdict tone="notice" icon={CircleHelp} title="Depends" line={dependsLine(waitingOn(list), plan.outcome.view.needs)} onPreview={onPreview} />

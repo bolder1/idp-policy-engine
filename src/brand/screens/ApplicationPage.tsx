@@ -38,7 +38,7 @@ import { useNewPolicy } from '../create/use-new-policy'
 import { playCue } from '../sound'
 import { AddExistingPolicy } from './AddExistingPolicy'
 import { AppPostSignInTab } from './AppPostSignIn'
-import { FallbackRow, RemoveDialog } from './AppProtection'
+import { FallbackRow, OnlyAppRefusal, RemoveDialog } from './AppProtection'
 import { appTypeOf, buildApp, catalogEntry, newAppId, newAppName, startingSetup, type CatalogApp } from './app-catalog'
 import {
   TAB_LABEL,
@@ -54,12 +54,13 @@ import {
   type NewDraft,
 } from './app-page-model'
 import { AppGroupsTab, AppUsersTab } from './app-people-tabs'
-import { REMOVE_RUNS_CHECKS, REPLACE_IN_POPUP, REPLACE_MAKES_DRAFT, REPLACE_RUNS_CHECKS, attachTo, attachableTo, deleteFacts, detachFrom } from './app-policies'
+import { REMOVE_RUNS_CHECKS, REPLACE_IN_POPUP, REPLACE_MAKES_DRAFT, REPLACE_RUNS_CHECKS, attachTo, attachableTo, deleteFacts, detachFrom, detachViewEdit } from './app-policies'
 import { DeleteFactsLine } from './app-facts'
 import { SetupTabBody, type SetupPatch } from './app-setup-forms'
 import { appStanding, type StandRow } from './app-standing'
 import { addToApp, removeFromApp, replaceOnApp } from './applications-model'
 import { useAppsGuard } from './board/apps-guard'
+import { useViewEdit } from './board/draft-model'
 import { SENT_TO_BOARD, arriveFromBoard, sendToBoard } from './board-return'
 import { ConfirmDelete } from './confirm-delete'
 import { GuardDrawer } from './guard-page'
@@ -575,8 +576,11 @@ function PoliciesTab({
   const spent = useRef<{ from: string; to: string } | null>(null)
   const [removing, setRemoving] = useState<Policy | null>(null)
   const [deleting, setDeleting] = useState<{ policy: Policy; open: boolean } | null>(null)
+  /* "Can't remove the only application" (AppProtection.tsx `OnlyAppRefusal`): kept while it animates out. */
+  const [refusing, setRefusing] = useState<{ policy: Policy; open: boolean } | null>(null)
   const statusChange = useStatusChange()
   const appsGuard = useAppsGuard()
+  const viewEdit = useViewEdit()
   const view = useRef<HTMLDivElement | null>(null)
 
   /* The policy's heading (app-policy-view.tsx), which carries its id. */
@@ -769,13 +773,24 @@ function PoliciesTab({
   const swapFrom = swapping && replacing && swapping.from === replacing.id ? replacing : null
   const swapTo = swapping ? (store.policyById(swapping.to) ?? null) : null
   const takeOff = (policyId: string) => {
-    if (removeFromApp(store, policyId, app)) focusHead()
+    if (removeFromApp(store, policyId, app, { viewEdit })) focusHead()
+  }
+  /* "View and edit" (board/draft-model.ts, owner 24 Nov 2026): an active policy keeps its application, so taking its
+     only one off is refused, before any confirm, with Make inactive as the way on. Read from the store at the press.
+     True when it refused. */
+  const refusesRemove = (policyId: string): boolean => {
+    if (!viewEdit) return false
+    const live = store.policyById(policyId)
+    if (!live || live.isSystem || detachViewEdit(live, app.id) !== null) return false
+    setRefusing({ policy: live, open: true })
+    return true
   }
   /* The confirm is the whole of it now (app-policies.ts `REMOVE_RUNS_CHECKS`): it has already named what
      becomes of the policy and who moves to which policy, so the press writes. */
   const detach = (policyId: string) => {
     const live = store.policyById(policyId)
     if (!live || live.isSystem) return
+    if (refusesRemove(policyId)) return
     if (!REMOVE_RUNS_CHECKS || !appsGuard.guards(live)) return takeOff(policyId)
     appsGuard.check(live, detachFrom(live, app.id).appIds, () => takeOff(policyId))
   }
@@ -811,6 +826,7 @@ function PoliciesTab({
   /* A policy that decides for nobody here comes off at once, with Undo. One
      that decides for somebody asks first, and says who moves where. */
   const remove = (row: StandRow) => {
+    if (refusesRemove(row.policy.id)) return
     if (row.state === 'decides') setRemoving(row.policy)
     else detach(row.policy.id)
   }
@@ -913,6 +929,13 @@ function PoliciesTab({
           if (removing) detach(removing.id)
           setRemoving(null)
         }}
+      />
+      <OnlyAppRefusal
+        policy={refusing?.policy ?? null}
+        open={!!refusing?.open}
+        app={app}
+        onClose={() => setRefusing((r) => (r ? { ...r, open: false } : r))}
+        onMakeInactive={(p) => statusChange.request(p, 'inactive')}
       />
       {deleting && (
         <ConfirmDelete

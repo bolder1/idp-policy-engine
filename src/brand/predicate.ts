@@ -185,7 +185,10 @@ const scopeSegment = (c: Condition) =>
         .sort()
         .join(',')
     : ''
-export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}|${scopeSegment(c)}`
+/* A Sign-in time's zone is part of what it asks (schedule.ts): Mon–Fri 09:00–18:00 in Kolkata and in Berlin are two
+   different conditions, and `mergeBranches` drops a twin. Only for that type, so every other key is byte-identical. */
+const zoneSegment = (c: Condition) => (c.typeId === 'schedule' && c.tz ? `|${c.tz}` : '')
+export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}|${scopeSegment(c)}${zoneSegment(c)}`
 
 /* The canonical identity of a whole predicate, and the product's single audit
    primitive. Conditions inside a card sort; cards sort among themselves. So it

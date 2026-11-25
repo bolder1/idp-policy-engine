@@ -434,9 +434,10 @@ describe('where it stands', () => {
   })
 
   it('beside the rule panel, the rule panel stays open and the canvas editable', () => {
-    expect(builderSrc).toContain('const inspBlocked = (describeOpen && !guidedBeside) || movedLocked')
+    /* Fix's Live view (draft-model.ts) blocks the panel and the canvas as well. */
+    expect(builderSrc).toContain('const inspBlocked = (describeOpen && !guidedBeside) || movedLocked || liveView')
     expect(builderSrc).toContain('const canvasLocked = (describeOpen && !guidedBeside) || movedLocked')
-    expect(builderSrc).toContain("onMove={(from, to) => (canvasLocked ? undefined : move(from, to))}")
+    expect(builderSrc).toContain("onMove={(from, to) => (canvasLocked || liveView ? undefined : move(from, to))}")
   })
 })
 

@@ -34,6 +34,7 @@ import { isPristine, stateLabel } from './parts'
 import { postActionLabel } from '../../post-sign-in'
 import { postTone, usePostBoard } from './post-board'
 import { RULE_ON_OFF } from './bar-tools'
+import { useRuleGaps } from './rule-gaps'
 import { useShows } from './builder-version'
 
 /* -----------------------------------------------------------------------------
@@ -155,7 +156,7 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
         </span>
         <span className="bb__cardsum__n">Every sign-in</span>
         <ArrowRight size={11} strokeWidth={2} aria-hidden />
-        <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
+        {rule.outcomeOpen ? <span className="bb__ifkw is-blank">Outcome not chosen yet</span> : <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>}
       </div>
     )
   }
@@ -181,7 +182,7 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
         </>
       )}
       <ArrowRight size={11} strokeWidth={2} aria-hidden />
-      <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
+      {rule.outcomeOpen ? <span className="bb__ifkw is-blank">Outcome not chosen yet</span> : <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>}
     </div>
   )
 }
@@ -336,7 +337,9 @@ export function RuleCard({
      is chosen, and is marked while a refused Turn on is about it (post-board.ts). */
   const postBoard = usePostBoard()
   const tone = postBoard.on ? postTone(rule.action) : TONE[rule.decision]
-  const refused = postBoard.refusal?.at === rule.id
+  /* And while a refused save has a part of this rule left empty (rule-gaps.ts). */
+  const gapsShown = useRuleGaps()
+  const refused = postBoard.refusal?.at === rule.id || gapsShown.some((g) => g.at === rule.id)
   const titleId = `${idPrefix}bb-rule-${rule.id}-title`
   const bodyId = `${idPrefix}bb-rule-${rule.id}-body`
   const saidId = `${idPrefix}bb-rule-${rule.id}-said`
@@ -686,7 +689,8 @@ export function TerminalCard({
 }) {
   const postBoard = usePostBoard()
   const tone = postBoard.on ? postTone(rule.action) : TONE[rule.decision]
-  const refused = postBoard.refusal?.at === 'fallback'
+  const gapsShown = useRuleGaps()
+  const refused = postBoard.refusal?.at === 'fallback' || gapsShown.some((g) => g.at === 'fallback')
   const ringed = useCardHighlighted(highlight, 'fallback') || traced
   const titleId = `${idPrefix}bb-terminal-title`
   const bodyId = `${idPrefix}bb-terminal-body`

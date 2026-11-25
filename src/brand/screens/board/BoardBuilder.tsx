@@ -1,9 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, History as PastIcon, Keyboard, ListChecks, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Redo2, ShieldAlert, Trash2, Undo2, Users, Wrench, type LucideIcon } from 'lucide-react'
+import { Check, ChevronsDownUp, ChevronsUpDown, CircleCheck, CirclePause, CopyPlus, Eye, History as PastIcon, Keyboard, ListChecks, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Radar, Redo2, ShieldAlert, Trash2, Undo2, Users, Wrench, type LucideIcon } from 'lucide-react'
 
-import { Confirm, Modal, Tip } from '../../kit'
+import { Confirm, Modal, Tip, type MenuItem } from '../../kit'
 import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
 import { dictionaryOf, type AnswerKey, type DescribeTenant, type RuleIds } from '../../create/describe-model'
 import { checksView, withChecks, type CheckContext } from '../../create/describe-checks'
@@ -23,7 +23,8 @@ import { arrivalKey, firstArrival, landFix, type ArriveFix } from './arrive-fix'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { afterPaint, guardOpens, isStale, overridePatch, patchSignIns, tryRunGuard, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from '../guard'
 import { GuardDrawer } from '../guard-page'
-import { canSaveAsTemplate, offersMonitorAfterSave, offersTurnOnAfterSave, portalRoot, statusToast, monitorOffered } from '../status-options'
+import { canSaveAsTemplate, templateHold, offersMonitorAfterSave, offersMonitoringView, offersTurnOnAfterSave, portalRoot, statusOptions, statusToast, monitorOffered, type StatusTarget } from '../status-options'
+import { useStatusChange } from '../use-status-change'
 import { toastDuration } from '../../toast-tone'
 import { useSaveAsTemplate } from '../save-template'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, revertTo, undo, type History } from '../history'
@@ -97,13 +98,31 @@ const EMPTY_START_BAR: boolean = shows('emptyStartBar')
 const TEMPLATE_TOGGLE: boolean = shows('builderTemplateToggle')
 /* A new policy is unsaved until a save from the builder (rollout.ts `newPolicyUnsaved`). */
 const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
+/* Nothing being said: one array, so the context does not change identity on every render. */
+const NO_GAPS: readonly RuleGap[] = []
+const NO_TRIED: ReadonlySet<string> = new Set()
+/* The status is switched from the ⋯; the pill beside the name is plain (rollout.ts `statusInMenu`). */
+const STATUS_IN_MENU: boolean = shows('statusInMenu')
+/* Show published policy opens in the board's left track, so the rule editor keeps the right and both stay in use
+   (rollout.ts `publishedLeft`; owner, 25 Nov 2026: "the user can edit while checking the previous policy"). */
+const PUBLISHED_LEFT: boolean = shows('publishedLeft')
+const STATUS_ICON: Record<StatusTarget, LucideIcon> = { active: CircleCheck, inactive: CirclePause, monitor: Radar }
+/* Verbs in a menu (the pill's menu listed the statuses themselves): active / inactive, never turn on (5 Nov 2026). */
+const STATUS_VERB: Record<StatusTarget, string> = { active: 'Make active', inactive: 'Make inactive', monitor: 'Monitor' }
 import './board.css'
 import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
 import { MovedPanel, MovedWalk, PublishMoved } from '../../migrate/moved-panel'
 import { CondTagsContext } from './cond-tags'
-import { markRolledBack, useExperience } from '../../migrate/experience'
+import { markRolledBack, useExperience, useMovedState } from '../../migrate/experience'
 import { RolledBackNote } from '../../migrate/moved-status'
 import { useWalkPublished } from '../../migrate/walk-published'
+import { FIX_SAVE_AND_PUBLISH, FIX_VERSION_BAR, FIX_VIEW_ON_CANVAS, NO_APP_REASON, PUBLISH_ASK, SAVE_AND_PUBLISH, draftAppsOf, isPublished, liveConfirmBody, offersLiveView, opensInDraftMode, publishToast, reachesSignIns, useDraftModel } from './draft-model'
+import { DraftModeChip, PublishedPanel, ViewEditActions } from './view-edit'
+import { DEFAULT_FLIPS, adminFallback, defaultFlip, withFlip, type DefaultFlip } from './default-flip'
+import { DefaultFlipNote } from './default-flip-note'
+import { CanvasViewPick, FirstPublishAsk, FixChip, LiveDraftSwitch, LiveViewTag, type CanvasView, type FirstStatus } from './draft-fix'
+import { useDraftV3, type V3Calls } from './draft-v3'
+import { RULE_GAPS, RuleGapsContext, gapPart, policyGaps, type RuleGap } from './rule-gaps'
 
 /* Lazy, the way the trail loads its own.
 
@@ -400,6 +419,35 @@ export function BoardBuilder({
   const [fixList, setFixList] = useState<FixItem[] | null>(null)
   const [fixesOpen, setFixesOpen] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  /* The Draft model switch (draft-model.ts, Design only). Fix: which copy the canvas shows, Compare, and the ask before
+     a save reaches live sign-ins. */
+  /* V3 is Fix plus publishing as numbered versions, review and roll back (draft-v3.tsx, policy-versions.ts). */
+  const draftModel = useDraftModel()
+  const v3 = draftModel === 'v3'
+  /* "View and edit" (view-edit.tsx, rollout.ts `viewEdit`): Fix with a mode. It keeps Fix's saves and its read-only
+     published canvas, and puts Edit in front of them. */
+  const viewEdit = draftModel === 'view'
+  const fix = draftModel === 'fix' || v3 || viewEdit
+  /* Fix's Live / Draft on the canvas, not the bar, and no change pill beside the status (rollout.ts `fixViewOnCanvas`).
+     Fix only: V3 keeps its bar switch and its version chip. */
+  const viewOnCanvas = FIX_VIEW_ON_CANVAS && draftModel === 'fix'
+  /* Fix's save by its name, everywhere it is named (rollout.ts `saveAndPublish`); undefined keeps each place's own word. */
+  const fixSaveLabel = FIX_SAVE_AND_PUBLISH && (draftModel === 'fix' || viewEdit) ? SAVE_AND_PUBLISH : undefined
+  /* Draft mode, entered by Edit only (owner, 24 Nov 2026: "Only the Edit button"). Every door opens the view; a new
+     policy, with nothing to view, starts in draft mode (`inEdit`, below). On Design a draft never published opens in
+     draft mode too, and Active and the other published policies in the view (draft-model.ts `opensInDraftMode`). */
+  const [editMode, setEditMode] = useState(() => opensInDraftMode(saved))
+  /* Show published policy, in draft mode: the live version in the right-hand panel. */
+  const [pubOpen, setPubOpen] = useState(false)
+  /* "Nothing else matched" just turned with the first rule or the last (default-flip.ts): its note, until put away. */
+  const [flipNote, setFlipNote] = useState<{ flip: DefaultFlip; stamp: number } | null>(null)
+  /* Fix's bar follows the version on screen (rollout.ts `versionBar`). It reads the canvas chip, so it comes with it. */
+  const byVersion = FIX_VERSION_BAR && viewOnCanvas
+  const [canvasView, setCanvasView] = useState<CanvasView>('draft')
+  const [liveAsk, setLiveAsk] = useState(false)
+  /* A first publish asks the status it starts with (draft-fix.tsx `FirstPublishAsk`). */
+  const [firstAsk, setFirstAsk] = useState(false)
+  const [firstAs, setFirstAs] = useState<FirstStatus>('active')
   const [cmd, setCmd] = useState(false)
   const [keys, setKeys] = useState(false)
   /* The template catalogue, offered from the empty board.
@@ -584,6 +632,9 @@ export function BoardBuilder({
     if (histFor.current === saved?.id) return
     histFor.current = saved?.id
     if (saved) setHist(historyOf(openForEditing(saved)))
+    /* "View and edit": another policy opens in its view, as every door does, or in draft mode if it is a draft. */
+    setEditMode(opensInDraftMode(saved))
+    setPubOpen(false)
   }, [saved?.id])
 
 
@@ -596,19 +647,34 @@ export function BoardBuilder({
      publishing can never write an old name or app list back over a new one. */
   const present = hist.present
   /* Who is a rule's question only (owner, 14 Oct 2026): a new rule starts empty, which reads as Everyone. */
-  const newRule = () => blankRule()
+  /* Its Then starts unanswered where `ruleGaps` is on: the Allow a blank holds is a default, not a choice (rule-gaps.ts). */
+  const newRule = (): Rule => (RULE_GAPS ? { ...blankRule(), outcomeOpen: true } : blankRule())
   /* A post sign-in policy's links are a standing fact too: they are made from
      the applications' pages while the board may be open, so the stored ones
      are read here and a save never writes old links back. */
   /* A copy's mark is one of them (23 Oct 2026): a rename takes it off the stored policy (store.tsx `keepsCopyMark`),
      and the bar's highlight and the canvas's copy note read the draft, so it is overlaid even when it is gone. */
+  /* "View and edit": the applications join the draft (owner, 24 Nov 2026), so the draft's own list stands and is
+     never overlaid. The view draws the stored one (`viewShown`, below). A published policy's name joins it the same
+     way; a policy never published has nothing live to keep apart, and its name is saved as it always was. */
+  const draftHoldsName = viewEdit && !!saved && !isPostSignIn(saved) && saved.status !== 'draft' && !saved.provisional
   const facts = useMemo(
-    () => (saved ? { name: saved.name, appIds: saved.appIds, audience: saved.audience, copiedFrom: saved.copiedFrom, ...(saved.session ? { session: saved.session } : null) } : null),
-    [saved],
+    () =>
+      saved
+        ? {
+            ...(draftHoldsName ? null : { name: saved.name }),
+            ...(viewEdit && !isPostSignIn(saved) ? null : { appIds: saved.appIds }),
+            audience: saved.audience,
+            copiedFrom: saved.copiedFrom,
+            ...(saved.session ? { session: saved.session } : null),
+          }
+        : null,
+    [saved, viewEdit, draftHoldsName],
   )
   /* Guided setup's applications, while a history entry holds a list the stored policy does not (`pendingApps`). */
   const pendingOn = (p: Policy, stored: Policy | undefined): string[] | null => {
-    if (!GUIDED_SETUP || !stored) return null
+    /* Not in "View and edit", where the draft holds its applications itself (`present.appIds`). */
+    if (!GUIDED_SETUP || !stored || viewEdit) return null
     const m = pendingApps.get(p)
     return m && sameSet(m.over, stored.appIds) && !sameSet(m.apps, stored.appIds) ? m.apps : null
   }
@@ -626,6 +692,14 @@ export function BoardBuilder({
   const templateFromCanvas = BAR_TEMPLATE && canSaveAsTemplate(onCanvas)
   /* Marked already: the ⋯ takes it off, as the Policies row does (rollout.ts `builderTemplateToggle`). */
   const templateMarked = BAR_TEMPLATE && TEMPLATE_TOGGLE && saveTemplate.marked(draft.id)
+  /* Nothing on the canvas to hand on yet, no rule or a rule not finished: the ⋯ row is greyed with why
+     (status-options.ts `templateHold`, rollout.ts `templateNeedsRules`). */
+  const templateWait = templateFromCanvas && !templateMarked ? templateHold(onCanvas, post) : null
+  /* The note goes once what it describes is gone: an Undo took the turn back, or the admin changed the default by hand. */
+  const flipHolds = !flipNote || (flipNote.flip === 'to-deny' ? draft.fallback?.setBy === 'auto' : draft.fallback?.decision !== 'deny')
+  useEffect(() => {
+    if (!flipHolds) setFlipNote(null)
+  }, [flipHolds])
   /* Not for a post sign-in policy, like the template doors beside it. */
   /* Only once the tenant has a policy of its own to reuse (owner, 2 Nov 2026: "if no policy exists or only Global is
      present, hide this … let the user add their first policy, then add this option"). The Global Default alone does not
@@ -647,6 +721,9 @@ export function BoardBuilder({
   const saveRule = (id: string) => {
     const r = draft.rules.find((x) => x.id === id)
     if (!r || savingRule) return
+    /* A rule with an empty part is not saved: the reasons go under its fields (rule-gaps.ts). */
+    const left = gaps.filter((g) => g.at === id)
+    if (left.length > 0) return refuseGaps(left)
     setSavingRule(id)
     /* The call to the API: a short wait the admin can see, then the rule is stored as it is now. */
     window.setTimeout(() => {
@@ -655,6 +732,18 @@ export function BoardBuilder({
       store.showToast(`${r.name.trim() || 'Rule'} saved`)
     }, RULE_SAVE_MS)
   }
+  /* What the rules still leave empty (rule-gaps.ts, every line): a post sign-in rule's name, who and conditions too,
+     its missing action having a refusal of its own, below. Said under their fields only for the rules a refused save
+     was about (`gapsTried`, by rule): Save rule tries one rule, Save policy every rule left at that press, and a rule
+     added afterwards is not said until a save includes it (23 Nov 2026 audit). A rule leaves the set once answered. */
+  const gaps = useMemo(() => (RULE_GAPS ? policyGaps(draft, post) : []), [draft, post])
+  const [gapsTried, setGapsTried] = useState<ReadonlySet<string>>(NO_TRIED)
+  useEffect(() => {
+    if (gapsTried.size === 0) return
+    const still = new Set([...gapsTried].filter((at) => gaps.some((g) => g.at === at)))
+    if (still.size !== gapsTried.size) setGapsTried(still.size === 0 ? NO_TRIED : still)
+  }, [gapsTried, gaps])
+  const shownGaps = useMemo(() => (gapsTried.size === 0 ? NO_GAPS : gaps.filter((g) => gapsTried.has(g.at))), [gapsTried, gaps])
   const issue = useMemo(() => (post ? issueTarget(draft) : null), [post, draft])
   const refusal: Refusal | null = attempted ? issue : null
   useEffect(() => {
@@ -663,7 +752,10 @@ export function BoardBuilder({
   /* A route to another policy's board keeps this builder mounted: it starts
      with no reason standing. */
   const boardOf = saved?.id
-  useEffect(() => setAttempted(false), [boardOf])
+  useEffect(() => {
+    setAttempted(false)
+    setGapsTried(NO_TRIED)
+  }, [boardOf])
   const refusalAt = refusal?.at
   const refusalText = refusal?.text
   const postBoard = useMemo<PostBoard>(
@@ -860,7 +952,11 @@ export function BoardBuilder({
      decide sign-ins: it drives the readings and, with a never-published policy,
      the publish gate. */
   /* Applications Guided setup chose and nothing has saved yet count as an edit, as its rules do. */
-  const edited = !!saved && (hasUnsavedChanges(saved, draft) || !!pending)
+  /* "View and edit": the draft's applications are an edit like its rules, against the saved draft's list (or the
+     policy's) for "unsaved", against the published list for "differs from live". */
+  const appsUnsaved = viewEdit && !!saved && (!sameSet(draft.appIds, draftAppsOf(saved)) || (draftHoldsName && draft.name !== (saved.pendingDraft?.name ?? saved.name)))
+  const appsDiffer = viewEdit && !!saved && (!sameSet(draft.appIds, saved.appIds) || (draftHoldsName && draft.name !== saved.name))
+  const edited = !!saved && (hasUnsavedChanges(saved, draft) || !!pending || appsUnsaved)
   /* A new policy is stored only by a save from in here (owner, 23 Nov 2026: "only when the user saves the policy from
      inside, not on Create policy"), so until then it is unsaved as a whole: Save draft is ready, the pill says so and
      leaving asks. Not on the start chooser, where nothing has been picked yet. rollout.ts `newPolicyUnsaved`. */
@@ -873,9 +969,57 @@ export function BoardBuilder({
   const stop = noRules ? NO_RULES_REASON : unnamed ? UNNAMED_REASON : null
   /* A new policy with no rule has nothing to lose: going back just drops it, with nothing asked. */
   const toLose = unsaved && !(saved?.provisional && noRules)
-  const live = !!saved && (differsFromLive(saved, draft) || !!pending)
+  const live = !!saved && (differsFromLive(saved, draft) || !!pending || appsDiffer)
   const toPublish = live || saved?.status === 'draft'
   const hasDraft = !!saved?.pendingDraft
+  /* "View and edit": draft mode once Edit is pressed, or from the start on a new policy; the view otherwise. The view
+     is read only and carries the status; draft mode has no status at all. */
+  /* A post sign-in policy is outside the mode: its board is as in Today. */
+  const inEdit = viewEdit && !post && (editMode || !!saved?.provisional)
+  /* Not for a post sign-in policy, whose board has no Edit to leave the view by (its links are made from the apps). */
+  const viewShown = viewEdit && !!saved && !inEdit && !post
+  /* Fix: a published policy whose copy differs from live offers Live / Draft; Live is the stored rules, read only.
+     Not in "View and edit", whose view is the stored policy and whose Show published policy is a panel. */
+  const liveOffered = fix && !viewEdit && !post && offersLiveView(saved, live)
+  /* V3 (draft-v3.tsx): versions, publish and review on top of Fix. What only the builder can do comes back through
+     `v3Calls`, set further down before the bar renders. */
+  const v3Calls = useRef<V3Calls | null>(null)
+  const v3s = useDraftV3({
+    on: v3 && !post && !!saved,
+    saved,
+    draft,
+    differs: live,
+    unsaved,
+    you: store.account.name,
+    apps: store.apps,
+    groups: store.groups,
+    users: store.users,
+    calls: v3Calls,
+    showToast: (t) => store.showToast(t),
+  })
+  /* Fix's Live view; V3 locks the canvas the same way in review and while a version is viewed. */
+  const fixLive = liveOffered && canvasView === 'live' && !v3s.historyOpen
+  const liveView = fixLive || v3s.readOnly || viewShown
+  /* Option A (owner, 24 Nov 2026: "draft can't be active inactive but published can"; status always from Published).
+     The status is the published version's alone: shown with Published, never with the draft. Published on screen reads
+     only, so it has the status and no saves; the draft on screen, or a policy never published, has no status at all.
+     Before any change the policy and its published version are one, and the bar is as it was. */
+  const publishedOnScreen = (byVersion && fixLive) || viewShown
+  /* "View and edit": status only outside draft mode (owner, 24 Nov 2026: "activate and deactivate should be outside"). */
+  const statusHidden = (byVersion && ((liveOffered && canvasView === 'draft') || !isPublished(saved))) || inEdit
+  /* What Published shows, as a policy to make a template from (the bar's ⋯). */
+  const fromPublished: Policy | null = publishedOnScreen && saved ? { ...draft, rules: saved.rules, fallback: saved.fallback, appIds: saved.appIds, pendingDraft: undefined } : null
+  useEffect(() => {
+    if (!liveOffered) setCanvasView('draft')
+  }, [liveOffered])
+  /* Live is a view: nothing stays selected on it, so no card wears the editing ring. */
+  useEffect(() => {
+    /* And the Fixes panel shuts: its Apply would edit the draft the view hides (23 Nov 2026 audit). */
+    if (liveView) {
+      setSelection({ kind: 'none' })
+      setFixesOpen(false)
+    }
+  }, [liveView])
   /* The edits themselves, for the bar's status control; undefined when there
      are none. Kept by identity so the bar does not see new edits on every render. */
   const boardEdits = useMemo<RuleSet | undefined>(
@@ -897,11 +1041,21 @@ export function BoardBuilder({
     /* Applications Guided setup chose are a standing fact, not a rule: a saved draft holds rules only, so they are
        saved to the policy itself, past the checks the Add rule already ran. */
     if (pending) store.savePolicy({ ...latest, ...facts, appIds: [...pending] })
-    store.saveDraft(saved.id, { rules: draft.rules, fallback: draft.fallback, checks: draft.checks })
+    /* "View and edit": the draft's applications are saved with it (policy-draft.ts `withSavedDraft`). */
+    store.saveDraft(saved.id, {
+      rules: draft.rules,
+      fallback: draft.fallback,
+      checks: draft.checks,
+      ...(viewEdit ? { appIds: [...draft.appIds] } : null),
+      ...(draftHoldsName ? { name: draft.name } : null),
+    })
+    /* A new policy loses its "new" mark with this save; it stays in draft mode all the same. */
+    if (viewEdit && !post) setEditMode(true)
     afterSave({ ...latest, ...facts })
     /* New marks a fix not saved yet. */
     setFixedNew([])
-    store.showToast('Draft saved')
+    /* Fix: a draft beside a live policy says that live did not move (draft-model.ts). */
+    store.showToast(fix && isPublished(latest) ? (byVersion || viewEdit ? 'Draft saved. The published version is unchanged.' : 'Draft saved. Live is unchanged.') : 'Draft saved')
     return true
   }
 
@@ -960,7 +1114,33 @@ export function BoardBuilder({
      publishing it. */
   /* With no rule on the canvas, every way out asks No rule added, Discard or Continue (rollout.ts `noRuleAlert`). */
   const noRuleLeave = NO_RULE_ALERT && noRules
-  useLeaveGuard({ dirty: toLose || noRuleLeave, save: saveDraft, saveLabel: 'Save as draft', blocked: stop, noRule: noRuleLeave })
+  const confirmLeave = useLeaveGuard({ dirty: toLose || noRuleLeave, save: saveDraft, saveLabel: 'Save as draft', blocked: stop, noRule: noRuleLeave })
+
+  /* "View and edit": Done goes back to the view. With edits not saved it asks first, in the one leave dialog (Keep
+     editing, Discard, Save as draft): Discard drops only the unsaved edits, so there is still no Discard draft (owner,
+     24 Nov 2026). The board's copy is rebuilt from the stored policy once the view is back (the effect below), so a
+     draft saved on the way out is what Edit opens next time. */
+  const leaveEdit = () => {
+    /* What writes into the draft closes with draft mode: Guide me (an action still playing is written first), the
+       Fixes panel, and Read as text, whose sentences select cards to edit. */
+    if (describing) closeGuided()
+    setFixesOpen(false)
+    setReading(false)
+    setEditMode(false)
+    setPubOpen(false)
+  }
+  const doneEditing = () => (unsaved ? confirmLeave(leaveEdit) : leaveEdit())
+  /* The published panel and the editor share one slot: picking a card to edit gives it back to the editor. */
+  useEffect(() => {
+    /* On the left it has a track of its own, so a card picked opens its editor beside it (`PUBLISHED_LEFT`). */
+    if (selection.kind !== 'none' && !PUBLISHED_LEFT) setPubOpen(false)
+  }, [selection])
+  const wasEditing = useRef(inEdit)
+  useEffect(() => {
+    const was = wasEditing.current
+    wasEditing.current = inEdit
+    if (was && !inEdit && saved) setHist(historyOf(openForEditing(saved)))
+  }, [inEdit, saved])
 
   /* The rehearsal that was re-walked here on every draft is Check access's
      run now, which reads the draft directly (TryJourney `policy`). */
@@ -1016,7 +1196,7 @@ export function BoardBuilder({
        under its canvas. Nor before the version with the dock's Undo and Redo
        (V1, `showHistory`): a toast's own Undo still takes a removal back. */
     const blocking = !!document.querySelector('[role="dialog"]:not([aria-modal="false"]), .bx-scrim')
-    if (action && showHistory && !typing && !blocking && !testOn) {
+    if (action && showHistory && !typing && !blocking && !testOn && !liveView) {
       e.preventDefault()
       if (action === 'redo') redoStep()
       else undoStep()
@@ -1072,7 +1252,9 @@ export function BoardBuilder({
     /* ⌘↵ — saves, the same as the button it stands in for. */
     if (cmd && e.key === 'Enter') {
       e.preventDefault()
-      if (!toPublish) store.showToast('Nothing to save')
+      /* Published reads only and has no save on its bar, so the key does not publish a draft nobody is looking at. */
+      if (publishedOnScreen) store.showToast(viewShown ? 'Press Edit to change this policy' : 'Switch to Draft to publish')
+      else if (!toPublish) store.showToast('Nothing to save')
       else if (saveBlocked) store.showToast(`${blockers} error${blockers === 1 ? '' : 's'} to fix first`)
       else saveNow()
       return
@@ -1103,7 +1285,7 @@ export function BoardBuilder({
     /* A locked canvas (Guided setup on the left or the right) is the panel's output: the keys that edit a rule — ⌘D,
        ⌥↑ / ⌥↓, [ and ], Delete, E — stand down as its buttons do. Bare ↑ / ↓ still move the selection, which is the
        panel's context; undo, redo and Escape are above and below. */
-    const lockedKey = canvasLocked && (((cmd && e.key.toLowerCase() === 'd') || ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.altKey)) || e.key === '[' || e.key === ']' || e.key === 'Delete' || (e.key.toLowerCase() === 'e' && !cmd && !e.altKey))
+    const lockedKey = (canvasLocked || liveView) && (((cmd && e.key.toLowerCase() === 'd') || ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.altKey)) || e.key === '[' || e.key === ']' || e.key === 'Delete' || (e.key.toLowerCase() === 'e' && !cmd && !e.altKey))
     if (lockedKey) return
 
     if (cmd && e.key.toLowerCase() === 'd') {
@@ -1118,6 +1300,8 @@ export function BoardBuilder({
        it — which is the distinction every list editor draws this way. The move
        comes with the grip, Move up and Move down (V1, `arrange`). */
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      /* Live is a view: nothing on it is picked for editing. */
+      if (liveView) return
       const dir = e.key === 'ArrowUp' ? -1 : 1
       if (e.altKey) {
         if (at < 0 || !arrange) return
@@ -1226,7 +1410,19 @@ export function BoardBuilder({
      still what the walkthrough opens; the bar no longer goes through it.
      `keep-off` because turning a draft on was the dialog's other button, and
      that lives on the status pill beside the name. */
-  const saveNow = () => {
+  const saveNow = () => commitSave(false)
+  /* Can decide a sign-in once published: an application, the system policy, or a post sign-in policy (which links its
+     applications on its own terms, post-board.ts). Otherwise a first publish can only be inactive. */
+  const canBeActive = post || draft.isSystem === true || draft.appIds.length > 0
+  /* The first publish's answer. Active is a turn on, so it runs the checks every turn on runs (Before turning on);
+     Inactive and Monitoring store it inactive, and Monitoring then switches it, as the toast's Monitor did. */
+  const publishFirst = () => {
+    setFirstAsk(false)
+    if (!canBeActive || firstAs === 'inactive') return publish('keep-off')
+    if (firstAs === 'monitor') return publish('keep-off', 'monitor')
+    checkThenPublish('turn-on')
+  }
+  const commitSave = (asked: boolean) => {
     if (stop) return store.showToast(stop)
     if (!toPublish || saveBlocked) return
     /* A live post sign-in policy is never saved back to draft for a rule left
@@ -1234,6 +1430,37 @@ export function BoardBuilder({
        (post-board.ts `saveRefused`). A draft saves as a draft. */
     const refused = post && saved ? saveRefused(saved, draft) : null
     if (refused) return refuse(refused)
+    /* A rule with an empty part is never saved, in either draft model (rule-gaps.ts). Save draft does not come here. */
+    if (gaps.length > 0) return refuseGaps(gaps)
+    /* "View and edit": a policy with no application can only be saved as a draft (owner, 24 Nov 2026), so Save and
+       publish refuses and opens the Applications panel, where the reason stands under the field. Make inactive is
+       not offered here: status lives outside draft mode, in the view. */
+    if (viewEdit && !post && !draft.isSystem && draft.appIds.length === 0) {
+      setSelection({ kind: 'apps' })
+      return store.showToast(NO_APP_REASON, undefined, { tone: 'warning' })
+    }
+    /* An application the draft took may have gone to another policy since: one application, one policy (14 Oct 2026). */
+    const taken = viewEdit ? draft.appIds.map((id) => ({ id, by: ownerOf(id, store.policies, draft.id) })).find((x) => x.by) : undefined
+    if (taken?.by) return store.showToast(`${store.appById(taken.id).name} is on ${taken.by.name}`, undefined, { tone: 'warning' })
+    /* V3 (draft-v3.tsx): Publish or Request review, after the same checks; their clean result opens its ask. */
+    if (v3s.on) {
+      if (v3s.inReview) return store.showToast('This draft is in review')
+      return checkThenPublish('keep-off', v3s.ask)
+    }
+    /* Fix (draft-model.ts): a save that changes what people sign in with asks once — the checks run first, and their
+       page is the ask when it opens; otherwise "Update live policy?" is, and its yes saves with the checks already done.
+       Saving never changes the status: a draft is stored inactive and the toast offers Make active. */
+    if (fix) {
+      if (asked) return publish('keep-off')
+      /* A first publish asks the status it starts with (owner, 24 Nov 2026: "the confirm ask Active or Inactive"),
+         Active where it can be had. */
+      if (byVersion && !isPublished(saved)) {
+        setFirstAs(canBeActive ? 'active' : 'inactive')
+        return setFirstAsk(true)
+      }
+      if (live && reachesSignIns(saved)) return checkThenPublish('keep-off', () => setLiveAsk(true))
+      return checkThenPublish('keep-off')
+    }
     /* Save policy makes a draft active where `saveMakesActive` is on (policy-draft.ts `committed`), through Before
        turning on, as the status pill's own turn on goes. */
     checkThenPublish(SAVE_MAKES_ACTIVE ? 'turn-on' : 'keep-off')
@@ -1279,10 +1506,12 @@ export function BoardBuilder({
   }
   const holdGuard = (kind: SaveGuard['kind'], d: Policy, result: GuardResult | 'error', run: number, intent: CommitIntent) =>
     setGuard({ kind, result, stamp: stampNow(), run, intent, rules: d.rules, fallback: d.fallback })
-  const checkThenPublish = (intent: CommitIntent) => {
+  const checkThenPublish = (intent: CommitIntent, onClean?: () => void) => {
+    /* Fix: a clean result asks "Update live policy?" (`onClean`) rather than saving; the checks page, when it opens, is the ask. */
+    const go = () => (onClean ? onClean() : publish(intent))
     const turnsOn = intent === 'turn-on' && guardsTurnOn && !!saved && committed(saved, withDescribed(draft), 'turn-on').status === 'active'
     const kind: SaveGuard['kind'] | null = guardsSave ? 'save' : turnsOn ? 'turn-on' : null
-    if (!kind) return publish(intent)
+    if (!kind) return go()
     if (checking) return
     setChecking(true)
     const d = draft
@@ -1290,7 +1519,7 @@ export function BoardBuilder({
       const result = tryRunGuard(guardInput(kind, d))
       setChecking(false)
       /* Turning on always opens its page (`guardOpens`); a save only when something interrupts. */
-      if (result !== 'error' && !guardOpens(result)) return publish(intent)
+      if (result !== 'error' && !guardOpens(result)) return go()
       setReview(false)
       holdGuard(kind, d, result, 0, intent)
       setGuardOpen(true)
@@ -1362,6 +1591,24 @@ export function BoardBuilder({
      card it is about is chosen, opened in the panel and shown on the chain,
      marked while it stands, and focus lands on its Then — where the reason
      is said, under the question it is about. Never a disabled button. */
+  /* A save refused for an empty part (rule-gaps.ts): the first rule left is chosen, opened in the panel, shown on the
+     chain and marked, and focus lands on the first reason, under the field it is about. Every gap stays said until
+     answered. Never a disabled button. */
+  const refuseGaps = (left: readonly RuleGap[]) => {
+    const first = left[0]
+    if (!first) return
+    setGapsTried((t) => new Set([...t, ...left.map((g) => g.at)]))
+    /* Out of whatever keeps the rule panel shut, so the reason can be said where it belongs: Check access, Fix's Live
+       view, the Fixes panel (23 Nov 2026 audit). Where something still covers it (Describe it, Guided setup beside the
+       canvas), the first reason is said in a toast as well. */
+    if (testOn) leaveTest()
+    setCanvasView('draft')
+    setFixesOpen(false)
+    if (describeOpen && !guidedBeside) store.showToast(first.text, undefined, { tone: 'warning' })
+    select(first.at === 'fallback' ? { kind: 'fallback' } : ruleAt(first.at, gapPart(first)))
+    setFlash({ id: first.at, key: Date.now() })
+    focusSoon(() => document.querySelector<HTMLElement>('.bb__insp .bb__gap'), true)
+  }
   const refuse = (r: Refusal) => {
     setAttempted(true)
     select(r.at === 'fallback' ? { kind: 'fallback' } : ruleAt(r.at, 'when'))
@@ -1386,7 +1633,8 @@ export function BoardBuilder({
      of the adjustment and everything drawn inside the stage follows for
      free. */
   /* Describe it closes the rule panel while it is open; Guided setup does too, except beside it. */
-  const inspBlocked = (describeOpen && !guidedBeside) || movedLocked
+  /* "View and edit": Show published policy holds the slot while it is open in draft mode (`pubPanel`, below). */
+  const inspBlocked = (describeOpen && !guidedBeside) || movedLocked || liveView || (inEdit && pubOpen && !PUBLISHED_LEFT)
   const panelShown = hasSubject && inspOpen && !inspBlocked
 
   /* The panel outlives its own close by one animation.
@@ -1530,12 +1778,12 @@ export function BoardBuilder({
      whenever it is on the canvas: any App Access policy but the system one, draft or live. */
   /* Guide me only where its door on the canvas is (Full, `guideMe`). */
   const describeDoorCmd = GUIDED_SETUP
-    ? guideMe && guidedOffered(features.describePolicy, saved) && !describeOpen && !testOn
-    : !!saved && describeOffered(features.describePolicy, saved) && describeState.turns.length > 0 && !describeOpen && !testOn
+    ? guideMe && guidedOffered(features.describePolicy, saved) && !describeOpen && !testOn && !viewShown
+    : !!saved && describeOffered(features.describePolicy, saved) && describeState.turns.length > 0 && !describeOpen && !testOn && !viewShown
   /* Under Check access the chain is hidden under its canvas, so the palette
      offers only what still means something there: the policy's save, the
-     sheet, Check access itself, and its views. */
-  const editing = !testOn
+     sheet, Check access itself, and its views. Nor in Fix's Live view, which reads only (23 Nov 2026 audit). */
+  const editing = !testOn && !liveView
   const boardCommands: Cmd[] = [
     /* Not while Describe it is open: the text writes the rules then. */
     ...(describeOpen || !editing ? [] : ([{ id: 'add', label: 'Add a rule', icon: Plus }] as Cmd[])),
@@ -1546,7 +1794,7 @@ export function BoardBuilder({
         ] as Cmd[])
       : []),
     /* In the bar's words: ⌘↵ saves at once, as the bar's button does (the review went, 23 Sep 2026). */
-    ...(toPublish ? ([{ id: 'publish', label: features.publish ? 'Publish policy' : 'Save policy', kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
+    ...(toPublish && !publishedOnScreen ? ([{ id: 'publish', label: v3s.on ? v3s.primaryLabel : (fixSaveLabel ?? (features.publish ? 'Publish policy' : 'Save policy')), kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
     /* Undo and Redo where the dock has them (V1, `showHistory`). */
     ...((canUndo(hist) || backToChooser) && editing && showHistory ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
     ...(canRedo(hist) && editing && showHistory ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
@@ -1560,10 +1808,52 @@ export function BoardBuilder({
     ...(editing ? draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd) : []),
   ]
 
+  /* The status choices in the bar's ⋯, the pill beside the name a plain status (rollout.ts `statusInMenu`, 23 Nov
+     2026). The same switch the pill's menu was (use-status-change.tsx): the same confirms, Before turning on and
+     refusals. Its callbacks are defined further down, so they are read through a ref set before the bar renders. */
+  const statusCalls = useRef<{ fix?: (next: RuleSet, toast: string) => void; reveal?: (i: number | null) => void; gaps?: (left: readonly RuleGap[]) => void }>({})
+  const menuStatus = useStatusChange({
+    unsaved: boardEdits !== undefined,
+    edits: boardEdits,
+    onEditsFix: (next, toast) => statusCalls.current.fix?.(next, toast),
+    onRevealRule: (i) => statusCalls.current.reveal?.(i),
+    onOpenBreakIn: openBreakInPage,
+    /* Make active refused for an empty part: said under the fields, as a refused save is (rule-gaps.ts). */
+    onGaps: (left) => statusCalls.current.gaps?.(left),
+  })
+  const movedStatus = useMovedState(saved)
+  /* "View and edit": a draft on an application is made active from the view in one press (it publishes), and while
+     the policy is not active Make active is the view's button, so the ⋯ does not say it twice (owner, 24 Nov 2026:
+     "if the thing is active once, move the Active part to the three-dot"). */
+  const viewOptions = viewShown && saved ? statusOptions(saved, { monitor: monitorOffered(store.features), draftActivates: true }) : []
+  /* With no application there is no Make active anywhere (owner, 24 Nov 2026), even on a seed that is stored Inactive. */
+  const viewHasApps = !!saved && (saved.isSystem === true || saved.appIds.length > 0)
+  const viewMakesActive = viewShown && !post && viewHasApps && viewOptions.some((o) => o.target === 'active')
+  const statusItems: MenuItem[] =
+    STATUS_IN_MENU && saved && !movedStatus.review && !statusHidden
+      ? [
+          ...statusOptions(saved, { monitor: monitorOffered(store.features), draftActivates: viewEdit })
+            .filter((o) => !((viewMakesActive || (viewEdit && !post && !viewHasApps)) && o.target === 'active'))
+            .map((o) => ({ id: `status:${o.target}`, label: STATUS_VERB[o.target], icon: STATUS_ICON[o.target] })),
+          ...(offersMonitoringView(saved, { monitor: monitorOffered(store.features) }) ? [{ id: 'status:view', label: 'View monitoring', icon: Eye }] : []),
+        ]
+      : []
+  const pickStatus = (id: string) => {
+    if (!saved) return
+    if (id === 'status:view') return menuStatus.viewMonitoring(saved.id)
+    menuStatus.request(saved, id.slice('status:'.length) as StatusTarget)
+  }
+
   if (!saved) return <div className="bpage">This policy no longer exists.</div>
 
   /* --- Edits -------------------------------------------------------------------- */
-  const commitDraft = (next: Policy) => {
+  /** Commits an edit and returns what went into the history: the edit itself, or the edit with its default turned. */
+  const commitDraft = (edit: Policy): Policy => {
+    /* The first rule turns an untouched "Nothing else matched" to Deny and the last turns it back, in this same entry,
+       so one Undo takes the rule and the turn together (default-flip.ts, rollout.ts `defaultFlips`). */
+    const flip = defaultFlip(draft, edit)
+    const next = flip ? withFlip(edit, flip) : edit
+    if (flip) noteFlip(flip)
     lastCommitted.current = next
     setHist((h) => {
       /* Applications Guided setup chose and nothing saved yet ride on to the next entry (`pendingApps`). */
@@ -1571,7 +1861,10 @@ export function BoardBuilder({
       if (m && !pendingApps.has(next)) pendingApps.set(next, m)
       return commit(h, next)
     })
+    return next
   }
+  /* The turn's note. A screen reader hears it from the live region beside it (`flipSaid`), since the note takes no focus. */
+  const noteFlip = (flip: DefaultFlip) => setFlipNote({ flip, stamp: Date.now() })
   /* Every removal says what went, with Undo, for six seconds (owner, 21 Sep
      2026). Undo steps back only while the removal is still the latest edit: a
      press after anything else has changed would undo THAT instead, so it says
@@ -1612,7 +1905,14 @@ export function BoardBuilder({
     const i = draft.rules.findIndex((r) => r.id === id)
     if (i >= 0) patchRule(i, p)
   }
-  const patchFallback = (p: Partial<Rule>) => commitDraft({ ...draft, fallback: { ...(draft.fallback ?? fallbackRule()), ...p } })
+  /* A hand edit marks the default as the admin's, so it never turns for them (default-flip.ts `adminFallback`). */
+  const patchFallback = (p: Partial<Rule>) => commitDraft({ ...draft, fallback: adminFallback(draft.fallback, p) })
+  /* The note's Allow instead: the policy stays open, and that is now the admin's choice. */
+  const allowInstead = () => {
+    const allow = withFlip(draft, 'to-allow').fallback
+    if (allow) commitDraft({ ...draft, fallback: { ...allow, setBy: 'admin' } })
+    setFlipNote(null)
+  }
 
   const insert = (rule: Rule, at: number) => {
     const rules = [...draft.rules]
@@ -1709,8 +2009,8 @@ export function BoardBuilder({
     }
     const built = build.rules
     const before = histNow.current.present
-    const next = { ...draft, rules: built }
-    commitDraft(next)
+    /* Keyed to what the history holds, which is a new object when the default turned with these rules. */
+    const next = commitDraft({ ...draft, rules: built })
     const stored = store.policyById(saved.id) ?? saved
     const others = store.policies.filter((p) => p.id !== stored.id).map((p) => p.name)
     const name = templateName(stored.name, t.name, others, templateGiven.current)
@@ -1762,7 +2062,8 @@ export function BoardBuilder({
   /* The canvas's door into Describe it (DescribeMagic.tsx): offered where Describe it is; the selected card is named
      in it as the context it opens on (owner, 19 Oct 2026). It is also the way back to a closed thread. */
   const describeBar =
-    DESCRIBE_BAR && !!saved && (GUIDED_SETUP ? guidedOffered(features.describePolicy, saved) : describeOffered(features.describePolicy, saved)) && !testOn && !readOpen && !describeOpen
+    /* Not in the "View and edit" view, which reads only: Edit first. */
+    DESCRIBE_BAR && !!saved && (GUIDED_SETUP ? guidedOffered(features.describePolicy, saved) : describeOffered(features.describePolicy, saved)) && !testOn && !readOpen && !describeOpen && !viewShown
   const barContext: DescribeContext | null = (() => {
     if (selection.kind === 'rule') {
       const at = draft.rules.findIndex((x) => x.id === selection.id)
@@ -1965,7 +2266,7 @@ export function BoardBuilder({
     return guidedCut.current.cut
   }
   /* The board as a plan reads it: its rules and last row, the applications it shows, and the policy's audience. */
-  const guidedBoard = (p: Policy, stored: Policy) => ({ rules: p.rules, fallback: p.fallback, appIds: pendingOn(p, stored) ?? stored.appIds, audience: stored.audience })
+  const guidedBoard = (p: Policy, stored: Policy) => ({ rules: p.rules, fallback: p.fallback, appIds: viewEdit ? p.appIds : (pendingOn(p, stored) ?? stored.appIds), audience: stored.audience })
   const runGuided = (act: GuidedAct) => {
     if (guidedHeld.current) return
     const latest = store.policyById(saved.id) ?? saved
@@ -1999,8 +2300,12 @@ export function BoardBuilder({
     let after = present
     let wrote = false
     if (plan.changed || appsChange) {
-      const next: Policy = { ...present, rules: plan.rules, fallback: plan.fallback, ...(appsChange ? { appIds: [...plan.appIds] } : null) }
-      const mark = appsChange ? { apps: [...plan.appIds], over: [...stored.appIds] } : pendingApps.get(present)
+      const planned: Policy = { ...present, rules: plan.rules, fallback: plan.fallback, ...(appsChange ? { appIds: [...plan.appIds] } : null) }
+      /* A first rule added here, or the last deleted, turns the default as the + and Delete do (default-flip.ts). */
+      const flip = defaultFlip(present, planned)
+      const next = flip ? withFlip(planned, flip) : planned
+      /* "View and edit": the applications are the draft's own, so no mark over the stored list. */
+      const mark = viewEdit ? undefined : appsChange ? { apps: [...plan.appIds], over: [...stored.appIds] } : pendingApps.get(present)
       if (mark) pendingApps.set(next, mark)
       const h = commit(histNow.current, next)
       if (h !== histNow.current) {
@@ -2009,6 +2314,7 @@ export function BoardBuilder({
         setHist(h)
         after = h.present
         wrote = true
+        if (flip) noteFlip(flip)
         const ids = changedCards(bodyOf(present), bodyOf(h.present))
         if (ids.length > 0) setFresh((f) => ({ ids, n: (f?.n ?? 0) + 1 }))
       } else if (mark) pendingApps.set(present, mark)
@@ -2210,7 +2516,14 @@ export function BoardBuilder({
   const canDescribe = describeOffered(features.describePolicy, saved)
   const describeDoor = canDescribe && describeState.turns.length > 0 && !describeOpen && !testOn && !readOpen
 
-  const publish = (intent: CommitIntent) => {
+  /* `then`: a first publish answered Monitoring (draft-fix.tsx `FirstPublishAsk`), switched once it is stored. */
+  const publish = (intent: CommitIntent, then?: 'monitor') => {
+    /* The last door before the store: whatever reached here (the checks page's confirm, V3's Publish or Approve, the
+       walkthrough's review) never stores a rule with an empty part, even if the draft changed under it (rule-gaps.ts). */
+    if (gaps.length > 0) {
+      setGuardOpen(false)
+      return refuseGaps(gaps)
+    }
     /* One commit rule for both builders — see `committed` in policy-draft.ts.
        No applications: a draft. A draft with applications: off, or on if the
        admin chose it. Anything published keeps the status it has in the store,
@@ -2228,6 +2541,9 @@ export function BoardBuilder({
        agree about the record from the moment it is saved. The store stamps
        lastModified only when something besides the stamp changed. */
     store.savePolicy(next)
+    if (then === 'monitor') store.setPolicyStatus(next.id, 'monitor')
+    /* V3: the stored policy becomes the next version (draft-v3.tsx), and the toast names it. */
+    const v3Said = v3s.on ? v3s.published(store.policyById(next.id) ?? next) : null
     /* Save and turn on: the policy goes live, with its own chime (sound.ts). */
     if (next.status === 'active' && saved.status !== 'active') playCue('publish')
     /* Guided setup's actions on the board now are saved: in force from here, whatever the new history holds. */
@@ -2237,6 +2553,11 @@ export function BoardBuilder({
     setHist(h)
     afterSave(next)
     setReview(false)
+    /* "View and edit": a publish ends draft mode, back in the view with the status (a first publish arrives Inactive). */
+    if (viewEdit) {
+      setEditMode(false)
+      setPubOpen(false)
+    }
     /* "From your text" stays on a card until the policy is saved, and a fix's New with it. */
     setSources({})
     setFixedNew([])
@@ -2247,13 +2568,15 @@ export function BoardBuilder({
        leaves draft only by being saved, so what is monitored is what was just
        on screen. The first save leaves it off, and the toast offers the one
        step on. */
-    const canMonitor = offersMonitorAfterSave(saved, next, { monitor: monitorOffered(store.features) })
+    /* Not where the first publish asked: the status was chosen there (`versionBar`). */
+    /* Nor in "View and edit", whose view carries Make active as a button. */
+    const canMonitor = !byVersion && !viewEdit && offersMonitorAfterSave(saved, next, { monitor: monitorOffered(store.features) })
     /* Turn on takes the toast's one button where Monitor is not offered (29 Oct 2026: "Save policy" then the pill was a
        long, quiet way to live). It opens the pill's own confirm, never a second one, and never writes the status itself. */
-    const canTurnOn = !canMonitor && offersTurnOnAfterSave(saved, next, { monitor: monitorOffered(store.features) })
+    const canTurnOn = !byVersion && !viewEdit && !canMonitor && offersTurnOnAfterSave(saved, next, { monitor: monitorOffered(store.features) })
     turnOnOffered.current = canTurnOn ? Date.now() : 0
     store.showToast(
-      commitToast(saved, next),
+      v3Said ?? (byVersion || viewEdit ? publishToast(saved, then ? { ...next, status: then } : next) : commitToast(saved, next)),
       canMonitor
         ? {
             label: 'Monitor',
@@ -2350,6 +2673,8 @@ export function BoardBuilder({
      access — the route came from inside it — gives the chain back first, as
      Open rule does: the change is read there. */
   const landArrival = (fix: ArriveFix) => {
+    /* "View and edit": a fix is an edit, so it lands in draft mode, where it can be seen and saved. */
+    if (viewEdit && !post) setEditMode(true)
     /* A Why finding's Fix brings the run's whole list: the Fixes panel opens on it, whatever the one pressed does. */
     if ('conflicts' in fix) {
       setFixList(fix.conflicts)
@@ -2381,10 +2706,59 @@ export function BoardBuilder({
     setFixedNew((f) => [...f, ...out.added])
   }
 
+  /* What the ⋯'s status switch calls back, as the pill's did (BoardBar's onEditsFix / onRevealRule below). */
+  statusCalls.current = {
+    fix: (next, toast) => {
+      commitDraft({ ...draft, rules: next.rules, fallback: next.fallback })
+      offerUndo(toast)
+    },
+    reveal: post ? revealIssue : revealRule,
+    gaps: refuseGaps,
+  }
+
+  /* What V3 asks the builder for (draft-v3.tsx): store live, save the draft, edit the canvas, roll live back. */
+  v3Calls.current = {
+    publish: () => publish('keep-off'),
+    saveDraft,
+    edit: (next, toast) => {
+      commitDraft({ ...draft, rules: next.rules, fallback: next.fallback })
+      offerUndo(toast)
+    },
+    rollLive: (v) => {
+      /* Live takes the older rules; a saved draft beside it stays as it is, and is told live moved on. */
+      const latest = store.policyById(saved.id) ?? saved
+      const next = { ...latest, rules: v.rules, fallback: v.fallback }
+      store.savePolicy(next)
+      if (unsaved || latest.pendingDraft) return
+      /* No draft: the canvas follows live, as it does after a save. */
+      const h = historyOf(openForEditing(next))
+      histNow.current = h
+      setHist(h)
+      afterSave(next)
+    },
+  }
+
+  /* V3's Version history takes the right-hand slot unless Check access, Read as text or Fixes has it. */
+  const v3Panel = v3s.historyOpen && !testOn && !readOpen && !fixesShown
+  /* The applications the canvas names: the stored list in "View and edit"'s view (and Fix's Live), the draft's otherwise. */
+  const shownApps: Policy = (fixLive || viewShown) && saved ? { ...draft, appIds: saved.appIds } : draft
+  /* "View and edit": Show published policy, in the same slot, in draft mode only (view-edit.tsx `PublishedPanel`). */
+  /* On the left (`PUBLISHED_LEFT`) it shares nothing with the right-hand slot, only the leading track, which Guided
+     setup, Describe it and a migrated draft's walk also use: it waits while one of those is open. */
+  const leftTrackTaken = (describeOpen && !GUIDED_SETUP) || (guidedOpen && guidedSide !== 'right') || movedOpen
+  const pubPanel =
+    inEdit && pubOpen && !!saved && isPublished(saved) && !post && !testOn && (PUBLISHED_LEFT ? !leftTrackTaken : !readOpen && !fixesShown && !v3Panel)
+  const pubLeft = pubPanel && PUBLISHED_LEFT
+
+  /* The start chooser is on the canvas ("How should this policy start?" / "No rules"): the bar is Back and the name. */
+  const onChooser = EMPTY_START_BAR && !!saved && !saved.movedFrom?.length && draft.rules.length === 0 && !scratch && !describing && !readOpen && !post
+
   return (
     /* Which kind of policy the canvas, the cards and the panel are drawing,
        and a refused Turn on's reason (post-board.ts). */
     <PostBoardContext.Provider value={postBoard}>
+    {/* The empty parts being said, for the panel and the cards (rule-gaps.ts). */}
+    <RuleGapsContext.Provider value={shownGaps}>
       {/* The policy, above the work.
 
           A sibling of `.bb` rather than a child, so the shell's flex column
@@ -2395,9 +2769,25 @@ export function BoardBuilder({
           the status is never shown. */}
       {saved && <RolledBackNote policy={saved} onContactSupport={contactSupport} />}
       <BoardBar
-        policy={draft}
+        /* The view names the policy as it is published; draft mode, as the draft holds it. */
+        policy={viewShown && saved ? { ...draft, name: saved.name } : draft}
+        onRename={
+          inEdit && draftHoldsName
+            ? (n) => {
+                commitDraft({ ...draft, name: n })
+                store.showToast('Name changed. Not saved yet.')
+              }
+            : undefined
+        }
+        /* No status on the start chooser either (owner, 23 Nov 2026), with `statusInMenu`. */
+        hideStatus={(STATUS_IN_MENU && onChooser) || statusHidden}
+        noRename={viewShown}
         unsaved={unsaved}
         draftSaved={hasDraft}
+        /* "View and edit": the view keeps the bar's own "Draft not published" pill while a saved draft waits (undefined
+           draws it); draft mode says itself on the canvas (DraftModeChip). */
+        chip={v3s.on ? v3s.chip : viewEdit ? (viewShown && hasDraft ? undefined : null) : viewOnCanvas ? null : fix ? <FixChip unsaved={unsaved} draft={saved?.pendingDraft} /> : undefined}
+        beside={liveOffered && !v3s.historyOpen && !viewOnCanvas ? <LiveDraftSwitch value={canvasView} onChange={setCanvasView} inUse={reachesSignIns(saved)} /> : undefined}
         edits={boardEdits}
         onEditsFix={(next, toast) => {
           /* Before turning on's ready fix: an edit like any other, undoable. */
@@ -2414,7 +2804,10 @@ export function BoardBuilder({
            button is enough … go inside and only then they can see the draft and save option"). The same test as
            BoardEmpty's below. rollout.ts `emptyStartBar`. */
         actions={
-          EMPTY_START_BAR && !!saved && !saved.movedFrom?.length && draft.rules.length === 0 && !scratch && !describing && !readOpen && !post ? undefined : (
+          onChooser ? undefined : (
+          <>
+          {/* V3: Version history's door, first of the policy's actions (draft-v3.tsx). */}
+          {v3s.historyButton}
           <BoardBarActions
             reading={readOpen}
             onRead={toggleRead}
@@ -2431,23 +2824,107 @@ export function BoardBuilder({
             canDiscard={edited || hasDraft}
             blockers={blockers}
             onSaveDraft={saveDraft}
+            /* Published reads only: nothing on screen to save (rollout.ts `versionBar`). */
+            viewOnly={publishedOnScreen}
+            /* "View and edit" (view-edit.tsx): Edit and Make active in the view; Show published policy and Done in draft mode. */
+            modeActions={
+              viewEdit && !post && saved ? (
+                <ViewEditActions
+                  editing={inEdit}
+                  onEdit={() => setEditMode(true)}
+                  onDone={saved.provisional ? undefined : doneEditing}
+                  onMakeActive={viewMakesActive ? () => menuStatus.request(saved, 'active') : undefined}
+                  /* On the left the button says what is on screen: the panel waits while Guided setup holds that track. */
+                  publishedOpen={PUBLISHED_LEFT ? pubPanel : pubOpen}
+                  onTogglePublished={
+                    isPublished(saved)
+                      ? () => {
+                          if (!pubOpen && !PUBLISHED_LEFT) setSelection({ kind: 'none' })
+                          setPubOpen(PUBLISHED_LEFT ? !pubPanel : !pubOpen)
+                        }
+                      : undefined
+                  }
+                />
+              ) : undefined
+            }
+            noDiscard={viewEdit && !post}
             onDiscard={discard}
             saveBlocked={saveBlocked}
             stop={stop}
             checking={checking}
             post={post}
             onSave={saveNow}
-            onSaveTemplate={templateMarked ? () => saveTemplate.unmark(onCanvas) : templateFromCanvas ? () => saveTemplate.open(onCanvas) : undefined}
+            saveLabel={v3s.on ? v3s.primaryLabel : fixSaveLabel}
+            /* On Published the template is made from what is on screen, the published version; the draft's gaps are not its. */
+            onSaveTemplate={templateMarked ? () => saveTemplate.unmark(onCanvas) : fromPublished ? (canSaveAsTemplate(fromPublished) ? () => saveTemplate.open(fromPublished) : undefined) : templateFromCanvas ? () => (gaps.length > 0 ? refuseGaps(gaps) : saveTemplate.open(onCanvas)) : undefined}
             templateMarked={templateMarked}
-            onCopyRules={BAR_COPY_RULES && copyOffered ? () => openPicker('policy') : undefined}
+            templateHold={fromPublished ? null : templateWait}
+            statusItems={statusItems}
+            onStatus={pickStatus}
+            /* Not on Published: it writes into the draft, which that view hides. */
+            onCopyRules={BAR_COPY_RULES && copyOffered && !publishedOnScreen ? () => openPicker('policy') : undefined}
             onRollBack={experience === 'today' && !!saved?.movedFrom?.length && saved.status === 'active' ? () => setRollAsk(true) : undefined}
             onContactSupport={experience === 'today' && !!saved?.movedFrom?.length && saved.status !== 'draft' ? contactSupport : undefined}
-            publish={movedLocked ? <PublishMoved policy={saved} onEdit={walkPublished.has(saved.id) ? undefined : () => setMovedEditing(true)} /> : undefined}
+            publish={
+              movedLocked ? (
+                <PublishMoved
+                  policy={saved}
+                  onEdit={
+                    walkPublished.has(saved.id)
+                      ? undefined
+                      : () => {
+                          setMovedEditing(true)
+                          /* "View and edit": the migration's Edit is the way into draft mode too. */
+                          if (viewEdit) setEditMode(true)
+                        }
+                  }
+                />
+              ) : (
+                v3s.barSlot
+              )
+            }
           />
+          </>
           )
         }
       />
 
+    {/* V3 (draft-v3.tsx): the banners above the bar, Version history, and the asks for publish, review and roll back. */}
+    {v3s.nodes}
+    {/* Fix (draft-model.ts): the one ask before a save reaches live sign-ins. */}
+    {fix && saved && (
+      <>
+        <Confirm
+          open={liveAsk}
+          onClose={() => setLiveAsk(false)}
+          destructive={false}
+          shape="hero"
+          title={byVersion || viewEdit ? PUBLISH_ASK : 'Update live policy?'}
+          confirmLabel={fixSaveLabel ?? 'Save policy'}
+          onConfirm={() => {
+            setLiveAsk(false)
+            commitSave(true)
+          }}
+        >
+          {liveConfirmBody(
+            appsOf(draft, store.apps).map((a) => a.name),
+            !draft.isSystem && draft.appIds.length === 0,
+          )}
+        </Confirm>
+        {byVersion && (
+          <FirstPublishAsk
+            open={firstAsk}
+            onClose={() => setFirstAsk(false)}
+            onConfirm={publishFirst}
+            value={firstAs}
+            onChange={setFirstAs}
+            canBeActive={canBeActive}
+            monitor={monitorOffered(store.features)}
+            reach={liveConfirmBody(appsOf(draft, store.apps).map((a) => a.name), false)}
+          />
+        )}
+      </>
+    )}
     {saved && (
       <Confirm
         open={rollAsk}
@@ -2476,10 +2953,36 @@ export function BoardBuilder({
          under Check access is only hidden (check-access.css). */
       /* Describe it opens its own leading track and keeps the right one
          closed (V4 §4.1): the inspector never stands beside it. */
-      className={`bb ${testOn ? 'is-checking' : ''}${movedDraft ? ' is-moved-view' : ''}${movedRing ? ' is-moved-hi' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : movedOpen ? ' is-guided is-guided-left' : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
+      className={`bb ${testOn ? 'is-checking' : ''}${movedDraft ? ' is-moved-view' : ''}${liveView ? ' is-live-view' : ''}${viewOnCanvas || viewShown ? ' is-view-pick' : ''}${movedRing ? ' is-moved-hi' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : movedOpen ? ' is-guided is-guided-left' : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown || v3Panel || (pubPanel && !pubLeft)) ? '' : 'is-insp-closed'}${pubLeft ? ' is-pub-left' : ''}${flipNote ? ' is-default-flip' : ''} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
       style={{ '--bb-insp': `${guidedRight ? GUIDED_W : colW}px` } as React.CSSProperties}
       data-cond-link={condLink ?? undefined}
     >
+      {/* Fix's Live view names where the policy is deciding sign-ins, once (draft-fix.tsx). */}
+      {/* With `fixViewOnCanvas` that corner is the Live / Draft switch, from the first change until live matches again. */}
+      {viewOnCanvas && saved && (
+        <CanvasViewPick
+          shown={liveOffered}
+          value={canvasView}
+          onChange={setCanvasView}
+          inUse={reachesSignIns(saved)}
+          unsaved={unsaved}
+          draft={saved.pendingDraft}
+          status={byVersion ? saved.status : undefined}
+        />
+      )}
+      {/* "View and edit": draft mode says so in that corner, with whether the draft is saved (view-edit.tsx). */}
+      {viewEdit && saved && <DraftModeChip shown={inEdit && !post} unsaved={unsaved} savedBy={saved.pendingDraft?.savedBy ?? (saved.status === 'draft' && !saved.provisional ? 'You' : undefined)} />}
+      {fix && !viewOnCanvas && !viewEdit && saved && (
+        <LiveViewTag
+          shown={fixLive}
+          status={saved.status}
+          apps={appsOf(saved, store.apps).map((a) => ({ id: a.id, name: a.name }))}
+        />
+      )}
+      {/* V3: "Viewing v2" over a version, with Back to draft (draft-v3.tsx). */}
+      {v3s.tag}
+      {/* V3: two versions side by side over the whole board (version-compare.tsx). */}
+      {v3s.compareView}
       {/* Describe it, on the left in its own track (V4 §4.1). The selection
           is cleared while it is open, so the rule editor is never beside it.
           First in the region, as it is drawn first: Tab goes from the bar to
@@ -2591,8 +3094,9 @@ export function BoardBuilder({
         />
       ) : (
       <Board
-        policy={draft}
-        unsaved={unsavedIds}
+        /* Fix's Live view: the stored rules, read only (draft-model.ts). */
+        policy={v3s.shown ? { ...draft, ...v3s.shown } : (fixLive || viewShown) && saved ? { ...draft, rules: saved.rules, fallback: saved.fallback, appIds: saved.appIds } : draft}
+        unsaved={liveView ? [] : unsavedIds}
         saving={savingRule}
         /* The one lookup the stage would otherwise need a store for.
 
@@ -2605,18 +3109,19 @@ export function BoardBuilder({
           /* The chain's first node names ONE application, and says how many
              more beside it — the bar no longer carries them. A post sign-in
              policy's are the applications linked to it (post-board.ts). */
+          /* "View and edit": the view names the stored applications, as its canvas draws the stored rules (`shownApps`). */
           post
             ? (linkedAppsOf(draft, store.apps)[0]?.name ?? null)
-            : draft.appIds.length > 0
-            ? (appsOf(draft, store.apps)[0]?.name ?? null)
+            : shownApps.appIds.length > 0
+            ? (appsOf(shownApps, store.apps)[0]?.name ?? null)
             : draft.isSystem
               ? 'any application'
               : null
         }
         /* The first application's id, for its logo in the start pill, so the
            logo and the name beside it are the same application. */
-        destinationAppId={post ? (linkedAppsOf(draft, store.apps)[0]?.id ?? null) : draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
-        destinationMore={Math.max((post ? linkedAppsOf(draft, store.apps) : appsOf(draft, store.apps)).length - 1, 0)}
+        destinationAppId={post ? (linkedAppsOf(draft, store.apps)[0]?.id ?? null) : shownApps.appIds.length > 0 ? (appsOf(shownApps, store.apps)[0]?.id ?? null) : null}
+        destinationMore={Math.max((post ? linkedAppsOf(draft, store.apps) : appsOf(shownApps, store.apps)).length - 1, 0)}
         /* Groups first, then people, as the pane lists them; a name the
            directory no longer has reads "(deleted)". */
         note={
@@ -2650,11 +3155,12 @@ export function BoardBuilder({
         fitKey={describeOpen ? layout : 'edit'}
         /* Beside the rule panel the canvas is never shrunk below its own size: it pans instead (12 px type floor). */
         fitFloor={guidedBeside ? 1 : undefined}
-        locked={canvasLocked}
+        locked={canvasLocked || liveView}
         flash={flash}
-        fresh={fixedNew}
+        fresh={v3s.fresh ?? fixedNew}
         resolve={resolve}
-        onSelect={select}
+        /* Live is a view: a card there is read, never selected for editing (draft-model.ts). */
+        onSelect={liveView ? () => undefined : select}
         expandedOf={expandedOf}
         onToggleExpand={toggleExpand}
         /* Read-only while Describe it is open (V4 §4.1): the board is the
@@ -2665,17 +3171,17 @@ export function BoardBuilder({
            the left or the right (`.bb.is-guided-locked`), and leaves it
            editable beside the rule panel, where the power admin works. */
         onInsert={(at) => {
-          if (canvasLocked) return
+          if (canvasLocked || liveView) return
           /* The first rule of a scratch policy: its name is the first thing
              to fill in, as it was when the chooser inserted it. */
           const first = draft.rules.length === 0
           insert(newRule(), at)
           if (first) focusSoon(() => document.querySelector<HTMLElement>('.bb__insp input[aria-label="Rule name"]'), true)
         }}
-        onMove={(from, to) => (canvasLocked ? undefined : move(from, to))}
-        onToggle={(i, on) => (canvasLocked ? undefined : patchRule(i, { enabled: on }))}
-        onDuplicate={(i) => (canvasLocked ? undefined : duplicate(i))}
-        onDelete={(i) => (canvasLocked ? undefined : remove(i))}
+        onMove={(from, to) => (canvasLocked || liveView ? undefined : move(from, to))}
+        onToggle={(i, on) => (canvasLocked || liveView ? undefined : patchRule(i, { enabled: on }))}
+        onDuplicate={(i) => (canvasLocked || liveView ? undefined : duplicate(i))}
+        onDelete={(i) => (canvasLocked || liveView ? undefined : remove(i))}
         onHover={setHover}
         onHoverLast={describeOpen ? setHoverLast : undefined}
         sources={sources}
@@ -2694,12 +3200,12 @@ export function BoardBuilder({
                 panel it acts on, was a second door for a room that was not
                 short of them. */}
             <Tip text={`Undo (${chord(['mod'], 'Z', MAC)})`} placement="top">
-              <button type="button" className="bb__act" aria-label="Undo" disabled={!canUndo(hist) && !backToChooser} onClick={undoStep}>
+              <button type="button" className="bb__act" aria-label="Undo" disabled={liveView || (!canUndo(hist) && !backToChooser)} onClick={undoStep}>
                 <Undo2 size={14} strokeWidth={2} />
               </button>
             </Tip>
             <Tip text={`Redo (${chord(['mod', 'shift'], 'Z', MAC)})`} placement="top">
-              <button type="button" className="bb__act" aria-label="Redo" disabled={!canRedo(hist)} onClick={redoStep}>
+              <button type="button" className="bb__act" aria-label="Redo" disabled={liveView || !canRedo(hist)} onClick={redoStep}>
                 <Redo2 size={14} strokeWidth={2} />
               </button>
             </Tip>
@@ -2826,6 +3332,18 @@ export function BoardBuilder({
           onClose={() => setFixesOpen(false)}
         />
       )}
+      {/* V3's Version history, in the same slot (draft-v3.tsx): the canvas beside it draws the version picked. */}
+      {v3Panel && v3s.panel}
+      {flipNote && <DefaultFlipNote flip={flipNote.flip} stamp={flipNote.stamp} onAllow={allowInstead} onClose={() => setFlipNote(null)} />}
+      {/* Mounted before it speaks, so the change is announced (default-flip.ts); only where the default turns at all. */}
+      {DEFAULT_FLIPS && (
+        <p className="u-sr-only" role="status">
+          {flipNote ? (flipNote.flip === 'to-deny' ? 'Nothing else matched is now Deny' : 'Nothing else matched is Allow again') : ''}
+        </p>
+      )}
+      {pubPanel && saved && (
+        <PublishedPanel policy={{ ...saved, pendingDraft: undefined }} left={pubLeft} onClose={() => setPubOpen(false)} />
+      )}
       {fixList && !fixesOpen && !testOn && !describeOpen && (
         <button type="button" className="bdsc-door bfix-door" onClick={() => {
             setReading(false)
@@ -2842,6 +3360,18 @@ export function BoardBuilder({
         <Inspector
           leaving={panelLeaving}
           draft={draft}
+          /* "View and edit": the start node's applications are an edit to the draft, held until Save and publish. */
+          appsDraft={
+            inEdit
+              ? {
+                  appIds: draft.appIds,
+                  apply: (ids) => {
+                    commitDraft({ ...draft, appIds: ids })
+                    store.showToast('Applications changed. Not saved yet.')
+                  },
+                }
+              : undefined
+          }
           selection={selection}
           /* What is wrong with the rule on screen, said where it is edited.
              No edition has a Check sheet, so this is the only place the
@@ -2936,7 +3466,7 @@ export function BoardBuilder({
       <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard shortcuts" width={480}>
         <dl className="bb__keys">
           {/* Only the keys that do something on this build: the version's and the flags' (shortcuts.ts). */}
-          {keys && boardShortcuts({ mac: MAC, commands: features.commands, testing: canTest && !post, publish: features.publish, arrange, history: showHistory, onOff: RULE_ON_OFF }).map(([k, what]) => (
+          {keys && boardShortcuts({ mac: MAC, commands: features.commands, testing: canTest && !post, publish: features.publish, saveLabel: fixSaveLabel, arrange, history: showHistory, onOff: RULE_ON_OFF }).map(([k, what]) => (
             <div key={k}>
               <dt>
                 {k.split(' ').map((part) => (
@@ -2967,6 +3497,7 @@ export function BoardBuilder({
         onChoosePolicy={(p) => copyRules(p, copyableRules(p))}
       />
       {saveTemplate.dialog}
+      {STATUS_IN_MENU && menuStatus.dialog}
       {/* A policy's rules land under the ones here; a template goes through `applyTemplate`, as the gallery's pick does,
           so it names a policy the product named and says what it left out. */}
       <RulePickerSlider
@@ -3027,9 +3558,11 @@ export function BoardBuilder({
             policyName={saved.name}
             result={guard.result}
             run={guard.run}
-            primaryLabel={guard.kind === 'turn-on' ? 'Make active' : features.publish ? 'Publish policy' : 'Save policy'}
+            primaryLabel={guard.kind === 'turn-on' ? 'Make active' : v3s.on ? v3s.primaryLabel : (fixSaveLabel ?? (features.publish ? 'Publish policy' : 'Save policy'))}
             onConfirm={() => {
               setGuardOpen(false)
+              /* V3: past the checks, the save is Publish or Request review, which asks for its note. */
+              if (v3s.on && guard.kind === 'save') return v3s.ask()
               publish(guard.intent)
             }}
             onClose={() => setGuardOpen(false)}
@@ -3068,6 +3601,7 @@ export function BoardBuilder({
 
     </div>
     </CondTagsContext.Provider>
+    </RuleGapsContext.Provider>
     </PostBoardContext.Provider>
   )
 }

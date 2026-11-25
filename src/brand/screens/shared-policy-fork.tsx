@@ -131,7 +131,11 @@ export function SharedPolicyFork({
   inline = false,
   only,
   split = false,
+  viewEdit = false,
 }: {
+  /** "View and edit" (board/draft-model.ts): the copy is made and opened in the builder's view, so it is named Copy for
+      the application, and its verb is Copy. The edit happens behind the builder's own Edit. */
+  viewEdit?: boolean
   open: boolean
   /** The policy the Edit was for. */
   policy: Policy
@@ -155,7 +159,7 @@ export function SharedPolicyFork({
 }) {
   const { apps } = useBrand()
   const editVerb = 'Edit for all'
-  const copyVerb = split ? 'Copy and edit' : 'Duplicate'
+  const copyVerb = viewEdit ? 'Copy' : split ? 'Copy and edit' : 'Duplicate'
   const single = !!only
   const popup = single || (asPopup ?? FORK_IN_POPUP)
   const [q, setQ] = useState('')
@@ -228,7 +232,7 @@ export function SharedPolicyFork({
   if (single && only) {
     const others = on.filter((a) => a.id !== app.id)
     /* A short title naming the job, as Remove's names the application with a question mark. */
-    const title = only === 'edit' ? 'Edit shared policy?' : split ? `Edit for ${app.name} only?` : `Duplicate for ${app.name}?`
+    const title = only === 'edit' ? 'Edit shared policy?' : viewEdit ? `Copy for ${app.name}?` : split ? `Edit for ${app.name} only?` : `Duplicate for ${app.name}?`
     const card = <ForkCard way={only} policy={policy} app={app} others={others} />
     if (inline) {
       return open ? (

@@ -2,6 +2,7 @@ import type { AccessDecision, Audience, Condition, Predicate, Rule, RuleWho } fr
 import { DECISION_PHRASE } from '../../decision-words'
 import { daysWords, type DescribeTenant } from '../../create/describe-model'
 import { intersectWho, normaliseWho } from '../../rule-who'
+import { scheduleWords } from '../../schedule'
 
 /* -----------------------------------------------------------------------------
    What a change did, in plain lines (Guided setup, 19 Oct 2026; design §4,
@@ -111,6 +112,8 @@ export function condWords(c: Condition, t: SaidTenant): string {
       return `at risk ${c.operator === 'below' ? 'below' : 'above'} ${c.values[0] ?? ''}`.trim()
     case 'time':
       return c.operator === 'not between' ? `outside ${c.values[0] ?? ''} to ${c.values[1] ?? ''}` : `between ${c.values[0] ?? ''} and ${c.values[1] ?? ''}`
+    case 'schedule':
+      return `${c.operator === 'outside' ? 'outside' : 'within'} ${scheduleWords(c.values)}`
     case 'day': {
       const weekdays = c.values.length === WEEKDAYS.length && WEEKDAYS.every((d) => c.values.includes(d))
       const days = weekdays ? 'weekdays' : daysWords(c.values)

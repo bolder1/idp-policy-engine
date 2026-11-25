@@ -7,6 +7,7 @@ import { DECISION_WORDS } from '../decision-words'
 import { Badge, Button, Callout, Drawer, Field, Modal, TipDot } from '../kit'
 import { listNames } from '../rule-who'
 import { CRITICAL_GUARD, TESTER } from '../tester'
+import { ACTIVE_WORDS } from './status-options'
 import { reviewKind, reviewItemName, type ReviewLine } from '../review-rows'
 import { REASON_MAX, BREAK_IN_TIP } from './break-in-model'
 import { Seg } from './board/Section'
@@ -63,8 +64,9 @@ import './guard.css'
 const TITLE: Record<GuardKind, string> = {
   save: 'Before saving: your edits',
   apps: 'Before saving: applications',
-  'turn-on': 'Before turning on',
-  'turn-off': 'Before turning off',
+  /* Active / inactive words where `activeWords` is on (status-options.ts). */
+  'turn-on': ACTIVE_WORDS ? 'Before making it active' : 'Before turning on',
+  'turn-off': ACTIVE_WORDS ? 'Before making it inactive' : 'Before turning off',
   'to-monitor': 'Before switching to monitoring',
 }
 

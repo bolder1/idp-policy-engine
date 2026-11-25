@@ -13,6 +13,7 @@ import type { DraftCheck } from './draft-checks'
 import type { AppSetup } from './app-setup'
 import type { PostAction, PostSetup } from './post-sign-in'
 import { TESTER, TESTER_WITHHELD_CONDITIONS } from './tester'
+import { SCHEDULE, SIGN_IN_TIME } from './schedule'
 
 export type PolicyType = 'App Access' | 'Session' | 'Account Management'
 
@@ -201,7 +202,7 @@ export interface ConditionType {
   hint: string
   operators: string[]
   /** Where the value comes from: a library object, a fixed list, a clock, typed. `number` is typed with `unit` after it. */
-  valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'range' | 'time' | 'text' | 'number'
+  valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'range' | 'time' | 'text' | 'number' | 'schedule'
   /** What a `number` counts, said after the field and the value: "hours", "records". */
   unit?: string
   /* Which policy type asks it (post-sign-in.ts, 13 Oct 2026). `post`: only a
@@ -372,6 +373,10 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      means both. The parameter sheet lists them as two rows for the same
      reason. */
   { id: 'day', label: 'Sign-in days', group: 'Time', hint: 'The weekday of the sign-in', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], postLabel: 'Event days', postHint: 'The weekday of the event' },
+  /* The two above as one (schedule.ts, 24 Nov 2026): each day's hours and the time zone they are read in. The menu
+     offers it in their place on the Design line only (`WHEN_CONDITIONS`), so the argument above still holds for the
+     lines that keep the pair. */
+  { id: 'schedule', label: 'Sign-in time', group: 'Time', hint: 'The day and time of the sign-in, in a set time zone', operators: ['within', 'outside'], valueKind: 'schedule', postLabel: 'Event time', postHint: 'The day and time of the event, in a set time zone' },
   /* --- The two attribute conditions, and why there are two -------------------
 
      The sheet lists both: "Custom user attributes", with the comparison types
@@ -450,13 +455,16 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
    and it is short enough to be the whole answer. */
 /* A sign-in policy's: the post sign-in conditions are never offered on one
    (and the trail builder, which only builds sign-in policies, reads this). */
+/* Sign-in time in place of Sign-in hours and Sign-in days on the Design line, and never elsewhere (schedule.ts). */
+const timeOffered = (id: string) => (SIGN_IN_TIME ? id !== 'time' && id !== 'day' : id !== SCHEDULE)
+
 export const WHEN_CONDITIONS = CONDITION_CATALOGUE.filter(
-  (c) => !c.who && c.phase !== 'post' && !(TESTER && TESTER_WITHHELD_CONDITIONS.includes(c.id)),
+  (c) => !c.who && c.phase !== 'post' && !(TESTER && TESTER_WITHHELD_CONDITIONS.includes(c.id)) && timeOffered(c.id),
 )
 
 /* A post sign-in policy's If (post-sign-in.ts, 13 Oct 2026): its own
    conditions and the shared ones, never the sign-in-only risk scores. */
-export const POST_WHEN_CONDITIONS = CONDITION_CATALOGUE.filter((c) => !c.who && c.phase !== 'sign-in')
+export const POST_WHEN_CONDITIONS = CONDITION_CATALOGUE.filter((c) => !c.who && c.phase !== 'sign-in' && timeOffered(c.id))
 
 /** What a rule's If offers, by the type of policy it is in. */
 export const whenConditionsFor = (post: boolean): ConditionType[] => (post ? POST_WHEN_CONDITIONS : WHEN_CONDITIONS)
@@ -769,6 +777,15 @@ export interface Rule {
       blank's — Allow, then "any enabled method" — still count as written
       (23 Sep 2026: that rule was reading "Nothing set yet"). */
   pristine?: true
+  /** Nobody has pressed Allow or Deny yet: the `decision` a new rule holds is the blank's default, not an answer.
+      Set by the board's new rule where `ruleGaps` is on; cleared only by pressing an outcome (WhatEditor). Unlike
+      `pristine`, adding a condition or a who does not clear it, so a save can still refuse the unanswered Then
+      (board/rule-gaps.ts; owner, 23 Nov 2026: "I didn't choose any Allow or anything, so this cannot be saved"). */
+  outcomeOpen?: true
+  /** "Nothing else matched" only: who last set its outcome. 'auto' is the builder turning it to Deny at the first rule;
+      'admin' is a hand edit in its panel. Absent is the blank default, Allow. Only an untouched default turns, so an
+      outcome the admin chose is never changed for them (board/default-flip.ts, rollout.ts `defaultFlips`). */
+  setBy?: 'auto' | 'admin'
   /** Ordered steps, when secondFactor is 'chain'. */
   methodChain?: string[]
   /** Fallback method, when secondFactor is 'preferred' and the user set none. */
@@ -1031,6 +1048,10 @@ export function addedLabel(p: Pick<Policy, 'addedOn'>): string {
 export interface PolicyDraft {
   rules: Rule[]
   fallback?: Rule
+  /** The applications the draft holds, where they join it ("View and edit", draft-model.ts); absent, the policy's own. */
+  appIds?: string[]
+  /** The name the draft holds, the same way; absent, the policy's own. */
+  name?: string
   savedAt: string
   savedBy: string
 }

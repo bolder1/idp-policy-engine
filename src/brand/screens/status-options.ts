@@ -4,6 +4,13 @@ import { monitorBlocker, openForEditing } from '../policy-draft'
 import { ACCESS_CHECK } from './sign-in-tests/names'
 import { MARK_LABEL, UNMARK_LABEL } from '../tester'
 import { shows } from '../rollout'
+import { policyGaps } from './board/rule-gaps'
+
+/* The confirms say active / inactive, never Turn on / Turn off (owner, 5 Nov 2026; rollout.ts `activeWords`, Design only
+   since 24 Nov). Where it is off, the words are as they were. */
+export const ACTIVE_WORDS: boolean = shows('activeWords')
+const ON = ACTIVE_WORDS ? { title: 'Make this policy active?', verb: 'Make active' } : { title: 'Turn on this policy?', verb: 'Turn on' }
+const OFF = ACTIVE_WORDS ? { title: 'Make this policy inactive?', verb: 'Make inactive' } : { title: 'Turn off this policy?', verb: 'Turn off' }
 
 /* What a published policy can be switched to, where its menu and dialog
    portal, and which switches ask first. Plain functions, kept apart from the
@@ -61,10 +68,14 @@ const MONITOR: StatusOption = { target: 'monitor', label: 'Monitoring' }
    Linked to no application, it can still be turned on. Never Monitor: its
    statuses are Draft, Active and Inactive (owner, 13 Oct 2026). */
 export function statusOptions(
-  policy: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType },
-  opts: { monitor?: boolean } = {},
+  policy: Pick<Policy, 'status' | 'isSystem'> & { type?: PolicyType; appIds?: string[]; movedFrom?: Policy['movedFrom'] },
+  opts: { monitor?: boolean; draftActivates?: boolean } = {},
 ): StatusOption[] {
   if (policy.status === 'draft' && policy.type === 'Session' && !policy.isSystem) return [TURN_ON]
+  /* "View and edit" (draft-model.ts): a sign-in draft on an application is made active in one press, which publishes
+     it. With no application it has no Make active at all (owner, 24 Nov 2026). */
+  /* Not a migrated draft: it is in review, and Publish waits for Approve (migrate/, 17 Nov 2026). */
+  if (opts.draftActivates && policy.status === 'draft' && !policy.isSystem && !policy.movedFrom?.length && (policy.appIds?.length ?? 0) > 0) return [TURN_ON]
   if (policy.isSystem || policy.status === 'draft' || policy.status === 'always-on') return []
   const monitor = opts.monitor !== false && (policy.type ?? 'App Access') === 'App Access'
   switch (policy.status) {
@@ -131,7 +142,28 @@ export function canSaveAsTemplate(policy: Policy): boolean {
   return openForEditing(policy).rules.length > 0
 }
 
-export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean; /** Already a template: the item takes it off again. */ marked?: boolean }): { id: RowMenuId; label: string }[] {
+/* Not every policy is worth keeping as a template (owner, 25 Nov 2026: "this cannot be a template … only use Mark as a
+   template wherever we can find the thing important … maybe disable it … let the user know"). One with no rule, or with
+   a rule not finished, has nothing a template could hand on yet. The menus keep the row, greyed, with why in its pill,
+   so the way to it is plain; the row's star stays away until it can be pressed. On Design this narrows the 20 Nov
+   "every draft, even with no rule yet" (rollout.ts `templateNeedsRules`). */
+const TEMPLATE_NEEDS_RULES: boolean = shows('templateNeedsRules')
+
+/** Why these rules cannot be marked as a template yet, as a menu row's pill; null when they can. */
+export function templateHold(p: Pick<Policy, 'rules' | 'fallback'>, post = false): string | null {
+  if (!TEMPLATE_NEEDS_RULES) return null
+  if (p.rules.length === 0) return 'No rules yet'
+  return policyGaps(p, post).length > 0 ? 'Unfinished rule' : null
+}
+
+/** The same for a stored policy: what a builder would open, a saved draft if there is one. */
+export const policyTemplateHold = (policy: Policy): string | null => templateHold(openForEditing(policy))
+
+/** A row of a policy's menu. A row that cannot be used yet is greyed, and says why in its pill. */
+export type RowMenuItem = { id: RowMenuId; label: string; disabled?: boolean; pill?: string }
+
+export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boolean; trail: boolean; /** Already a template: the item takes it off again. */ marked?: boolean }): RowMenuItem[] {
+  const hold = opts.marked ? null : policyTemplateHold(policy)
   const { monitor } = opts
   const signIn = policy.type !== 'Session'
   return [
@@ -145,7 +177,7 @@ export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boo
     ...(opts.marked
       ? [{ id: 'template' as const, label: UNMARK_LABEL }]
       : canSaveAsTemplate(policy)
-        ? [{ id: 'template' as const, label: MARK_LABEL }]
+        ? [{ id: 'template' as const, label: MARK_LABEL, ...(hold ? { disabled: true, pill: hold } : null) }]
         : []),
     ...(policy.isSystem
       ? []
@@ -275,18 +307,18 @@ export function statusConfirmParts(
 ): StatusConfirmParts {
   if (policy.type === 'Session' && target !== 'monitor') {
     return target === 'active'
-      ? { title: 'Turn on this policy?', lead: { does: 'starts acting on events', where: 'in', rest: '.' }, notes: [], verb: 'Turn on' }
-      : { title: 'Turn off this policy?', lead: { does: 'stops acting on events', where: 'in', rest: '.' }, notes: [], verb: 'Turn off' }
+      ? { title: ON.title, lead: { does: 'starts acting on events', where: 'in', rest: '.' }, notes: [], verb: ON.verb }
+      : { title: OFF.title, lead: { does: 'stops acting on events', where: 'in', rest: '.' }, notes: [], verb: OFF.verb }
   }
   if (target === 'active') {
     return {
-      title: 'Turn on this policy?',
+      title: ON.title,
       lead: { does: 'starts deciding sign-ins', where: 'to', rest: '.' },
       notes: policy.pendingDraft ? ['Your saved draft is not included.'] : [],
-      verb: 'Turn on',
+      verb: ON.verb,
     }
   }
-  if (target === 'inactive') return { title: 'Turn off this policy?', lead: { does: 'stops deciding sign-ins', where: 'to', rest: '.' }, notes: [], verb: 'Turn off' }
+  if (target === 'inactive') return { title: OFF.title, lead: { does: 'stops deciding sign-ins', where: 'to', rest: '.' }, notes: [], verb: OFF.verb }
   if (policy.status === 'active') {
     return {
       title: 'Monitor this policy?',

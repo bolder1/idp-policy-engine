@@ -210,7 +210,9 @@ export function patchRule(r: Rule, p: Partial<Rule>): Rule {
      `who` is stored that way: JSON drops it, and the key keeps its place. */
   /* A post sign-in rule's outcome is its `action` (post-sign-in.ts), so
      choosing one is that rule's first real write in the same way. */
-  const base = r.pristine && ('decision' in p || 'action' in p) ? { ...r, pristine: undefined } : r
+  /* And the open Then (`outcomeOpen`, rule-gaps.ts) closes on the same write, from wherever it comes: the panel's tiles,
+     Guided setup's What happens, a twin's merge (23 Nov 2026 audit). */
+  const base = (r.pristine || r.outcomeOpen) && ('decision' in p || 'action' in p) ? { ...r, pristine: undefined, outcomeOpen: undefined } : r
   if (!('who' in p)) return { ...base, ...p }
   return { ...base, ...p, who: normaliseWho(p.who) }
 }

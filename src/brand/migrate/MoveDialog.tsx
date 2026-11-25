@@ -11,7 +11,7 @@ import './old-policies.css'
 import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, FileInput, Plus, Send, Layers, Power, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { Button, Modal } from '../kit'
 import { useBrand } from '../store'
-import { type MovePlan } from './plan'
+import { ONE_APP_MOVES, type MovePlan } from './plan'
 import './move-dialog.css'
 
 /* -----------------------------------------------------------------------------
@@ -40,7 +40,8 @@ function MoveSum({ plan, count, newCount }: ReturnType<typeof useMovePlan>) {
       <span className="bmpk__fig is-new">
         <b>{newCount}</b>
         <span>{newCount === 1 ? 'new policy' : 'new policies'}</span>
-        <em>One per application, or shared</em>
+        {/* Never shared since `oneAppMoves` (plan.ts). */}
+        <em>{ONE_APP_MOVES ? 'One per application' : 'One per application, or shared'}</em>
       </span>
       <span className="bmpk__fig">
         <b>{plan.zones.length}</b>

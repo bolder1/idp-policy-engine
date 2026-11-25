@@ -1164,6 +1164,11 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
   border: 0; background: none; color: var(--text-primary); font: inherit; outline: none;
 }
 .bm8__gnum > span { color: var(--text-secondary); font-size: var(--fs-sm); }
+/* A typed value that can't be saved (GENERAL_SAVE): the reason under its question, and the field's edge in the same
+   colour. */
+.bm8__gtext .bm8__gerr { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fb-negative-fg); }
+.bm8__gtext-input[aria-invalid='true'],
+.bm8__gnum.is-invalid { border-color: var(--fb-negative-fg); }
 
 /* The general settings on the page's own tab (owner, 21 Oct 2026), the same rows the slide-over draws.
 

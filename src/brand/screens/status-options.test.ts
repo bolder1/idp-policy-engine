@@ -86,6 +86,12 @@ describe('statusToast', () => {
     expect(statusToast('HRMS', 'active', 'monitor').text).toBe('HRMS is monitoring')
   })
 
+  it('says active / inactive where `activeToasts` is on (Design)', () => {
+    expect(statusToast('HRMS', 'inactive', 'active', true).text).toBe('HRMS is active')
+    expect(statusToast('HRMS', 'active', 'inactive', true).text).toBe('HRMS is inactive')
+    expect(statusToast('HRMS', 'active', 'monitor', true).text).toBe('HRMS is monitoring')
+  })
+
   it('offers Undo only between Inactive and Monitoring', () => {
     expect(statusToast('HRMS', 'inactive', 'monitor').undo).toBe('inactive')
     expect(statusToast('HRMS', 'monitor', 'inactive').undo).toBe('monitor')

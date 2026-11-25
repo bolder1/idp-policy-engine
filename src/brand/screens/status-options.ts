@@ -246,8 +246,16 @@ export function turnOnExtras(
    only between the two statuses that enforce nothing (Inactive and
    Monitoring). An Undo that restored enforcement would be a Turn on that
    skipped its confirmation. */
-export function statusToast(name: string, from: PolicyStatus, to: StatusTarget): { text: string; undo: PolicyStatus | null } {
-  const text = to === 'active' ? `${name} is on` : to === 'inactive' ? `${name} is off` : `${name} is monitoring`
+/* In the same words as the switch that made it (owner, 25 Nov 2026: Make inactive's toast said "… is off"; rollout.ts
+   `activeToasts`, Design only): "is active" / "is inactive". Elsewhere "is on" / "is off", as before. */
+export const ACTIVE_TOASTS: boolean = shows('activeToasts')
+export function statusToast(
+  name: string,
+  from: PolicyStatus,
+  to: StatusTarget,
+  activeWords: boolean = ACTIVE_TOASTS,
+): { text: string; undo: PolicyStatus | null } {
+  const text = to === 'monitor' ? `${name} is monitoring` : `${name} is ${activeWords ? to : to === 'active' ? 'on' : 'off'}`
   const quiet = (s: PolicyStatus) => s === 'inactive' || s === 'monitor'
   return { text, undo: quiet(from) && quiet(to) ? from : null }
 }

@@ -244,6 +244,14 @@ export const ROLLOUT = {
    *  picked. Existing signals keep their values (25 Nov, owner: "don't need to change any values. Just check the name
    *  and add all of this"; fingerprint.ts). Design only. */
   allRiskParameters: ['design'],
+  /** The toast after a status switch says "… is active" / "… is inactive", never "is on" / "is off", in the words of
+   *  `activeWords`' confirms (25 Nov, owner: yes to fixing "… is off" after Make inactive; status-options.ts
+   *  `statusToast`). Design only. */
+  activeToasts: ['design'],
+  /** Builder: saving the policy saves its rules too, so a rule card's "Unsaved" tag goes with Save policy / Save and
+   *  publish, and with Save draft for every rule that has no empty part (25 Nov, noticed in the morning's builder
+   *  review: the tag stayed after Save and publish; BoardBuilder.tsx `markRulesSaved`). Design only. */
+  rulesSaveWithPolicy: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

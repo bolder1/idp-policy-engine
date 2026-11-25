@@ -98,6 +98,8 @@ const EMPTY_START_BAR: boolean = shows('emptyStartBar')
 const TEMPLATE_TOGGLE: boolean = shows('builderTemplateToggle')
 /* A new policy is unsaved until a save from the builder (rollout.ts `newPolicyUnsaved`). */
 const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
+/* A policy save marks its rules saved, so a card's Unsaved goes with it (rollout.ts `rulesSaveWithPolicy`). */
+const RULES_SAVE_WITH_POLICY: boolean = shows('rulesSaveWithPolicy')
 /* Nothing being said: one array, so the context does not change identity on every render. */
 const NO_GAPS: readonly RuleGap[] = []
 const NO_TRIED: ReadonlySet<string> = new Set()
@@ -718,6 +720,13 @@ export function BoardBuilder({
     () => (RULE_SAVE ? draft.rules.filter((r) => savedRules[r.id] !== JSON.stringify(r)).map((r) => r.id) : []),
     [draft.rules, savedRules],
   )
+  /* A policy save stores its rules too, so their cards stop reading Unsaved (rollout.ts `rulesSaveWithPolicy`; noticed
+     25 Nov 2026: the tag stayed on every card after Save and publish). Publish clears them all, since it refuses while
+     any rule has an empty part; Save draft clears only the rules with none, so an unfinished rule still reads Unsaved. */
+  const markRulesSaved = (rules: readonly Rule[]) => {
+    if (!RULES_SAVE_WITH_POLICY || rules.length === 0) return
+    setSavedRules((all) => ({ ...all, ...Object.fromEntries(rules.map((r) => [r.id, JSON.stringify(r)])) }))
+  }
   const saveRule = (id: string) => {
     const r = draft.rules.find((x) => x.id === id)
     if (!r || savingRule) return
@@ -1051,6 +1060,7 @@ export function BoardBuilder({
     })
     /* A new policy loses its "new" mark with this save; it stays in draft mode all the same. */
     if (viewEdit && !post) setEditMode(true)
+    markRulesSaved(draft.rules.filter((r) => !gaps.some((g) => g.at === r.id)))
     afterSave({ ...latest, ...facts })
     /* New marks a fix not saved yet. */
     setFixedNew([])
@@ -2541,6 +2551,7 @@ export function BoardBuilder({
        agree about the record from the moment it is saved. The store stamps
        lastModified only when something besides the stamp changed. */
     store.savePolicy(next)
+    markRulesSaved(next.rules)
     if (then === 'monitor') store.setPolicyStatus(next.id, 'monitor')
     /* V3: the stored policy becomes the next version (draft-v3.tsx), and the toast names it. */
     const v3Said = v3s.on ? v3s.published(store.policyById(next.id) ?? next) : null

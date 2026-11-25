@@ -15,6 +15,7 @@ import { detailsChanges } from '../policy-details-review'
 import { portalRoot } from '../status-options'
 import { isPostSignIn } from '../../post-sign-in'
 import { useAppsGuard } from './apps-guard'
+import { useSimpleDraft } from './draft-model'
 import { linkedRows } from './post-board'
 import { AudienceEditor } from './WhoEditor'
 
@@ -75,6 +76,7 @@ export function AppsPane({
   const [picked, setPicked] = useState<string[]>(toDraft?.appIds ?? saved?.appIds ?? [])
   const [aud, setAud] = useState<Audience | null>(null)
   const appsGuard = useAppsGuard()
+  const simple = useSimpleDraft()
   /* Undo on a ready fix's toast. It runs after later renders, so it reads the
      pane as it is then, not as it was when the fix was made (below). */
   const undoFix = useRef<(back: string[], fixed: string[]) => void>(() => {})
@@ -128,8 +130,12 @@ export function AppsPane({
               picked={picked}
               onChange={setPicked}
               takenBy={(id) => (picked.includes(id) ? undefined : ownerOf(id, store.policies, saved.id)?.name)}
-              /* The reason under the field (owner, 24 Nov 2026: no application, draft only). */
-              emptyNote={picked.length === 0 ? <p className="bb__apps__note">A policy with no application can only be saved as a draft.</p> : null}
+              /* The reason under the field (owner, 24 Nov 2026: no application, draft only; in Simple, 25 Nov: saved inactive). */
+              emptyNote={
+                picked.length === 0 ? (
+                  <p className="bb__apps__note">{simple ? 'With no application, the policy is saved inactive.' : 'A policy with no application can only be saved as a draft.'}</p>
+                ) : null
+              }
             />
           </div>
         </section>

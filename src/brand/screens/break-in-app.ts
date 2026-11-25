@@ -1,5 +1,6 @@
 import type { AccessDecision, Policy } from '../data'
 import { AUTH_METHODS } from '../methods'
+import { NO_POLICY, isNoPolicy } from '../no-global-default'
 import {
   acceptanceOptions,
   applyBreakInFix,
@@ -160,7 +161,7 @@ export function runBreakInOnApp(policies: readonly Policy[], appId: string, env:
   const decided = new Map<string, string[]>()
   for (const card of deck) {
     const res = resolveSignIn(policies, attemptFacts(card, appId), e, opts.substitute ? { substitute: opts.substitute } : {})
-    const decider = res.decidedBy ? byId.get(res.decidedBy.policyId) : undefined
+    const decider = res.decidedBy ? (byId.get(res.decidedBy.policyId) ?? (isNoPolicy(res.decidedBy.policyId) ? NO_POLICY : undefined)) : undefined
     const base = { personId: card.personId, story: card.story, status: res.status }
     if (!decider || !res.trace) {
       const round: AttemptRound = { challenge: card, want: card.want, trace: noTrace(), decision: null, factor: null, outcome: 'undecided', outcomes: [] }

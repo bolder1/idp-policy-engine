@@ -306,7 +306,7 @@ export function statusMenu(
   policy: Policy,
   app: Pick<App, 'id' | 'name'>,
   apps: readonly App[],
-  opts: { monitor: boolean; deletable: boolean; viewEdit?: boolean },
+  opts: { monitor: boolean; deletable: boolean; viewEdit?: boolean; /** "Simple": no status switches, Save policy decides (owner, 25 Nov 2026). */ simple?: boolean },
 ): MenuItem[] {
   if (policy.isSystem || policy.status === 'always-on') return []
   const remove: MenuItem = { id: 'remove', label: `Remove from ${app.name}` }
@@ -327,7 +327,7 @@ export function statusMenu(
      application the distinction does not exist, and the labels stay plain. */
   const shared = others.length > 0
   const alsoOn = `${listPhrase(others.map((a) => a.name))} too`
-  const switches: MenuItem[] = statusOptions(policy, { monitor: opts.monitor })
+  const switches: MenuItem[] = (opts.simple ? [] : statusOptions(policy, { monitor: opts.monitor }))
     .filter((o) => !opts.viewEdit || o.target !== 'active')
     .map((o) => ({
       id: o.target,

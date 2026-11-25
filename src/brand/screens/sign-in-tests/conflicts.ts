@@ -1,6 +1,7 @@
 import { FALLBACK_NAME, enforces, memberGroupIds, ruleExpired, type AccessDecision, type Policy, type Rule, type RuleWho, type User } from '../../data'
 import { CANT_TELL, DECISION_PHRASE, DECISION_WORDS, factWords } from '../../decision-words'
 import { listNames, normaliseWho, whoPasses, whoSummary } from '../../rule-who'
+import { NO_POLICY, isNoPolicy } from '../../no-global-default'
 import { journeyOf, type JourneyStep } from '../board/model'
 import { personOf, tracePolicy, traceRule, type FactKey, type SignInFacts, type SimEnv, type SimUser } from '../simulate'
 import { audienceNames, evaluatedList, resolveSignIn, tierOf, type PolicyTier, type StandingKind, type TenantResolution } from '../tenant-resolver'
@@ -533,7 +534,8 @@ export function conflictsOf(input: ConflictsInput): SignInConflicts {
   const list = evaluatedList(input.policies, input.substitute)
   const person = personOf(facts.personId, env)
   if (!person || !res.decidedBy || !res.trace) return EMPTY(person, env)
-  const decider = list.find((p) => p.id === res.decidedBy!.policyId)
+  /* The stand-in for "no policy covers it" is in no list (no-global-default.ts). */
+  const decider = list.find((p) => p.id === res.decidedBy!.policyId) ?? (isNoPolicy(res.decidedBy.policyId) ? NO_POLICY : undefined)
   if (!decider) return EMPTY(person, env)
   const trace = res.trace
   const app = appNameOf(facts.appId, env)
@@ -1006,7 +1008,7 @@ function rowOf(
   label: string,
   groups: GroupRef[],
 ): AsGroupRow {
-  const p = r.decidedBy ? list.find((x) => x.id === r.decidedBy!.policyId) : undefined
+  const p = r.decidedBy ? (list.find((x) => x.id === r.decidedBy!.policyId) ?? (isNoPolicy(r.decidedBy.policyId) ? NO_POLICY : undefined)) : undefined
   const hit = r.trace?.hitIndex ?? null
   const rule = p ? (hit !== null ? p.rules[hit] : p.fallback) : undefined
   const possible = distinct(r.possible.map((o) => o.decision))

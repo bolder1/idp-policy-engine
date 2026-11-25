@@ -86,6 +86,8 @@ import { CharCount } from '../CharCount'
 
 /** The place results open over the sticky save bar (rollout `zonesHitsOverBar`). */
 const HITS_OVER_BAR = shows('zonesHitsOverBar')
+/* Create and Save end on the Zones list, with their toast (rollout `backAfterSave`). */
+const BACK_AFTER_SAVE: boolean = shows('backAfterSave')
 
 /* -----------------------------------------------------------------------------
    Zones.
@@ -310,13 +312,23 @@ export function ZonesFinal() {
             if (creating) {
               const id = store.addZone(z)
               setCreating(null)
-              setOpenId(id)
               store.showToast(`${z.name} created`)
+              /* Back on the list, on the new row (rollout.ts `backAfterSave`). */
+              if (BACK_AFTER_SAVE) {
+                setOpenId(null)
+                focusRowOrSearch(id, searchRef)
+                return
+              }
+              setOpenId(id)
               /* Stored under another id only if this one was taken meanwhile; the page then remounts. */
               if (id !== z.id) focusZoneHeading()
             } else {
               store.updateZone(z)
               store.showToast(`${z.name} saved`)
+              if (BACK_AFTER_SAVE) {
+                setOpenId(null)
+                focusRowOrSearch(z.id, searchRef)
+              }
             }
           }}
           /* A stored zone's rename is saved at once, and only the name: read

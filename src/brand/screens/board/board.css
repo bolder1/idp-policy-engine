@@ -1724,6 +1724,19 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
   background: var(--int-neutral-border);
   border-color: var(--int-neutral-border-hover);
 }
+/* Solid accent (rollout.ts `saveRuleLook`; owner, 25 Nov 2026: the light grey "looks disabled … add another type of
+   button here, not active [orange] because Save policy is"). `--accent` is the look's own: blue in the rebrand look
+   (rebrand.css, the live console's active colour), slate in the console look. Still filled, as 23 Sep asked, and never a
+   second orange. A save with nothing to save keeps the kit's faded look. */
+.bb__inspfoot.is-slate .bx-btn--neutral {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-inverse);
+}
+.bb__inspfoot.is-slate .bx-btn--neutral:not(:disabled):hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
 
 /* A section: Figma's grammar — a title row you can collapse, an action on the
    right where adding is the point, the body underneath. */

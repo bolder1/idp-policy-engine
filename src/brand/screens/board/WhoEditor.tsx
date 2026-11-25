@@ -9,6 +9,7 @@ import { EVERYONE, type Audience, type Rule, type RuleWho } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { outsideAudience } from '../../audience-ops'
 import { normaliseWho, type WhoKind, type WhoList } from '../../rule-who'
+import { shows } from '../../rollout'
 import { useShows } from './builder-version'
 import { gapText, useRuleGaps } from './rule-gaps'
 
@@ -58,6 +59,13 @@ import { gapText, useRuleGaps } from './rule-gaps'
    or amber: nothing is wrong, and the info blue on this panel is spent on the
    linter's findings, so a second blue box here would read as a finding.
    -------------------------------------------------------------------------- */
+
+/* The Default group (rollout.ts `whoDefaultGroup`): not a directory group, but the answer "everyone the policy covers",
+   which an empty Who already means. Ticked while nothing is named; ticking another group unticks it and the rule covers
+   just those; unticking every group brings it back (owner, 25 Nov 2026: "Default, or pick groups"). */
+const DEFAULT_GROUP: boolean = shows('whoDefaultGroup')
+const DEFAULT_ID = '__default'
+const DEFAULT_NAME = 'Default'
 
 /** Which field of `RuleWho` a row edits. The except lists are not edited here. */
 const FIELD: Record<WhoKind, WhoList> = { group: 'groupIds', user: 'userIds' }
@@ -138,8 +146,16 @@ export function WhoEditor({
      one-liner, nothing added yet, with an add button inside"). The empty kind
      says so in the row, at the row's height, with its Add inside it, so the
      section reads as two fields of one form, one filled and one not. */
+  /* "Default" in the group list stands for everyone (rollout.ts `whoDefaultGroup`; owner, 25 Nov 2026: "by default only
+     show that selected, add a default group in the group list"). Nothing named reads as the Groups row holding Default,
+     beside an empty People row, rather than the "Applies to everyone" empty state. */
   const pair =
-    named === 0 ? (
+    named === 0 && DEFAULT_GROUP ? (
+      <div className="bb__whorows">
+        <WhoRow kind="group" faces={[{ kind: 'group', key: DEFAULT_ID, name: DEFAULT_NAME }]} outside={0} onOpen={() => setPicking({ kind: 'group', view: 'all' })} />
+        <EmptyWhoRow kind="user" onAdd={() => setPicking({ kind: 'user', view: 'all' })} />
+      </div>
+    ) : named === 0 ? (
       /* The If section's empty state, in its shape (owner, 22 Sep 2026, and again 19 Oct: "we have a different empty
          state for this one … like we have in condition"), with the answer it stands for as its heading — Everyone
          (owner, 14 Oct 2026: "show the Who part with Everyone so the user can easily understand"): the mark, the
@@ -439,6 +455,8 @@ function WhoDialog({
     setDraft(allOn ? draft.filter((x) => !rows.some((r) => r.id === x)) : [...new Set([...draft, ...rows.map((r) => r.id)])])
 
   const everyone = draft.length === 0 && otherCount === 0
+  /* A rule's group list leads with Default while no person is named, so it can stand for everyone (`whoDefaultGroup`). */
+  const withDefault = DEFAULT_GROUP && kind === 'group' && subject === 'rule' && otherCount === 0
   const go = (v: 'chosen' | 'all') => {
     setView(v)
     setQ('')
@@ -519,7 +537,7 @@ function WhoDialog({
               <ArrowLeft size={14} strokeWidth={2} aria-hidden />
               View {draft.length} selected
             </button>
-          ) : (
+          ) : withDefault ? null : (
             <p className="bb__whopick__lede">Leave this empty and the rule covers everyone the policy governs.</p>
           )}
 
@@ -543,6 +561,23 @@ function WhoDialog({
           )}
 
           <div className="bb__wholist" role="group" aria-label={word.many}>
+            {/* Default first, ticked while no group is: pressing it clears the groups, and the rule covers everyone. */}
+            {withDefault && !query && (
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={draft.length === 0}
+                className={`bb__whoitem${draft.length === 0 ? ' is-on' : ''}`}
+                onClick={() => setDraft([])}
+              >
+                <span className="bx-tick" aria-hidden>
+                  {draft.length === 0 && <Check size={12} strokeWidth={3} />}
+                </span>
+                <Face kind="group" name={DEFAULT_NAME} decorative />
+                <b>{DEFAULT_NAME}</b>
+                <em>Everyone the policy covers</em>
+              </button>
+            )}
             {rows.length === 0 && <NoMatches compact noun={word.noun} query={q} onClear={() => setQ('')} />}
             {rows.map((r) => {
               const on = draft.includes(r.id)

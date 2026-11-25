@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Power, type LucideIcon } from 'lucide-react'
 
-import { Badge, Button, Drawer } from '../kit'
+import { Badge, Button, Drawer, StatusPill } from '../kit'
+import './policy-details-drawer.css'
 import { useBrand } from '../store'
 import { loadAndGo } from './guarded-moves'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
@@ -40,6 +41,9 @@ export function PolicyDetailsDrawer({
   policyId,
   onClose,
   boardFrom,
+  statusHead = false,
+  template,
+  onMakeActive,
 }: {
   open: boolean
   policyId: string
@@ -47,6 +51,15 @@ export function PolicyDetailsDrawer({
   /* Opened on an application's page: the board this drawer opens says so, and
      its way back returns to that application (BoardBar.tsx). */
   boardFrom?: { appId: string }
+  /** The status in the drawer's head, beside its title, and not again on the overview card (rollout.ts `policyDrawer`;
+   *  owner, 25 Nov 2026: "include a dedicated status and button"). Open in builder is then the drawer's one orange. */
+  statusHead?: boolean
+  /** Mark as template, or Remove from templates, as the row's menu says it; greyed with why while it cannot be one yet
+   *  (owner, 25 Nov 2026: "add an option to mark as a template"). */
+  template?: { label: string; hold: string | null; icon: LucideIcon; onPress: () => void }
+  /** A policy saved as a draft, on an application: Make active, which publishes and activates it in one confirm
+   *  (use-status-change.tsx `draftActivates`; owner, 25 Nov 2026: "for draft one we can also add make active"). */
+  onMakeActive?: () => void
 }) {
   const store = useBrand()
   const session = useTestingSession()
@@ -81,14 +94,46 @@ export function PolicyDetailsDrawer({
       onClose={onClose}
       title="Policy details"
       width={680}
+      head={
+        statusHead && policy ? (
+          <div className="bpd-head">
+            <h2>Policy details</h2>
+            <StatusPill status={policy.status} />
+          </div>
+        ) : undefined
+      }
       actions={
-        <Button variant="secondary" iconRight={ArrowUpRight} onClick={toBuilder}>
-          Open in builder
-        </Button>
+        /* Without the Design drawer's extras (rollout `policyDrawer`), the foot is the bare button it always was. */
+        !statusHead && !template && !onMakeActive ? (
+          <Button variant="secondary" iconRight={ArrowUpRight} onClick={toBuilder}>
+            Open in builder
+          </Button>
+        ) : (
+        <span className="bpd-foot">
+          {/* The template on the left, apart from the ways forward on the right. */}
+          {template && (
+            <span className="bpd-foot__start">
+              <Button variant="secondary" icon={template.icon} title={template.hold ?? undefined} blocked={template.hold ?? undefined} onClick={template.onPress}>
+                {template.label}
+              </Button>
+            </span>
+          )}
+          {onMakeActive && (
+            <Button variant="secondary" icon={Power} onClick={onMakeActive}>
+              Make active
+            </Button>
+          )}
+          <Button variant={statusHead ? 'brand' : 'secondary'} iconRight={ArrowUpRight} onClick={toBuilder}>
+            {/* A draft waits (Draft changes on the page, or a policy still a draft): the builder opens on it, so the button
+                says so (owner, 25 Nov 2026: "here we can say continue editing"). */}
+            {statusHead && policy && (policy.pendingDraft || policy.status === 'draft') ? 'Continue editing' : 'Open in builder'}
+          </Button>
+        </span>
+        )
       }
     >
       <div className="insp__page" key={policyId}>
-        <PolicyPage policyId={policyId} focus={undefined} plan={null} onEdit={go} onOpenOne={setOpenOne} canvas />
+        <PolicyPage policyId={policyId} focus={undefined} plan={null} onEdit={go} onOpenOne={setOpenOne} canvas heroStatus={!statusHead} diffShown={!statusHead} />
         {PAST_IN_DETAILS && !HIDE_CHECKS && policy && mine.length > 0 && (
           /* Modelled sign-ins say so wherever they are drawn (test-dock.ts), here too, though the cards above the list are gone. */
           /* Folded: a week of rows at the foot made the slider read as a log. One press unfolds it (owner, 7 Oct 2026). */

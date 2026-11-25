@@ -36,6 +36,9 @@ import { CharCount } from '../../CharCount'
 
 /* The Global Default's last row shows a read-only Who (rollout.ts `globalWho`). */
 const GLOBAL_WHO = shows('globalWho')
+/* Save rule in the solid accent (blue in the rebrand look), so it no longer reads as disabled (rollout.ts `saveRuleLook`,
+   board.css `.is-slate`). */
+const SAVE_RULE_SLATE: boolean = shows('saveRuleLook')
 
 /* -----------------------------------------------------------------------------
    The inspector — the right pane, for whatever is selected on the board.
@@ -327,7 +330,7 @@ export function Inspector({
           doing in the panel. The default at the foot of the chain is a rule
           too, so the word holds there as well. */}
       {selection.kind !== 'apps' && onSave && (
-        <div className="bb__inspfoot">
+        <div className={`bb__inspfoot${SAVE_RULE_SLATE ? ' is-slate' : ''}`}>
           <Button variant="secondary" size="sm" disabled={!canSave && !saveBusy} busy={saveBusy} title={saveTitle} onClick={saveBusy ? undefined : onSave}>
             {saveBusy && <span className="bb__tspin" aria-hidden />}
             {saveLabel}

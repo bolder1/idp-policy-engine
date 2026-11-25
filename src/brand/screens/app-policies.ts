@@ -1,7 +1,7 @@
 import { coversEveryApp, enforces, type App, type Group, type Policy, type User } from '../data'
 import { isPostSignIn } from '../post-sign-in'
 import { asStored, withoutApps } from '../policy-draft'
-import { removeLeavesActiveEmpty } from './board/draft-model'
+import { removeLeavesActiveEmpty, simpleDraftOn } from './board/draft-model'
 import { listNames } from '../rule-who'
 /* A cycle, and a harmless one: app-standing reads `policiesForApp` from here
    and `summarise` and the delete lines below read `appStanding` from there,
@@ -455,6 +455,9 @@ export function detachViewEdit(p: Policy, appId: string): Policy | null {
 export function withAppsViewEdit(p: Policy, appIds: string[]): Policy | null {
   const next = { ...p, appIds, pendingDraft: draftAppsFollow(p, appIds) }
   if (p.isSystem || isPostSignIn(p) || appIds.length > 0) return next
+  /* Simple (owner, 25 Nov 2026): Inactive is a policy with no application, so a published one that loses its last goes
+     inactive, an Active one too, and a draft stays a draft. */
+  if (simpleDraftOn() && p.status !== 'draft') return { ...next, status: 'inactive', pendingDraft: next.pendingDraft && { ...next.pendingDraft, appIds: undefined } }
   if (p.appIds.length > 0 && (p.status === 'active' || p.status === 'monitor' || p.status === 'always-on')) return null
   /* A policy that becomes a draft has no applications of its own any more, and its saved draft's list goes with them. */
   return asStored({ ...next, status: 'draft', pendingDraft: next.pendingDraft && { ...next.pendingDraft, appIds: undefined } })

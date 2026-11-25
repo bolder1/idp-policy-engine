@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 
 import { Badge, Confirm } from './kit'
 import { useBrand, type LeaveGuard } from './store'
+import { useSimpleDraft } from './screens/board/draft-model'
 
 /* --- Leaving a screen with unsaved work ---------------------------------------
 
@@ -148,7 +149,10 @@ export function LeaveDialog() {
    - `draft`: a saved draft on a published policy that is not live yet.
    Unsaved wins when both are true — it is the more urgent fact. */
 export function ChangeState({ unsaved, draft = false }: { unsaved: boolean; draft?: boolean }) {
+  /* "Simple" says no publish anywhere: the saved draft is just a Draft (owner, 25 Nov 2026: "can say it draft, no need
+     to add anything else"; board/draft-model.ts). */
+  const simple = useSimpleDraft()
   if (unsaved) return <Badge tone="notice" className="bx-change">Unsaved changes</Badge>
-  if (draft) return <Badge tone="info" className="bx-change">Draft not published</Badge>
+  if (draft) return <Badge tone="info" className="bx-change">{simple ? 'Draft' : 'Draft not published'}</Badge>
   return null
 }

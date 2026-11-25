@@ -1,6 +1,7 @@
 import { enforces, memberGroupIds, type AccessDecision, type Policy, type User } from '../data'
 import { DECISION_PHRASE, strictestFirst } from '../decision-words'
 import type { Tenant } from '../fixtures'
+import { NO_GLOBAL_DEFAULT, NO_POLICY } from '../no-global-default'
 import { isPostSignIn } from '../post-sign-in'
 import { EMPTY_RISK_PROFILE, riskScale } from '../risk-signals'
 import { personOf, tracePolicy, type EvalLibrary, type FactKey, type PolicyTrace, type PossibleOutcome, type SignInFacts, type SimEnv } from './simulate'
@@ -279,6 +280,9 @@ export function governingPolicy(policies: readonly Policy[], facts: SignInFacts,
     return { policyId: p.id, policyName: p.name, tier: tierOf(p), kind: w.kind, reason: w.reason }
   })
 
+  /* No global default on Design (no-global-default.ts): an application no policy covers is Blocked, decided by the
+     stand-in `NO_POLICY` rather than left "incomplete". */
+  if (!decider && NO_GLOBAL_DEFAULT) return { decider: NO_POLICY, standings: ordered, missing: [], watched, list }
   return decider
     ? { decider, standings: ordered, missing: [], watched, list }
     : { decider: null, standings: ordered, missing: ['a global default policy'], watched, list }

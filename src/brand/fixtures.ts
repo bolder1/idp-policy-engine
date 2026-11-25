@@ -27,6 +27,7 @@ import { type RiskProfile } from './risk-signals'
 import type { SavedSignIn } from './saved-sign-ins'
 import { leaves } from './predicate'
 import { SAVE_MAKES_ACTIVE, withoutApps } from './policy-draft'
+import { simpleDraftOn } from './screens/board/draft-model'
 import {
   showcaseApps,
   showcaseGroups,
@@ -188,7 +189,18 @@ function clonePolicy(src: Policy, i: number, dept: string, scale: number): Polic
    "Nothing else matched" left without an action (`settledPostSignIn`); made a
    draft for that, it takes a saved draft as its rules, as a sign-in policy
    does, since a draft never carries one. */
+/* "Simple" (board/draft-model.ts; owner, 25 Nov 2026: "only a policy with no application can be saved as inactive,
+   otherwise everything will be active or active with draft"). A sign-in policy that has an application is never
+   Inactive there: stored or settled, it is Active. Monitoring and drafts are left as they are. */
+export function activeWithApps(p: Policy): Policy {
+  if (isPostSignIn(p) || p.isSystem || p.appIds.length === 0 || p.status !== 'inactive') return p
+  return { ...p, status: 'active' }
+}
+
 export function settled(p: Policy): Policy {
+  /* Simple: every write keeps the rule, so an application added from any door (the Policies apps dialog, an
+     application's Add existing policy) makes an Inactive policy Active. */
+  if (simpleDraftOn()) p = activeWithApps(p)
   if (isPostSignIn(p)) {
     const s = settledPostSignIn(p)
     if (s === p || !s.pendingDraft) return s

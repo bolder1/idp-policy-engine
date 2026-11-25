@@ -3,6 +3,7 @@ import { DECISION_PHRASE, DECISION_WORDS, decisionsOr, factWords } from '../../d
 import { cardJoin, leaves, topJoin } from '../../predicate'
 import type { SavedSignIn } from '../../saved-sign-ins'
 import { incompleteLine, type DecisionView } from '../board/try-sign-in'
+import { NO_POLICY, NO_POLICY_LINE, isNoPolicy } from '../../no-global-default'
 import { normaliseWho } from '../../rule-who'
 import { personOf, type ConditionResult, type RuleTrace, type SignInFacts, type SimEnv } from '../simulate'
 import { evaluatedList, tierOf, type StandingKind, type TenantResolution } from '../tenant-resolver'
@@ -674,6 +675,11 @@ function outcomeOfRun(res: TenantResolution, decider: Policy | null): EngineOutc
     const line = incompleteLine(res)
     view = { ...NOTHING, line }
     why = line
+  } else if (res.status === 'decided' && isNoPolicy(res.decidedBy?.policyId)) {
+    /* No policy covers the application: Blocked, and said so plainly (no-global-default.ts). */
+    view = { status: 'decided', decision: res.decision, line: NO_POLICY_LINE, outcomes: [], needs: [], watching: [] }
+    why = NO_POLICY_LINE
+    by = NO_POLICY_LINE
   } else if (res.status === 'decided') {
     view = { status: 'decided', decision: res.decision, line: `${policyName} · ${ruleLine}`, outcomes: [], needs: [], watching: differingWatch(res) }
     why = `Decided by ${policyName} · ${ruleLine}`
@@ -741,7 +747,8 @@ export function engineRun(input: EngineInput): EngineRun {
   const missing = res.missing as readonly string[]
   const empty = !person || !appId || missing.includes('person') || missing.includes('app')
 
-  const decider = res.decidedBy ? (policies.find((p) => p.id === res.decidedBy?.policyId) ?? null) : null
+  /* No global default (no-global-default.ts): the stand-in decides an application no policy covers; it is in no list. */
+  const decider = res.decidedBy ? (policies.find((p) => p.id === res.decidedBy?.policyId) ?? (isNoPolicy(res.decidedBy.policyId) ? NO_POLICY : null)) : null
   const outcome = outcomeOfRun(res, decider)
   const steps: EngineStep[] = []
   const push = (s: EngineStep) => steps.push(s) - 1

@@ -1,6 +1,7 @@
 import { FALLBACK_NAME, enforces, type AccessDecision, type App, type Policy, type Rule, type Zone } from '../../data'
 import { CANT_TELL, DECISION_WORDS, FACT_WORDS, decisionsOr } from '../../decision-words'
 import { openForEditing } from '../../policy-draft'
+import { NO_POLICY, isNoPolicy } from '../../no-global-default'
 import { LEVEL_LABEL, SIGN_IN_LEVELS, type SavedSignIn, type SignInLevel } from '../../saved-sign-ins'
 import { breakInDefault } from '../break-in-model'
 import { personOf, type FactKey, type SignInFacts, type SimEnv } from '../simulate'
@@ -89,7 +90,7 @@ export function tryResult(policies: readonly Policy[], form: SignInForm, env: Si
 export function decidingPolicy(res: TenantResolution, policies: readonly Policy[], substitute?: Policy): Policy | undefined {
   const id = res.decidedBy?.policyId
   if (!id) return undefined
-  return substitute?.id === id ? substitute : policies.find((p) => p.id === id)
+  return substitute?.id === id ? substitute : (policies.find((p) => p.id === id) ?? (isNoPolicy(id) ? NO_POLICY : undefined))
 }
 
 /* The rule a resolution names: the one that matched, the last row, or where it

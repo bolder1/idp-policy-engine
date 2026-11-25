@@ -31,12 +31,43 @@ import { isBuilderUnlocked, useBuilderUnlocked } from './builder-version'
    reviewer (policy-versions.ts, draft-v3.tsx). Built for the Full builder. */
 /* View and edit (24 Nov 2026, the stakeholders through the owner): Fix with a mode. A published policy, or a saved
    draft, opens view-only; Edit enters draft mode; status changes only outside it (rollout.ts `viewEdit`). */
-export type DraftModel = 'today' | 'fix' | 'v3' | 'view'
+/* Simple (25 Nov 2026 evening, owner: "save draft means save draft and save policy means active … make things short and
+   simple"): View and edit with two saves and one status rule. Save draft keeps a draft; Save policy makes the policy
+   active, or inactive while it has no application; Show live version is in every edit state (rollout.ts `simpleDraft`). */
+export type DraftModel = 'today' | 'fix' | 'v3' | 'view' | 'simple'
 
 export const DRAFT_MODELS: boolean = shows('draftModels')
 
 /** The "View and edit" choice exists (rollout.ts `viewEdit`). */
 export const VIEW_EDIT: boolean = shows('viewEdit')
+
+/** The "Simple" choice exists (rollout.ts `simpleDraft`). */
+export const SIMPLE_DRAFT: boolean = shows('simpleDraft')
+
+/** Simple's main save, by name, everywhere it is named (owner, 25 Nov 2026: "call it save and activate", then the same
+ *  evening "call it activate policy or something instead of save and activate"). */
+export const SAVE_AND_ACTIVATE = 'Activate policy'
+
+/** Simple's words: the green button, its panel, the button while nothing is live, the ask before a save reaches sign-ins. */
+export const LIVE_BUTTON = 'Show live version'
+export const LIVE_PANEL = 'Live version'
+export const NOTHING_LIVE = 'Nothing is live yet'
+/** Show live version waits for a change, as Save draft and Save policy do (owner, 25 Nov 2026). */
+export const NO_CHANGE_YET = 'No changes yet'
+export const SAVE_ASK = 'Save this policy?'
+/** Simple, Activate policy with no application: what happens, and the way to active (owner, 25 Nov 2026). */
+export const NO_APP_ASK = 'No application chosen'
+export const NO_APP_BODY = 'This policy will be saved as inactive. Add an application to make it active.'
+export const SIMPLE_DRAFT_TOAST = 'Draft saved. The live version is unchanged.'
+
+/** Simple's toast after Save policy. With no application it says how the policy becomes active. */
+export function simpleSaveToast(before: Pick<Policy, 'status'>, after: Pick<Policy, 'name' | 'status' | 'appIds' | 'isSystem'>): string {
+  if (after.status === 'inactive' && !after.isSystem && after.appIds.length === 0) return `${after.name} saved. It is inactive until it has an application.`
+  if (after.status === before.status) return `${after.name} saved`
+  if (after.status === 'active') return `${after.name} saved. It is active.`
+  if (after.status === 'inactive') return `${after.name} saved. It is inactive.`
+  return `${after.name} saved`
+}
 
 /** Fix's Live / Draft on the canvas rather than the bar (rollout.ts `fixViewOnCanvas`, draft-fix.tsx `CanvasViewPick`). */
 export const FIX_VIEW_ON_CANVAS: boolean = shows('fixViewOnCanvas')
@@ -65,6 +96,7 @@ export const DRAFT_MODEL_OPTIONS: { value: DraftModel; label: string }[] = [
   { value: 'fix', label: 'Fix' },
   { value: 'v3', label: 'V3' },
   ...(VIEW_EDIT ? [{ value: 'view' as const, label: 'View and edit' }] : []),
+  ...(VIEW_EDIT && SIMPLE_DRAFT ? [{ value: 'simple' as const, label: 'Simple' }] : []),
 ]
 
 const KEY = 'idp.builder.draft-model'
@@ -73,7 +105,7 @@ const listeners = new Set<() => void>()
 function read(): DraftModel {
   try {
     const v = localStorage.getItem(KEY)
-    return v === 'fix' || v === 'v3' || (v === 'view' && VIEW_EDIT) ? v : 'today'
+    return v === 'fix' || v === 'v3' || (v === 'view' && VIEW_EDIT) || (v === 'simple' && VIEW_EDIT && SIMPLE_DRAFT) ? v : 'today'
   } catch {
     return 'today'
   }
@@ -119,12 +151,24 @@ export function useDraftModel(): DraftModel {
 /** "View and edit" is the model in force (rollout.ts `viewEdit`): the builder, the application page and the Policies
  *  list all read it, so one choice changes the three together. Server render is Today. */
 export function useViewEdit(): boolean {
-  return useDraftModel() === 'view'
+  const m = useDraftModel()
+  /* Simple is View and edit with fewer words, so everything that reads the mode reads it for Simple too. */
+  return m === 'view' || m === 'simple'
 }
 
 /** The same, outside React (a store write, a model function): unlocked, on the Design line, with "View and edit" chosen. */
 export function viewEditOn(): boolean {
-  return DRAFT_MODELS && VIEW_EDIT && isBuilderUnlocked() && current === 'view'
+  return DRAFT_MODELS && VIEW_EDIT && isBuilderUnlocked() && (current === 'view' || (SIMPLE_DRAFT && current === 'simple'))
+}
+
+/** "Simple" is the model in force (rollout.ts `simpleDraft`). Server render is Today. */
+export function useSimpleDraft(): boolean {
+  return useDraftModel() === 'simple'
+}
+
+/** The same, outside React: the Policies page's Applications dialog and an application's Remove read it. */
+export function simpleDraftOn(): boolean {
+  return DRAFT_MODELS && VIEW_EDIT && SIMPLE_DRAFT && isBuilderUnlocked() && current === 'simple'
 }
 
 /* --- View and edit's rules, pure ---------------------------------------------------- */
@@ -141,6 +185,8 @@ export const draftAppsOf = (p: Pick<Policy, 'appIds' | 'pendingDraft'>): string[
 /** Taking `appId` off `p` would leave an active sign-in policy with no application: refused while it is active. */
 export function removeLeavesActiveEmpty(p: Pick<Policy, 'appIds' | 'status' | 'isSystem' | 'type'>, appId: string): boolean {
   if (p.isSystem || p.type === 'Session') return false
+  /* Simple has no Make inactive to do first: the policy goes inactive with its last application (owner, 25 Nov 2026). */
+  if (simpleDraftOn()) return false
   return p.appIds.length === 1 && p.appIds[0] === appId && (p.status === 'active' || p.status === 'monitor' || p.status === 'always-on')
 }
 

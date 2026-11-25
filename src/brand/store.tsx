@@ -46,7 +46,9 @@ import { normaliseHook, type Hook } from './hooks'
    application, a post sign-in one with a rule or "Nothing else matched"
    left without an action — and `refusesStatus` refuses switching either on
    before that, and a post sign-in one to Monitoring ever. */
-import { refusesStatus, settled, showcaseTenant, tenantAt, testerTenant, type Tenant } from './fixtures'
+import { activeWithApps, refusesStatus, settled, showcaseTenant, tenantAt, testerTenant, type Tenant } from './fixtures'
+import { useSimpleDraft } from './screens/board/draft-model'
+import { NO_GLOBAL_DEFAULT } from './no-global-default'
 import { SHOWCASE } from './showcase'
 import { EMPTY_TENANT, emptyTenant } from './empty-tenant'
 import { withSpareApps } from './spare-apps'
@@ -797,12 +799,23 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
   /* On Design, a seeded Sign-in hours + Sign-in days pair reads as one Sign-in time wherever that is exact
      (schedule.ts `withSignInTime`); every other line opens on the seed byte for byte. */
   const [seed] = useState<Tenant>(() => {
-    const t = withSpareApps(EMPTY_TENANT ? emptyTenant() : TESTER ? testerTenant() : SHOWCASE ? showcaseTenant() : tenantAt('medium'))
+    const raw = withSpareApps(EMPTY_TENANT ? emptyTenant() : TESTER ? testerTenant() : SHOWCASE ? showcaseTenant() : tenantAt('medium'))
+    /* No Global Default Policy on Design (no-global-default.ts): the tenant opens without the system policy, and an
+       application no policy covers is Blocked. */
+    const t = NO_GLOBAL_DEFAULT ? { ...raw, policies: raw.policies.filter((p) => !p.isSystem) } : raw
     return SIGN_IN_TIME ? { ...t, policies: t.policies.map(withSignInTime) } : t
   })
   /* `fresh` (the app passes it, tests do not): the new builder as a tenant first meets it, with no sign-in policies
      of its own yet, so the move from the old builder starts on an empty page (owner, 3 Nov 2026). */
   const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)
+  /* "Simple" (board/draft-model.ts; owner, 25 Nov 2026): Inactive is only a policy with no application, so while it is
+     chosen a seeded Inactive policy that has one is Active, as every save would leave it (fixtures.ts `activeWithApps`).
+     Choosing another model later keeps what Simple made; a reload brings the seed back. */
+  const simpleModel = useSimpleDraft()
+  useEffect(() => {
+    if (!simpleModel) return
+    setPolicies((all) => (all.some((p) => activeWithApps(p) !== p) ? all.map(activeWithApps) : all))
+  }, [simpleModel, setPolicies])
   /* With policies is the default start (owner, 11 Nov 2026); `fresh` no longer empties it. */
   const [builderStart, setBuilderStartState] = useState<'empty' | 'seeded'>('seeded')
   const [deadlineView, setDeadlineView] = useState<DeadlineView>('now')

@@ -22,6 +22,14 @@
 }
 .bmf .bmf__trigger:hover { border-color: var(--border-strong); }
 .bmf .bmf__trigger.is-set { border-color: var(--accent); }
+/* The button itself says filters are on, in the active chip's colours, where the summary chip stood (rollout.ts
+   `filtersOnButton`; owner, 25 Nov 2026: "can remove, and just make the More filters button active somehow"). */
+.bmf .bmf__trigger.is-set.is-lit {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: var(--fw-medium);
+}
+.bmf .bmf__trigger.is-set.is-lit:hover { border-color: var(--accent-hover); }
 .bmf .bmf__clear,
 .bmf .bmf__reset {
   border: 0;

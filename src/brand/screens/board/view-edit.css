@@ -99,6 +99,17 @@
     inset 0 0 0 1px var(--fb-positive-strong-border),
     0 0 0 3px color-mix(in srgb, var(--fb-positive-dot) 16%, transparent);
 }
+/* Simple, nothing live yet: the same button in grey, still, and the not-allowed cursor the kit's off buttons use. */
+.bve-pubbtn.is-off,
+.bve-pubbtn.is-off:hover {
+  animation: none;
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  background: var(--surface-sunken);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.bve-pubbtn.is-off::after { display: none; }
 @keyframes bve-pub-drift {
   to { background-position: 100% 50%; }
 }
@@ -106,6 +117,25 @@
   .bve-pubbtn { animation: none; }
   .bve-pubbtn::after { display: none; }
 }
+
+/* Simple's Live version popup (view-edit.tsx `LiveVersionPopup`): the read-only canvas at a height that fits the window,
+   scrolling inside. */
+.bve-livepop__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  /* Clear of the close control the bare modal floats at its top right. */
+  padding-right: var(--space-10);
+  margin-bottom: var(--space-6);
+  min-height: 32px;
+}
+.bve-livepop__head h2 { margin: 0; font-size: var(--fs-lg); }
+.bve-livepop {
+  height: min(560px, calc(100vh - 220px));
+  overflow: auto;
+  border-radius: var(--radius-md);
+}
+.bve-livepop .insp__canvas { height: 100%; }
 
 /* The published version, read only, in the inspector's slot. Its canvas scrolls inside the panel. */
 .bve-pub { display: flex; flex-direction: column; min-height: 0; }

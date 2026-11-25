@@ -145,13 +145,30 @@ export function published(draft: Policy): Policy {
      policy, never the builder's copy, because the status can be changed from
      the bar while an edit is open. */
 
-export type CommitIntent = 'keep-off' | 'turn-on'
+/* `activate` is Simple's Save policy (board/draft-model.ts `useSimpleDraft`): it ends active wherever it can, an Inactive
+   policy too, where `turn-on` only switches a draft on. */
+export type CommitIntent = 'keep-off' | 'turn-on' | 'activate'
 
 const hasApps = (p: Pick<Policy, 'appIds' | 'isSystem'>) => p.isSystem === true || p.appIds.length > 0
+
+/* Simple's one status rule (owner, 25 Nov 2026: "save draft means save draft and save policy means active"; with no
+   application it is saved inactive). `saved` is the stored policy, so its status is what the policy has now; `base` is
+   the draft about to be stored, its status still the stored one. The system policy never comes here. */
+function activated(saved: Policy, base: Policy): Policy {
+  /* No application decides no sign-in: inactive, whatever it was, a draft included. An Active policy whose draft took
+     its last application goes inactive with it, and "Save this policy?" says so first (draft-model.ts `liveConfirmBody`). */
+  if (!hasApps(base)) return { ...base, status: 'inactive' }
+  /* A draft or an Inactive policy goes active; the builder runs Before making it active first (BoardBuilder `guardsTurnOn`). */
+  if (saved.status === 'draft' || saved.status === 'inactive') return { ...base, status: 'active' }
+  /* Active stays active. Monitoring stays monitoring: it is switched off in the product today, and a save that made it
+     enforce would skip the checks a turn on runs. */
+  return base
+}
 
 /** The policy as Review & save stores it. */
 export function committed(saved: Policy, draft: Policy, intent: CommitIntent = 'keep-off'): Policy {
   const base = published({ ...draft, status: saved.status })
+  if (intent === 'activate' && !base.isSystem) return activated(saved, base)
   /* Save policy never leaves a draft (owner, 23 Nov 2026): a draft goes active when it can and the admin asked for
      it, inactive otherwise; a policy with no application cannot decide a sign-in, so it is stored inactive. Draft
      comes only from Save draft. */

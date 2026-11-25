@@ -63,7 +63,7 @@ import { AppsPeek } from './apps-peek'
 import { SharedPolicyFork } from './shared-policy-fork'
 import { StatusScopeDialog } from './status-scope-dialog'
 import { STATUS_WORD, storedVersions } from './board/read-as-text'
-import { useViewEdit } from './board/draft-model'
+import { useSimpleDraft, useViewEdit } from './board/draft-model'
 import { useDraftDiff } from './board/use-lines'
 import { checkAccessFrom } from './guarded-moves'
 import { SAMPLE_DAY, monitorRows, monitorSamples, planLine, planOf } from './monitor-sample'
@@ -1258,17 +1258,19 @@ export function AppPolicyView({
      own Edit, and a status changes only outside draft mode, this head among those places. So the head says the state
      and carries the way to change it: Make active while the policy is not active, Make inactive in the ⋯ once it is. */
   const viewEdit = useViewEdit()
+  /* "Simple" has no Make active / Make inactive here either: Save policy in the builder decides (owner, 25 Nov 2026). */
+  const simple = useSimpleDraft()
   /* Make active where the policy can be made active, a draft on this application included: one confirm publishes it and
      makes it active (use-status-change.tsx `draftActivates`). Through `onMenu`, so it is the page's own status change
      and its dialogs. */
   const activates =
-    viewEdit && policy.status !== 'active' && statusOptions(policy, { monitor: monitorOffered(features), draftActivates: true }).some((o) => o.target === 'active')
+    viewEdit && !simple && policy.status !== 'active' && statusOptions(policy, { monitor: monitorOffered(features), draftActivates: true }).some((o) => o.target === 'active')
   /* The head says the state now, so the state Note under it ("Inactive", "Draft": "It decides no sign-ins.", with its
      Turn on link) would say it twice. The other notes say something the head does not, and stay. */
   const anyNotice = tabNotice(row, others, diff, plan)
   const notice = viewEdit && (anyNotice?.kind === 'draft' || anyNotice?.kind === 'inactive') ? null : anyNotice
   const coverage = useMemo(() => coverageOf(app.id, policy, policies, users, groups), [app.id, policy, policies, users, groups])
-  const menu = statusMenu(policy, app, apps, { monitor: monitorOffered(features), deletable, viewEdit })
+  const menu = statusMenu(policy, app, apps, { monitor: monitorOffered(features), deletable, viewEdit, simple })
   /* Save as template, between the switches and Remove, so the red one stays last (owner, 27 Oct 2026). The policy as
      stored: what a builder would open, a saved draft if there is one (template-from-policy.ts). */
   const withTemplateRow = (items: MenuItem[]): MenuItem[] => {

@@ -307,10 +307,16 @@ export function PolicyPage({
   canvas = false,
   onPreview,
   preview = false,
+  heroStatus = true,
+  diffShown = true,
 }: {
   policyId: string
   focus: string | null | undefined
   plan: EngineRun | null
+  /** False where the status is said beside it already (the Policy details drawer's head, rollout.ts `policyDrawer`). */
+  heroStatus?: boolean
+  /** False hides Draft changes (the Policy details drawer, `policyDrawer`; owner, 25 Nov 2026: "hide this as of now"). */
+  diffShown?: boolean
   /** Absent: nothing here edits, so its applications are listed with no Edit. */
   onEdit?: (t: InspectTarget) => void
   onOpenOne: (id: string | null | undefined) => void
@@ -359,7 +365,7 @@ export function PolicyPage({
         target={{ kind: 'policy', policyId: policy.id }}
         kicker={policy.isSystem ? 'Default policy' : 'Policy'}
         name={policy.name}
-        badge={<StatusPill status={policy.status} />}
+        badge={heroStatus ? <StatusPill status={policy.status} /> : undefined}
         facts={policyFacts(policy, { apps, groups, users }, onEdit && !preview ? () => onEdit({ kind: 'policy', policyId: policy.id }) : undefined)}
         strip={
           !plan ? undefined : depends ? (
@@ -371,7 +377,7 @@ export function PolicyPage({
           )
         }
       />
-      {diff && (diff.added.length > 0 || diff.removed.length > 0) && (
+      {diffShown && diff && (diff.added.length > 0 || diff.removed.length > 0) && (
         <Block title="Draft changes" aside="Not live yet">
           <ul className="insp__diff">
             {diff.removed.map((t) => (

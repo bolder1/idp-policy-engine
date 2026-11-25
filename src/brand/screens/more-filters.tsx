@@ -36,6 +36,8 @@ import './more-filters.css'
    operator. Design only until the owner has checked it (rollout.ts `moreFiltersCompact`); off, everything is as it
    was. */
 const COMPACT: boolean = shows('moreFiltersCompact')
+/* No summary chip: the More filters button lights up instead (rollout.ts `filtersOnButton`). */
+const FILTERS_ON_BUTTON: boolean = shows('filtersOnButton')
 
 interface Option {
   value: string
@@ -180,10 +182,11 @@ export function MoreFilters({
       <button
         ref={trigger}
         type="button"
-        className={`bmf__trigger ${anySet(value) ? 'is-set' : ''}`}
+        className={`bmf__trigger ${anySet(value) ? 'is-set' : ''}${FILTERS_ON_BUTTON ? ' is-lit' : ''}`}
+        /* With the chip gone, the button names what is applied on hover (`filtersOnButton`). */
         aria-haspopup="dialog"
         aria-expanded={open}
-        title="More filters"
+        title={FILTERS_ON_BUTTON && anySet(value) ? (COMPACT ? summaryText(summary) : chipText()) : 'More filters'}
         onClick={() => {
           setFocusSearch(true)
           setOpen((o) => !o)
@@ -195,7 +198,7 @@ export function MoreFilters({
 
       {/* One chip for everything applied (owner, 19 Nov 2026: "merge all into one"): its × clears them all, a click
           reopens the dropdown on the first applied attribute. */}
-      {anySet(value) && (
+      {anySet(value) && !FILTERS_ON_BUTTON && (
         <Chip active onClick={() => openAt(FILTER_ORDER.find((k) => isSet(value, k)) ?? 'app')} removable onRemove={() => onChange(NO_FILTERS)}>
           {/* The chip cuts off with an ellipsis when the bar is short of room; the title keeps the whole list. */}
           {COMPACT ? (

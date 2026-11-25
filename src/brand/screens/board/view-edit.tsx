@@ -3,9 +3,10 @@ import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion
 import { useId } from 'react'
 
 import type { Policy } from '../../data'
-import { Badge, Button, IconButton } from '../../kit'
+import { Badge, Button, IconButton, Modal } from '../../kit'
 import { shows } from '../../rollout'
 import { ReadOnlyCanvas } from '../sign-in-tests/InspectPanel'
+import { LIVE_BUTTON, LIVE_PANEL, NOTHING_LIVE } from './draft-model'
 import { STATUS_WORD } from './read-as-text'
 import './view-edit.css'
 
@@ -35,6 +36,8 @@ export function ViewEditActions({
   onMakeActive,
   publishedOpen,
   onTogglePublished,
+  simple = false,
+  liveOff = NOTHING_LIVE,
 }: {
   editing: boolean
   onEdit: () => void
@@ -45,6 +48,11 @@ export function ViewEditActions({
   /** Draft mode on a policy that has been published: its live version beside the draft. */
   publishedOpen: boolean
   onTogglePublished?: () => void
+  /** Simple (draft-model.ts `useSimpleDraft`): the button says "Show live version" and stands in every edit state,
+   *  greyed while nothing is live (owner, 25 Nov 2026). */
+  simple?: boolean
+  /** Why the greyed button waits, said on hover: nothing live yet, or no change to compare. */
+  liveOff?: string
 }) {
   if (!editing) {
     return (
@@ -67,14 +75,25 @@ export function ViewEditActions({
   }
   /* On a narrow window these two keep their icons and drop their words (view-edit.css `.bve-label`), so the saves
      beside them stay on screen. The words stay the accessible name, and the title says them on hover. */
+  const label = simple ? LIVE_BUTTON : 'Show published policy'
+  /* Simple keeps the button where it is while there is no live version, greyed and saying why on hover. */
+  const nothingLive = simple && !onTogglePublished
   return (
     <span className="bve-acts">
-      {onTogglePublished &&
+      {(onTogglePublished || nothingLive) &&
         (PUBLISHED_LOOK ? (
-          <PublishedButton pressed={publishedOpen} onClick={onTogglePublished} />
+          <PublishedButton pressed={publishedOpen} onClick={onTogglePublished} label={label} offTitle={liveOff} />
         ) : (
-          <Button variant="secondary" size="sm" icon={Eye} pressed={publishedOpen} title="Show published policy" onClick={onTogglePublished}>
-            <span className="bve-label">Show published policy</span>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Eye}
+            pressed={publishedOpen}
+            title={nothingLive ? liveOff : label}
+            blocked={nothingLive ? liveOff : undefined}
+            onClick={onTogglePublished}
+          >
+            <span className="bve-label">{label}</span>
           </Button>
         ))}
       {/* The way back to the view. With `modeButtons` it says so, "Exit edit mode", where "Done" read as finishing the
@@ -129,27 +148,32 @@ const RING_MOTION: Variants = {
 
 const RING_STILL: Variants = { rest: { opacity: 1, x: 0 }, hover: { opacity: 1, x: 0 }, open: { opacity: 1, x: 0 } }
 
-function PublishedButton({ pressed, onClick }: { pressed: boolean; onClick: () => void }) {
+/* Without `onClick` there is nothing live to show (Simple): the button stays in its place, grey and still, and its
+   title says why. `aria-disabled` rather than `disabled`, so the title still shows on hover, as the kit's do. */
+function PublishedButton({ pressed, onClick, label, offTitle = NOTHING_LIVE }: { pressed: boolean; onClick?: () => void; label: string; offTitle?: string }) {
   const reduce = useReducedMotion()
+  const off = !onClick
+  const still = reduce || off
   return (
     <motion.button
       type="button"
-      className="bx-btn bx-btn--sm bve-pubbtn"
-      title="Show published policy"
-      aria-pressed={pressed}
+      className={`bx-btn bx-btn--sm bve-pubbtn${off ? ' is-off' : ''}`}
+      title={off ? offTitle : label}
+      aria-pressed={off ? undefined : pressed}
+      aria-disabled={off || undefined}
       onClick={onClick}
       /* No `initial={false}`: it would skip the mount animation, and with it the outer rings' breathing at rest. */
-      animate={pressed ? 'open' : 'rest'}
-      whileHover={reduce ? undefined : 'hover'}
-      whileTap={reduce ? undefined : { scale: 0.97 }}
+      animate={pressed && !off ? 'open' : 'rest'}
+      whileHover={still ? undefined : 'hover'}
+      whileTap={still ? undefined : { scale: 0.97 }}
     >
       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         {RINGS.map((r) => (
-          <motion.path key={r.d} d={r.d} custom={r} variants={reduce ? RING_STILL : RING_MOTION} />
+          <motion.path key={r.d} d={r.d} custom={r} variants={still ? RING_STILL : RING_MOTION} />
         ))}
         <circle cx="12" cy="12" r="2" fill="currentColor" />
       </svg>
-      <span className="bve-label">Show published policy</span>
+      <span className="bve-label">{label}</span>
     </motion.button>
   )
 }
@@ -179,20 +203,38 @@ export function DraftModeChip({ shown, unsaved, savedBy }: { shown: boolean; uns
   )
 }
 
+/** Simple's Show live version, as a popup over the board (owner, 25 Nov 2026: "convert this Live version as a popup"):
+ *  the live rules read only, the status beside the title, nothing to press but close. */
+export function LiveVersionPopup({ policy, open, onClose }: { policy: Policy; open: boolean; onClose: () => void }) {
+  return (
+    /* `bare`, with its own head row: the status sits beside the title on one line, as the Policy details drawer has it,
+       rather than floating at the top corner (owner, 25 Nov 2026: "fix the alignment"). */
+    <Modal open={open} onClose={onClose} title={LIVE_PANEL} width={720} bare>
+      <div className="bve-livepop__head">
+        <h2>{LIVE_PANEL}</h2>
+        <Badge tone={policy.status === 'active' ? 'positive' : 'neutral'}>{STATUS_WORD[policy.status]}</Badge>
+      </div>
+      <div className="bve-livepop">
+        <ReadOnlyCanvas policy={policy} traced={[]} framed still idPrefix="live-" />
+      </div>
+    </Modal>
+  )
+}
+
 /** Show published policy: the version people sign in with, read only, in the inspector's slot, or with `left` in the
  *  board's leading track, so the rule editor keeps the right and the two are read side by side (rollout.ts
  *  `publishedLeft`). */
-export function PublishedPanel({ policy, left = false, onClose }: { policy: Policy; left?: boolean; onClose: () => void }) {
+export function PublishedPanel({ policy, left = false, title = 'Published policy', onClose }: { policy: Policy; left?: boolean; /** Simple says "Live version". */ title?: string; onClose: () => void }) {
   const uid = useId()
   return (
     <aside className={`bb__insp brat bve-pub${left ? ' is-left' : ''}`} aria-labelledby={`${uid}-title`}>
       <div className="bb__inspbar brat__bar">
         <h2 id={`${uid}-title`} className="brat__title">
-          Published policy
+          {title}
         </h2>
         <span className="brat__barend">
           <Badge tone={policy.status === 'active' ? 'positive' : 'neutral'}>{STATUS_WORD[policy.status]}</Badge>
-          <IconButton icon={X} size="sm" tone="ghost" label="Close Published policy" onClick={onClose} />
+          <IconButton icon={X} size="sm" tone="ghost" label={`Close ${title}`} onClick={onClose} />
         </span>
       </div>
       <div className="bve-pub__body">

@@ -1,0 +1,17 @@
+/* Policy details drawer (policy-details-drawer.tsx, rollout.ts `policyDrawer`): the status beside the title, and the
+   foot's template on the left, Make active and the builder on the right. Scoped to its own classes; every line loads it. */
+.bpd-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.bpd-foot {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.bpd-foot__start { margin-right: auto; }

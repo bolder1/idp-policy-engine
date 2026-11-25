@@ -99,6 +99,10 @@ import { SHOWCASE } from '../showcase'
 import { RiskArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
 import './risk-signals.css'
+import { shows } from '../rollout'
+
+/* Save ends on the Risk signal profile list, with its toast (rollout `backAfterSave`). */
+const BACK_AFTER_SAVE: boolean = shows('backAfterSave')
 
 /* A mark per signal.
 
@@ -254,6 +258,11 @@ export function RiskSignals() {
           onSave={(p) => {
             store.updateRiskProfile(p)
             store.showToast(`${p.name} saved`)
+            /* Back on the list, on this row (rollout `backAfterSave`). */
+            if (BACK_AFTER_SAVE) {
+              listFocus.current = { id: p.id }
+              setOpenId(null)
+            }
           }}
         />
       ) : (

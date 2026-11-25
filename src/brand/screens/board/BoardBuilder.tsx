@@ -100,6 +100,10 @@ const TEMPLATE_TOGGLE: boolean = shows('builderTemplateToggle')
 const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
 /* A policy save marks its rules saved, so a card's Unsaved goes with it (rollout.ts `rulesSaveWithPolicy`). */
 const RULES_SAVE_WITH_POLICY: boolean = shows('rulesSaveWithPolicy')
+/* Save draft and the main save end on the list the board came from, with their toast (rollout.ts `backAfterSave`). */
+const BACK_AFTER_SAVE: boolean = shows('backAfterSave')
+/* "Nothing else matched"'s Save rule saves that row only, not the policy (rollout.ts `fallbackSavesRule`). */
+const FALLBACK_SAVES_RULE: boolean = shows('fallbackSavesRule')
 /* Nothing being said: one array, so the context does not change identity on every render. */
 const NO_GAPS: readonly RuleGap[] = []
 const NO_TRIED: ReadonlySet<string> = new Set()
@@ -118,8 +122,8 @@ import { CondTagsContext } from './cond-tags'
 import { markRolledBack, useExperience, useMovedState } from '../../migrate/experience'
 import { RolledBackNote } from '../../migrate/moved-status'
 import { useWalkPublished } from '../../migrate/walk-published'
-import { FIX_SAVE_AND_PUBLISH, FIX_VERSION_BAR, FIX_VIEW_ON_CANVAS, NO_APP_REASON, PUBLISH_ASK, SAVE_AND_PUBLISH, draftAppsOf, isPublished, liveConfirmBody, offersLiveView, opensInDraftMode, publishToast, reachesSignIns, useDraftModel } from './draft-model'
-import { DraftModeChip, PublishedPanel, ViewEditActions } from './view-edit'
+import { FIX_SAVE_AND_PUBLISH, FIX_VERSION_BAR, FIX_VIEW_ON_CANVAS, LIVE_PANEL, NOTHING_LIVE, NO_APP_ASK, NO_APP_BODY, NO_APP_REASON, NO_CHANGE_YET, PUBLISH_ASK, SAVE_AND_ACTIVATE, SAVE_AND_PUBLISH, SAVE_ASK, SIMPLE_DRAFT_TOAST, draftAppsOf, isPublished, liveConfirmBody, offersLiveView, opensInDraftMode, publishToast, reachesSignIns, simpleSaveToast, useDraftModel } from './draft-model'
+import { DraftModeChip, LiveVersionPopup, PublishedPanel, ViewEditActions } from './view-edit'
 import { DEFAULT_FLIPS, adminFallback, defaultFlip, withFlip, type DefaultFlip } from './default-flip'
 import { DefaultFlipNote } from './default-flip-note'
 import { CanvasViewPick, FirstPublishAsk, FixChip, LiveDraftSwitch, LiveViewTag, type CanvasView, type FirstStatus } from './draft-fix'
@@ -428,13 +432,19 @@ export function BoardBuilder({
   const v3 = draftModel === 'v3'
   /* "View and edit" (view-edit.tsx, rollout.ts `viewEdit`): Fix with a mode. It keeps Fix's saves and its read-only
      published canvas, and puts Edit in front of them. */
-  const viewEdit = draftModel === 'view'
+  /* "Simple" (rollout.ts `simpleDraft`) is View and edit with two saves: Save draft, and Save policy, which makes the
+     policy active (inactive while it has no application). Everything View and edit does, Simple does, but its words. */
+  const simple = draftModel === 'simple'
+  const viewEdit = draftModel === 'view' || simple
   const fix = draftModel === 'fix' || v3 || viewEdit
   /* Fix's Live / Draft on the canvas, not the bar, and no change pill beside the status (rollout.ts `fixViewOnCanvas`).
      Fix only: V3 keeps its bar switch and its version chip. */
   const viewOnCanvas = FIX_VIEW_ON_CANVAS && draftModel === 'fix'
-  /* Fix's save by its name, everywhere it is named (rollout.ts `saveAndPublish`); undefined keeps each place's own word. */
-  const fixSaveLabel = FIX_SAVE_AND_PUBLISH && (draftModel === 'fix' || viewEdit) ? SAVE_AND_PUBLISH : undefined
+  /* Fix's save by its name, everywhere it is named (rollout.ts `saveAndPublish`); undefined keeps each place's own word.
+     Simple's is "Save and activate" (owner, 25 Nov 2026), in the bar, ⌘↵, the shortcuts, the checks page and the ask. */
+  const fixSaveLabel = simple ? SAVE_AND_ACTIVATE : FIX_SAVE_AND_PUBLISH && (draftModel === 'fix' || draftModel === 'view') ? SAVE_AND_PUBLISH : undefined
+  /* What the main save asks the store for: Simple's ends active where it can (policy-draft.ts `committed`). */
+  const saveIntent: CommitIntent = simple ? 'activate' : 'keep-off'
   /* Draft mode, entered by Edit only (owner, 24 Nov 2026: "Only the Edit button"). Every door opens the view; a new
      policy, with nothing to view, starts in draft mode (`inEdit`, below). On Design a draft never published opens in
      draft mode too, and Active and the other published policies in the view (draft-model.ts `opensInDraftMode`). */
@@ -447,6 +457,12 @@ export function BoardBuilder({
   const byVersion = FIX_VERSION_BAR && viewOnCanvas
   const [canvasView, setCanvasView] = useState<CanvasView>('draft')
   const [liveAsk, setLiveAsk] = useState(false)
+  /* Simple: Activate policy with no application asks once, then saves it inactive. */
+  const [noAppAsk, setNoAppAsk] = useState(false)
+  /* A save that is done takes the admin back to the list it came from, its toast with it (rollout.ts `backAfterSave`;
+     owner, 25 Nov 2026: "don't let the user stay in the details page, redirect to its main page with a toast"). Set by
+     Save draft and the main save; acted on once the board reads saved, so the leave guard has nothing to ask. */
+  const [leaveSaved, setLeaveSaved] = useState(false)
   /* A first publish asks the status it starts with (draft-fix.tsx `FirstPublishAsk`). */
   const [firstAsk, setFirstAsk] = useState(false)
   const [firstAs, setFirstAs] = useState<FirstStatus>('active')
@@ -724,8 +740,27 @@ export function BoardBuilder({
      25 Nov 2026: the tag stayed on every card after Save and publish). Publish clears them all, since it refuses while
      any rule has an empty part; Save draft clears only the rules with none, so an unfinished rule still reads Unsaved. */
   const markRulesSaved = (rules: readonly Rule[]) => {
+    /* The last row goes with them, when it has no empty part. */
+    if (RULES_SAVE_WITH_POLICY && FALLBACK_SAVES_RULE && !gaps.some((g) => g.at === 'fallback')) setSavedFallback(JSON.stringify(draft.fallback ?? null))
     if (!RULES_SAVE_WITH_POLICY || rules.length === 0) return
     setSavedRules((all) => ({ ...all, ...Object.fromEntries(rules.map((r) => [r.id, JSON.stringify(r)])) }))
+  }
+  /* "Nothing else matched" saves as a rule too (rollout.ts `fallbackSavesRule`; owner, 25 Nov 2026: pressing its Save
+     rule opened the make-active ask, because it saved the whole policy). As last saved, keyed 'fallback' as rule-gaps
+     names it; unsaved when the board's differs. */
+  const [savedFallback, setSavedFallback] = useState<string>(() => JSON.stringify(draft.fallback ?? null))
+  const fallbackUnsaved = !!draft.fallback && savedFallback !== JSON.stringify(draft.fallback)
+  const saveFallbackRule = () => {
+    const f = draft.fallback
+    if (!f || savingRule) return
+    const left = gaps.filter((g) => g.at === 'fallback')
+    if (left.length > 0) return refuseGaps(left)
+    setSavingRule('fallback')
+    window.setTimeout(() => {
+      setSavedFallback(JSON.stringify(f))
+      setSavingRule(null)
+      store.showToast(`${f.name.trim() || 'Nothing else matched'} saved`)
+    }, RULE_SAVE_MS)
   }
   const saveRule = (id: string) => {
     const r = draft.rules.find((x) => x.id === id)
@@ -971,6 +1006,15 @@ export function BoardBuilder({
      leaving asks. Not on the start chooser, where nothing has been picked yet. rollout.ts `newPolicyUnsaved`. */
   const neverSaved = NEW_POLICY_UNSAVED && !!saved?.provisional && (draft.rules.length > 0 || !!scratch)
   const unsaved = edited || neverSaved
+  /* Back to where the board was opened from once a save has landed (`leaveSaved`): the bar's own way back
+     (BoardBar.tsx `back`), an application's page when it carried one, Policies otherwise. */
+  useEffect(() => {
+    if (!leaveSaved || unsaved || !saved) return
+    setLeaveSaved(false)
+    const fromId = store.screen.name === 'board' ? store.screen.from?.appId : undefined
+    const fromApp = fromId ? store.apps.find((a) => a.id === fromId) : undefined
+    store.go(fromApp ? { name: 'application', appId: fromApp.id, tab: post ? 'post-sign-in' : 'policies', flash: saved.id } : { name: 'policies' })
+  }, [leaveSaved, unsaved, saved, store, post])
   /* A policy needs a rule to be saved at all (owner, 2 Nov 2026: no empty policies), and a new one opened with no form
      needs a name of its own too. The reason is on the buttons and in the leave dialog. */
   const noRules = hasNoRules(draft)
@@ -984,7 +1028,9 @@ export function BoardBuilder({
   /* "View and edit": draft mode once Edit is pressed, or from the start on a new policy; the view otherwise. The view
      is read only and carries the status; draft mode has no status at all. */
   /* A post sign-in policy is outside the mode: its board is as in Today. */
-  const inEdit = viewEdit && !post && (editMode || !!saved?.provisional)
+  /* Simple has no view: the builder always edits, with no Edit policy or Exit edit mode (owner, 25 Nov 2026: "no edit
+     and exit edit mode … remove that"). The Policy details drawer is where a policy is read. */
+  const inEdit = viewEdit && !post && (simple || editMode || !!saved?.provisional)
   /* Not for a post sign-in policy, whose board has no Edit to leave the view by (its links are made from the apps). */
   const viewShown = viewEdit && !!saved && !inEdit && !post
   /* Fix: a published policy whose copy differs from live offers Live / Draft; Live is the stored rules, read only.
@@ -1015,7 +1061,8 @@ export function BoardBuilder({
      Before any change the policy and its published version are one, and the bar is as it was. */
   const publishedOnScreen = (byVersion && fixLive) || viewShown
   /* "View and edit": status only outside draft mode (owner, 24 Nov 2026: "activate and deactivate should be outside"). */
-  const statusHidden = (byVersion && ((liveOffered && canvasView === 'draft') || !isPublished(saved))) || inEdit
+  /* Simple keeps the plain pill: it has no view to carry it, and nothing to switch it with (`statusItems`). */
+  const statusHidden = (byVersion && ((liveOffered && canvasView === 'draft') || !isPublished(saved))) || (inEdit && !simple)
   /* What Published shows, as a policy to make a template from (the bar's ⋯). */
   const fromPublished: Policy | null = publishedOnScreen && saved ? { ...draft, rules: saved.rules, fallback: saved.fallback, appIds: saved.appIds, pendingDraft: undefined } : null
   useEffect(() => {
@@ -1065,7 +1112,16 @@ export function BoardBuilder({
     /* New marks a fix not saved yet. */
     setFixedNew([])
     /* Fix: a draft beside a live policy says that live did not move (draft-model.ts). */
-    store.showToast(fix && isPublished(latest) ? (byVersion || viewEdit ? 'Draft saved. The published version is unchanged.' : 'Draft saved. Live is unchanged.') : 'Draft saved')
+    store.showToast(
+      fix && isPublished(latest)
+        ? simple
+          ? SIMPLE_DRAFT_TOAST
+          : byVersion || viewEdit
+            ? 'Draft saved. The published version is unchanged.'
+            : 'Draft saved. Live is unchanged.'
+        : 'Draft saved',
+    )
+    if (BACK_AFTER_SAVE) setLeaveSaved(true)
     return true
   }
 
@@ -1445,7 +1501,8 @@ export function BoardBuilder({
     /* "View and edit": a policy with no application can only be saved as a draft (owner, 24 Nov 2026), so Save and
        publish refuses and opens the Applications panel, where the reason stands under the field. Make inactive is
        not offered here: status lives outside draft mode, in the view. */
-    if (viewEdit && !post && !draft.isSystem && draft.appIds.length === 0) {
+    /* Not in Simple, where Save policy stores such a policy inactive (owner, 25 Nov 2026) and the toast says why. */
+    if (viewEdit && !simple && !post && !draft.isSystem && draft.appIds.length === 0) {
       setSelection({ kind: 'apps' })
       return store.showToast(NO_APP_REASON, undefined, { tone: 'warning' })
     }
@@ -1460,16 +1517,21 @@ export function BoardBuilder({
     /* Fix (draft-model.ts): a save that changes what people sign in with asks once — the checks run first, and their
        page is the ask when it opens; otherwise "Update live policy?" is, and its yes saves with the checks already done.
        Saving never changes the status: a draft is stored inactive and the toast offers Make active. */
+    /* Simple, no application: nothing to check, since it decides no sign-in; say it saves inactive and how it becomes
+       active, then save (owner, 25 Nov 2026: "the user can save a policy without apps as well … let the user know"). */
+    if (simple && !asked && !post && !draft.isSystem && draft.appIds.length === 0) return setNoAppAsk(true)
+    /* Simple goes the same way with its own intent: the checks, "Save this policy?" where live sign-ins change, and a
+       policy that becomes active runs Before making it active (`guardsTurnOn`). */
     if (fix) {
-      if (asked) return publish('keep-off')
+      if (asked) return publish(saveIntent)
       /* A first publish asks the status it starts with (owner, 24 Nov 2026: "the confirm ask Active or Inactive"),
          Active where it can be had. */
       if (byVersion && !isPublished(saved)) {
         setFirstAs(canBeActive ? 'active' : 'inactive')
         return setFirstAsk(true)
       }
-      if (live && reachesSignIns(saved)) return checkThenPublish('keep-off', () => setLiveAsk(true))
-      return checkThenPublish('keep-off')
+      if (live && reachesSignIns(saved)) return checkThenPublish(saveIntent, () => setLiveAsk(true))
+      return checkThenPublish(saveIntent)
     }
     /* Save policy makes a draft active where `saveMakesActive` is on (policy-draft.ts `committed`), through Before
        turning on, as the status pill's own turn on goes. */
@@ -1492,14 +1554,17 @@ export function BoardBuilder({
      decide real sign-ins runs the same checks). It opens Before turning on,
      always, on the draft as the board holds it. */
   const guardsSave = features.beforeTurningOn && !!saved && enforces(saved) && saved.type === 'App Access'
-  const guardsTurnOn = features.beforeTurningOn && !!saved && saved.status === 'draft' && saved.type === 'App Access' && !saved.isSystem
+  /* Simple's Save policy turns an Inactive policy on as well, so that is a turn on too. */
+  const guardsTurnOn = features.beforeTurningOn && !!saved && (saved.status === 'draft' || (simple && saved.status === 'inactive')) && saved.type === 'App Access' && !saved.isSystem
+  /* The intent a turn on is measured with: Simple's own, which switches an Inactive policy on where `turn-on` does not. */
+  const turnIntent: CommitIntent = simple ? 'activate' : 'turn-on'
   const stampNow = (): GuardStamp => ({ policies: store.policies, zones: store.zones, fingerprints: store.fingerprints, riskScale: store.riskScale })
   /* The policy's own checks join the saved sign-ins (describe spec, §5.5):
      those of the version being saved, which are the stored ones unless
      Describe it wrote this draft's on this visit — a described draft turned on
      from the walkthrough's review has not been stored yet. */
   const guardInput = (kind: SaveGuard['kind'], d: Policy, signIns = store.savedSignIns): GuardInput => {
-    const after = committed(saved ?? d, withDescribed(d), kind === 'save' ? 'keep-off' : 'turn-on')
+    const after = committed(saved ?? d, withDescribed(d), kind === 'save' ? 'keep-off' : turnIntent)
     return {
       kind,
       before: kind === 'save' ? (saved ?? null) : null,
@@ -1519,7 +1584,7 @@ export function BoardBuilder({
   const checkThenPublish = (intent: CommitIntent, onClean?: () => void) => {
     /* Fix: a clean result asks "Update live policy?" (`onClean`) rather than saving; the checks page, when it opens, is the ask. */
     const go = () => (onClean ? onClean() : publish(intent))
-    const turnsOn = intent === 'turn-on' && guardsTurnOn && !!saved && committed(saved, withDescribed(draft), 'turn-on').status === 'active'
+    const turnsOn = (intent === 'turn-on' || intent === 'activate') && guardsTurnOn && !!saved && committed(saved, withDescribed(draft), intent).status === 'active'
     const kind: SaveGuard['kind'] | null = guardsSave ? 'save' : turnsOn ? 'turn-on' : null
     if (!kind) return go()
     if (checking) return
@@ -1839,8 +1904,9 @@ export function BoardBuilder({
   /* With no application there is no Make active anywhere (owner, 24 Nov 2026), even on a seed that is stored Inactive. */
   const viewHasApps = !!saved && (saved.isSystem === true || saved.appIds.length > 0)
   const viewMakesActive = viewShown && !post && viewHasApps && viewOptions.some((o) => o.target === 'active')
+  /* Simple: no Make active / Make inactive anywhere; Save policy decides (owner, 25 Nov 2026: "save means active"). */
   const statusItems: MenuItem[] =
-    STATUS_IN_MENU && saved && !movedStatus.review && !statusHidden
+    STATUS_IN_MENU && saved && !movedStatus.review && !statusHidden && !simple
       ? [
           ...statusOptions(saved, { monitor: monitorOffered(store.features), draftActivates: viewEdit })
             .filter((o) => !((viewMakesActive || (viewEdit && !post && !viewHasApps)) && o.target === 'active'))
@@ -2553,6 +2619,8 @@ export function BoardBuilder({
     store.savePolicy(next)
     markRulesSaved(next.rules)
     if (then === 'monitor') store.setPolicyStatus(next.id, 'monitor')
+    /* Done: back to the list with the toast below (`backAfterSave`). V3 keeps its version ask on the board. */
+    if (BACK_AFTER_SAVE && !v3s.on) setLeaveSaved(true)
     /* V3: the stored policy becomes the next version (draft-v3.tsx), and the toast names it. */
     const v3Said = v3s.on ? v3s.published(store.policyById(next.id) ?? next) : null
     /* Save and turn on: the policy goes live, with its own chime (sound.ts). */
@@ -2587,7 +2655,7 @@ export function BoardBuilder({
     const canTurnOn = !byVersion && !viewEdit && !canMonitor && offersTurnOnAfterSave(saved, next, { monitor: monitorOffered(store.features) })
     turnOnOffered.current = canTurnOn ? Date.now() : 0
     store.showToast(
-      v3Said ?? (byVersion || viewEdit ? publishToast(saved, then ? { ...next, status: then } : next) : commitToast(saved, next)),
+      v3Said ?? (simple ? simpleSaveToast(saved, next) : byVersion || viewEdit ? publishToast(saved, then ? { ...next, status: then } : next) : commitToast(saved, next)),
       canMonitor
         ? {
             label: 'Monitor',
@@ -2758,7 +2826,8 @@ export function BoardBuilder({
      setup, Describe it and a migrated draft's walk also use: it waits while one of those is open. */
   const leftTrackTaken = (describeOpen && !GUIDED_SETUP) || (guidedOpen && guidedSide !== 'right') || movedOpen
   const pubPanel =
-    inEdit && pubOpen && !!saved && isPublished(saved) && !post && !testOn && (PUBLISHED_LEFT ? !leftTrackTaken : !readOpen && !fixesShown && !v3Panel)
+    /* Not in Simple, whose live version is a popup (`LiveVersionPopup`, below), leaving the board's tracks as they are. */
+    inEdit && pubOpen && !!saved && isPublished(saved) && !post && !testOn && !simple && (PUBLISHED_LEFT ? !leftTrackTaken : !readOpen && !fixesShown && !v3Panel)
   const pubLeft = pubPanel && PUBLISHED_LEFT
 
   /* The start chooser is on the canvas ("How should this policy start?" / "No rules"): the bar is Back and the name. */
@@ -2843,15 +2912,19 @@ export function BoardBuilder({
                 <ViewEditActions
                   editing={inEdit}
                   onEdit={() => setEditMode(true)}
-                  onDone={saved.provisional ? undefined : doneEditing}
+                  onDone={saved.provisional || simple ? undefined : doneEditing}
                   onMakeActive={viewMakesActive ? () => menuStatus.request(saved, 'active') : undefined}
                   /* On the left the button says what is on screen: the panel waits while Guided setup holds that track. */
-                  publishedOpen={PUBLISHED_LEFT ? pubPanel : pubOpen}
+                  publishedOpen={PUBLISHED_LEFT && !simple ? pubPanel : pubOpen}
+                  /* Simple: "Show live version" in every edit state, greyed while nothing is live (owner, 25 Nov 2026). */
+                  simple={simple}
+                  /* Simple: greyed until the board differs from what is live, as Save draft and Save policy wait. */
+                  liveOff={!isPublished(saved) ? NOTHING_LIVE : NO_CHANGE_YET}
                   onTogglePublished={
-                    isPublished(saved)
+                    isPublished(saved) && (!simple || live)
                       ? () => {
-                          if (!pubOpen && !PUBLISHED_LEFT) setSelection({ kind: 'none' })
-                          setPubOpen(PUBLISHED_LEFT ? !pubPanel : !pubOpen)
+                          if (!pubOpen && !PUBLISHED_LEFT && !simple) setSelection({ kind: 'none' })
+                          setPubOpen(PUBLISHED_LEFT && !simple ? !pubPanel : !pubOpen)
                         }
                       : undefined
                   }
@@ -2905,12 +2978,30 @@ export function BoardBuilder({
     {/* Fix (draft-model.ts): the one ask before a save reaches live sign-ins. */}
     {fix && saved && (
       <>
+        {/* Simple, no application (`noAppAsk`): not a block, a heads-up. Keep editing to add one; Save as inactive goes on. */}
+        {simple && (
+          <Confirm
+            open={noAppAsk}
+            onClose={() => setNoAppAsk(false)}
+            destructive={false}
+            tone="info"
+            title={NO_APP_ASK}
+            cancelLabel="Keep editing"
+            confirmLabel="Save as inactive"
+            onConfirm={() => {
+              setNoAppAsk(false)
+              commitSave(true)
+            }}
+          >
+            {NO_APP_BODY}
+          </Confirm>
+        )}
         <Confirm
           open={liveAsk}
           onClose={() => setLiveAsk(false)}
           destructive={false}
           shape="hero"
-          title={byVersion || viewEdit ? PUBLISH_ASK : 'Update live policy?'}
+          title={simple ? SAVE_ASK : byVersion || viewEdit ? PUBLISH_ASK : 'Update live policy?'}
           confirmLabel={fixSaveLabel ?? 'Save policy'}
           onConfirm={() => {
             setLiveAsk(false)
@@ -2982,7 +3073,8 @@ export function BoardBuilder({
         />
       )}
       {/* "View and edit": draft mode says so in that corner, with whether the draft is saved (view-edit.tsx). */}
-      {viewEdit && saved && <DraftModeChip shown={inEdit && !post} unsaved={unsaved} savedBy={saved.pendingDraft?.savedBy ?? (saved.status === 'draft' && !saved.provisional ? 'You' : undefined)} />}
+      {/* Not in Simple (owner, 25 Nov 2026: "this thing not needed, can remove"): its saves say what they did. */}
+      {viewEdit && !simple && saved && <DraftModeChip shown={inEdit && !post} unsaved={unsaved} savedBy={saved.pendingDraft?.savedBy ?? (saved.status === 'draft' && !saved.provisional ? 'You' : undefined)} />}
       {fix && !viewOnCanvas && !viewEdit && saved && (
         <LiveViewTag
           shown={fixLive}
@@ -3353,7 +3445,12 @@ export function BoardBuilder({
         </p>
       )}
       {pubPanel && saved && (
-        <PublishedPanel policy={{ ...saved, pendingDraft: undefined }} left={pubLeft} onClose={() => setPubOpen(false)} />
+        <PublishedPanel policy={{ ...saved, pendingDraft: undefined }} left={pubLeft} title={simple ? LIVE_PANEL : undefined} onClose={() => setPubOpen(false)} />
+      )}
+      {/* Simple: Show live version opens the live rules in a popup (owner, 25 Nov 2026). Only while there is a live
+          version and the board differs from it, as the button allows. */}
+      {simple && saved && isPublished(saved) && (
+        <LiveVersionPopup policy={{ ...saved, pendingDraft: undefined }} open={inEdit && pubOpen && live && !post} onClose={() => setPubOpen(false)} />
       )}
       {fixList && !fixesOpen && !testOn && !describeOpen && (
         <button type="button" className="bdsc-door bfix-door" onClick={() => {
@@ -3402,7 +3499,16 @@ export function BoardBuilder({
                 saveTitle: unsavedIds.includes(selection.id) ? undefined : 'Saved',
                 onSave: () => saveRule(selection.id),
               }
-            : {
+            : FALLBACK_SAVES_RULE && RULE_SAVE && selection.kind === 'fallback'
+              ? /* "Nothing else matched" saves itself only, as any rule does: never the policy, so no ask to activate. */
+                {
+                  canSave: fallbackUnsaved && !savingRule,
+                  saveLabel: savingRule === 'fallback' ? 'Saving rule…' : 'Save rule',
+                  saveBusy: savingRule === 'fallback',
+                  saveTitle: fallbackUnsaved ? undefined : 'Saved',
+                  onSave: saveFallbackRule,
+                }
+              : {
                 canSave: toPublish && !saveBlocked,
                 saveLabel: 'Save rule',
                 saveTitle: !toPublish ? 'Nothing to save' : saveBlocked ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined,

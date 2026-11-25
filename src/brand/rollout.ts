@@ -252,6 +252,48 @@ export const ROLLOUT = {
    *  publish, and with Save draft for every rule that has no empty part (25 Nov, noticed in the morning's builder
    *  review: the tag stayed after Save and publish; BoardBuilder.tsx `markRulesSaved`). Design only. */
   rulesSaveWithPolicy: ['design'],
+  /** The Draft model switch's fifth choice, "Simple" (25 Nov evening, owner: "the goal is to make things short and
+   *  simple"; draft-model.ts `useSimpleDraft`). View and edit with two saves only: Save draft keeps a draft and changes
+   *  nothing live; Save policy makes the policy active, an Inactive one too, through Before making it active. With no
+   *  application Save policy stores it inactive (reverses the 24 Nov "draft only" for Simple). Show live version, the
+   *  green button, is in every edit state, greyed while nothing is live. No "publish" on its buttons or toasts. Later the
+   *  same evening (owner): no Edit policy / Exit edit mode, the builder always edits; no Make active / Make inactive
+   *  anywhere ("save means active"; Inactive is only a policy saved with no application), so removing the last
+   *  application makes it inactive and delete needs no step first; Show live version waits for a change as the saves
+   *  do; no Draft chip on the canvas. Design only. */
+  simpleDraft: ['design'],
+  /** Policies: a policy's name opens the Policy details drawer again, with the status in its head (not again on its
+   *  card) and Open in builder as its one button, no ⋯ (25 Nov evening, owner: "Bring back the drawer … include a
+   *  dedicated status and button", then "3 dot can be removed"). Reverses `directOpen`'s row for the list; the builder
+   *  bar's name card stays. Design only. */
+  policyDrawer: ['design'],
+  /** Builder: the rule panel's Save rule in the solid accent (blue in the rebrand look, slate in the console look),
+   *  where the light grey read as disabled (25 Nov evening, owner: "looks disabled … add another type of button here,
+   *  not active because Save policy is"). Filled (23 Sep), never a second orange (board.css `.bb__inspfoot.is-slate`).
+   *  Design only. */
+  saveRuleLook: ['design'],
+  /** More filters: no summary chip beside the button; the button itself lights in the active chip's colours while a
+   *  filter is applied, and its title names them (25 Nov evening, owner: "can remove, and just make the More filters
+   *  button active somehow with color"; more-filters.tsx). Clearing stays in the dropdown. Design only. */
+  filtersOnButton: ['design'],
+  /** Builder: "Nothing else matched"'s Save rule saves that row only, as every rule's does, never the whole policy
+   *  (25 Nov evening, owner: changing it and pressing Save rule opened the make-active popup). A policy save marks it
+   *  saved with the rules (`rulesSaveWithPolicy`). Design only. */
+  fallbackSavesRule: ['design'],
+  /** Builder, a rule's Who: a "Default" group stands for everyone the policy covers, in place of the "Applies to everyone
+   *  by default" empty state. It starts ticked; ticking another group unticks it and the rule covers just those;
+   *  unticking every group brings it back (25 Nov evening, owner: "Default, or pick groups"; WhoEditor.tsx). Stored as
+   *  it always was: no groups named means everyone. Design only. */
+  whoDefaultGroup: ['design'],
+  /** A big action ends on its list, with its toast: the builder's Save draft and main save go back to where the board
+   *  was opened from (Policies, or the application's page); library pages' create and save close back to their list
+   *  (25 Nov evening, owner: "don't let the user stay in the details page, they should be redirected to its main page
+   *  with a toast"). Design only. */
+  backAfterSave: ['design'],
+  /** The Global Default Policy is no longer a concept: not seeded, not listed, not named; a sign-in to an application
+   *  no policy covers is Blocked, said "No policy · Blocked" (25 Nov evening, owner: "remove global policy, completely
+   *  not a concept any more", then "Blocked", "everywhere on Design"). Design only. */
+  noGlobalDefault: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

@@ -96,6 +96,10 @@ import { CREATE_VERSIONS, readCreateVersion, writeCreateVersion, type CreateVers
 import { SHOWCASE } from '../showcase'
 import { TESTER } from '../tester'
 import { DevicesArt } from '../empty-art'
+import { shows } from '../rollout'
+
+/* Create and Save end on the Device profiles list, with their toast (rollout `backAfterSave`). */
+const BACK_AFTER_SAVE: boolean = shows('backAfterSave')
 
 /* -----------------------------------------------------------------------------
    Device fingerprint · profiles.
@@ -256,8 +260,10 @@ export function DeviceFingerprintV2() {
     const id = store.addFingerprint({ ...p, id: freshId(p.name) })
     created.current = id
     setWizard(false)
-    setOpenId(id)
     store.showToast(`${p.name} created`)
+    /* Back on the list, on the new row, rather than into it (`backAfterSave`). */
+    if (BACK_AFTER_SAVE) return leaveCreate(id)
+    setOpenId(id)
   }
 
   /* Back on the list from a create flow: on the row it created, if it did, and
@@ -315,8 +321,14 @@ export function DeviceFingerprintV2() {
               const id = store.addFingerprint(p)
               created.current = id
               setCreating(null)
-              setOpenId(id)
               store.showToast(`${p.name} created`)
+              /* Back on the list, on the new row (`backAfterSave`). */
+              if (BACK_AFTER_SAVE) {
+                setListFocus({ id, on: 'open' })
+                setOpenId(null)
+                return
+              }
+              setOpenId(id)
               /* Stored under another id only if this one was taken meanwhile;
                  the page then remounts, and its heading takes focus again. */
               if (id !== p.id) focusProfileHeading()
@@ -324,6 +336,10 @@ export function DeviceFingerprintV2() {
             }
             store.updateFingerprint(p)
             store.showToast(`${p.name} saved`)
+            if (BACK_AFTER_SAVE) {
+              setListFocus({ id: p.id, on: 'open' })
+              setOpenId(null)
+            }
           }}
         />
       ) : wizard && version !== 'current' ? (

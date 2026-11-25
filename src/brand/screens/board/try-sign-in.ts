@@ -1,6 +1,7 @@
 import { FALLBACK_NAME, enforces, memberGroupIds, type AccessDecision, type Condition, type Policy, type Rule, type Zone } from '../../data'
 import { CANT_TELL, DECISION_WORDS, decisionsOr, factWords } from '../../decision-words'
 import type { AuthMethod } from '../../methods'
+import { NO_POLICY, isNoPolicy } from '../../no-global-default'
 import { PLACES, searchPlaces, type PlaceKind } from '../../places'
 import { differsFromLive } from '../../policy-draft'
 import { leaves } from '../../predicate'
@@ -143,7 +144,8 @@ export function standingWatch(cols: readonly ColumnResult[]): readonly WatchedRe
 function policyOf(res: TenantResolution, policies: readonly Policy[], substitute?: Policy): Policy | undefined {
   const id = res.decidedBy?.policyId
   if (!id) return undefined
-  return substitute?.id === id ? substitute : policies.find((p) => p.id === id)
+  /* The stand-in for "no policy covers it" is in no list (no-global-default.ts). */
+  return substitute?.id === id ? substitute : (policies.find((p) => p.id === id) ?? (isNoPolicy(id) ? NO_POLICY : undefined))
 }
 
 /* The rule that decided, or null for the last row. */

@@ -6,7 +6,7 @@ import { Confirm } from '../kit'
 import { appsOf, enforces, type Policy, type PolicyStatus } from '../data'
 import { guardSignIns } from '../draft-checks'
 import { RULE_GAPS, policyGaps, type RuleGap } from './board/rule-gaps'
-import { commitToast, lastSaved, monitorBlocker, published, sameRules, turnOnBlocker, type RuleSet } from '../policy-draft'
+import { NO_RULES_REASON, commitToast, lastSaved, monitorBlocker, published, refusesEmpty, sameRules, turnOnBlocker, type RuleSet } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
 import { isPostSignIn, turnOnIssue } from '../post-sign-in'
 import { playCue } from '../sound'
@@ -276,8 +276,17 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
     const policy: Policy = draftActivates(stored, target, viewEdit) ? { ...stored, status: 'inactive' } : stored
     const unsaved = options.unsaved === true
     if (target === 'active') {
-      const left = gapsToGoLive(policy, editsNow(policy, opts.edits ?? options.edits).edits)
+      const goingLive = editsNow(policy, opts.edits ?? options.edits).edits
+      const left = gapsToGoLive(policy, goingLive)
       if (left.length > 0) return refuseGaps(policy, left)
+      /* No empty policy goes live (policy-draft.ts `refusesEmpty`, Design only), whichever door Make active is pressed at. */
+      const live = goingLive ?? { rules: policy.rules, fallback: policy.fallback }
+      if (!isPostSignIn(policy) && refusesEmpty({ rules: live.rules, fallback: live.fallback, isSystem: policy.isSystem })) {
+        const screen = store.screen
+        const here = (screen.name === 'board' || screen.name === 'builder') && screen.policyId === policy.id
+        const open = { label: 'Open policy', run: () => store.go({ name: 'board', policyId: policy.id }) }
+        return store.showToast(NO_RULES_REASON, here ? undefined : open, { tone: 'warning' })
+      }
     }
 
     /* A post sign-in policy (post-sign-in.ts) has no sign-in checks to run.

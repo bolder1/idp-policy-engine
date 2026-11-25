@@ -8,7 +8,7 @@ import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type 
 import { dictionaryOf, type AnswerKey, type DescribeTenant, type RuleIds } from '../../create/describe-model'
 import { checksView, withChecks, type CheckContext } from '../../create/describe-checks'
 import { guardSignIns } from '../../draft-checks'
-import { NO_RULES_REASON, SAVE_MAKES_ACTIVE, UNNAMED_REASON, commitToast, committed, differsFromLive, hasNoRules, hasUnsavedChanges, isUntitled, openForEditing, type CommitIntent, type RuleSet } from '../../policy-draft'
+import { NO_RULES_REASON, SAVE_MAKES_ACTIVE, UNNAMED_REASON, commitToast, committed, differsFromLive, hasNoRules, hasUnsavedChanges, isUntitled, openForEditing, refusesEmpty, type CommitIntent, type RuleSet } from '../../policy-draft'
 import { useBrand, useNameLookup } from '../../store'
 import { playCue } from '../../sound'
 import { TemplateSheet } from '../../create/TemplateSheet'
@@ -1018,6 +1018,8 @@ export function BoardBuilder({
   /* A policy needs a rule to be saved at all (owner, 2 Nov 2026: no empty policies), and a new one opened with no form
      needs a name of its own too. The reason is on the buttons and in the leave dialog. */
   const noRules = hasNoRules(draft)
+  /* Design: a policy with no rule of its own is never made live or saved as a policy, only as a draft (`noEmptyLive`). */
+  const emptyRefused = !post && refusesEmpty(draft)
   const unnamed = !!saved?.provisional && isUntitled((store.policyById(saved.id) ?? saved).name)
   const stop = noRules ? NO_RULES_REASON : unnamed ? UNNAMED_REASON : null
   /* A new policy with no rule has nothing to lose: going back just drops it, with nothing asked. */
@@ -1491,6 +1493,8 @@ export function BoardBuilder({
   const commitSave = (asked: boolean) => {
     if (stop) return store.showToast(stop)
     if (!toPublish || saveBlocked) return
+    /* No empty policy goes live or is saved as a policy (policy-draft.ts `refusesEmpty`); Save draft does not come here. */
+    if (emptyRefused) return store.showToast(NO_RULES_REASON, undefined, { tone: 'warning' })
     /* A live post sign-in policy is never saved back to draft for a rule left
        without an action: the save is refused and the reason said under it
        (post-board.ts `saveRefused`). A draft saves as a draft. */
@@ -2599,6 +2603,10 @@ export function BoardBuilder({
     if (gaps.length > 0) {
       setGuardOpen(false)
       return refuseGaps(gaps)
+    }
+    if (emptyRefused) {
+      setGuardOpen(false)
+      return store.showToast(NO_RULES_REASON, undefined, { tone: 'warning' })
     }
     /* One commit rule for both builders — see `committed` in policy-draft.ts.
        No applications: a draft. A draft with applications: off, or on if the

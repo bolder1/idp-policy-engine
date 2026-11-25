@@ -298,6 +298,12 @@ export const ROLLOUT = {
    *  this policy?" above an Activate policy button) and the toast "<name> is active" (was "<name> saved"). Found in the
    *  26 Nov capture run; owner: "fix both". Design only. */
   simpleActivateWords: ['design'],
+  /** No policy goes live, or is saved as a policy, with no rule of its own: a policy whose only row is "Nothing else
+   *  matched" as the product left it is refused with "Add a rule first" by the builder's main save (Save policy,
+   *  Activate policy, Save and publish, Publish) and by every Make active. Save draft still works. An admin-edited last
+   *  row still counts as a rule (23 Nov ruling). Found in the 26 Nov Tester run: Save policy put a policy with no rules
+   *  live, "Now allowed 288" of 360 sign-ins. Owner: "Yes, block it". Design only. */
+  noEmptyLive: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

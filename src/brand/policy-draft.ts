@@ -72,6 +72,15 @@ export const hasNoRules = (p: Pick<Policy, 'rules' | 'isSystem' | 'fallback'>): 
 /** What a refused save says. */
 export const NO_RULES_REASON = 'Add a rule first'
 
+/* No empty policy goes live (rollout.ts `noEmptyLive`, Design only): with no rule of its own, a policy would decide every
+   sign-in by its last row alone, and that row as the product left it is a blanket Allow nobody chose. An admin who
+   edited "Nothing else matched" chose it, so that still counts as a rule (23 Nov 2026 ruling). */
+export const NO_EMPTY_LIVE: boolean = shows('noEmptyLive')
+export const isEmptyPolicy = (p: Pick<Policy, 'rules' | 'isSystem' | 'fallback'>): boolean =>
+  p.rules.length === 0 && !p.isSystem && p.fallback?.setBy !== 'admin'
+/** The live-making saves refuse an empty policy; Save draft does not. */
+export const refusesEmpty = (p: Pick<Policy, 'rules' | 'isSystem' | 'fallback'>): boolean => NO_EMPTY_LIVE && isEmptyPolicy(p)
+
 /** A name the product gave, not the admin: "Untitled policy", "Untitled post sign-in policy 2". */
 export const isUntitled = (name: string): boolean => /^Untitled( post sign-in)? policy( \d+)?$/.test(name.trim())
 
@@ -189,9 +198,11 @@ export function withoutApps(status: Policy['status']): Policy['status'] {
 }
 
 /** Why a policy cannot be switched on, or null when it can. `errors` counts blocking errors on its live rules. */
-export function turnOnBlocker(p: Pick<Policy, 'appIds' | 'isSystem' | 'status' | 'pendingDraft'>, errors: number): string | null {
+export function turnOnBlocker(p: Pick<Policy, 'appIds' | 'isSystem' | 'status' | 'pendingDraft'> & Partial<Pick<Policy, 'rules' | 'fallback'>>, errors: number): string | null {
   if (p.status === 'draft') return 'Review and save this draft first.'
   if (!hasApps(p)) return 'Assign an application first.'
+  /* Its live rules decide once it is on, so those are what must hold a rule (`noEmptyLive`). */
+  if (p.rules && refusesEmpty({ rules: p.rules, fallback: p.fallback, isSystem: p.isSystem })) return `${NO_RULES_REASON}.`
   /* "Live" when a saved draft exists, because that draft may already be fixed. */
   const rules = p.pendingDraft ? 'its live rules' : 'its rules'
   if (errors > 0) return errors === 1 ? `Fix the error in ${rules} first.` : `Fix the ${errors} errors in ${rules} first.`

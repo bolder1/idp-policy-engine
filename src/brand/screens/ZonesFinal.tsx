@@ -62,9 +62,11 @@ import {
   zoneReviewRows,
   type PlaceList,
   type Refusal,
+  CITY_RANGE_MIN,
+  CITY_RANGE_ONE,
 } from './zone-entries'
 import { NoteStyleSwitch, ZoneNote } from './zone-notes'
-import { useNoteStyle, type ZoneHalf } from './zone-notes-model'
+import { NOTE_STYLE_SWITCH, useNoteStyle, type ZoneHalf } from './zone-notes-model'
 import { deleteImpact, policiesUsing } from './usage'
 import { libraryChecked, zoneGuard, zoneRestored } from './library-guard'
 import { useLibraryReview } from './library-review'
@@ -80,6 +82,7 @@ import { SHOWCASE } from '../showcase'
 import { TESTER } from '../tester'
 import { ZonesArt } from '../empty-art'
 import { shows } from '../rollout'
+import { CharCount } from '../CharCount'
 
 /** The place results open over the sticky save bar (rollout `zonesHitsOverBar`). */
 const HITS_OVER_BAR = shows('zonesHitsOverBar')
@@ -833,10 +836,13 @@ export function ZoneDetail({
             slot `PageHead` gives it: the side note's two versions (1 Oct to
             16 Oct 2026).
             Shown in the showcase build too, because it is a decision still
-            open; it goes once the owner picks — see zone-notes.tsx. */}
-        <div className="bpage__preview">
-          <NoteStyleSwitch />
-        </div>
+            open; it goes once the owner picks — see zone-notes.tsx. Gone
+            where the owner hid it (25 Nov 2026, `NOTE_STYLE_SWITCH`). */}
+        {NOTE_STYLE_SWITCH && (
+          <div className="bpage__preview">
+            <NoteStyleSwitch />
+          </div>
+        )}
       </header>
 
       <section className="bz7__build">
@@ -1035,6 +1041,8 @@ function DuplicateZoneModal({
               }
             }}
           />
+          {/* The count under the name (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+          <CharCount value={name} max={NAME_MAX} />
           {taken && (
             <span className="bz7__fielderr" id="bz7-dup-err">
               {NAME_IN_USE}
@@ -1116,6 +1124,8 @@ function NameOnlyModal({
             }
           }}
         />
+        {/* The count under the name (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+        <CharCount value={name} max={NAME_MAX} />
         {taken && (
           <span className="bz7__fielderr" id="bz7-new-err">
             {NAME_IN_USE}
@@ -1818,6 +1828,12 @@ export function PlaceSection({
      number already there. Zero still means "the city itself", whichever unit
      is on screen, and the row goes back to being a plain city. */
   const setCityKm = (c: Chosen, km: number, unit: DistanceUnit = 'km') => {
+    /* Under CITY_RANGE_ONE nothing goes under 1, so a range never turns back into a plain city; and a plain city,
+       which already reads "1 km", is left as it is until the number or the unit really changes. */
+    if (CITY_RANGE_ONE) {
+      km = Math.max(km, CITY_RANGE_MIN)
+      if (c.kind === 'cities' && km === CITY_RANGE_MIN && unit === 'km') return
+    }
     if (c.kind === 'range') {
       if (km > 0) put({ ...l, ranges: l.ranges.map((r) => (r === c.range ? { ...r, km, unit } : r)) })
       else put({ ...l, ranges: l.ranges.filter((r) => r !== c.range), cities: [...l.cities, c.range.label] })
@@ -2065,7 +2081,8 @@ export function PlaceSection({
   const placeLine = (c: Chosen) => {
     const city = c.kind === 'range' || c.kind === 'cities'
     const key = cityKey(c)
-    const km = c.kind === 'range' ? c.range.km : 0
+    /* A city with no range reads the least a range can be: 0 where that is "the city itself", 1 under CITY_RANGE_ONE. */
+    const km = c.kind === 'range' ? c.range.km : city ? CITY_RANGE_MIN : 0
     const unit: DistanceUnit = c.kind === 'range' ? unitOf(c.range) : 'km'
     const kind = city ? 'City' : (c as PlaceRow).label
     const covered = coverNote(c)
@@ -2093,17 +2110,27 @@ export function PlaceSection({
               plain box, the unit chosen beside it. It was a stepper with "km"
               printed inside, which offered no other unit and spent two arrows
               on a number nobody nudges one at a time. */}
-          <input
-            id={`${kmUid}-${key}`}
-            className="bz7__rangenum"
-            inputMode="numeric"
-            aria-label={`Range around ${c.v}`}
-            value={String(km)}
-            onChange={(e) => {
-              const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4)
-              setCityKm(c, Math.min(Number(digits || 0), RANGE_MAX[unit]), unit)
-            }}
-          />
+          {CITY_RANGE_ONE && city ? (
+            <RangeNumber
+              id={`${kmUid}-${key}`}
+              label={`Range around ${c.v}`}
+              km={km}
+              max={RANGE_MAX[unit]}
+              onKm={(n) => setCityKm(c, n, unit)}
+            />
+          ) : (
+            <input
+              id={`${kmUid}-${key}`}
+              className="bz7__rangenum"
+              inputMode="numeric"
+              aria-label={`Range around ${c.v}`}
+              value={String(km)}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4)
+                setCityKm(c, Math.min(Number(digits || 0), RANGE_MAX[unit]), unit)
+              }}
+            />
+          )}
           <Picker
             size="md"
             label={`Range unit for ${c.v}`}
@@ -2202,3 +2229,30 @@ export function SearchRange({ km = 0, unit = 'km' }: { km?: number; unit?: Dista
    the narrower ones out of the list with. Nothing sweeps any more (23 Sep
    2026) — a covered row stays and says "In India" — and `coveredBy` in
    places.ts answers the same question for the note. */
+
+/* A city's Range under CITY_RANGE_ONE (owner, 25 Nov 2026: "can't have zero"). The box holds what is typed while it has
+   focus, so clearing it to type 5 is not 1 then 15; only a whole number of 1 or more is stored. Left empty or at 0, it
+   stores 1 and shows it. */
+function RangeNumber({ id, label, km, max, onKm }: { id: string; label: string; km: number; max: number; onKm: (n: number) => void }) {
+  const [text, setText] = useState<string | null>(null)
+  return (
+    <input
+      id={id}
+      className="bz7__rangenum"
+      inputMode="numeric"
+      aria-label={label}
+      value={text ?? String(km)}
+      onFocus={() => setText(String(km))}
+      onChange={(e) => {
+        const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4)
+        setText(digits)
+        const n = Math.min(Number(digits || 0), max)
+        if (n >= CITY_RANGE_MIN) onKm(n)
+      }}
+      onBlur={() => {
+        if (text !== null && Number(text || 0) < CITY_RANGE_MIN) onKm(CITY_RANGE_MIN)
+        setText(null)
+      }}
+    />
+  )
+}

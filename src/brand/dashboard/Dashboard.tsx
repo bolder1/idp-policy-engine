@@ -9,6 +9,7 @@ import { PageBar } from '../screens/page-bar'
 import { primeSound } from '../sound'
 import { useBrand } from '../store'
 import { shows } from '../rollout'
+import { CharCount } from '../CharCount'
 import { useTheme } from '../theme-mode'
 import { checkLayout } from './check'
 import type { Mark } from './tags'
@@ -636,6 +637,9 @@ function NameDialog({ naming, onChange, onClose, onSave }: { naming: Naming | nu
           }}
         />
       </label>
+      {/* The count under the name (owner, 25 Nov 2026: "Add character limit to all of the needed places"). Just after the
+          label, not in it: `.bdash-name span` would give it the label's type. */}
+      <CharCount value={naming?.value ?? ''} max={48} />
     </Modal>
   )
 }

@@ -1,5 +1,7 @@
 import { useId, useState } from 'react'
 
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS, TEXT_MAX } from '../char-limits'
 import { Drawer, SaveBar, Toggle } from '../kit'
 import { useLeaveGuard } from '../leave-guard'
 import { Picker } from '../picker'
@@ -115,16 +117,20 @@ export function GeneralSettings({
         {/* Owner, 19 Nov 2026: "add mobile issuer name after additional admin". */}
         {MOBILE_ISSUER && (
           <Row title="Mobile issuer name" hint="Shown above the code in authenticator apps." error={issues.mobileIssuer} errorId={`${id}-issuer-err`}>
+            {/* A limit and its count, under the field in the row's control column (owner, 25 Nov 2026: "Add character
+                limit to all of the needed places"). This row shows on every line, so only CHAR_COUNTS sets the limit. */}
             <input
               className="bm8__gtext-input"
               type="text"
               value={value.mobileIssuer}
+              maxLength={CHAR_COUNTS ? TEXT_MAX.label : undefined}
               onChange={(e) => set('mobileIssuer', e.target.value)}
               aria-label="Mobile issuer name"
               aria-invalid={issues.mobileIssuer ? true : undefined}
               aria-describedby={issues.mobileIssuer ? `${id}-issuer-err` : undefined}
               spellCheck={false}
             />
+            <CharCount value={value.mobileIssuer} max={TEXT_MAX.label} />
           </Row>
         )}
       </section>

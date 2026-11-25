@@ -26,6 +26,8 @@ import {
   type SamlSetup,
 } from '../app-setup'
 import { Button, IconButton, NumberStepper, TipDot, Toggle } from '../kit'
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS } from '../char-limits'
 import { Picker } from '../picker'
 import { useBrand, type AppTab } from '../store'
 import { CLIENT_NOTE, type AppDraft, type BasicIssues } from './app-page-model'
@@ -143,6 +145,9 @@ function TextField({
         aria-describedby={error ? `${id}-err` : undefined}
         onChange={(e) => onChange(e.target.value)}
       />
+      {/* The count under a field with a limit (25 Nov 2026, "Add character limit to all of the needed places"): the
+          Display name. A URL or an identifier passes no limit and gets no count. */}
+      {maxLength !== undefined && <CharCount value={value} max={maxLength} />}
     </Row>
   )
 }
@@ -538,10 +543,13 @@ function DescriptionField({ value, onChange }: { value: string; onChange: (v: st
     <div className="bmc__field">
       <div className="bmc__label bdt__labelrow">
         <label htmlFor={id}>Description</label>
-        {n > DESCRIPTION_COUNT_FROM && <span className="bdt__count">{DESCRIPTION_MAX - n} left</span>}
+        {/* Where the counts show, the "N left" gives way to the count under the field (25 Nov 2026, "Add character
+            limit to all of the needed places"): one count, never two. */}
+        {!CHAR_COUNTS && n > DESCRIPTION_COUNT_FROM && <span className="bdt__count">{DESCRIPTION_MAX - n} left</span>}
       </div>
       <div className="bmc__control">
         <textarea id={id} rows={4} maxLength={DESCRIPTION_MAX} value={value} onChange={(e) => onChange(e.target.value)} />
+        <CharCount value={value} max={DESCRIPTION_MAX} />
       </div>
     </div>
   )

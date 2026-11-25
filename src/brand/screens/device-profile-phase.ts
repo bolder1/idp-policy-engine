@@ -18,3 +18,6 @@ export const REGISTRATION_MFA: boolean = shows('registrationMfa')
 /* LOCKED_SIGNALS: an always-on signal can't be unticked, so its priority can't be changed either, and Review leaves it
    out (owner, 23 Nov 2026). By line: rollout.ts `lockedSignals`. */
 export const LOCKED_SIGNALS: boolean = shows('lockedSignals')
+/* REVIEW_ALWAYS_ON: the wizard's Review step lists the always-on signals too, with the rest; only that step, never the
+   live preview beside the others (owner, 25 Nov 2026). By line: rollout.ts `reviewAlwaysOn`. */
+export const REVIEW_ALWAYS_ON: boolean = shows('reviewAlwaysOn')

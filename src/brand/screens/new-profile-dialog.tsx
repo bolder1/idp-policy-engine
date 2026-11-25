@@ -1,6 +1,8 @@
 import { useEffect, useId, useState } from 'react'
 
 import { Button, Modal } from '../kit'
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS } from '../char-limits'
 import { nameIssue, PROFILE_NAME_MAX, type ProfileMode } from '../fingerprint'
 import { ChoiceTiles } from './device-profile-parts'
 import { kindChoices } from './device-profile-choices'
@@ -101,6 +103,14 @@ export function NewProfileDialog({
               }
             }}
           />
+          {/* The count under the name (25 Nov 2026, "Add character limit to all of the needed places"). In a `<small>`,
+              not a bare span: `.bfp2__field > span` would dress the count as a second label. Drawn only where the
+              counts show, so an empty wrapper adds no gap to the field on the other lines. */}
+          {CHAR_COUNTS && (
+            <small>
+              <CharCount value={name} max={PROFILE_NAME_MAX} />
+            </small>
+          )}
           {shown && (
             <span id={errorId} className="bfp2__fielderror">
               {problem}

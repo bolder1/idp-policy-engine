@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, ArrowUp, ChevronDown, Square, Clock, Gauge, MapPin, MonitorSmartphone, PenLine, Undo2, UserMinus, UserRound, Users, X } from 'lucide-react'
 
 import { Button, Field, IconButton, NumberStepper, Tip, TipDot, TipMark } from '../../kit'
+import { CharCount } from '../../CharCount'
 import { CantTell, DecisionBadge } from '../../decision-badge'
 import { Picker, type PickerOption } from '../../picker'
 import { AppLogo } from '../../logos/AppLogo'
@@ -1053,6 +1054,9 @@ export function DescribePanel({
             )}
           </div>
         </div>
+        {/* Owner, 25 Nov 2026, "Add character limit to all of the needed places": the box stops at 500 and cuts a
+            long paste, so its count sits under the composer, outside the border, where it leaves Send alone. */}
+        <CharCount value={state.box} max={500} />
       </div>
 
       {pop && popAlive && (
@@ -1326,6 +1330,9 @@ function MessageField({ value, onCommit }: { value: string | null; onCommit: (m:
           }
         }}
       />
+      {/* Owner, 25 Nov 2026, "Add character limit to all of the needed places": the draft's count, since that is
+          what the field holds until it commits. */}
+      <CharCount value={draft} max={200} />
     </Field>
   )
 }

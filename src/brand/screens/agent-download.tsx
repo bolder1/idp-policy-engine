@@ -1,11 +1,26 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { Ban, ChevronDown, ChevronUp, Download, MonitorSmartphone } from 'lucide-react'
-import { Button, Note } from '../kit'
+import { Ban, ChevronDown, ChevronUp, Download, MonitorSmartphone, Terminal } from 'lucide-react'
+import { Button, Modal, Note } from '../kit'
 import { useBrand } from '../store'
+import { BrandMark } from '../logos/BrandMark'
 import { PlatformMark } from '../logos/PlatformMark'
+import { shows } from '../rollout'
 import type { Platform } from '../risk-signals'
 import { FilterTabs } from './page-bar'
+
+/* Download agent opens a centred pop-up with the three desktop agents, one large card each (owner, 25 Nov 2026: "We
+   only have three options, so give it a big pop-up … Windows, Mac OS, Linux", and "Remove the mobile part"). The
+   rollout table's `agentDownloadDialog` entry; a line without it keeps the anchored panel with Desktop and Mobile. */
+const AGENT_DIALOG: boolean = shows('agentDownloadDialog')
+
+/* Linux takes the terminal glyph the device health lists already give it (device-profile-parts.tsx `GROUP_MARK`):
+   there is no Linux path in BrandMark, and one mark per platform across the console beats a second drawing here. */
+const DESKTOP_AGENTS: { id: string; name: string; file: string; mark: ReactNode }[] = [
+  { id: 'windows', name: 'Windows', file: 'Installer (.msi)', mark: <BrandMark brand="windows" size={28} /> },
+  { id: 'macos', name: 'macOS', file: 'Installer (.pkg)', mark: <BrandMark brand="apple" size={28} /> },
+  { id: 'linux', name: 'Linux', file: 'Installer (.deb, .rpm)', mark: <Terminal size={28} strokeWidth={1.7} aria-hidden /> },
+]
 
 /* The agent-based prerequisites, in six drawings to compare (owner, 16 Oct 2026:
    "give me 5 options of this, also keep this version with us … go through
@@ -309,8 +324,50 @@ function Installer({ platform, name, file, onGet }: { platform: Platform; name: 
   )
 }
 
-/* The installers panel, anchored under the button. */
+/* The three desktop agents in a centred pop-up (AGENT_DIALOG). A card is the download: no footer, since a pick is the
+   whole answer and the close is the way out without one. */
+function AgentDownloadDialog(): ReactNode {
+  const get = useGet()
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button variant="secondary" size="sm" icon={Download} onClick={() => setOpen(true)}>
+        Download agent
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Download the Device Agent" width={680}>
+        <ul className="bagent-os">
+          {DESKTOP_AGENTS.map((a) => (
+            <li key={a.id}>
+              <button
+                type="button"
+                className="bagent-os__card"
+                aria-label={`Download the Device Agent for ${a.name}, ${a.file}`}
+                onClick={() => {
+                  setOpen(false)
+                  get(a.name)
+                }}
+              >
+                <Download size={16} strokeWidth={2} aria-hidden className="bagent-os__dl" />
+                <span className="bagent-os__mark" aria-hidden>
+                  {a.mark}
+                </span>
+                <strong>{a.name}</strong>
+                <span className="bagent-os__file">{a.file}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Modal>
+    </>
+  )
+}
+
+/* The installers panel, anchored under the button. With AGENT_DIALOG, the pop-up above instead. */
 function AgentDownload(): ReactNode {
+  return AGENT_DIALOG ? <AgentDownloadDialog /> : <AgentDownloadPanel />
+}
+
+function AgentDownloadPanel(): ReactNode {
   const get = useGet()
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement | null>(null)

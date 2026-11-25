@@ -438,6 +438,10 @@
 /* The 420px cap exists to stop a 1,400px text input on a full-width page; in a
    520px dialog it just leaves the field short of the picker beneath it. */
 .bnp .bname2__field input[type='text'] { width: 100%; max-width: none; }
+/* A name's character count (CharCount, CHAR_COUNTS) ends where its field ends: capped as the field is on a page, the
+   field's full width in the dialog. The column's own gap already spaces it. */
+.bname2__field > .bx-charcount { max-width: 420px; margin-top: 0; }
+.bnp .bname2__field > .bx-charcount { max-width: none; }
 
 /* The footer is otherwise flush right, and the note belongs at the other end. */
 /* The application, stated rather than asked — for the dialog opened from an

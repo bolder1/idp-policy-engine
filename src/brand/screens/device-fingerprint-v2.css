@@ -126,6 +126,10 @@
 
 .bfp2__field { display: flex; flex-direction: column; gap: var(--space-4); }
 .bfp2__field > span { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+/* A field's character count (CharCount, CHAR_COUNTS) is a span in the label too, but not a second label: the kit's quiet
+   count type, back over the rule above. */
+.bfp2__field > span.bx-charcount { font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-tertiary); }
+.bfp2__field > span.bx-charcount.is-full { color: var(--text-secondary); }
 .bfp2 .bfp2__field input, .bfp2__form .bfp2__field input {
   height: var(--ctl-height-md); padding: 0 11px;
   background: var(--ctl-bg);
@@ -1531,6 +1535,29 @@
 .bagent__itemtext strong { font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .bagent__itemtext span { font-size: var(--fs-sm); color: var(--text-tertiary); }
 .bagent__itemdl { color: var(--text-link); }
+/* Download agent's pop-up (agent-download.tsx AGENT_DIALOG): the three desktop agents as three large cards, the whole
+   card the download. Neutral at rest; the hover and focus are the console's grey, never orange. */
+.bagent-os { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }
+.bagent-os__card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  width: 100%; padding: var(--space-8) var(--space-5) var(--space-7);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg);
+  background: var(--surface-raised); color: var(--text-primary); font: inherit; text-align: center; cursor: pointer;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+.bagent-os__card:hover { border-color: var(--border-strong); background: var(--surface-sunken); }
+.bagent-os__card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bagent-os__mark {
+  display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: var(--space-3);
+  border-radius: var(--radius-lg); background: var(--surface-sunken); color: var(--text-primary);
+}
+.bagent-os__card:hover .bagent-os__mark { background: var(--surface-raised); }
+.bagent-os__card strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+.bagent-os__file { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bagent-os__dl { position: absolute; top: var(--space-4); right: var(--space-4); color: var(--text-tertiary); }
+.bagent-os__card:hover .bagent-os__dl { color: var(--text-link); }
+@media (max-width: 600px) { .bagent-os { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .bagent-os__card { transition: none; } }
 @media (max-width: 520px) {
   .bagent__head { flex-wrap: wrap; }
   .bagent__groups { grid-template-columns: minmax(0, 1fr); }

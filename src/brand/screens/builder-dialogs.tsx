@@ -2,6 +2,8 @@ import { AlertTriangle, CopyPlus, Info, ListX, XCircle } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useId, useMemo, useState } from 'react'
 
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS, TEXT_MAX } from '../char-limits'
 import { FALLBACK_NAME, enforces, fallbackRule, nameTaken, type Policy, type Rule } from '../data'
 import { EmptyState } from '../empty'
 import { Badge, Button, DecisionChip, Field, Modal, TipDot, TipMark } from '../kit'
@@ -384,6 +386,8 @@ export function SaveTemplateDialog({
               save()
             }}
           />
+          {/* The count under the name (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+          <CharCount value={name} max={50} />
           {taken && (
             <p id={`${uid}-taken`} className="bdlg-error" role="alert">
               A template with this name already exists.
@@ -396,13 +400,17 @@ export function SaveTemplateDialog({
           htmlFor={`${uid}-desc`}
           hint="What this template is for, and when to reach for it."
         >
+          {/* A limit and its count (owner, 25 Nov 2026: "Add character limit to all of the needed places"); a line
+              without CHAR_COUNTS keeps no limit. */}
           <textarea
             id={`${uid}-desc`}
             className="bdlg-input"
             rows={3}
             value={description}
+            maxLength={CHAR_COUNTS ? TEXT_MAX.description : undefined}
             onChange={(e) => setDescription(e.target.value)}
           />
+          <CharCount value={description} max={TEXT_MAX.description} />
         </Field>
 
         <fieldset className="bdlg-tpl__cats">

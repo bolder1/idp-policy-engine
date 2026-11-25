@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from 'motion/react'
 
 import { Note } from '../kit'
 import { FilterTabs } from './page-bar'
-import { NOTE_STYLES, examplesOf, factsOf, useNoteStyle, type Example, type NoteStyle, type ZoneHalf } from './zone-notes-model'
+import { NOTE_STYLES, NOTE_STYLE_SWITCH, examplesOf, factsOf, useNoteStyle, type Example, type NoteStyle, type ZoneHalf } from './zone-notes-model'
 
 /* -----------------------------------------------------------------------------
    The zone page's side note, in two versions behind one switch.
@@ -52,6 +52,7 @@ import { NOTE_STYLES, examplesOf, factsOf, useNoteStyle, type Example, type Note
 /** The switch, for the zone page head's preview slot — see `PageHead`. */
 export function NoteStyleSwitch() {
   const [style, setStyle] = useNoteStyle()
+  if (!NOTE_STYLE_SWITCH) return null
   return (
     <div className="bwidth">
       <span className="bwidth__label" aria-hidden>

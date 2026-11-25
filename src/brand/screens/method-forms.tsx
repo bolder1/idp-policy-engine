@@ -4,6 +4,23 @@ import { Eye, EyeOff, Plus, X } from 'lucide-react'
 import { NumberStepper, TipDot } from '../kit'
 import { Picker } from '../picker'
 import { fieldIssue, type ConfigField } from '../method-config'
+import { CHAR_COUNTS, TEXT_MAX } from '../char-limits'
+import { CharCount } from '../CharCount'
+
+/* The fields that take a limit, and their count under them (owner, 25 Nov 2026: "Add character limit to all of the
+   needed places"). Only the words a person is shown: a name in an app or a mail, a message, a security question. The
+   other text fields hold URLs, ids, UUIDs, CA names and API paths, and stay uncapped. Keyed by label, because the id
+   'issuer' is also the smart card's Trusted issuing CA. A line without CHAR_COUNTS caps none of them. */
+const FIELD_MAX = new Map<string, number>([
+  ['Issuer label', TEXT_MAX.label],
+  ['From name', TEXT_MAX.label],
+  ['Name shown in the app', TEXT_MAX.label],
+  ['Relying-party name', TEXT_MAX.label],
+  ['Message template', TEXT_MAX.message],
+  ['Message body', TEXT_MAX.message],
+  ['Question pool', TEXT_MAX.message],
+])
+const fieldMax = (f: ConfigField): number | undefined => (CHAR_COUNTS ? FIELD_MAX.get(f.label) : undefined)
 
 /* -----------------------------------------------------------------------------
    The configuration form.
@@ -49,6 +66,8 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
   /* A filled-in value that cannot work, said under the field as it is typed. */
   const issue = fieldIssue(f)
   const describedBy = [f.help ? `${uid}-help` : '', issue ? `${uid}-err` : ''].filter(Boolean).join(' ') || undefined
+  /* The limit on a text or message field, and its count (25 Nov 2026, "Add character limit to all of the needed places"). */
+  const max = fieldMax(f)
 
   return (
     <div className={`bmc__field is-${f.kind} ${missing ? 'is-missing' : ''}`}>
@@ -94,11 +113,13 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
             type="text"
             value={f.value}
             placeholder={f.placeholder}
+            maxLength={max}
             aria-invalid={missing || !!issue}
             aria-describedby={describedBy}
             onChange={(e) => onChange(f.id, e.target.value)}
           />
         )}
+        {f.kind === 'text' && max !== undefined && <CharCount value={f.value} max={max} />}
 
         {f.kind === 'secret' && (
           /* Masked by default and revealable on demand. A write-only field is
@@ -192,10 +213,12 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
             id={`${uid}-c`}
             rows={f.rows ?? 3}
             value={f.value}
+            maxLength={max}
             aria-describedby={f.help ? `${uid}-help` : undefined}
             onChange={(e) => onChange(f.id, e.target.value)}
           />
         )}
+        {f.kind === 'textarea' && max !== undefined && <CharCount value={f.value} max={max} />}
 
         {f.kind === 'list' && <ListField f={f} onChange={onChange} />}
       </div>
@@ -210,6 +233,9 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
 
 function ListField({ f, onChange }: { f: Extract<ConfigField, { kind: 'list' }>; onChange: (id: string, v: unknown) => void }) {
   const [draft, setDraft] = useState('')
+  /* A security question's limit, and its count (25 Nov 2026, "Add character limit to all of the needed places").
+     Origins have none. */
+  const max = fieldMax(f)
   const add = () => {
     const v = draft.trim()
     // Silently ignoring a duplicate is better than a validation message here:
@@ -237,6 +263,7 @@ function ListField({ f, onChange }: { f: Extract<ConfigField, { kind: 'list' }>;
           value={draft}
           placeholder={`Add a ${f.itemLabel}…`}
           aria-label={`Add a ${f.itemLabel}`}
+          maxLength={max}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -249,6 +276,8 @@ function ListField({ f, onChange }: { f: Extract<ConfigField, { kind: 'list' }>;
           <Plus size={13} strokeWidth={2.2} /> Add
         </button>
       </div>
+      {/* Under the add row, not inside it: the row is a flex line of field and button. */}
+      {max !== undefined && <CharCount value={draft} max={max} />}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { EmptyState } from '../empty'
 import { EVERYONE, enforces, type Audience } from '../data'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
 import { POLICY_NAME_MAX, policyNameIssue } from '../policy-name'
+import { CharCount } from '../CharCount'
 import { useBrand, type PolicyDetailsFrom } from '../store'
 import { ApplicationField } from './scope-fields'
 import { detailsChanges } from './policy-details-review'
@@ -144,6 +145,8 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
               onChange={(e) => setName(e.target.value)}
               placeholder="Finance Team – High Security"
             />
+            {/* The name's count, under it (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+            <CharCount value={name} max={POLICY_NAME_MAX} />
             {blocked && (
               <p id="pd-name-error" className="bpd__error">
                 {blocked}

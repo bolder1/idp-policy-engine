@@ -7,6 +7,7 @@ import { CantTell, DecisionBadge } from '../decision-badge'
 import { DECISION_WORDS } from '../decision-words'
 import { EmptyState } from '../empty'
 import { Badge, Button, Callout, Field, Tip, TipDot } from '../kit'
+import { CharCount } from '../CharCount'
 import { useBrand, useNameLookup } from '../store'
 import {
   BREAK_IN_TIP,
@@ -696,6 +697,8 @@ export function AcceptForm({ onAccept, onCancel }: { onAccept: (reason: string) 
           aria-describedby={tried && empty ? errId : undefined}
           onChange={(e) => setReason(e.target.value)}
         />
+        {/* The count under the reason (25 Nov 2026, "Add character limit to all of the needed places"). */}
+        <CharCount value={reason} max={REASON_MAX} />
       </Field>
       {tried && empty && (
         <p id={errId} className="bbi__said" role="alert">

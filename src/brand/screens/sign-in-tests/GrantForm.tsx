@@ -1,5 +1,6 @@
 import { useId, useState, type FormEvent } from 'react'
 
+import { CharCount } from '../../CharCount'
 import { Button, Field } from '../../kit'
 import { TEMP_ACCESS_MAX_DAYS, TEMP_ACCESS_REASON_MAX, addDays, tempAccessIssue } from './temp-access'
 
@@ -55,6 +56,8 @@ export function GrantForm({ today, person, onGrant }: { today: string; person: s
       )}
       <Field label="Reason" htmlFor={reasonId}>
         <input id={reasonId} type="text" maxLength={TEMP_ACCESS_REASON_MAX} value={reason} aria-invalid={issue?.field === 'reason'} onChange={(e) => setReason(e.target.value)} />
+        {/* Owner, 25 Nov 2026, "Add character limit to all of the needed places". */}
+        <CharCount value={reason} max={TEMP_ACCESS_REASON_MAX} />
       </Field>
       {issue?.field === 'reason' && (
         <p className="bbi__said" role="alert">

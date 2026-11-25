@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
+import { shows } from '../rollout'
+
 /* -----------------------------------------------------------------------------
    What the zone page's side note says, and which version shows — the parts of
    zone-notes.tsx that are not drawing, in their own module so that one exports
@@ -60,13 +62,18 @@ const subscribe = (l: () => void) => {
   }
 }
 
+/* The switch goes where the owner hid it (25 Nov 2026: "Hide this completely, this is not the part of the build"), and
+   with it any Sticky note a viewer had picked: the Note is the one drawn. The rollout table's `hideNoteStyle`; the
+   stored pick is left alone, so a line with the switch still has it. */
+export const NOTE_STYLE_SWITCH: boolean = !shows('hideNoteStyle')
+
 export function useNoteStyle(): [NoteStyle, (s: NoteStyle) => void] {
   const style = useSyncExternalStore(
     subscribe,
     () => (current ??= readNoteStyle()),
     () => 'note' as NoteStyle,
   )
-  return [style, applyNoteStyle]
+  return [NOTE_STYLE_SWITCH ? style : 'note', applyNoteStyle]
 }
 
 /* --- The examples --------------------------------------------------------------
@@ -109,6 +116,20 @@ export const NET_EXAMPLES: Example[] = [
   { text: 'AS15169', gloss: 'an ASN' },
 ]
 
+/* Each family on its own row with its own example (owner, 25 Nov 2026: "IPv4 and IPv6 can have their own examples,
+   don't merge"): an address and a network for each, IPv4 first, then the range (IPv4 only) and the ASN. The IPv6
+   values are from the documentation block (RFC 3849); the IPv4 ones private, as above. The rollout table's
+   `zoneIpExamples` entry; a line without it keeps the merged rows. */
+export const NET_EXAMPLES_SPLIT: Example[] = [
+  { text: '10.0.0.1', gloss: 'an IPv4 address' },
+  { text: '2001:db8::1', gloss: 'an IPv6 address' },
+  { text: '192.168.1.0/24', gloss: 'an IPv4 network' },
+  { text: '2001:db8::/32', gloss: 'an IPv6 network' },
+  { text: '10.1.0.1-10.1.0.99', gloss: 'an IPv4 range' },
+  { text: 'AS15169', gloss: 'an ASN' },
+]
+const ZONE_IP_EXAMPLES: boolean = shows('zoneIpExamples')
+
 /* The two facts the Locations note always carried, in fewer words. The IP
    note has none: its paste line was removed on 23 Sep 2026. */
 export const PLACE_FACTS = [
@@ -116,7 +137,7 @@ export const PLACE_FACTS = [
   "Matched on the sign-in's IP, so a VPN shows where it exits.",
 ]
 
-export const examplesOf = (half: ZoneHalf) => (half === 'net' ? NET_EXAMPLES : PLACE_EXAMPLES)
+export const examplesOf = (half: ZoneHalf) => (half === 'net' ? (ZONE_IP_EXAMPLES ? NET_EXAMPLES_SPLIT : NET_EXAMPLES) : PLACE_EXAMPLES)
 export const factsOf = (half: ZoneHalf) => (half === 'net' ? [] : PLACE_FACTS)
 
 /* `TIP_SEEN_KEY`, `readTipSeen` and `markTipSeen` stood here: whether the

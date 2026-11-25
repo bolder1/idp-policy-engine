@@ -3,6 +3,7 @@ import { sameName, withinRange } from '../places'
 import { allOf, anyOf, type CondState } from '../predicate'
 import { lookUpAddress } from './geo-fixture'
 import type { FactKey, SignInFacts, SignInPlace } from './sign-in-facts'
+import { CITY_RANGE_ONE } from './zone-entries'
 import { ipInEntry, isAddress, isValidAsn } from './zone-validation'
 
 /* -----------------------------------------------------------------------------
@@ -159,8 +160,11 @@ export function zoneHalves(zone: Zone, facts: SignInFacts): ZoneHalves {
           push(locMissing, 'location.coordinates')
           continue
         }
-        /* Inclusive: a sign-in exactly at the edge is inside the range. */
-        const hit = withinRange({ lat: place.lat, lon: place.lon }, r)
+        /* Inclusive: a sign-in exactly at the edge is inside the range. With CITY_RANGE_ONE a range is the city and
+           this far around it, so a sign-in from the city itself is in at any distance from its centre. */
+        const hit =
+          withinRange({ lat: place.lat, lon: place.lon }, r) ||
+          (CITY_RANGE_ONE && !!place.city && sameName('city', r.label, place.city))
         if (hit && locationEntry === undefined) {
           locationEntry = r.label
           locationRange = r

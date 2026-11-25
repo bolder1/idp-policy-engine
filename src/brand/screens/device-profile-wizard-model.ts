@@ -424,7 +424,9 @@ export function checkValue(a: Attribute, v: AttrConfigValue | undefined): string
 
 /* Everything the profile will be, in the order the steps asked it. Read off
    `draftOf`, so an unticked row's kept value is not reported as part of it. */
-export function reviewSections(s: WizardState, step3: Step3Shape, v1 = false): ReviewSection[] {
+/** `withAlways`: list the always-on signals too. Only the Review step passes it (REVIEW_ALWAYS_ON); the live preview
+ *  beside the other steps keeps them out. */
+export function reviewSections(s: WizardState, step3: Step3Shape, v1 = false, withAlways = false): ReviewSection[] {
   const d = draftOf(s)
   const sections: ReviewSection[] = [
     {
@@ -464,9 +466,12 @@ export function reviewSections(s: WizardState, step3: Step3Shape, v1 = false): R
     })
   }
   const noun = ITEM_NOUN[d.mode].many
-  /* The always-on signals are nobody's choice, so Review leaves them out (owner, 23 Nov 2026; `LOCKED_SIGNALS`). */
+  /* The always-on signals are nobody's choice, so Review leaves them out (owner, 23 Nov 2026; `LOCKED_SIGNALS`)… except
+     on the Review step itself, where the profile is read in full before Create, the fixed ones with the rest in the
+     order step 3 lists them (owner, 25 Nov 2026: "This should also showcase in review. the disabled one as well. not
+     every time but here only in step 4"). */
   const all = chosenAttributes(d)
-  const chosen = all.filter((a) => !(LOCKED_SIGNALS && a.always))
+  const chosen = all.filter((a) => withAlways || !(LOCKED_SIGNALS && a.always))
   /* Only the always-on ones chosen: nothing here was the admin's to pick, so the section is left out rather than
      reading "No signals" over a profile that has four. */
   if (chosen.length > 0 || all.length === 0) sections.push({

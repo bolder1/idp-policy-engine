@@ -23,6 +23,8 @@ import {
 import { TemplateIcon } from '../template-icon'
 
 import { Badge, Button, Confirm, DecisionChip, IconButton, MenuButton, Tabs, Tip, TipDot, Toggle, type MenuItem } from '../kit'
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS } from '../char-limits'
 import { blankRule, fallbackRule, reidRule, uniqueName, type Audience, type Policy, type Rule } from '../data'
 import { hasOpenDialog } from '../dialog-chrome'
 import { EmptyState } from '../empty'
@@ -1031,20 +1033,34 @@ function RuleCard({
     { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
   ]
 
+  const nameInput = (
+    <input
+      className="bf__ruleName"
+      aria-label="Rule name"
+      placeholder="Rule name"
+      maxLength={50}
+      value={rule.name}
+      onChange={(e) => onPatch({ name: e.target.value })}
+    />
+  )
+
   return (
     <li ref={el} className={`bf__rule ${open ? 'is-open' : ''} ${rule.enabled ? '' : 'is-off'}`}>
       <div className="bf__rulehead">
         <span className={`bf__ruleno is-${DEC_KEY[rule.decision]}`}>{index + 1}</span>
 
         {open ? (
-          <input
-            className="bf__ruleName"
-            aria-label="Rule name"
-            placeholder="Rule name"
-            maxLength={50}
-            value={rule.name}
-            onChange={(e) => onPatch({ name: e.target.value })}
-          />
+          /* Owner, 25 Nov 2026, "Add character limit to all of the needed places": with CHAR_COUNTS the name and its
+             count share one column in the head row, so the count sits under the name only. Other lines keep the bare
+             input. */
+          CHAR_COUNTS ? (
+            <span style={{ display: 'grid', flex: 1, minWidth: 0 }}>
+              {nameInput}
+              <CharCount value={rule.name} max={50} />
+            </span>
+          ) : (
+            nameInput
+          )
         ) : (
           <button type="button" className="bf__ruleopen" onClick={onOpen}>
             <strong>{label}</strong>

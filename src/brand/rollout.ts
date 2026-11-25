@@ -215,6 +215,35 @@ export const ROLLOUT = {
    *  and Save; the switches still save as they are flicked (25 Nov, owner: "to store this two value we need a footer
    *  with save and cancel button"). Every line, on his word ("for all designers devs and testers"). */
   generalSave: ALL,
+  /** Device profiles → Download agent opens a centred pop-up with three large cards, Windows, macOS and Linux, and no
+   *  mobile agents (25 Nov, owner: "We only have three options, so give it a big pop-up", "Remove the mobile part";
+   *  agent-download.tsx). Design only. */
+  agentDownloadDialog: ['design'],
+  /** Device profile wizard, step 4 Review: the always-on signals (Device type and the rest) are listed with the chosen
+   *  ones; the live preview beside the other steps still leaves them out (25 Nov, owner: "This should also showcase in
+   *  review. the disabled one as well. not every time but here only in step 4"). Design only. */
+  reviewAlwaysOn: ['design'],
+  /** Zones → IP addresses → What you can add: IPv4 and IPv6 each get their own row and example, for an address and for
+   *  a network, rather than one "IPv4 or IPv6" row (25 Nov, owner: "IPv4 and IPv6 can have their own examples, don't
+   *  merge"; zone-notes-model.ts). Design only. */
+  zoneIpExamples: ['design'],
+  /** Zones → Locations: a city's Range is 1 or more, never 0, and a city added without one reads 1; a city range also
+   *  matches a sign-in from that city by name, so 1 km never matches less than the city did (25 Nov, owner: "This
+   *  should be one by default. can't have zero. for cities"; zone-entries.ts `CITY_RANGE_ONE`). Supersedes the 22 Sep
+   *  "set to zero by default". Design only. */
+  cityRangeOne: ['design'],
+  /** Zones: the page head's Note style switch (Note / Sticky note) is gone, and the Note is the one drawn (25 Nov,
+   *  owner: "Hide this completely, this is not the part of the build"; zone-notes-model.ts). Design only. */
+  hideNoteStyle: ['design'],
+  /** Every free-text field (names, descriptions, messages, reasons) has a character limit and shows its count under
+   *  it, "12/50" (25 Nov, owner: "Add character limit to all of the needed places"; char-limits.ts, CharCount.tsx).
+   *  Design only. */
+  charCounts: ['design'],
+  /** Trusted device signals: every attribute in the product's risk parameter list (42, from the dev's payload) is in
+   *  the catalogue; the ones it lacked are added with the payload's category, priority and description, off until
+   *  picked. Existing signals keep their values (25 Nov, owner: "don't need to change any values. Just check the name
+   *  and add all of this"; fingerprint.ts). Design only. */
+  allRiskParameters: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

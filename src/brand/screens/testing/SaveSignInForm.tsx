@@ -6,6 +6,7 @@ import { Button, Field } from '../../kit'
 import { Picker } from '../../picker'
 import { LEVEL_LABEL, LEVEL_META, LEVEL_PICKER_ORDER, SAVED_NAME_MAX, type SignInLevel } from '../../saved-sign-ins'
 import { useBrand } from '../../store'
+import { CharCount } from '../../CharCount'
 import { currentDraft, defaultSaveDraft, saveIssue, savedSignInOf, type SaveDraft } from './save-sign-in'
 import type { SignInForm } from './sign-in-form'
 import './testing.css'
@@ -90,6 +91,8 @@ export function SaveSignInForm({
           value={draft.name}
           onChange={(e) => setEdits((d) => ({ ...d, name: e.target.value }))}
         />
+        {/* The name's count, under it (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+        <CharCount value={draft.name} max={SAVED_NAME_MAX} />
       </Field>
       <Field label="Expected">
         <Picker

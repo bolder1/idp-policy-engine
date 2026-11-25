@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 
 import { CheckRow, Toggle } from '../../kit'
+import { CharCount } from '../../CharCount'
 import { SHOWCASE } from '../../showcase'
 import { Picker } from '../../picker'
 import { DENIAL_REASONS } from '../sign-in-tests/phase'
@@ -687,6 +688,8 @@ function DenyMessage({ rule, onPatch, at }: { rule: Rule; onPatch: (p: Partial<R
             placeholder="What they can do, for example connect from the office"
             onChange={(e) => onPatch({ denyAction: e.target.value.trim() === '' ? undefined : e.target.value })}
           />
+          {/* Counts under Next step and Contact (25 Nov 2026, "Add character limit to all of the needed places"). */}
+          <CharCount value={rule.denyAction ?? ''} max={DENY_EXTRA_MAX} />
           {!rule.denyAction && (
             <button type="button" className="bb__denysuggest" onClick={() => onPatch({ denyAction: DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)] })}>
               Use “{DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)]}”
@@ -703,6 +706,7 @@ function DenyMessage({ rule, onPatch, at }: { rule: Rule; onPatch: (p: Partial<R
             placeholder="Who to ask, for example the IT help desk"
             onChange={(e) => onPatch({ denyContact: e.target.value.trim() === '' ? undefined : e.target.value })}
           />
+          <CharCount value={rule.denyContact ?? ''} max={DENY_EXTRA_MAX} />
         </>
       )}
     </div>
@@ -876,6 +880,8 @@ function DenyMessageCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<R
               placeholder="What they can do, for example connect from the office"
               onChange={(e) => onPatch({ denyAction: e.target.value.trim() === '' ? undefined : e.target.value })}
             />
+            {/* Counts under Next step and Contact (25 Nov 2026, "Add character limit to all of the needed places"). */}
+            <CharCount value={rule.denyAction ?? ''} max={DENY_EXTRA_MAX} />
             {!rule.denyAction && (
               <button type="button" className="bb__denysuggest" onClick={() => onPatch({ denyAction: DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)] })}>
                 Use “{DENY_ACTION_SUGGESTION[denyReasonOfRule(rule)]}”
@@ -892,6 +898,7 @@ function DenyMessageCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<R
               placeholder="Who to ask, for example the IT help desk"
               onChange={(e) => onPatch({ denyContact: e.target.value.trim() === '' ? undefined : e.target.value })}
             />
+            <CharCount value={rule.denyContact ?? ''} max={DENY_EXTRA_MAX} />
           </>
         )}
       </div>

@@ -20,6 +20,8 @@ import {
   XCircle,
 } from 'lucide-react'
 
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS, TEXT_MAX } from '../char-limits'
 import { MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../predicate'
@@ -556,13 +558,18 @@ function CardBlock({
         <span className="bf__cardn" aria-hidden>
           {cardLetter(index)}
         </span>
+        {/* A limit and its count (owner, 25 Nov 2026: "Add character limit to all of the needed places"); a line
+            without CHAR_COUNTS keeps no limit. Beside the name, not under it: the head is one centred 26px row, and a
+            second line under the name alone would drop the letter, the hint and the menu off its middle. */}
         <input
           className="bf__cardname"
           aria-label={`Name for branch ${cardLetter(index)}`}
           placeholder="Branch name"
           value={k.label ?? ''}
+          maxLength={CHAR_COUNTS ? TEXT_MAX.label : undefined}
           onChange={(e) => onPatch(k.id, { ...k, label: e.target.value || undefined })}
         />
+        <CharCount value={k.label ?? ''} max={TEXT_MAX.label} />
         <em className="bf__cardcount">{cardJoin(k) === 'and' ? AND_HINT : OR_HINT}</em>
         <MenuButton
           label={`Branch ${cardLetter(index)} actions`}

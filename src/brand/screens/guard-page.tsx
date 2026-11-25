@@ -5,6 +5,7 @@ import { ChevronDown, RefreshCw, ShieldAlert } from 'lucide-react'
 import { ChangeList, ChangeSection, type ChangeBlock, type ChangeItem } from '../change-list'
 import { DECISION_WORDS } from '../decision-words'
 import { Badge, Button, Callout, Drawer, Field, Modal, TipDot } from '../kit'
+import { CharCount } from '../CharCount'
 import { listNames } from '../rule-who'
 import { CRITICAL_GUARD, TESTER } from '../tester'
 import { ACTIVE_WORDS } from './status-options'
@@ -250,6 +251,8 @@ function ExpectForm({ decision, onSave, onCancel }: { decision: string; onSave: 
             if (said) setSaid(null)
           }}
         />
+        {/* The count under the reason (25 Nov 2026, "Add character limit to all of the needed places"). */}
+        <CharCount value={reason} max={REASON_MAX} />
       </Field>
       {said && (
         <p id={`${id}-e`} className="bgd__said" role="alert">

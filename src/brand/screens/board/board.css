@@ -2586,6 +2586,11 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    The description is no longer a section of its own; it sits under the name it
    belongs to and grows with what is typed into it. */
 .bb__inspname { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+/* The rule name's character count (CharCount, CHAR_COUNTS) hangs under the field without taking a line in the bar, so
+   the number, the field and the bar's buttons stay centred on one line; the bar's bottom padding gives it the room. */
+.bb__inspbar.is-rule:has(.bx-charcount) { padding-bottom: calc(var(--space-5) + var(--space-6)); }
+.bb__inspname:has(> .bx-charcount) { position: relative; }
+.bb__inspname > .bx-charcount { position: absolute; top: 100%; right: 0; margin-top: var(--space-1); }
 
 /* The block's foot: the two places a condition can go that are not already
    inside a group somebody made. */

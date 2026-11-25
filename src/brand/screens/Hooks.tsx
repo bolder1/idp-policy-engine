@@ -25,6 +25,8 @@ import {
 } from '../hooks'
 import { HooksArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS, TEXT_MAX } from '../char-limits'
 
 /* -----------------------------------------------------------------------------
    External hooks — the library screen.
@@ -319,17 +321,32 @@ function HookForm({
             onChange={(e) => set({ name: e.target.value })}
             placeholder="Fraud score lookup"
           />
+          {/* The count under the name (owner, 25 Nov 2026: "Add character limit to all of the needed places"). In a
+              <small>, not a bare span: `.bhk__field > span` is the field's label type and would restyle the count. */}
+          {CHAR_COUNTS && (
+            <small>
+              <CharCount value={draft.name} max={80} />
+            </small>
+          )}
           <FieldIssues id={msgId('name')} issues={shown('name')} />
         </label>
 
         <label className="bhk__field">
           <span>Description</span>
+          {/* A limit and its count (owner, 25 Nov 2026: "Add character limit to all of the needed places"); a line
+              without CHAR_COUNTS keeps no limit. */}
           <textarea
             rows={2}
             value={draft.description ?? ''}
+            maxLength={CHAR_COUNTS ? TEXT_MAX.description : undefined}
             onChange={(e) => set({ description: e.target.value })}
             placeholder="Owner and purpose"
           />
+          {CHAR_COUNTS && (
+            <small>
+              <CharCount value={draft.description ?? ''} max={TEXT_MAX.description} />
+            </small>
+          )}
         </label>
 
         <fieldset className="bhk__modes" data-field="mode" aria-describedby={impact.modeError ? msgId('mode') : undefined}>

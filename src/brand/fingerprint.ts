@@ -39,6 +39,7 @@ import { nameTaken } from './data'
 import { AUTH_METHODS } from './methods'
 import { allOf, type CondState } from './predicate'
 import type { ReviewLine } from './review-rows'
+import { shows } from './rollout'
 import type { DevicePlatform, FactKey, SignInDevice } from './screens/sign-in-facts'
 
 /* Back, and only for the device catalogue. See DEVICE_ATTRIBUTES below: the two
@@ -865,9 +866,68 @@ export const DEVICE_ATTRIBUTES: Attribute[] = [
    else-shaped: a mode added without a catalogue, or an id typed wrong, silently
    returned the other list rather than failing. A total map cannot be
    incomplete, and adding a third kind without a catalogue is a compile error. */
+/* --- The rest of the product's risk parameters (owner, 25 Nov 2026) -------------
+
+   The dev's risk parameter payload names 42 attributes. Read by name against the list above, 25 are already here (RAM
+   is "Memory and storage"; Manufacturer and Model are the one "Manufacturer and model" row; browser.screenprint is
+   "Screen resolution"), and these 17 were not. Owner: "don't need to change any values. Just check the name and add
+   all of this" — so nothing above changes, and each new row takes the payload's priority (all Low) and its description
+   as the tip, off until an admin picks it. Filed under the categories this list already uses, beside their nearest
+   row: the location fields under Network with Geolocation, the browser's under Browser, Mobile device under Hardware
+   with Device type; the device's own clock and time zone (the payload's SOFTWARE) under Platform. Collected without
+   an agent, phase 1: the payload is what the product reads today. The rollout table's `allRiskParameters`. */
+const LOW = { priority: 'Low', weight: 10, phase: 1 } as const
+const MORE_RISK_PARAMETERS: { after: string; attrs: Attribute[] }[] = [
+  {
+    after: 'device-type',
+    attrs: [{ id: 'mobile-device', category: 'Hardware', name: 'Mobile device', purpose: 'Whether the device is a mobile one.', ...LOW }],
+  },
+  {
+    after: 'canvas',
+    attrs: [
+      { id: 'browser-tz', category: 'Browser', name: 'Browser time zone', purpose: 'The time zone the browser reports.', ...LOW },
+      { id: 'cookies', category: 'Browser', name: 'Cookie support', purpose: 'Whether the browser accepts cookies.', ...LOW },
+      { id: 'local-storage', category: 'Browser', name: 'Local storage', purpose: 'Whether the browser offers local storage.', ...LOW },
+      { id: 'session-storage', category: 'Browser', name: 'Session storage', purpose: 'Whether the browser offers session storage.', ...LOW },
+    ],
+  },
+  {
+    after: 'geo',
+    attrs: [
+      { id: 'continent', category: 'Network', name: 'Continent', purpose: 'The continent the sign-in comes from.', ...LOW },
+      { id: 'continent-code', category: 'Network', name: 'Continent code', purpose: 'The continent, as its code.', ...LOW },
+      { id: 'country', category: 'Network', name: 'Country', purpose: 'The country the sign-in comes from.', ...LOW },
+      { id: 'country-code', category: 'Network', name: 'Country code', purpose: 'The country, as its code.', ...LOW },
+      { id: 'region', category: 'Network', name: 'Region or state', purpose: 'The region or state the sign-in comes from.', ...LOW },
+      { id: 'region-code', category: 'Network', name: 'Region code', purpose: 'The region or state, as its code.', ...LOW },
+      { id: 'city', category: 'Network', name: 'City', purpose: 'The city the sign-in comes from.', ...LOW },
+      { id: 'postal-code', category: 'Network', name: 'Postal code', purpose: 'The postal code the sign-in comes from.', ...LOW },
+      { id: 'latitude', category: 'Network', name: 'Latitude', purpose: 'Where the sign-in comes from: its latitude.', ...LOW },
+      { id: 'longitude', category: 'Network', name: 'Longitude', purpose: 'Where the sign-in comes from: its longitude.', ...LOW },
+    ],
+  },
+  {
+    after: 'time',
+    attrs: [
+      { id: 'system-tz', category: 'Platform', name: 'System time zone', purpose: "The time zone set on the device.", ...LOW },
+      { id: 'system-time', category: 'Platform', name: 'System time', purpose: "The time on the device's clock.", ...LOW },
+    ],
+  },
+]
+
+/** The device list with each group of the rest placed after its nearest row; a group whose row is gone goes last. */
+function withRiskParameters(base: Attribute[]): Attribute[] {
+  const out = [...base]
+  for (const g of MORE_RISK_PARAMETERS) {
+    const at = out.findIndex((a) => a.id === g.after)
+    out.splice(at === -1 ? out.length : at + 1, 0, ...g.attrs)
+  }
+  return out
+}
+
 export const CATALOGUE: Record<ProfileMode, Attribute[]> = {
   os: OS_ATTRIBUTES,
-  device: DEVICE_ATTRIBUTES,
+  device: shows('allRiskParameters') ? withRiskParameters(DEVICE_ATTRIBUTES) : DEVICE_ATTRIBUTES,
 }
 
 export const attributesFor = (mode: ProfileMode): Attribute[] => CATALOGUE[mode]

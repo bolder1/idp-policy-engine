@@ -7,6 +7,7 @@ import { ChangeList, ChangeSection, type ChangeBlock } from '../../change-list'
 import { FALLBACK_NAME, fallbackRule, type App, type Group, type Policy, type Rule, type User } from '../../data'
 import { Face } from '../../faces'
 import { Badge, Button, Confirm, IconButton, Modal, Toggle } from '../../kit'
+import { CharCount } from '../../CharCount'
 import type { RuleSet } from '../../policy-draft'
 import { describeChanges } from '../changes'
 import { liveConfirmBody, reachesSignIns } from './draft-model'
@@ -609,6 +610,8 @@ export function useDraftV3(o: {
         <label className="bv3-field">
           <span className="u-label">Note</span>
           <textarea rows={2} maxLength={200} placeholder="Optional" value={note} onChange={(e) => setNote(e.target.value)} />
+          {/* The count under the note (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+          <CharCount value={note} max={200} />
         </label>
       </Confirm>
       <Confirm
@@ -642,6 +645,8 @@ export function useDraftV3(o: {
         <label className="bv3-field">
           <span className="u-label">Reason</span>
           <textarea rows={3} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
+          {/* The count under the reason (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+          <CharCount value={reason} max={300} />
         </label>
       </Modal>
     </>

@@ -31,6 +31,8 @@ import { ruleMenu } from './rule-menu'
 import { PANEL_WIDTH_BUTTON, RULE_ON_OFF } from './bar-tools'
 import { useShows } from './builder-version'
 import { shows } from '../../rollout'
+import { CHAR_COUNTS, TEXT_MAX } from '../../char-limits'
+import { CharCount } from '../../CharCount'
 
 /* The Global Default's last row shows a read-only Who (rollout.ts `globalWho`). */
 const GLOBAL_WHO = shows('globalWho')
@@ -483,6 +485,9 @@ function RuleHead({
           className="bb__input bb__input--title"
           aria-label="Rule name"
           value={rule.name}
+          /* Capped and counted where CHAR_COUNTS is on (owner, 25 Nov 2026: "Add character limit to all of the
+             needed places"); other lines keep the field uncapped. */
+          maxLength={CHAR_COUNTS ? TEXT_MAX.name : undefined}
           placeholder="Name this rule"
           onFocus={() => {
             before.current = rule.name
@@ -493,6 +498,7 @@ function RuleHead({
             if (settled !== rule.name) onPatch({ name: settled })
           }}
         />
+        <CharCount value={rule.name} max={TEXT_MAX.name} />
       </div>
       {RULE_ON_OFF && <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />}
     </>

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS } from '../char-limits'
 import { nameTaken, type NewPolicyStart } from '../data'
 import { Button, Modal } from '../kit'
 import { useBrand } from '../store'
@@ -90,7 +92,9 @@ export function NewPolicyDialog({ open, ask, onClose }: { open: boolean; ask: Ne
             <label htmlFor="np-name" className="bname2__label">
               Policy name <i>*</i>
             </label>
-            {name.length > 39 && <span className="bname2__count">{50 - name.length} left</span>}
+            {/* With CHAR_COUNTS the count under the field says it instead (25 Nov 2026, "Add character limit to all of the
+                needed places"). */}
+            {!CHAR_COUNTS && name.length > 39 && <span className="bname2__count">{50 - name.length} left</span>}
           </span>
           <input
             id="np-name"
@@ -108,6 +112,7 @@ export function NewPolicyDialog({ open, ask, onClose }: { open: boolean; ask: Ne
             aria-describedby={reason ? 'np-name-error' : undefined}
             placeholder="Finance team, high security"
           />
+          <CharCount value={name} max={50} />
           {reason && (
             <p id="np-name-error" className="bnp__error" role="alert">
               {reason}

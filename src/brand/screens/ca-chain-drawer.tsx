@@ -4,6 +4,7 @@ import { ArrowLeft, Download, FileBadge, FileText, Plus, Replace, Trash2, Upload
 
 import { EmptyState } from '../empty'
 import { Button, Drawer, IconButton, Note, RowMenu, TipDot, type MenuItem } from '../kit'
+import { CharCount } from '../CharCount'
 import {
   ALIAS_MAX,
   aliasIssue,
@@ -501,6 +502,8 @@ export function CaChainDrawer({
                 onChange={(e) => setDraftAlias(e.target.value)}
               />
             </div>
+            {/* Owner, 25 Nov 2026, "Add character limit to all of the needed places". */}
+            <CharCount value={draftAlias} max={ALIAS_MAX} />
             {draftAliasErr && (
               <p id={`${uid}-alias-err`} className="bmc__error">
                 {draftAliasErr}
@@ -588,6 +591,8 @@ export function CaChainDrawer({
                             onChange={(e) => rename(p.key, e.target.value)}
                           />
                         </div>
+                        {/* Owner, 25 Nov 2026, "Add character limit to all of the needed places". */}
+                        <CharCount value={p.alias} max={ALIAS_MAX} />
                         {aliasErr && (
                           <p id={`${p.key}-alias-err`} className="bmc__error">
                             {aliasErr}

@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowRight, Check, CheckCircle2, ClipboardCheck, FlaskConical, Pencil, Power, Send, Undo2, X } from 'lucide-react'
 import { Button, Confirm, Field, Modal, StatusPill } from '../kit'
+import { CharCount } from '../CharCount'
+import { CHAR_COUNTS, TEXT_MAX } from '../char-limits'
 import type { AccessDecision, Policy } from '../data'
 import { useBrand } from '../store'
 import {
@@ -397,7 +399,16 @@ export function RejectDialog({ policy, onClose, onSent, variant = 'assisted' }: 
       <div className="bmr__reject">
         <p>{today ? 'It stays a draft and the old policy keeps deciding.' : 'miniOrange gets the policy, what changed and your reason. The old policy keeps deciding until it is fixed.'}</p>
         <Field label="Reason" htmlFor="bmr-reason">
-          <textarea id="bmr-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+          {/* A message's limit and its count (25 Nov 2026, "Add character limit to all of the needed places"). Only
+              where the counts show: the other lines keep the reason unlimited, as it was. */}
+          <textarea
+            id="bmr-reason"
+            rows={3}
+            value={reason}
+            maxLength={CHAR_COUNTS ? TEXT_MAX.message : undefined}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <CharCount value={reason} max={TEXT_MAX.message} />
         </Field>
       </div>
     </Modal>

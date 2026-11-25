@@ -2,6 +2,7 @@ import { DEFAULT_RANGE_KM, rangeText, type Policy, type Zone, type ZoneLocation,
 import { PLACES, coveredBy, type Place } from '../places'
 import { leaves } from '../predicate'
 import type { ReviewLine } from '../review-rows'
+import { shows } from '../rollout'
 import { lookUpAddress } from './geo-fixture'
 import { classifyIp, isValidAsn, type IpKind } from './zone-validation'
 
@@ -182,6 +183,14 @@ export function withStoredName(stored: Zone | undefined, name: string): Zone | n
 
 /** A range around a catalogue city, at `km`. */
 export const rangeAt = (p: Place, km: number): ZoneRange => ({ km, lat: p.lat, lon: p.lon, label: p.name, placeId: p.id })
+
+/* A city's Range is never 0 (owner, 25 Nov 2026: "This should be one by default. can't have zero. for cities"). A city
+   stored without a range — added, or seeded — reads 1, the box takes nothing under 1, and a range is "the city and this
+   far around it": zone-match.ts also matches it by the city's name, so 1 km never matches less than the plain city
+   did. The rollout table's `cityRangeOne`; a line without it keeps 0 as "the city itself". */
+export const CITY_RANGE_ONE: boolean = shows('cityRangeOne')
+/** The least a city's Range box takes. */
+export const CITY_RANGE_MIN = CITY_RANGE_ONE ? 1 : 0
 
 /** Whether `p` is the city this range is drawn around: by catalogue id, or by
     name for a range that has none. */

@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, Check, Lock } from 'lucide-react'
-import { LOCKED_SIGNALS } from './device-profile-phase'
+import { LOCKED_SIGNALS, REVIEW_ALWAYS_ON } from './device-profile-phase'
 
 import { Button, Drawer, TipDot, TipMark } from '../kit'
 import { ChangeList, ChangeSection } from '../change-list'
@@ -27,6 +27,7 @@ import {
 } from '../fingerprint'
 import { footerEdge } from '../footer-edge'
 import { useShows } from './board/builder-version'
+import { CharCount } from '../CharCount'
 import { RemediationForm } from './device-profile-remediation'
 import { LIST_COLUMNS, checkName, deviceGroupsOf, inDeviceGroup, kindChoices, reachChoices, versionError, type DeviceGroup } from './device-profile-choices'
 import {
@@ -264,6 +265,8 @@ export function DeviceProfileWizard({
                   }
                 }}
               />
+              {/* The name's count, under it (owner, 25 Nov 2026: "Add character limit to all of the needed places"). */}
+              <CharCount value={s.name} max={PROFILE_NAME_MAX} />
               {nameShown && (
                 <span id={nameId} className="bfp2__fielderror">
                   {nameProblem}
@@ -916,7 +919,7 @@ function Review({
           on screen, and a visible one would stack two headings over one line. */}
       <h2 className="u-sr-only">Review</h2>
       <ChangeList layout="list">
-        {reviewSections(state, step3, v1).map((sec) => (
+        {reviewSections(state, step3, v1, REVIEW_ALWAYS_ON).map((sec) => (
           <ChangeSection
             key={sec.step}
             layout="list"

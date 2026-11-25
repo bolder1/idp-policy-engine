@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
+import { CharCount } from '../CharCount'
 import { SidePanel } from './device-profile-parts'
 import { RISK_SIGNALS_NOTE } from './profile-notes'
 import { RISK_PAGE_VERSIONS, readRiskPage, writeRiskPage, type RiskPageVersion } from './risk-page-version'
@@ -567,6 +568,9 @@ function NameRiskProfileModal({
             }}
           />
         </label>
+        {/* The count under the name (25 Nov 2026, "Add character limit to all of the needed places"). After the label,
+            not in it: `.bfp2__field > span` would dress the count as a second label. */}
+        <CharCount value={name} max={RISK_PROFILE_NAME_MAX} />
         {shownProblem && (
           <p className="brs__nameerr" id="brs-name-problem" role="alert">
             {shownProblem}

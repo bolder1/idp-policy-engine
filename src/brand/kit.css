@@ -1333,6 +1333,14 @@ html[data-theme='dark'] {
 .bx-namefield__input[aria-invalid='true'] { border-color: var(--fb-negative-border); }
 .bx-namefield__foot { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
 .bx-namefield__count { padding-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+/* CharCount (CharCount.tsx, CHAR_COUNTS): a text field's "12/50", under the field at its right end, in NameField's
+   count type. A block of its own so it never shares a line with the field; a call site in a row puts it in the
+   column under the field. */
+.bx-charcount {
+  display: block; margin-top: var(--space-1); text-align: right;
+  font-size: var(--fs-sm); line-height: 1.4; color: var(--text-tertiary); font-variant-numeric: tabular-nums;
+}
+.bx-charcount.is-full { color: var(--text-secondary); }
 .bx-namefield__acts {
   display: inline-flex; align-items: stretch;
   background: var(--surface-raised);

@@ -10,7 +10,7 @@ The empty tenant is a **review tool, not part of the product**. It will be remov
 2. **The empty server:**
 
    ```
-   npm run dev:empty      # http://localhost:5191  (.claude/launch.json: "policy-empty")
+   npm run dev:empty      # http://localhost:5191  (run it by hand; not in .claude/launch.json)
    ```
 
    It is a Vite mode (`--mode empty`), so a tab there starts empty; **Hide empty states** still switches that tab to the full version. `npm run dev`, the build and the deploy never start empty.
@@ -19,7 +19,7 @@ The full reference for developers (every type, the drawings, copy formulas, edge
 
 On the empty tenant the **Dashboard** is one empty state ("Nothing to show yet", Add application, `dashboard/DashboardEmpty.tsx`). Its tiles are modelled sign-ins that would read as real numbers on an empty tenant.
 
-**To remove the tool:** delete `empty-tenant.ts`, `empty-wipe.tsx`, `empty-wipe.css` and `dashboard/DashboardEmpty.tsx`; remove their call sites in `store.tsx`, `ProfileMenu.tsx`, `BrandApp.tsx` and `main.tsx`, the `dev:empty` script and launch entry, and `ROLLOUT.emptyTenant`. The drawings (`empty-art.tsx`, `ROLLOUT.emptyArt`) are product and stay.
+**To remove the tool:** delete `empty-tenant.ts`, `empty-wipe.tsx`, `empty-wipe.css` and `dashboard/DashboardEmpty.tsx`; remove their call sites in `store.tsx`, `ProfileMenu.tsx`, `BrandApp.tsx` and `main.tsx`, the `dev:empty` script, and `ROLLOUT.emptyTenant`. The drawings (`empty-art.tsx`, `ROLLOUT.emptyArt`) are product and stay.
 - What a tenant has on its first day stays, because the product ships it:
   - the Global Default ("Baseline access")
   - the Authentication methods catalogue

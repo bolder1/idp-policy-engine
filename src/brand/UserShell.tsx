@@ -45,7 +45,8 @@ export function UserShell({ children }: { children: ReactNode }) {
     <div className="bus">
       <header className="bus__top">
         <a className="bus__logo" href="#" onClick={(e) => e.preventDefault()} aria-label="Xecurify by miniOrange">
-          <img src="/xecurify-logo.png" alt="Xecurify by miniOrange" />
+          {/* The dark wordmark as in the console's top bar (Shell.tsx): dark is Design only (rollout.ts darkSweep). */}
+          <img src={theme === 'dark' ? '/xecurify-logo-dark.png' : '/xecurify-logo.png'} alt="Xecurify by miniOrange" />
         </a>
 
         <nav className="bus__nav" aria-label="Main">

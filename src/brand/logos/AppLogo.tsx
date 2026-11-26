@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import { AppWindow } from 'lucide-react'
 
+import { shows } from '../rollout'
 import { RESOLVED_LOGOS } from './manifest.generated'
 import { LOGO_SOURCES } from './sources'
+
+/* Marks drawn in dark ink on a clear ground, which vanish on the console in dark (26 Nov 2026, rollout.ts darkSweep):
+   measured from public/logos, more than a quarter of their opaque pixels under 22% lightness and no tile of their own.
+   dark-theme.css turns their ink light, keeping the hue. Coloured marks, and marks on a tile of their own (Notion,
+   Linear, Intercom, Okta, ServiceNow), are left as their brands draw them. */
+const DARK_INK = shows('darkSweep') ? new Set(['github', 'zendesk', 'smartsheet', 'docusign', 'dropbox-sign']) : new Set<string>()
 
 /* -----------------------------------------------------------------------------
    AppLogo — one component, every app mark in the console.
@@ -77,7 +84,7 @@ export function AppLogo({
 
   if (showImage) {
     return (
-      <span className="applogo applogo--img" style={box} title={label}>
+      <span className="applogo applogo--img" style={box} title={label} data-ink={DARK_INK.has(meta?.id ?? appId) ? 'dark' : undefined}>
         <img src={resolved.file!} alt="" aria-hidden loading="lazy" onError={() => setFailed(true)} />
       </span>
     )

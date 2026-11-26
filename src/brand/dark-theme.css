@@ -1,0 +1,311 @@
+/* =============================================================================
+   The console in dark (owner, 26 Nov 2026: "go through the whole product and
+   fix the dark mode, just like we did for the dashboard").
+
+   Why it was broken. The product always wears the rebrand (`SHOWCASE` pins
+   `data-brand="rebrand"`, main.tsx), and rebrand.css is light only: it restates
+   every surface, text and control token at (0,2,0) and loads after tokens.css,
+   so it beat the dark block at the same weight. The theme switch turned the page
+   half dark: light surfaces and text, with dark chips, tints and neutral buttons
+   (near-black on white) wherever the rebrand had not restated a token.
+
+   What this does. The Dashboard's night board (dashboard.css, 20 Nov) said the
+   console's tokens again in its `--night-*` palette for its own page; this says
+   them again for the whole console, so every screen, popup and toast follows
+   without a rule of its own, and the Dashboard and the console are one dark.
+   `:root[data-theme='dark'][data-brand='rebrand']` is (0,3,0), so it beats the
+   rebrand whatever the load order; the plain `:root[data-theme='dark']` covers
+   the current look and loads after tokens.css and console-theme.css.
+
+   Design only: dark is reachable only where the theme switch shows (rollout.ts
+   `topBarTools`, and `darkSweep` in theme-mode.ts). Every other line is light,
+   so nothing here can reach it.
+
+   Two rules carry over from light. Selection stays blue (lifted so it reads on
+   the deep ground), never orange. Orange stays the one primary fill, with the
+   rebrand's own white label; orange WORDS take the lighter night shade.
+   ========================================================================== */
+
+:root[data-theme='dark'],
+:root[data-theme='dark'][data-brand='rebrand'] {
+  color-scheme: dark;
+
+  /* --- Surfaces: the night board's layered glass ---------------------------- */
+  --surface-page: var(--night-page);
+  --surface-raised: var(--night-card);
+  --surface-sunken: var(--night-sunken);
+  --surface-inset: var(--night-inset);
+  --surface-overlay: var(--night-card-top);
+  --surface-inverse: var(--night-text);
+
+  /* --- Lines ----------------------------------------------------------------- */
+  --border-subtle: var(--night-edge);
+  --border-default: #232c39;
+  --border-strong: #3a4555;
+
+  /* --- Text: every step clears 4.5:1 on a card (#0e1219) ---------------------- */
+  --text-primary: var(--night-text);
+  --text-body: var(--night-body);
+  --text-secondary: var(--night-secondary);
+  --text-tertiary: #8794a5;
+  --text-muted: #7d8a9b;
+  --text-placeholder: #6e7a8a;
+  --text-disabled: #465264;
+  --text-inverse: var(--night-page);
+  --text-on-brand: #ffffff;
+  --text-link: var(--night-link);
+
+  /* --- Selection: the rebrand's blue, lifted ----------------------------------
+     #3b82f6 is 5.1:1 as words on a card and 3.7:1 under a white tick or label;
+     the light blue (#0d6efd) was 4.0:1 as words. In dark "more" is lighter, so
+     hover and strong step UP. */
+  --blue: #3b82f6;
+  --blue-hover: #5b9af8;
+  --blue-strong: #8ab4ff;
+  --blue-soft: rgba(59, 130, 246, 0.14);
+  --blue-soft-hover: rgba(59, 130, 246, 0.22);
+  --accent: #3b82f6;
+  --accent-hover: #5b9af8;
+  --accent-strong: #8ab4ff;
+  --accent-soft: rgba(59, 130, 246, 0.14);
+  --accent-soft-border: rgba(91, 154, 248, 0.42);
+  --focus-ring: #6ea8fe;
+  --focus-halo: rgba(110, 168, 254, 0.26);
+  --focus-ring-danger: #fb7185;
+
+  /* --- Orange -----------------------------------------------------------------
+     The fill hovers DEEPER, as in light: a lighter hover (#ef7650) left the white
+     label at 2.85:1. --brand-active doubles as the orange WORD shade (tokens.css),
+     so it takes the night board's light orange, as dashboard.css does. */
+  --brand: #eb5424;
+  --brand-hover: #d64c21;
+  --brand-active: var(--night-brand-text);
+  --brand-on-fill: #eb5424;
+  --brand-text: var(--night-brand-text);
+  --brand-subtle-bg: var(--night-brand-wash);
+  --brand-subtle-border: var(--night-brand-edge);
+  --int-brand-bg: #eb5424;
+  --int-brand-bg-hover: #d64c21;
+  --int-brand-bg-active: #a73c1a;
+  --int-brand-text: #ffffff;
+  --rb-cta: #eb5424;
+  --rb-cta-hover: #d64c21;
+  --rb-cta-active: #a73c1a;
+
+  /* --- Buttons and states ------------------------------------------------------ */
+  --int-neutral-bg: var(--night-card-top);
+  --int-neutral-bg-hover: var(--night-inset);
+  --int-neutral-bg-active: var(--night-edge);
+  --int-neutral-border: #313b49;
+  --int-neutral-border-hover: #465264;
+  --int-neutral-text: var(--night-text);
+  --int-ghost-bg-hover: rgba(255, 255, 255, 0.05);
+  --int-ghost-bg-active: rgba(255, 255, 255, 0.08);
+  --int-ghost-text: var(--night-secondary);
+  --int-danger-bg: #e5484d;
+  --int-danger-bg-hover: #d63c42;
+  --int-danger-text: #ffffff;
+  --int-setup-bg: #2a3442;
+  --int-setup-bg-hover: #3a4555;
+  --state-hover-bg: rgba(255, 255, 255, 0.05);
+  --state-press-bg: rgba(255, 255, 255, 0.08);
+
+  /* --- Fields: still edge-only, like the rebrand, with an edge that shows ------ */
+  --ctl-bg: transparent;
+  --ctl-bg-hover: rgba(255, 255, 255, 0.02);
+  --ctl-border: #313b49;
+  --ctl-border-hover: #465264;
+  --ctl-border-focus: #3b82f6;
+
+  /* --- Tables ------------------------------------------------------------------- */
+  --table-head-bg: var(--night-sunken);
+  --table-head-fg: var(--night-secondary);
+  --table-head-rule: var(--night-edge);
+  --table-rule: var(--night-edge);
+  --table-row-hover: rgba(255, 255, 255, 0.03);
+
+  /* --- Meaning: a faint wash with a lit edge, never a light pill (night board) --- */
+  --fb-positive-bg: var(--night-good-wash);
+  --fb-positive-border: var(--night-good-edge);
+  --fb-positive-fg: var(--night-good);
+  --fb-positive-dot: var(--night-good);
+  /* Allow with 2FA keeps its own deeper teal green (owner, 6 Oct 2026); the
+     night board folded it into the first green, which a decision chip cannot. */
+  --fb-positive-strong-bg: rgba(45, 179, 154, 0.12);
+  --fb-positive-strong-border: rgba(45, 179, 154, 0.34);
+  --fb-positive-strong-fg: #5fd3bc;
+  --fb-positive-strong-dot: #2db39a;
+  --fb-negative-bg: var(--night-bad-wash);
+  --fb-negative-border: var(--night-bad-edge);
+  --fb-negative-fg: var(--night-bad);
+  --fb-negative-dot: var(--night-bad);
+  --fb-notice-bg: var(--night-warn-wash);
+  --fb-notice-border: var(--night-warn-edge);
+  --fb-notice-fg: var(--night-warn);
+  --fb-notice-dot: var(--night-warn);
+  --fb-info-bg: var(--night-info-wash);
+  --fb-info-border: rgba(125, 211, 252, 0.3);
+  --fb-info-fg: var(--night-info);
+  --fb-info-dot: var(--night-info);
+  --fb-neutral-bg: rgba(255, 255, 255, 0.04);
+  --fb-neutral-border: #2a3442;
+  --fb-neutral-fg: var(--night-body);
+  --fb-neutral-dot: #7d8a9b;
+  /* Info as a FILL under white words (the move banner's Migrate my policies, its
+     door). The info word colour above is light, so a fill made from it carried
+     dark words on a pale slab; this is the deep blue light mode draws. */
+  --info-fill: #2f80d6;
+  --info-fill-deep: #1a5fae;
+
+  /* --- The rail ------------------------------------------------------------------ */
+  --shell-bg: #0b0e14;
+  --shell-bg-deep: var(--night-page);
+  --shell-raised: var(--night-card-top);
+  --shell-border: rgba(255, 255, 255, 0.06);
+  --shell-border-strong: rgba(255, 255, 255, 0.12);
+  --shell-text: var(--night-text);
+  --shell-text-secondary: rgba(205, 213, 223, 0.86);
+  --shell-text-muted: rgba(154, 165, 180, 0.9);
+  --shell-item-hover: rgba(255, 255, 255, 0.05);
+  --shell-item-active: rgba(255, 255, 255, 0.08);
+
+  /* --- Depth: shadow does little on a dark ground, so a hairline rim carries it -- */
+  --el-low: var(--night-el-low);
+  --el-mid: var(--night-el-mid);
+  --el-high: var(--night-el-high);
+  --el-overlay: 0 24px 60px -16px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+  /* --- Glass, the canvas dot, the data hues ------------------------------------- */
+  --glass-surface: var(--night-glass-surface);
+  --glass-tray: var(--night-glass-tray);
+  --glass-edge: var(--night-glass-edge);
+  --glass-rim: rgba(0, 0, 0, 0.4);
+  --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8), 0 2px 8px -4px rgba(0, 0, 0, 0.5);
+  --card-dot: rgba(255, 255, 255, 0.08);
+  --viz-indigo: var(--viz-indigo-lit);
+  --viz-sky: var(--viz-sky-lit);
+  --viz-violet: var(--viz-violet-lit);
+  --viz-teal: var(--viz-teal-lit);
+  --viz-pink: var(--viz-pink-lit);
+  --viz-slate: var(--viz-slate-lit);
+  --viz-sky-deep: var(--viz-sky-lit);
+  --viz-teal-deep: var(--viz-teal-lit);
+  --viz-amber-deep: var(--night-warn);
+
+  /* --- The retro start cards and template shelves (tokens.css) ------------------
+     Light washes on cream in light; here each hue lifts to read on the deep
+     ground and its wash is the hue mixed faintly into a card. */
+  --start-template: #ef7650;
+  --start-template-wash: color-mix(in srgb, #ef7650 10%, var(--night-card));
+  --start-template-wash-2: color-mix(in srgb, #ef7650 18%, var(--night-card));
+  --start-reuse: #7f9cc9;
+  --start-reuse-wash: color-mix(in srgb, #7f9cc9 10%, var(--night-card));
+  --start-reuse-wash-2: color-mix(in srgb, #7f9cc9 18%, var(--night-card));
+  --start-scratch-wash: var(--night-inset);
+  --tpl-quick: #7f9cc9;
+  --tpl-quick-wash: color-mix(in srgb, #7f9cc9 10%, var(--night-card));
+  --tpl-quick-wash-2: color-mix(in srgb, #7f9cc9 18%, var(--night-card));
+  --tpl-device: #5fb3ad;
+  --tpl-device-wash: color-mix(in srgb, #5fb3ad 10%, var(--night-card));
+  --tpl-device-wash-2: color-mix(in srgb, #5fb3ad 18%, var(--night-card));
+  --tpl-risk: #d0a443;
+  --tpl-risk-wash: color-mix(in srgb, #d0a443 10%, var(--night-card));
+  --tpl-risk-wash-2: color-mix(in srgb, #d0a443 18%, var(--night-card));
+  --tpl-compliance: #c58bb0;
+  --tpl-compliance-wash: color-mix(in srgb, #c58bb0 10%, var(--night-card));
+  --tpl-compliance-wash-2: color-mix(in srgb, #c58bb0 18%, var(--night-card));
+}
+
+/* The page itself, and every scroll area in it: `scrollbar-color` inherits, so
+   one rule swaps Chrome's grey dark scrollbar (a light slab under the Policies
+   table) for a quiet thumb on a clear track. A sheet that sets its own (the
+   rail's) keeps it. */
+:root[data-theme='dark'] {
+  scrollbar-color: #2f3a48 transparent;
+}
+:root[data-theme='dark'] body {
+  background: var(--night-page);
+}
+
+/* =============================================================================
+   Screens that draw a colour of their own instead of reading a token. Each was
+   found by tools/rigs/dark-sweep (audit.cjs on the rail, scenes.cjs past it).
+   ========================================================================== */
+
+/* Dialogs and drawers: a 40% scrim of near-black does nothing on a near-black
+   page, so the dialog sat on the page without lifting off it. Deeper, and the
+   dialog keeps the hairline rim --el-overlay gives it. */
+:root[data-theme='dark'] .bx-scrim,
+:root[data-theme='dark'][data-brand='rebrand'] .bx-scrim {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+/* App marks in dark ink (logos/AppLogo.tsx DARK_INK): the ink turns light and
+   the hue comes back round, so GitHub reads white and Zendesk a light teal. */
+:root[data-theme='dark'] .applogo[data-ink='dark'] img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Migration: the Migrate my policies button and the door it opens
+   (old-policies.css `.bnbb`) are drawn from --fb-info-fg as a fill. */
+:root[data-theme='dark'] button.bnbb {
+  background: linear-gradient(180deg, var(--info-fill), var(--info-fill-deep));
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--info-fill) 60%, transparent);
+  color: #ffffff;
+}
+:root[data-theme='dark'] .bnbb__shine {
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+}
+:root[data-theme='dark'] .bnbb__door,
+:root[data-theme='dark'] .bmgd {
+  /* Their marks, line and words read --text-inverse, which is the night page
+     here: white again inside the blue. */
+  --text-inverse: #ffffff;
+  background: radial-gradient(circle at 50% 40%, var(--info-fill), var(--night-page));
+  color: #ffffff;
+}
+
+/* The builder and Access checks canvas (board.css `.bb`): its dark ground was
+   the older dark (#12181f), LIGHTER than the night cards drawn on it, so the
+   layers read inside out. The night page under them, with its own faint dots.
+   One step more specific than board.css's own dark rule, which ships in a later
+   chunk and would win the tie. */
+:root[data-theme='dark'] .brand-root .bb {
+  --bb-stage: var(--night-page);
+  --bb-dot: #1c2430;
+}
+
+/* An Access checks run, Focus (focus.css): the engine's working blue was pinned
+   to the light blue; in the console's dark it is the lifted selection blue. The
+   dimmed stage (data-stage="dark") keeps its own values. */
+:root[data-theme='dark'] .rl-focus-root:not([data-stage='dark']) {
+  --fc-work: var(--accent);
+  --fc-work-soft: var(--accent-soft);
+  --fc-work-line: var(--accent-soft-border);
+  --fc-link: var(--text-link);
+  --fc-shadow: var(--night-el-low);
+  --fc-shadow-focus: var(--night-el-high);
+  --fc-shadow-turned: var(--night-el-mid);
+  --fc-depth-shade: rgba(0, 0, 0, 0.32);
+  --fc-pick-hover: rgba(255, 255, 255, 0.03);
+}
+/* Break-in attempts on the canvas bar: an inverted pill (the text colour as its
+   fill) is a white slab in dark. A lit chip instead, still the bar's loudest. */
+:root[data-theme='dark'] .f2cb__break {
+  background: color-mix(in srgb, var(--night-text) 12%, var(--night-card));
+  box-shadow: inset 0 0 0 1px var(--night-edge-strong);
+  color: var(--night-text);
+}
+
+/* New device profile: the steps behind you were a fixed #9e9e9e disc with the
+   card colour for its number, a light coin on the night page. */
+:root[data-theme='dark'] .bdpw__steps {
+  --bdpw-disc: #3a4555;
+}
+:root[data-theme='dark'] .bdpw__stepn {
+  color: var(--text-primary);
+}
+:root[data-theme='dark'] .bdpw__step.is-on .bdpw__stepn {
+  color: #ffffff;
+}

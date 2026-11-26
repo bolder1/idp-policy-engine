@@ -114,6 +114,8 @@ import './brand/rebrand/auth-methods.css'
 import './brand/rebrand/trail-builder.css'
 import './brand/rebrand/board.css'
 import './brand/rebrand/create.css'
+// The console in dark, over everything above it, the rebrand included (Design only; see the sheet).
+import './brand/dark-theme.css'
 import { applyBrand, readBrand } from './brand/brand-mode'
 import { SHOWCASE } from './brand/showcase'
 

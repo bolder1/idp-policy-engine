@@ -77,9 +77,12 @@ import { useBrand, useToast, type BrandScreen } from './store'
 import { pressToastAction } from './toast-action'
 import { useTheme } from './theme-mode'
 import { playCue, playToastCue, useSoundSetting } from './sound'
+import { RequestsButton } from './user-dash/RequestsDrawer'
 
 /* Search, the theme switch and the sound switch in the top bar: Design only (rollout.ts `topBarTools`). */
 const TOP_BAR_TOOLS: boolean = shows('topBarTools')
+/* The proposed User Dashboard's Requests: what people asked for, for the admin to decide (user-dash/). Design only. */
+const USER_DASH: boolean = shows('userDashboard')
 
 /* -----------------------------------------------------------------------------
    AdminShell — the live console's chrome, measured off
@@ -655,6 +658,7 @@ export function Shell({ children }: { children: ReactNode }) {
               {sound ? <Volume2 size={20} strokeWidth={1.7} /> : <VolumeX size={20} strokeWidth={1.7} />}
             </button>
           </Tip>}
+          {USER_DASH && <RequestsButton />}
           <Tip text={`Documentation. ${NOT_BUILT}`}>
             <button type="button" className="bshell__icon is-inert" aria-label="Documentation" aria-disabled="true">
               <BookOpen size={20} strokeWidth={1.7} />

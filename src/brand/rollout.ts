@@ -455,6 +455,9 @@ export const ROLLOUT = {
    *  palette, over the light-only rebrand, plus the screens that hard-code a light colour. Dark is reachable only where
    *  this and `topBarTools` both show (theme-mode.ts); everywhere else the page is light. Design only. */
   darkSweep: ['design'],
+  /** The proposed User Dashboard (26 Nov, owner's demo for his manager; spec 2026-11-26-user-dashboard-design.md): a
+   *  Today / Proposed switch on the end-user site, Apps + My account, Travel notice, and the admin's Requests. */
+  userDashboard: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

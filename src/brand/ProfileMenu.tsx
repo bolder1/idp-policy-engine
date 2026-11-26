@@ -16,11 +16,14 @@ import { RoleAvatar } from './role-avatar'
 import { EMPTY_TENANT } from './empty-tenant'
 import { EmptyWipe } from './empty-wipe'
 import { ROLE_ACCOUNT } from './role-account'
+import { useUserDashVersion } from './user-dash/version'
 
 /* The admin's name and badge follow the line (rollout.ts `roleIdentity`), with the sign-in's email under the name. */
 const ROLE_IDENTITY: boolean = shows('roleIdentity')
 /* Show / Hide empty states: a review tool, not product (empty-tenant.ts). Design only, on every server. */
 const GO_EMPTY: boolean = shows('emptyTenant')
+/* The proposed User Dashboard (user-dash/): Personal Profile and Change Password open its pages. Design only. */
+const USER_DASH: boolean = shows('userDashboard')
 
 /* -----------------------------------------------------------------------------
    The account menu, and the only way between the two sides.
@@ -54,7 +57,7 @@ const NOT_BUILT = SHOWCASE ? 'Coming soon.' : 'Not built in this prototype.'
 let focusAvatarOnMount = false
 
 export function ProfileMenu() {
-  const { role, setRole, account, migrationStarted } = useBrand()
+  const { role, setRole, account, migrationStarted, go } = useBrand()
   const [open, setOpen] = useState(false)
   /* Roles (owner, 19 Nov 2026): the views this sign-in may open, decided by who signed in (HOME_LINE), not by the
      view open now. A designer sees all three and comes back to Design freely; anyone else asks for the passphrase. */
@@ -134,6 +137,21 @@ export function ProfileMenu() {
   }
 
   const goingTo = role === 'admin' ? 'user' : 'admin'
+  const [dashVersion] = useUserDashVersion()
+  const proposedUser = USER_DASH && role === 'user' && dashVersion === 'proposed'
+  const built = (label: string, Icon: typeof UserRound, page: 'profile' | 'password') => (
+    <button
+      role="menuitem"
+      type="button"
+      onClick={() => {
+        close(false)
+        go({ name: 'account', page })
+      }}
+    >
+      <Icon size={14} strokeWidth={1.9} aria-hidden />
+      {label}
+    </button>
+  )
 
   /* A grid cell around the Tip, so its inline wrapper stretches to the menu's
      width and the item lays out like the others. */
@@ -187,8 +205,18 @@ export function ProfileMenu() {
               </span>
             </div>
 
-            {unbuilt('Personal Profile', UserRound)}
-            {unbuilt('Change Password', Lock)}
+            {/* On the proposed User Dashboard (Design) the two are real pages in My account; elsewhere, not built. */}
+            {proposedUser ? (
+              <>
+                {built('Personal Profile', UserRound, 'profile')}
+                {built('Change Password', Lock, 'password')}
+              </>
+            ) : (
+              <>
+                {unbuilt('Personal Profile', UserRound)}
+                {unbuilt('Change Password', Lock)}
+              </>
+            )}
 
             {/* The switch, named after where it takes you rather than after what
                 you currently are — "User Dashboard" from the admin side, "Admin

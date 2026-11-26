@@ -5,6 +5,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type Dispatch,
@@ -114,6 +115,8 @@ import type { BreakInAcceptance } from './screens/break-in-model'
 import type { FixItem } from './screens/sign-in-tests/conflict-fix'
 import type { NameLookup } from './screens/predicate-prose'
 import { toastDuration, toastTone, type ToastTone } from './toast-tone'
+import { reduceUserDash, type UserDashAction, type UserDashState } from './user-dash/state'
+import { seedUserDash } from './user-dash/seed'
 
 /* Who is looking. Not a permission check — the prototype has no auth — but the
    same split the real product makes: an admin decides what may exist, a person
@@ -263,6 +266,11 @@ export type BrandScreen =
      end-user site has exactly two places — this and Setup 2FA — which is why
      it has a top bar and no rail to put one in. */
   | { name: 'apps' }
+  /* End-user only, proposed User Dashboard (user-dash/): My account and its page. */
+  | { name: 'account'; page?: AccountPage }
+
+/** My account's pages (proposed User Dashboard, 26 Nov 2026). */
+export type AccountPage = 'overview' | 'methods' | 'sign-ins' | 'devices' | 'travel' | 'profile' | 'password'
 
 /** The two halves of the Display tokens page. */
 export type DisplayTokenTab = 'assignments' | 'tokens'
@@ -564,6 +572,9 @@ export interface BrandStore {
      saved or turned on read them with no testing screen mounted. Reset per
      persona, like every other tenant collection. */
   savedSignIns: SavedSignIn[]
+  /** The proposed User Dashboard's demo record (user-dash/state.ts): one slice, in memory, kept across a role switch. */
+  userDash: UserDashState
+  actUserDash: (a: UserDashAction) => void
   /** Adds at the end. Returns the stored id. */
   addSavedSignIn: (s: SavedSignIn) => string
   /** Merges `patch` into the saved sign-in with this id; an unknown id changes nothing. */
@@ -845,6 +856,7 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
   const [zones, setZones, zonesRef] = useCollection<Zone>(() => seed.zones)
   const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => seed.scenarios)
   const [savedSignIns, setSavedSignIns, savedSignInsRef] = useCollection<SavedSignIn>(() => seed.savedSignIns)
+  const [userDash, actUserDash] = useReducer(reduceUserDash, undefined, seedUserDash)
   const [legacy, setLegacy] = useState<LegacyEstate>(() => (SHOWCASE && !TESTER && !EMPTY_TENANT ? (MIGRATE_SCALE ? scaleLegacy : showcaseLegacy) : EMPTY_LEGACY))
   const [movedLegacy, setMovedLegacy] = useState<Record<string, string>>({})
   const movedLegacyRef = useRef(movedLegacy)
@@ -1187,6 +1199,8 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
       /* A profile a move made is not listed until a policy using it is approved (fingerprintById still finds it). */
       fingerprints: visibleFingerprints,
       hooks,
+      userDash,
+      actUserDash,
       edition,
       /* The showcase pin (showcase.ts): lite, plus the tenant-wide testing
          page and the Break-in test the owner is comparing (25 Sep 2026). The
@@ -1746,7 +1760,7 @@ export function BrandProvider({ children }: { children: ReactNode; fresh?: boole
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
       registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast, holdToast,
       gauntletOverrides, breakInAccepted, changeLog, legacy, movedLegacy, activity, touch, builderStart, setBuilderStart, deadlineView, intro, moveDialog, reviewOpen, setupDone, moveTour, moveApps, moveJob, moved, imported, migrationStarted, held, landing, activating, migrationDone, moveMinimized, staged, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
-      visibleFingerprints,
+      visibleFingerprints, userDash,
       setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setDirectory, setApps,
       policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef, appsRef,
     ],

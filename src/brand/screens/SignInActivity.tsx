@@ -21,6 +21,11 @@ import { ActivityArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
 import './sign-in-tests/sign-in-activity.css'
 import { Pager } from '../pager'
+import { shows } from '../rollout'
+import { ReportBanner } from '../user-dash/ReportBanner'
+
+/* The proposed User Dashboard's report line (user-dash/). Design only. */
+const USER_DASH: boolean = shows('userDashboard')
 import { PAGE_SIZES, PAGINATION, usePaged } from '../pager-state'
 
 /* -----------------------------------------------------------------------------
@@ -131,6 +136,7 @@ export function SignInActivity({ appId, view: startView, q, from }: { appId?: st
         caption="The week’s sign-ins across every application, and why any were refused."
         crumb={crumb}
       />
+      {USER_DASH && <ReportBanner />}
       <Tabs<View> className="bx-tabs--line sia__tabs" name="View" value={view} onChange={setView} options={VIEWS} />
       <PageBar
         left={

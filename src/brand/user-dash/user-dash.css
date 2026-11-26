@@ -1,0 +1,204 @@
+/* The proposed User Dashboard (user-dash/). Every rule is under .bud, so the Today site and the console are untouched.
+   Tokens only; 12px floor (--fs-sm). */
+
+/* --- Shared ------------------------------------------------------------------------------------ */
+.bud .bud-head h1 { margin: 0; font-size: var(--fs-2xl); }
+.bud .bud-head p { margin: 4px 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
+.bud .bud-quiet { font-size: var(--fs-md); color: var(--text-tertiary); }
+.bud .bud-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 18px 20px;
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+}
+.bud .bud-card h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+.bud .bud-card p { margin: 0; }
+.bud .bud-card > .bx-btn { align-self: flex-start; }
+
+/* --- My account frame ---------------------------------------------------------------------------- */
+.bud.bud-acct { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: start; }
+.bud .bud-acct__nav { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 88px; }
+.bud .bud-acct__link {
+  display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 12px;
+  border: 0; border-radius: var(--radius-md); background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-base); color: var(--text-secondary); text-align: left;
+}
+.bud .bud-acct__link:hover { background: var(--state-hover-bg); color: var(--text-primary); }
+.bud .bud-acct__link.is-on { background: var(--accent-soft); color: var(--accent-strong); font-weight: var(--fw-semibold); }
+.bud .bud-acct__link:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bud .bud-acct__page { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+/* .bpage > * spans every column (screens.css); the frame places its two itself. */
+.bud.bud-acct > .bud-acct__nav { grid-column: 1; }
+.bud.bud-acct > .bud-acct__page { grid-column: 2; }
+/* Sign-in methods is today's page inside the frame: it keeps its own heading and width. */
+.bud .bud-acct__page > .bpage { max-width: none; padding: 0; }
+
+/* --- Overview ------------------------------------------------------------------------------------ */
+.bud .bud-ov { display: flex; flex-direction: column; gap: 18px; }
+.bud .bud-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bud .bud-check__row {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  min-height: 44px; border-top: 1px solid var(--border-subtle); color: var(--text-tertiary);
+}
+.bud .bud-check__row:first-child { border-top: 0; }
+.bud .bud-check__label { font-size: var(--fs-base); color: var(--text-primary); }
+.bud .bud-check__ok { color: var(--fb-positive-dot); }
+.bud .bud-ov__doors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+
+@media (max-width: 720px) {
+  .bud.bud-acct { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .bud.bud-acct > .bud-acct__nav, .bud.bud-acct > .bud-acct__page { grid-column: 1; }
+  .bud .bud-acct__nav { position: static; flex-direction: row; overflow-x: auto; }
+  .bud .bud-acct__link { flex: none; }
+  .bud .bud-ov__doors { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Forms ---------------------------------------------------------------------------------------- */
+.bud.bud-form { display: flex; flex-direction: column; gap: 14px; }
+.bud .bud-err { margin: -8px 0 0; font-size: var(--fs-sm); color: var(--danger); }
+
+/* --- Apps home ------------------------------------------------------------------------------------ */
+.bud.bud-apps { display: flex; flex-direction: column; gap: 20px; }
+.bud .bud-todo {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; cursor: pointer; text-align: left;
+  font: inherit; background: var(--accent-soft); border: 1px solid var(--accent-soft-border); border-radius: var(--radius-lg);
+  color: var(--text-primary);
+}
+.bud .bud-todo:hover { border-color: var(--accent); }
+.bud .bud-todo:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bud .bud-todo__title { font-size: var(--fs-base); font-weight: var(--fw-semibold); flex: none; }
+.bud .bud-todo__items { flex: 1; min-width: 0; font-size: var(--fs-md); color: var(--text-secondary); }
+.bud .bud-apps__bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.bud .bud-apps__bar > .bx-btn { margin-left: auto; }
+.bud .bud-apps__search {
+  display: flex; align-items: center; gap: 8px; width: min(360px, 100%); height: 36px; padding: 0 12px;
+  background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-tertiary);
+}
+.bud .bud-apps__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
+.bud .bud-apps__search input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; font-size: var(--fs-base); color: var(--text-primary); }
+.bud .bud-apps__search input:focus-visible { outline: none; }
+.bud .bud-apps__hidden { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-md); color: var(--text-secondary); cursor: pointer; }
+.bud .bud-apps__sec { display: flex; flex-direction: column; gap: 10px; }
+.bud .bud-apps__sec h2 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bud .bud-apps__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.bud .bud-app {
+  position: relative; display: flex; background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+}
+.bud .bud-app:hover { border-color: var(--border-strong); }
+.bud .bud-app.is-hidden { opacity: 0.6; }
+.bud .bud-app__open {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px;
+  border: 0; background: none; cursor: pointer; text-align: left; font: inherit; border-radius: var(--radius-lg);
+}
+.bud .bud-app__open:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bud .bud-app__name { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bud .bud-app__tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; }
+
+/* --- Pages inside My account ---------------------------------------------------------------------- */
+.bud .bud-page { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.bud-modal__text { margin: 0; font-size: var(--fs-base); color: var(--text-body); line-height: 1.5; }
+
+/* --- Recent sign-ins ------------------------------------------------------------------------------ */
+.bud .bud-table { display: flex; flex-direction: column; background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow-x: auto; }
+.bud .bud-table__row {
+  display: grid; grid-template-columns: minmax(110px, 1fr) minmax(140px, 1.4fr) minmax(100px, 1fr) 86px 100px 104px;
+  align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; min-width: 640px;
+  border-top: 1px solid var(--border-subtle); font-size: var(--fs-md); color: var(--text-body);
+}
+.bud .bud-table__row--head { border-top: 0; min-height: 40px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bud .bud-table__app { display: inline-flex; align-items: center; gap: 10px; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bud .bud-table__end { justify-self: end; }
+
+/* --- Devices -------------------------------------------------------------------------------------- */
+.bud .bud-devices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bud .bud-device { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 60px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.bud .bud-device:first-child { border-top: 0; }
+.bud .bud-device__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bud .bud-device__name { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+
+/* --- Profile and Password ------------------------------------------------------------------------- */
+.bud .bud-actions { display: flex; gap: 10px; }
+.bud .bud-facts { margin: 0; display: flex; flex-direction: column; }
+.bud .bud-facts__row { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 46px; border-top: 1px solid var(--border-subtle); }
+.bud .bud-facts__row:first-child { border-top: 0; }
+.bud .bud-facts dt { font-size: var(--fs-md); color: var(--text-tertiary); }
+.bud .bud-facts dd { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
+.bud .bud-pw { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr); gap: 18px; align-items: start; }
+.bud .bud-pw__rules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
+@media (max-width: 720px) { .bud .bud-pw { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- Bell ----------------------------------------------------------------------------------------- */
+.bud.bud-bell { position: relative; }
+.bud .bud-bell__btn { position: relative; }
+.bud .bud-bell__dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--surface-raised); }
+.bud .bud-bell__panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: min(360px, calc(100vw - 32px));
+  background: var(--surface-overlay); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); box-shadow: var(--el-high);
+}
+.bud .bud-bell__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); }
+.bud .bud-bell__head h2 { margin: 0 auto 0 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); }
+.bud .bud-bell__switch { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bud .bud-bell__list { list-style: none; margin: 0; padding: 6px 0; max-height: 320px; overflow-y: auto; }
+.bud .bud-bell__list li { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; font-size: var(--fs-md); color: var(--text-secondary); }
+.bud .bud-bell__list li.is-unread { color: var(--text-primary); font-weight: var(--fw-semibold); }
+.bud .bud-bell__empty { margin: 0; padding: 28px 16px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
+
+/* --- Travel --------------------------------------------------------------------------------------- */
+.bud .bud-head--row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.bud .bud-trip__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--text-tertiary); }
+.bud .bud-trip__head h2 { color: var(--text-primary); }
+.bud .bud-trip__dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.bud .bud-trip__group { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.bud .bud-trip__group h3 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-secondary); }
+.bud .bud-trip__group.is-blocked h3 { color: var(--danger); }
+.bud .bud-trip__group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.bud .bud-trip__group li {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; font-size: var(--fs-md); color: var(--text-primary);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+@media (max-width: 720px) { .bud .bud-trip__dates { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- Admin side: Requests and the report line ----------------------------------------------------- */
+.bud .bud-req__btn { position: relative; }
+.bshell__icon.bud-req__btn { position: relative; }
+.bud-req__dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--surface-raised); }
+.bud.bud-req { display: flex; flex-direction: column; gap: 12px; }
+.bud .bud-req__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bud .bud-req__row { display: flex; flex-direction: column; gap: 6px; padding: 14px 0; border-top: 1px solid var(--border-subtle); }
+.bud .bud-req__row:first-child { border-top: 0; padding-top: 0; }
+.bud .bud-req__kind { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-tertiary); }
+.bud .bud-req__body { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-base); color: var(--text-primary); }
+.bud .bud-req__app { display: inline-flex; align-items: center; gap: 8px; }
+.bud .bud-req__end { display: flex; justify-content: flex-end; }
+.bud.bud-banner {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: var(--fs-md); color: var(--text-primary);
+  background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); border-radius: var(--radius-md);
+}
+
+/* The card's star and hide stay out of the way until the card is pointed at or focused; a favourite keeps its star.
+   A touch screen has no hover, so they always show there. */
+.bud .bud-app__tools .bx-iconbtn,
+.bud .bud-app__tools > * { opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
+.bud .bud-app:hover .bud-app__tools > *,
+.bud .bud-app:focus-within .bud-app__tools > *,
+.bud .bud-app__tools > *:has([aria-pressed="true"]),
+.bud .bud-app__tools > [aria-pressed="true"] { opacity: 1; }
+@media (hover: none) { .bud .bud-app__tools > * { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bud .bud-app__tools > * { transition: none; } }
+
+/* Password and email fields, drawn as the kit draws text fields (kit.css .brand-root :where(input[type='text'] …)),
+   which does not list these two types. */
+.bud input[type='password'],
+.bud input[type='email'] {
+  width: 100%; height: var(--ctl-height-md); padding: 0 var(--space-5); font-size: var(--fs-md);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius); background: var(--ctl-bg);
+}
+.bud input[type='password']:focus-visible,
+.bud input[type='email']:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
+
+/* The Today / Proposed switch is the demo's control, for a desktop review: on a phone the bar keeps the live site's
+   places, language and account only. */
+.bud-switch { display: inline-flex; }
+@media (max-width: 600px) {
+  .bud-switch { display: none; }
+  .bud .bud-apps__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

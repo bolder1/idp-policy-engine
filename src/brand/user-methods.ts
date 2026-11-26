@@ -215,6 +215,12 @@ export const SEED_ENROLMENT: UserEnrolment = {
 
 /* --- Whether a card can be switched on ------------------------------------------ */
 
+/** Methods this person has set up: enrolled, holding a token for, or fed by their profile. Setup 2FA and the proposed
+ *  User Dashboard's checkup read the same answer. */
+export function configuredMethodIds(reachable: readonly { id: string }[], e: Pick<UserEnrolment, 'configured'>, heldFor: (id: string) => number): string[] {
+  return reachable.filter((m) => e.configured.includes(m.id) || heldFor(m.id) > 0 || (profileFieldsFor(m.id) !== null && profileHas(m.id))).map((m) => m.id)
+}
+
 /** Ready to use: enrolled, nothing to set up, or a token the admin assigned to this person. */
 export function readyFor(methodId: string, e: Pick<UserEnrolment, 'configured'>, heldTokens = 0): boolean {
   const kind = enrolShapeFor(methodId).kind

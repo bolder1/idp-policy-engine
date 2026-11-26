@@ -36,7 +36,7 @@ import { useBrand, type Role } from '../store'
 import { EmptyState, NoMatches } from '../empty'
 import { MethodIcon, RecoveryTab } from './recovery'
 import { EnrolForm, ProfileFacts, UserMethodCard } from './user-config'
-import { PROFILE, PROFILE_LABEL, activateIn, enrolIssue, enrolShapeFor, profileFieldsFor, profileHas, readyFor, type UserEnrolment } from '../user-methods'
+import { PROFILE, PROFILE_LABEL, activateIn, configuredMethodIds, enrolIssue, enrolShapeFor, profileFieldsFor, readyFor, type UserEnrolment } from '../user-methods'
 import { ActiveMethod } from './active-method'
 import { SettingField } from '../setting-field'
 import { ConfigFields } from './method-forms'
@@ -441,9 +441,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const held = tokensOf(store.hardwareTokens, store.viewerId).length
   const heldFor = (id: string) => (id === DISPLAY_TOKEN_METHOD_ID ? held : 0)
   /** Methods this person has set up (or holds a token for). */
-  const configuredIds = reachable
-    .filter((m) => enrolment.configured.includes(m.id) || heldFor(m.id) > 0 || (profileFieldsFor(m.id) !== null && profileHas(m.id)))
-    .map((m) => m.id)
+  const configuredIds = configuredMethodIds(reachable, enrolment, heldFor)
   /** Methods this person could switch on now. */
   const readyIds = reachable.filter((m) => readyFor(m.id, enrolment, heldFor(m.id))).map((m) => m.id)
 

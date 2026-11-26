@@ -9,6 +9,16 @@ import { UserShell } from './UserShell'
 import { Policies } from './screens/Policies'
 import { TestingSessionProvider } from './screens/testing/session'
 import { UserApps } from './screens/UserApps'
+import { AccountPage } from './user-dash/AccountPage'
+import { AppsHome } from './user-dash/AppsHome'
+import { useUserDashVersion } from './user-dash/version'
+
+/* The end user's landing: today's apps page, or the proposed Apps home on the lines that see it (Design). */
+const USER_DASH: boolean = shows('userDashboard')
+function UserAppsRoute() {
+  const [version] = useUserDashVersion()
+  return USER_DASH && version === 'proposed' ? <AppsHome /> : <UserApps />
+}
 import { BrandProvider, useBrand, type BrandScreen } from './store'
 import { FRESH_BUILDER } from './migrate/legacy'
 import { IntroCarousel } from './migrate/IntroCarousel'
@@ -160,7 +170,9 @@ function ScreenBody() {
       return <GroupsPage key={groupId ?? 'list'} groupId={groupId} tab={tab} from={from} />
     }
     case 'apps':
-      return <UserApps />
+      return <UserAppsRoute />
+    case 'account':
+      return <AccountPage page={screen.page ?? 'overview'} />
     case 'home':
       /* The new Dashboard reaches only the lines in its rollout entry (Design for now); the rest get Classic. */
       if (EMPTY_TENANT) return <DashboardEmpty />

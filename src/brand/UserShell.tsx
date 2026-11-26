@@ -4,9 +4,21 @@ import { Languages, Moon, Sun } from 'lucide-react'
 import { Tip } from './kit'
 import { ProfileMenu } from './ProfileMenu'
 import { Picker } from './picker'
-import { useBrand, type BrandScreen } from './store'
+import { useBrand } from './store'
 import { useTheme } from './theme-mode'
 import { SHOWCASE } from './showcase'
+import { shows } from './rollout'
+import { USER_DASH_PICKERS } from './user-dash/phase'
+import { UserBell } from './user-dash/UserBell'
+import { navFor, useUserDashVersion } from './user-dash/version'
+import './user-dash/user-dash.css'
+
+/* The proposed User Dashboard (user-dash/) reaches only the lines in its rollout entry: Design. */
+const USER_DASH: boolean = shows('userDashboard')
+const VERSIONS = [
+  { value: 'today', label: 'Today' },
+  { value: 'proposed', label: 'Proposed' },
+]
 
 /* -----------------------------------------------------------------------------
    The end-user site's chrome, which is the admin console's minus almost all of
@@ -26,10 +38,7 @@ import { SHOWCASE } from './showcase'
    store: a screen cannot decide it has different chrome.
    -------------------------------------------------------------------------- */
 
-const NAV: { label: string; screen: BrandScreen }[] = [
-  { label: 'Dashboard', screen: { name: 'apps' } },
-  { label: 'Setup 2FA', screen: { name: 'methods' } },
-]
+/* The places are navFor's (user-dash/version.ts): Today is the live pair, Dashboard and Setup 2FA. */
 
 const LANGUAGES = ['English', 'Arabic', 'French', 'German', 'Italian', 'Portuguese', 'Spanish']
 
@@ -40,6 +49,9 @@ export function UserShell({ children }: { children: ReactNode }) {
      keeps it, and the same control to change it. */
   const [theme, setTheme] = useTheme()
   const next = theme === 'light' ? 'dark' : 'light'
+  const [picked, setPicked] = useUserDashVersion()
+  const version = USER_DASH ? picked : 'today'
+  const NAV = navFor(version)
 
   return (
     <div className="bus">
@@ -51,7 +63,7 @@ export function UserShell({ children }: { children: ReactNode }) {
 
         <nav className="bus__nav" aria-label="Main">
           {NAV.map((item) => {
-            const on = screen.name === item.screen.name
+            const on = item.on.includes(screen.name)
             return (
               <button
                 key={item.label}
@@ -67,6 +79,22 @@ export function UserShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="bus__right">
+          {USER_DASH && USER_DASH_PICKERS && (
+            <span className="bud-switch">
+            <Picker
+              label="User Dashboard"
+              prefix="User Dashboard"
+              size="md"
+              value={version}
+              options={VERSIONS}
+              onChange={(v) => {
+                setPicked(v === 'proposed' ? 'proposed' : 'today')
+                /* My account exists only in Proposed: leaving it lands on the apps. */
+                if (v !== 'proposed' && screen.name === 'account') go({ name: 'apps' })
+              }}
+            />
+            </span>
+          )}
           {/* The live bar carries a language picker, and it is worth keeping
               rather than dropping as chrome: it is the clearest single signal
               that this site is for everyone in the tenant, not for the person
@@ -89,6 +117,7 @@ export function UserShell({ children }: { children: ReactNode }) {
               </button>
             </Tip>
           )}
+          {version === 'proposed' && <UserBell />}
           <ProfileMenu />
         </div>
       </header>

@@ -447,8 +447,9 @@ export const ROLLOUT = {
    *  "No policy" (was "Default only"), the protection slider's empty list and its callout, and the replace flow's
    *  meanwhile line say so; the slider's "tenant default isn't listed" note goes. Post sign-in gets the full page empty
    *  state with its drawing, as every policy page has (26 Nov, owner: "update the empty states … now we don't have any
-   *  global default policies … all policies can have their own empty state"). Design only. */
-  emptyNoDefault: ['design'],
+   *  global default policies … all policies can have their own empty state"). Every line on the owner's word the same
+   *  day ("Yes, all lines"), to match `noGlobalDefault`, which reached every line in cbbfaab. */
+  emptyNoDefault: ALL,
   /** The whole console in dark, the Dashboard night board's way (26 Nov, owner: "go through the whole product and fix
    *  the dark mode, just like we did for the dashboard"). dark-theme.css says every token again in the `--night-*`
    *  palette, over the light-only rebrand, plus the screens that hard-code a light colour. Dark is reachable only where

@@ -2,7 +2,8 @@ import { shows } from './rollout'
 
 /* Empty states with no Global Default (rollout.ts `emptyNoDefault`; owner, 26 Nov 2026: "update the empty states …
    now we don't have any global default policies"). On Design an application no policy covers BLOCKS its sign-ins
-   (no-global-default.ts), so nothing may say they "fall through to the tenant default". The words, said once here. */
+   (no-global-default.ts), so nothing may say they "fall through to the tenant default". The words, said once here.
+   Every line since the owner's "Yes, all lines" (26 Nov), as `noGlobalDefault` is. */
 
 export const EMPTY_NO_DEFAULT: boolean = shows('emptyNoDefault')
 

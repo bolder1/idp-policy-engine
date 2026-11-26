@@ -38,7 +38,10 @@ export function ViewEditActions({
   onTogglePublished,
   simple = false,
   liveOff = NOTHING_LIVE,
+  hideLive = false,
 }: {
+  /** One version only, so no live version to show: Simple's Inactive policy (rollout.ts `ruleSaveFocus`). */
+  hideLive?: boolean
   editing: boolean
   onEdit: () => void
   /** Absent on a new policy, which has no view to go back to until its first save. */
@@ -80,7 +83,7 @@ export function ViewEditActions({
   const nothingLive = simple && !onTogglePublished
   return (
     <span className="bve-acts">
-      {(onTogglePublished || nothingLive) &&
+      {!hideLive && (onTogglePublished || nothingLive) &&
         (PUBLISHED_LOOK ? (
           <PublishedButton pressed={publishedOpen} onClick={onTogglePublished} label={label} offTitle={liveOff} />
         ) : (

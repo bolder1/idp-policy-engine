@@ -309,7 +309,14 @@ export function PolicyPage({
   preview = false,
   heroStatus = true,
   diffShown = true,
+  rulesOf,
+  rulesAside,
 }: {
+  /** The rules the canvas draws in place of the stored ones: the saved draft's, while the Policy details drawer's
+   *  Draft / Live switch is on Draft (rollout.ts `drawerDraftRules`). The card above keeps the live policy. */
+  rulesOf?: Pick<Policy, 'rules' | 'fallback'>
+  /** What sits at the end of the Rules heading in place of "In order": that switch. */
+  rulesAside?: ReactNode
   policyId: string
   focus: string | null | undefined
   plan: EngineRun | null
@@ -395,10 +402,10 @@ export function PolicyPage({
           </ul>
         </Block>
       )}
-      <Block title="Rules" aside="In order">
+      <Block title="Rules" aside={rulesAside ?? 'In order'}>
         {canvas ? (
           /* The builder's own canvas, read only (owner, 7 Oct 2026: "instead of this, the canvas itself"). */
-          <ReadOnlyCanvas policy={policy} traced={by ? [by.id ?? 'fallback'] : []} {...(preview ? { still: true, idPrefix: 'preview-' } : null)} />
+          <ReadOnlyCanvas policy={rulesOf ? { ...policy, rules: rulesOf.rules, fallback: rulesOf.fallback } : policy}traced={by ? [by.id ?? 'fallback'] : []} {...(preview ? { still: true, idPrefix: 'preview-' } : null)} />
         ) : (
         <ul className="insp__accs">
           {list.map((r) => {

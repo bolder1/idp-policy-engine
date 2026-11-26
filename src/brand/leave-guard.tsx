@@ -3,6 +3,10 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Badge, Confirm } from './kit'
 import { useBrand, type LeaveGuard } from './store'
 import { useSimpleDraft } from './screens/board/draft-model'
+import { shows } from './rollout'
+
+/** A saved draft is said where saving and activity live, not as a pill beside the status (rollout `draftOffPill`). */
+const DRAFT_OFF_PILL: boolean = shows('draftOffPill')
 
 /* --- Leaving a screen with unsaved work ---------------------------------------
 
@@ -153,6 +157,7 @@ export function ChangeState({ unsaved, draft = false }: { unsaved: boolean; draf
      to add anything else"; board/draft-model.ts). */
   const simple = useSimpleDraft()
   if (unsaved) return <Badge tone="notice" className="bx-change">Unsaved changes</Badge>
+  if (draft && DRAFT_OFF_PILL) return null
   if (draft) return <Badge tone="info" className="bx-change">{simple ? 'Draft' : 'Draft not published'}</Badge>
   return null
 }

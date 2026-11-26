@@ -5,6 +5,7 @@ import { AnchoredPopover } from '../screens/testing/AnchoredPopover'
 import type { WidgetId } from './catalog'
 import { arrange, toSpecs, type ArrangeMode, type Row } from './layout'
 import { MiniRows } from './mini'
+import { A11Y_ATTR } from './a11y'
 import { BRAND_SWATCHES, THEMES, THEME_IDS, type ThemeId } from './themes'
 
 /* -----------------------------------------------------------------------------
@@ -45,7 +46,7 @@ export function ThemePicker({ value, brand, onTheme, onBrand }: { value: ThemeId
         Theme
       </Button>
       <AnchoredPopover anchor={anchor} open={open} onClose={() => setOpen(false)} label="Theme" width={340}>
-        <div className="bdash-pop bdash-vars" data-chrome style={{ ['--dash-brand' as string]: brand }}>
+        <div className="bdash-pop bdash-vars" data-chrome {...A11Y_ATTR} style={{ ['--dash-brand' as string]: brand }}>
           <div className="bdash-pick-list" role="radiogroup" aria-label="Theme">
             {THEME_IDS.map((id) => (
               <button key={id} type="button" role="radio" aria-checked={value === id} className={`bdash-option${value === id ? ' is-on' : ''}`} onClick={() => onTheme(id)}>
@@ -81,7 +82,7 @@ export function ThemePicker({ value, brand, onTheme, onBrand }: { value: ThemeId
 export function ColourList({ value, boardTheme, onPick }: { value: ThemeId | null; boardTheme: ThemeId; onPick: (t: ThemeId | null) => void }) {
   const options: { id: ThemeId | null; name: string; swatch: ThemeId }[] = [{ id: null, name: 'Dashboard theme', swatch: boardTheme }, ...THEME_IDS.map((id) => ({ id, name: THEMES[id].name, swatch: id }))]
   return (
-    <div className="bdash-pop is-compact" role="radiogroup" aria-label="Colour">
+    <div className="bdash-pop is-compact" {...A11Y_ATTR} role="radiogroup" aria-label="Colour">
       {options.map((o) => (
         <button key={o.id ?? 'board'} type="button" role="radio" aria-checked={value === o.id} className={`bdash-option is-small${value === o.id ? ' is-on' : ''}`} onClick={() => onPick(o.id)}>
           <ThemeSwatch theme={o.swatch} />
@@ -113,7 +114,7 @@ export function ArrangeMenu({ rows, pinned, onArrange }: { rows: Row[]; pinned?:
         Arrange
       </Button>
       <AnchoredPopover anchor={anchor} open={open} onClose={() => setOpen(false)} label="Arrange" width={360}>
-        <div className="bdash-pop" data-chrome>
+        <div className="bdash-pop" data-chrome {...A11Y_ATTR}>
           <div className="bdash-pick-list">
             {MODES.map((m, i) => (
               <button

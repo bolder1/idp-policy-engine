@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Check, Columns3 } from 'lucide-react'
 import { AnchoredPopover } from '../screens/testing/AnchoredPopover'
+import { A11Y, A11Y_ATTR } from './a11y'
 import { COLS, type Row } from './layout'
 import { splitChoices } from './splits'
 
@@ -37,15 +38,16 @@ export function SplitPicker({ row, index, onSplit }: { row: Row; index: number; 
         <Columns3 size={14} strokeWidth={2.2} aria-hidden />
       </button>
       <AnchoredPopover anchor={anchor} open={open} onClose={() => setOpen(false)} label={label} width={244} align="start">
-        <div className="bdash-split" role="radiogroup" aria-label={label} data-chrome>
+        <div className="bdash-split" role={A11Y ? 'group' : 'radiogroup'} aria-label={label} data-chrome {...A11Y_ATTR}>
           {choices.map((c) => {
             const held = !c.on && c.why
             return (
               <button
                 key={c.spans.join('-')}
                 type="button"
-                role="radio"
-                aria-checked={c.on}
+                role={A11Y ? undefined : 'radio'}
+                aria-checked={A11Y ? undefined : c.on}
+                aria-pressed={A11Y ? c.on : undefined}
                 aria-disabled={held ? true : undefined}
                 aria-label={held ? `${c.name}: ${c.why}` : c.name}
                 title={held ? (c.why ?? c.name) : c.name}

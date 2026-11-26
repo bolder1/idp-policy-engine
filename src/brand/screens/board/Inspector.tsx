@@ -39,6 +39,9 @@ const GLOBAL_WHO = shows('globalWho')
 /* Save rule in the solid accent (blue in the rebrand look), so it no longer reads as disabled (rollout.ts `saveRuleLook`,
    board.css `.is-slate`). */
 const SAVE_RULE_SLATE: boolean = shows('saveRuleLook')
+/* While the rule has something to save, Save rule is the view's one orange: the bar's primary steps back to secondary
+   meanwhile (rollout.ts `ruleSaveFocus`). With nothing to save it is the quiet grey, which reads off because it is. */
+const SAVE_RULE_ORANGE: boolean = shows('ruleSaveFocus')
 
 /* -----------------------------------------------------------------------------
    The inspector — the right pane, for whatever is selected on the board.
@@ -84,6 +87,7 @@ export function Inspector({
   saveLabel = 'Save rule',
   saveTitle,
   saveBusy = false,
+  saveLeads = false,
   onSave,
 }: {
   draft: Policy
@@ -123,6 +127,8 @@ export function Inspector({
   saveTitle?: string
   /** The save is running (Save rule's call to the API, tester.ts RULE_SAVE). */
   saveBusy?: boolean
+  /** Save rule is the view's one orange: the bar's primary has stepped back for it (rollout.ts `ruleSaveFocus`). */
+  saveLeads?: boolean
   /** Stores the policy. The same call the bar's Save makes. */
   onSave?: () => void
 }) {
@@ -330,8 +336,8 @@ export function Inspector({
           doing in the panel. The default at the foot of the chain is a rule
           too, so the word holds there as well. */}
       {selection.kind !== 'apps' && onSave && (
-        <div className={`bb__inspfoot${SAVE_RULE_SLATE ? ' is-slate' : ''}`}>
-          <Button variant="secondary" size="sm" disabled={!canSave && !saveBusy} busy={saveBusy} title={saveTitle} onClick={saveBusy ? undefined : onSave}>
+        <div className={`bb__inspfoot${SAVE_RULE_SLATE && !SAVE_RULE_ORANGE ? ' is-slate' : ''}`}>
+          <Button variant={SAVE_RULE_ORANGE && saveLeads ? 'brand' : 'secondary'} size="sm" disabled={!canSave && !saveBusy} busy={saveBusy} title={saveTitle} onClick={saveBusy ? undefined : onSave}>
             {saveBusy && <span className="bb__tspin" aria-hidden />}
             {saveLabel}
           </Button>

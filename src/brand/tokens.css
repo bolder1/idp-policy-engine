@@ -587,6 +587,11 @@
   --viz-teal-lit: #2dd4bf;
   --viz-pink-lit: #f472b6;
   --viz-slate-lit: #94a3b8;
+  /* Deeper twins for a white card, where sky (2.8:1) and teal (2.5:1) fall under the 3:1 a chart mark needs, and the
+     amber a dashboard warning draws in (dashboardA11y, 25 Nov). Sky 4.1:1, teal 3.7:1, amber 3.7:1. */
+  --viz-sky-deep: #0284c7;
+  --viz-teal-deep: #0d9488;
+  --viz-amber-deep: #b07a00;
 
   --night-page: #07090d;
   --night-card: #0e1219;

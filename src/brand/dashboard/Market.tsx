@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { A11Y } from './a11y'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { X, type LucideIcon } from 'lucide-react'
 import { SearchBox } from '../kit'
@@ -59,8 +60,22 @@ export function Market({
       close.current()
     }
     window.addEventListener('keydown', key, true)
+    /* dashboardA11y: the sheet is modal, so the page behind it is too: Tab and a screen reader stay inside it. */
+    const held: HTMLElement[] = []
+    const hold = requestAnimationFrame(() => {
+      const overlay = sheet.current?.closest('.bmarket')
+      if (!A11Y || !overlay?.parentElement) return
+      for (const el of Array.from(overlay.parentElement.children)) {
+        /* Announcers stay live, so a toast said while the sheet is open is still read. */
+        if (el === overlay || !(el instanceof HTMLElement) || el.inert || el.matches('.u-sr-only, [aria-live], [role=status], [role=alert]')) continue
+        el.inert = true
+        held.push(el)
+      }
+    })
     return () => {
       cancelAnimationFrame(frame)
+      cancelAnimationFrame(hold)
+      for (const el of held) el.inert = false
       window.removeEventListener('keydown', key, true)
       before?.focus?.({ preventScroll: true })
     }

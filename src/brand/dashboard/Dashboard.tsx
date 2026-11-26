@@ -42,6 +42,7 @@ import {
 } from './model'
 import { BLANK_ID, OVERVIEW, XECURIFY_TEMPLATES } from './templates'
 import { THEMES, type ThemeId } from './themes'
+import { A11Y, A11Y_ATTR } from './a11y'
 import { DashboardArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
 
@@ -192,7 +193,15 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
     entered.current = null
   }
   const cancel = () => {
-    if (entered.current) restore(entered.current)
+    const before = entered.current
+    if (before) {
+      /* dashboardA11y: Cancel throws away a whole session, so when anything changed it can be had back, as a removed
+         widget can. With nothing changed it is a plain exit. */
+      const now = snap()
+      const changed = A11Y && (now.theme !== before.theme || JSON.stringify(now.rows) !== JSON.stringify(before.rows))
+      restore(before)
+      if (changed) store.showToast('Changes discarded', { label: 'Undo', run: () => restore(now) })
+    }
     leave()
   }
 
@@ -409,7 +418,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
     <>
       {lookSwitch}
       <AnimatePresence>
-        {hint && (
+        {hint && !A11Y && (
           <motion.span className="bdash-hint" role="status" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
             Customize to move, resize or add widgets
           </motion.span>
@@ -422,7 +431,7 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   )
 
   return (
-    <div className="bpage bdash bdash-vars" ref={page} data-look={night ? 'dark' : undefined} data-polish={POLISH ? '' : undefined} style={{ ['--dash-brand' as string]: prefs.brand }}>
+    <div className="bpage bdash bdash-vars" ref={page} data-look={night ? 'dark' : undefined} data-polish={POLISH ? '' : undefined} {...A11Y_ATTR} style={{ ['--dash-brand' as string]: prefs.brand }}>
       <PageHead title="Dashboard" caption="Your tenant at a glance." preview={switches} />
 
       <div className="bdash-tabs">

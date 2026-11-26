@@ -8,6 +8,7 @@ import { SUGGESTED } from './templates'
 import type { ThemeId } from './themes'
 import { HIDE_CHECKS } from '../tester'
 import { offered } from './withheld'
+import { A11Y } from './a11y'
 
 /* Where Check access is withheld (Dev handoff, rollout.ts activityAndChecks), Quick actions doesn't promise it. */
 const blurbOf = (w: WidgetId): string => (HIDE_CHECKS && w === 'shortcuts' ? 'New policy, add an app, add a user' : WIDGETS[w].blurb)
@@ -95,7 +96,7 @@ export function Library({
   const shelves: { value: Shelf; label: string }[] = [{ value: 'all', label: 'All widgets' }, ...CATEGORIES, ...(row ? [] : [{ value: 'on' as const, label: 'On this dashboard' }])]
 
   return (
-    <Market open={open} title={row ? `Add to ${row.label}` : 'Add widgets'} by={row ? 'Widgets that fit this row' : 'Pick what this dashboard shows'} icon={LayoutGrid} query={q} onQuery={setQ} placeholder="Search widgets" onClose={onClose}>
+    <Market open={open} title={row ? `Add to ${row.label}` : 'Add widgets'} by={row ? 'Widgets that fit this row' : A11Y ? undefined : 'Pick what this dashboard shows'} icon={LayoutGrid} query={q} onQuery={setQ} placeholder="Search widgets" onClose={onClose}>
       <div className="bmarket__chips" role="group" aria-label="Widgets by need">
         {shelves.map((s) => (
           <Chip key={s.value} active={shelf === s.value} onClick={() => setShelf(s.value)}>

@@ -21,11 +21,15 @@ import {
   PowerOff,
   Radar,
   Replace,
+  ShieldPlus,
   Trash2,
   Unlink,
   type LucideIcon,
 } from 'lucide-react'
 import { TemplateIcon } from '../template-icon'
+import { EmptyState } from '../empty'
+import { PoliciesArt } from '../empty-art'
+import { shows } from '../rollout'
 
 import { appsOf, enforces, memberGroupIds, ruleExpired, type App, type Policy } from '../data'
 import { DecisionBadge } from '../decision-badge'
@@ -397,6 +401,9 @@ const SOON = HEAD_READS ? undefined : 'Coming soon'
 export const APP_POLICY_GLANCE = true
 /* The glance is the canvas's frame, so with the canvas off the tab is the 15 Oct table layout as a whole. */
 const GLANCE = APP_POLICY_GLANCE && RULES_CANVAS
+/* No policy and no Global Default to draw (Design has none, ROLLOUT.noGlobalDefault): the page empty state, not a
+   heading over a blank page (26 Nov 2026). Design only (ROLLOUT.appPoliciesEmpty). */
+const EMPTY_TAB: boolean = shows('appPoliciesEmpty')
 
 /* The tab on the policy alone (owner, 21 Oct 2026: "they want to remove the sign-in activity from here, so focus on the
    policy; move the sign-in activity into a button"). The rules canvas takes the room, a details card and the post
@@ -1547,6 +1554,35 @@ export function AppNoPolicyView({
   const chain = useChainOpen(null)
   const glance = useGlance(null, globalDefault)
   const hasRail = linkedTo(app.id, store.policies).length > 0
+  if (EMPTY_TAB && !globalDefault)
+    return (
+      /* The same block as the unsaved application's Policies tab (ApplicationPage.tsx `NewAppPolicies`) and the library
+         pages. The wrapper takes `data-tab-head` so a Remove or a Delete draft still lands focus here (`focusHead`). */
+      <div className="apol is-empty" tabIndex={-1} data-tab-head aria-label={`No policy on ${app.name}`}>
+        <EmptyState
+          art={<PoliciesArt badge="shield" />}
+          icon={ShieldPlus}
+          title={`No policy on ${app.name}`}
+          action={
+            <>
+              <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={onNew}>
+                Create new policy
+              </Button>
+              {onAdd && (
+                <Button variant="secondary" icon={ListPlus} onClick={onAdd}>
+                  Add existing policy
+                </Button>
+              )}
+            </>
+          }
+        />
+        {hasRail && (
+          <div className="apol__rail">
+            <PostSignInLinks app={app} onTab={onTab} />
+          </div>
+        )}
+      </div>
+    )
   return (
     <div className={GLANCE ? 'apol is-glance' : 'apol'} style={GLANCE ? ({ '--apol-rows': FOCUS_ROWS } as CSSProperties) : undefined}>
       <header className="apol__head">

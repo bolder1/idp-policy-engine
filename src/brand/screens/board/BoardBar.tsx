@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Check } from 'lucide-react'
 import { TemplateIcon } from '../../template-icon'
 import { AlignLeft, Headset, Undo2, ChevronRight, CopyPlus, GraduationCap, LogIn, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
@@ -25,6 +25,8 @@ import { shows } from '../../rollout'
 const NEW_POLICY_UNSAVED: boolean = shows('newPolicyUnsaved')
 /* The pill is a plain status and the switches are in the ⋯ (rollout.ts `statusInMenu`). */
 const STATUS_IN_MENU: boolean = shows('statusInMenu')
+/** A saved draft reads on Save draft, not as a pill beside the status (rollout `draftOffPill`). */
+const DRAFT_OFF_PILL: boolean = shows('draftOffPill')
 /* The policy's details card on its name, where Policies' details slider was (rollout.ts `directOpen`). */
 const POLICY_CARD: boolean = shows('directOpen')
 
@@ -401,6 +403,7 @@ export function BoardBarActions({
   quietSave = false,
   toPublish,
   unsaved,
+  draftSaved = false,
   canDiscard,
   blockers,
   saveBlocked,
@@ -461,6 +464,8 @@ export function BoardBarActions({
   toPublish: boolean
   /** Edits since the last save or draft. */
   unsaved: boolean
+  /** A draft is saved and nothing has changed since: Save draft says so (rollout `draftOffPill`). */
+  draftSaved?: boolean
   /** Unsaved edits or a saved draft to throw away. */
   canDiscard: boolean
   blockers: number
@@ -550,8 +555,8 @@ export function BoardBarActions({
       {!publish && !viewOnly && discard && !noDiscard && <Button variant="secondary" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
         Discard
       </Button>}
-      {!publish && !viewOnly && <Button variant="secondary" size="sm" disabled={!unsaved} blocked={stop && unsaved ? stop : undefined} title={!unsaved ? 'No changes to save' : (stop ?? undefined)} onClick={onSaveDraft}>
-        Save draft
+      {!publish && !viewOnly && <Button variant="secondary" size="sm" disabled={!unsaved} blocked={stop && unsaved ? stop : undefined} title={!unsaved ? 'No changes to save' : (stop ?? undefined)} icon={DRAFT_OFF_PILL && draftSaved && !unsaved ? Check : undefined} onClick={onSaveDraft}>
+        {DRAFT_OFF_PILL && draftSaved && !unsaved ? 'Draft saved' : 'Save draft'}
       </Button>}
       {/* One word, and it does that word (owner, 23 Sep 2026: "make it save
           only — hide the review part as of now, only show the save directly;

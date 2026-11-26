@@ -10,6 +10,14 @@ import { viewOf, type Kind } from './model'
 import { useTile } from './tile-context'
 import { shows } from '../rollout'
 import type { WidgetId } from './catalog'
+import { A11Y } from './a11y'
+
+/** A node's plain text when it is a string or number, for a `title` that shows what an ellipsis hid (dashboardA11y). */
+const full = (...parts: ReactNode[]): string | undefined => {
+  if (!A11Y) return undefined
+  const text = parts.filter((p) => typeof p === 'string' || typeof p === 'number').join(' · ')
+  return text || undefined
+}
 
 /* 22 Nov audit #12 (rollout.ts dashboardPolish): a list or table a filter leaves empty says so (states.tsx). */
 const STATES = shows('dashboardPolish')
@@ -162,16 +170,16 @@ export function Stat({
   const Arrow = up === undefined ? null : up ? TrendingUp : TrendingDown
   return (
     <div className="bdw-stat">
-      <h2 className="bdw-stat__label">{meta.name}</h2>
+      <h2 className="bdw-stat__label" title={full(meta.name)}>{meta.name}</h2>
       {chip && <span className="bdw-stat__chip">{chip}</span>}
       <p className="bdw-stat__value">{value}</p>
       {spark && <div className="bdw-stat__spark">{spark}</div>}
       <div className="bdw-stat__foot">
         <p className="bdw-stat__line">
-          <span>{line}</span>
+          <span title={full(line)}>{line}</span>
           {Arrow && <Arrow size={16} strokeWidth={2} aria-hidden />}
         </p>
-        <p className="bdw-stat__caption">{caption}</p>
+        <p className="bdw-stat__caption" title={full(caption)}>{caption}</p>
       </div>
     </div>
   )
@@ -199,7 +207,7 @@ export function Row({ lead, title, sub, trail, onClick }: { lead?: ReactNode; ti
     </>
   )
   return (
-    <li className="bdw-row">
+    <li className="bdw-row" title={full(title, sub)}>
       {onClick ? (
         <button type="button" className="bdw-row__open" onClick={onClick}>
           {main}
@@ -249,7 +257,7 @@ export function BarList({ items, format = fmt, tone }: { items: BarItem[]; forma
               animate={{ width: `${(i.value / max) * 100}%` }}
               transition={{ duration: reduce ? 0 : 0.6, ease: [0.22, 1, 0.36, 1] }}
             />
-            <span className="bdw-bar__label">
+            <span className="bdw-bar__label" title={full(i.label)}>
               {i.lead}
               <span>{i.label}</span>
               {i.hint && <em>{i.hint}</em>}

@@ -86,7 +86,7 @@ import { boardShortcuts, chord, isMacPlatform } from './shortcuts'
 
 import { boardTourSeen } from '../../tour/board-tour'
 
-import { useLeaveGuard } from '../../leave-guard'
+import { ChangeState, useLeaveGuard } from '../../leave-guard'
 import { shows } from '../../rollout'
 
 /* Leaving a canvas that holds no rule asks first (owner, 20 Nov 2026). rollout.ts `noRuleAlert`. */
@@ -104,6 +104,9 @@ const RULES_SAVE_WITH_POLICY: boolean = shows('rulesSaveWithPolicy')
 const BACK_AFTER_SAVE: boolean = shows('backAfterSave')
 /* "Nothing else matched"'s Save rule saves that row only, not the policy (rollout.ts `fallbackSavesRule`). */
 const FALLBACK_SAVES_RULE: boolean = shows('fallbackSavesRule')
+/* A rule with unsaved changes open in the panel quiets the bar's primary; Save rule closes the panel (rollout.ts
+   `ruleSaveFocus`). */
+const RULE_SAVE_FOCUS: boolean = shows('ruleSaveFocus')
 /* Nothing being said: one array, so the context does not change identity on every render. */
 const NO_GAPS: readonly RuleGap[] = []
 const NO_TRIED: ReadonlySet<string> = new Set()
@@ -760,6 +763,8 @@ export function BoardBuilder({
       setSavedFallback(JSON.stringify(f))
       setSavingRule(null)
       store.showToast(`${f.name.trim() || 'Nothing else matched'} saved`)
+      if (RULE_SAVE_FOCUS && simple && !post) saveRuleToPolicy()
+      if (RULE_SAVE_FOCUS) closeAfterRuleSave(byId('bb-terminal-title'))
     }, RULE_SAVE_MS)
   }
   const saveRule = (id: string) => {
@@ -774,7 +779,32 @@ export function BoardBuilder({
       setSavedRules((all) => ({ ...all, [id]: JSON.stringify(r) }))
       setSavingRule(null)
       store.showToast(`${r.name.trim() || 'Rule'} saved`)
+      if (RULE_SAVE_FOCUS && simple && !post) saveRuleToPolicy()
+      if (RULE_SAVE_FOCUS) closeAfterRuleSave(byId(`bb-rule-${id}-title`))
     }, RULE_SAVE_MS)
+  }
+  /* Simple, after Save rule (rollout.ts `ruleSaveFocus`): an Inactive policy has one version, so the rules go onto the
+     policy itself; any other policy keeps them as its draft, the head says Draft and Activate policy puts it live. */
+  const saveRuleToPolicy = () => {
+    if (!oneVersion || !saved) return saveDraft({ stay: true })
+    const latest = store.policyById(saved.id) ?? saved
+    const facts = saveFacts(latest)
+    store.savePolicy({
+      ...latest,
+      ...facts,
+      rules: draft.rules,
+      fallback: draft.fallback,
+      checks: draft.checks,
+      ...(draftHoldsName ? { name: draft.name } : null),
+      pendingDraft: undefined,
+    })
+    markRulesSaved(draft.rules.filter((r) => !gaps.some((g) => g.at === r.id)))
+    afterSave({ ...latest, ...facts })
+  }
+  /* Save rule ends the edit: the panel slides away and focus lands on the card it saved, as its close button does. */
+  const closeAfterRuleSave = (card: () => HTMLElement | null) => {
+    setInspOpen(false)
+    focusSoon(card)
   }
   /* What the rules still leave empty (rule-gaps.ts, every line): a post sign-in rule's name, who and conditions too,
      its missing action having a refusal of its own, below. Said under their fields only for the rules a refused save
@@ -1027,6 +1057,10 @@ export function BoardBuilder({
   const live = !!saved && (differsFromLive(saved, draft) || !!pending || appsDiffer)
   const toPublish = live || saved?.status === 'draft'
   const hasDraft = !!saved?.pendingDraft
+  /* Simple's Inactive policy has one version (owner, 26 Nov 2026: "there will be a single version because only one
+     exists for inactive"): Save rule stores onto the policy itself, with no Draft tag and no Show live version
+     (rollout.ts `ruleSaveFocus`). */
+  const oneVersion = RULE_SAVE_FOCUS && simple && !post && saved?.status === 'inactive'
   /* "View and edit": draft mode once Edit is pressed, or from the start on a new policy; the view otherwise. The view
      is read only and carries the status; draft mode has no status at all. */
   /* A post sign-in policy is outside the mode: its board is as in Today. */
@@ -1088,7 +1122,9 @@ export function BoardBuilder({
   /* The leave guard's Save as draft too: the name and audience the thread
      gives go on the policy first (`factsToSave`), or a draft described and
      saved before Done kept the rules and lost who they are for. */
-  const saveDraft = () => {
+  /* `stay`: Save rule's own save in Simple (rollout.ts `ruleSaveFocus`): the draft is stored, the board stays open and
+     the rule's toast is the only one. */
+  const saveDraft = ({ stay = false }: { stay?: boolean } = {}) => {
     if (!saved) return false
     if (stop) {
       store.showToast(stop)
@@ -1113,6 +1149,7 @@ export function BoardBuilder({
     afterSave({ ...latest, ...facts })
     /* New marks a fix not saved yet. */
     setFixedNew([])
+    if (stay) return true
     /* Fix: a draft beside a live policy says that live did not move (draft-model.ts). */
     store.showToast(
       fix && isPublished(latest)
@@ -1739,6 +1776,15 @@ export function BoardBuilder({
     return () => clearTimeout(t)
   }, [panelShown])
   const panelLeaving = panelAlive && !panelShown
+  /* The panel's Save rule is lit (its rule has unsaved changes), so the bar's primary steps back to secondary: one
+     filled button at a time (rollout.ts `ruleSaveFocus`). Same tests as the panel's own `canSave` below. */
+  const ruleSaveLeads =
+    RULE_SAVE_FOCUS &&
+    RULE_SAVE &&
+    panelShown &&
+    !testOn &&
+    ((selection.kind === 'rule' && unsavedIds.includes(selection.id)) ||
+      (FALLBACK_SAVES_RULE && selection.kind === 'fallback' && fallbackUnsaved))
 
   /* --- Check access (test mode) ------------------------------------------------
 
@@ -2874,7 +2920,7 @@ export function BoardBuilder({
         draftSaved={hasDraft}
         /* "View and edit": the view keeps the bar's own "Draft not published" pill while a saved draft waits (undefined
            draws it); draft mode says itself on the canvas (DraftModeChip). */
-        chip={v3s.on ? v3s.chip : viewEdit ? (viewShown && hasDraft ? undefined : null) : viewOnCanvas ? null : fix ? <FixChip unsaved={unsaved} draft={saved?.pendingDraft} /> : undefined}
+        chip={v3s.on ? v3s.chip : RULE_SAVE_FOCUS && simple && !post ? (hasDraft && !oneVersion ? <ChangeState unsaved={false} draft /> : null) : viewEdit ? (viewShown && hasDraft ? undefined : null) : viewOnCanvas ? null : fix ? <FixChip unsaved={unsaved} draft={saved?.pendingDraft} /> : undefined}
         beside={liveOffered && !v3s.historyOpen && !viewOnCanvas ? <LiveDraftSwitch value={canvasView} onChange={setCanvasView} inUse={reachesSignIns(saved)} /> : undefined}
         edits={boardEdits}
         onEditsFix={(next, toast) => {
@@ -2897,6 +2943,7 @@ export function BoardBuilder({
           {/* V3: Version history's door, first of the policy's actions (draft-v3.tsx). */}
           {v3s.historyButton}
           <BoardBarActions
+            draftSaved={hasDraft}
             reading={readOpen}
             onRead={toggleRead}
             readRef={readButton}
@@ -2906,7 +2953,7 @@ export function BoardBuilder({
             onTest={pressTest}
             testRef={testButton}
             views={views.length > 0 ? <CheckBarViews views={views} panel={checkPanel} onToggle={toggleView} /> : undefined}
-            quietSave={testOn && checkPanel === 'form'}
+            quietSave={(testOn && checkPanel === 'form') || ruleSaveLeads}
             toPublish={toPublish}
             unsaved={unsaved}
             canDiscard={edited || hasDraft}
@@ -2926,6 +2973,7 @@ export function BoardBuilder({
                   publishedOpen={PUBLISHED_LEFT && !simple ? pubPanel : pubOpen}
                   /* Simple: "Show live version" in every edit state, greyed while nothing is live (owner, 25 Nov 2026). */
                   simple={simple}
+                  hideLive={oneVersion}
                   /* Simple: greyed until the board differs from what is live, as Save draft and Save policy wait. */
                   liveOff={!isPublished(saved) ? NOTHING_LIVE : NO_CHANGE_YET}
                   onTogglePublished={
@@ -3496,6 +3544,7 @@ export function BoardBuilder({
           onPatchRule={patchRule}
           onPatchFallback={patchFallback}
           onRemoved={offerUndo}
+          saveLeads={ruleSaveLeads}
           /* The panel's own save — the bar's act, at the foot of the form,
              in the bar's other words and a quieter weight. */
           {...(RULE_SAVE && selection.kind === 'rule'

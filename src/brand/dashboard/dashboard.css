@@ -3576,3 +3576,96 @@ button.bdw-bar__row:hover .bdw-bar {
     flex-direction: row;
   }
 }
+
+/* ---- Interface review, 25 Nov (rollout.ts dashboardA11y; the page and its popovers carry data-a11y) -------------
+   1. Focus is never suppressed. The board's controls had swapped the console's ring for a 20% halo alone (about 1.3:1
+      on white); they get the kit's ring back: a hairline in --focus-ring that traces the control, with the halo. */
+[data-a11y] :is(
+    .bdash-tile__remove,
+    .bdash-tile__colour button,
+    .bdash-tile__grab,
+    .bdash-option,
+    .bdash-dot,
+    .bdw-more,
+    .bdash-row__add,
+    .bdash-row__splitbtn,
+    .bdash-split__opt,
+    .bdash-row__grip button
+  ):focus-visible,
+[data-a11y] .bdash-dot:has(input:focus-visible) {
+  outline: var(--bw-thin) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  [data-a11y] :focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* 3. A day's state is not colour alone: a slow day is a half block and a down day a stub, so the strip reads by
+      height as well as by tone. */
+[data-a11y] .bdc-tracker {
+  align-items: flex-end;
+}
+[data-a11y] .bdc-tracker i {
+  align-self: stretch;
+}
+[data-a11y] .bdc-tracker i.is-slow {
+  align-self: flex-end;
+  height: 50%;
+}
+[data-a11y] .bdc-tracker i.is-down {
+  align-self: flex-end;
+  height: 25%;
+}
+
+/* 4. The stacked board in Customize keeps each row's menu. A narrow window has no margin beside the board for it, so
+      it sits on the row's left edge, halfway down, clear of each widget's corner buttons, and is always shown. */
+.bdash[data-a11y][data-polish] .bdash-board.is-stacked .bdash-row__tools {
+  top: 50%;
+  left: 0;
+  opacity: 1;
+  translate: -50% -50%;
+}
+/* A widget's head tools wrap onto a second line rather than run off a narrow tile. */
+[data-a11y] .bdw-head__tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+/* A stacked strip (Migration) wraps taller than its row; it scrolls inside its card rather than lose its title. */
+[data-a11y] .bdash-board.is-stacked .bdash-tile__card:has(> .bdw.is-strip) {
+  overflow-y: auto;
+}
+[data-a11y] .bdash-board.is-stacked .bdw.is-strip,
+[data-a11y] .bdash-board.is-stacked .bdw-strip {
+  height: auto;
+  min-height: 100%;
+  align-content: flex-start;
+}
+[data-a11y] .bdash-board.is-stacked .bdw-strip__text {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+/* ---- Interface review, 25 Nov, the MEDIUM findings (dashboardA11y) --------------------------------------------------
+   5. One orange button in the dock: Done. Add widgets is a neutral button like its neighbours. */
+.bdash[data-a11y] .bdash-dock .bdash-dock__add .bx-btn {
+  border-color: var(--glass-edge, var(--border-default));
+  background: var(--glass-tray, var(--surface-raised));
+  color: var(--text-primary);
+}
+.bdash[data-a11y] .bdash-dock .bdash-dock__add .bx-btn:not(:disabled):hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+.bdash[data-a11y] .bdash-dock .bdash-dock__add .bx-btn:not(:disabled):active {
+  background: var(--surface-sunken);
+}
+/* 6. Marks a card can see: on the light board the warning amber and the sky and teal series take their deeper twins,
+      each 3:1 or more on white. The night board keeps its lit palette. */
+.bdash[data-a11y]:not([data-look='dark']) {
+  --viz-sky: var(--viz-sky-deep);
+  --viz-teal: var(--viz-teal-deep);
+  --dash-warn: var(--viz-amber-deep);
+}

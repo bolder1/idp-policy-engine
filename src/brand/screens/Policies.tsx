@@ -71,7 +71,7 @@ import { DENIAL_REASONS } from './sign-in-tests/phase'
 import { PolicyDetailsDrawer } from './policy-details-drawer'
 import { blankPostSignInPolicy, isPostSignIn } from '../post-sign-in'
 import { blockedReason } from '../migrate/plan'
-import { activityLabel, lastActivity } from '../policy-activity'
+import { activityLabel, draftSavedLabel, lastActivity } from '../policy-activity'
 import { MoveBanner } from '../migrate/move-banner'
 import { MigrateEmpty } from '../migrate/MoveDialog'
 import { MoveFinale, MovingBar, MovingShowcase } from '../migrate/finale'
@@ -125,6 +125,8 @@ const POLICY_KINDS: { value: PolicyKind; label: string }[] = MIGRATION_FIRST
    with neither the page opens on Sign-in. */
 /* All Policies' More filters (19 Nov): Design only until the owner has checked it (rollout.ts `moreFilters`). */
 const MORE_FILTERS: boolean = shows('moreFilters')
+/** A saved draft reads in Last activity, not as a pill by the name (rollout `draftOffPill`). */
+const DRAFT_OFF_PILL: boolean = shows('draftOffPill')
 /* The bar on one line, its buttons dropping to icons as it narrows (19 Nov): Design only (rollout.ts `oneLineBar`). */
 const ONE_LINE_BAR: boolean = shows('oneLineBar')
 /* The bar's menus open over the table's sticky footer (24 Nov): Design only (rollout.ts `barOverPager`). */
@@ -776,7 +778,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   policy={p}
                   gauntlet={grades.get(p.id)}
                   showExposure={showExposure && !review}
-                  activity={review ? `${p.movedFrom?.length ?? 0} old ${p.movedFrom?.length === 1 ? 'policy' : 'policies'}` : activityLabel(lastActivity(p, store.activity, now), now)}
+                  activity={review ? `${p.movedFrom?.length ?? 0} old ${p.movedFrom?.length === 1 ? 'policy' : 'policies'}` : DRAFT_OFF_PILL && p.pendingDraft ? draftSavedLabel(p.pendingDraft.savedAt, lastActivity(p, store.activity, now), now) : activityLabel(lastActivity(p, store.activity, now), now)}
                   monitor={monitorOffered(store.features)}
                   trySignIn={store.features.trySignIn}
                   onOpen={() => openPolicy(p)}

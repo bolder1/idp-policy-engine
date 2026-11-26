@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { blankPolicy, type Policy } from '../../data'
 import { committed } from '../../policy-draft'
+import { ROLLOUT } from '../../rollout'
 import { BrandProvider } from '../../store'
 import { LIVE_BUTTON, NOTHING_LIVE, SAVE_AND_ACTIVATE, SAVE_ASK, SIMPLE_DRAFT_TOAST, liveConfirmBody, simpleSaveToast } from './draft-model'
 import { PublishedPanel, ViewEditActions } from './view-edit'
@@ -189,5 +190,29 @@ describe('Simple on the board', () => {
   it('draws Save rule in solid slate on Design, not the grey that read as disabled', () => {
     expect(inspectorSrc).toContain("const SAVE_RULE_SLATE: boolean = shows('saveRuleLook')")
     expect(boardCss).toMatch(/\.bb__inspfoot\.is-slate \.bx-btn--neutral \{\s*background: var\(--accent\);/)
+  })
+
+  it('quiets the bar while a lit Save rule leads, and closes the panel after Save rule (Design only)', () => {
+    expect(ROLLOUT.ruleSaveFocus).toEqual(['design'])
+    expect(builderSrc).toContain("const RULE_SAVE_FOCUS: boolean = shows('ruleSaveFocus')")
+    expect(builderSrc).toContain("quietSave={(testOn && checkPanel === 'form') || ruleSaveLeads}")
+    expect(builderSrc).toContain('if (RULE_SAVE_FOCUS) closeAfterRuleSave(byId(`bb-rule-${id}-title`))')
+    expect(builderSrc).toContain("if (RULE_SAVE_FOCUS) closeAfterRuleSave(byId('bb-terminal-title'))")
+  })
+
+  it('makes a lit Save rule the one orange, and in Simple stores the draft so the head says Draft (Design only)', () => {
+    expect(inspectorSrc).toContain("const SAVE_RULE_ORANGE: boolean = shows('ruleSaveFocus')")
+    expect(inspectorSrc).toContain("variant={SAVE_RULE_ORANGE && saveLeads ? 'brand' : 'secondary'}")
+    expect(builderSrc).toContain('saveLeads={ruleSaveLeads}')
+    expect(builderSrc.match(/if \(RULE_SAVE_FOCUS && simple && !post\) saveRuleToPolicy\(\)/g)).toHaveLength(2)
+    expect(builderSrc).toContain('if (!oneVersion || !saved) return saveDraft({ stay: true })')
+    expect(builderSrc).toContain('RULE_SAVE_FOCUS && simple && !post ? (hasDraft && !oneVersion ? <ChangeState unsaved={false} draft /> : null)')
+  })
+
+  it("keeps an Inactive policy to one version in Simple: Save rule stores onto it, no Draft tag, no Show live version", () => {
+    expect(builderSrc).toContain("const oneVersion = RULE_SAVE_FOCUS && simple && !post && saved?.status === 'inactive'")
+    expect(builderSrc).toContain('hideLive={oneVersion}')
+    const html = renderToStaticMarkup(<ViewEditActions editing onEdit={() => {}} publishedOpen={false} onTogglePublished={() => {}} simple hideLive />)
+    expect(html).not.toContain(LIVE_BUTTON)
   })
 })

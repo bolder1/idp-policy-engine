@@ -10,6 +10,7 @@ import { shows } from '../rollout'
 import { ColourList } from './ThemeMenus'
 import { WidgetBody } from './widgets'
 import { tagKey, type TileTag } from './tags'
+import { A11Y } from './a11y'
 
 /* -----------------------------------------------------------------------------
    One widget on the board.
@@ -157,8 +158,10 @@ function TileView({ cell, box, editing, range, movable, state, picked, boardThem
       {editing && tags && tags.length > 0 && state === 'rest' && (
         <span className="bdash-tile__tags" data-chrome>
           {tags.map((t) => (
-            <span key={t.kind} className={`bdash-tag is-${t.kind}`} title={t.why} aria-label={t.why}>
+            <span key={t.kind} className={`bdash-tag is-${t.kind}`} title={t.why} aria-label={A11Y ? undefined : t.why}>
               {t.label}
+              {/* dashboardA11y: a span's aria-label is not read, so the reason is text a screen reader reaches. */}
+              {A11Y && <span className="u-sr-only">: {t.why}</span>}
             </span>
           ))}
         </span>

@@ -350,7 +350,7 @@ describe('Past sign-ins, a button of its own on the bar', () => {
   it('leaves Run the one orange while the sign-in’s panel is open: the policy’s save steps down', () => {
     expect(bar(true, true)).toMatch(/data-tour="review"><button type="button" class="bx-btn bx-btn--neutral/)
     expect(bar(true, false)).toMatch(/data-tour="review"><button type="button" class="bx-btn bx-btn--brand/)
-    expect(builderSrc).toContain("quietSave={testOn && checkPanel === 'form'}")
+    expect(builderSrc).toContain("quietSave={(testOn && checkPanel === 'form') || ruleSaveLeads}")
   })
 })
 

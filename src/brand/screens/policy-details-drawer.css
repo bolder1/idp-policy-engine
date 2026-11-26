@@ -15,3 +15,6 @@
   min-width: 0;
 }
 .bpd-foot__start { margin-right: auto; }
+/* The Rules' Draft / Live switch (rollout.ts `drawerDraftRules`), where "In order" was: the heading's aside clips and
+   caps its text, which would cut the tab pair and its focus ring. */
+.insp__secmeta:has(> .bpd-ver) { max-width: none; overflow: visible; }

@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpRight, Power, type LucideIcon } from 'lucide-react'
 
-import { Badge, Button, Drawer, StatusPill } from '../kit'
+import { Badge, Button, Drawer, StatusPill, Tabs } from '../kit'
 import './policy-details-drawer.css'
 import { useBrand } from '../store'
+import { ChangeState } from '../leave-guard'
+import { shows } from '../rollout'
 import { loadAndGo } from './guarded-moves'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
 import { isPeek, type InspectTarget } from './sign-in-tests/inspect-model'
@@ -33,6 +35,14 @@ import { HIDE_CHECKS } from '../tester'
 
 /* Hidden for now (owner, 7 Oct 2026): the week's sample sign-ins under the rules. Kept, not deleted. */
 const PAST_IN_DETAILS = false
+
+/* Draft / Live on the Rules of a policy with a saved draft, Draft first (rollout.ts `drawerDraftRules`). */
+const DRAFT_RULES = shows('drawerDraftRules')
+type Version = 'draft' | 'live'
+const VERSIONS: { value: Version; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'live', label: 'Live' },
+]
 
 const LIBRARY_SCREEN = { zone: { name: 'zones' }, device: { name: 'fingerprint' }, risk: { name: 'risk-signals' }, hook: { name: 'hooks' }, app: { name: 'applications' } } as const
 
@@ -69,6 +79,13 @@ export function PolicyDetailsDrawer({
   const [openOne, setOpenOne] = useState<string | null | undefined>(undefined)
   const from = boardFrom ? { from: boardFrom } : null
   const [showPast, setShowPast] = useState(false)
+  /* Draft first each time the drawer opens, or opens on another policy. */
+  const [version, setVersion] = useState<Version>('draft')
+  useEffect(() => {
+    if (open) setVersion('draft')
+  }, [open, policyId])
+  const draft = DRAFT_RULES ? policy?.pendingDraft : undefined
+  const onDraft = !!draft && version === 'draft'
   const go = (t: InspectTarget) => {
     if (t.kind === 'see') return
     if (isPeek(t)) {
@@ -95,10 +112,12 @@ export function PolicyDetailsDrawer({
       title="Policy details"
       width={680}
       head={
-        statusHead && policy ? (
+        (statusHead || onDraft) && policy ? (
           <div className="bpd-head">
             <h2>Policy details</h2>
-            <StatusPill status={policy.status} />
+            {statusHead && <StatusPill status={policy.status} />}
+            {/* Which version the Rules show, in the row's own Draft words (owner, 25 Nov 2026: a Draft tag in the head). */}
+            {onDraft && <ChangeState unsaved={false} draft />}
           </div>
         ) : undefined
       }
@@ -133,7 +152,10 @@ export function PolicyDetailsDrawer({
       }
     >
       <div className="insp__page" key={policyId}>
-        <PolicyPage policyId={policyId} focus={undefined} plan={null} onEdit={go} onOpenOne={setOpenOne} canvas heroStatus={!statusHead} diffShown={!statusHead} />
+        <PolicyPage policyId={policyId} focus={undefined} plan={null} onEdit={go} onOpenOne={setOpenOne} canvas heroStatus={!statusHead} diffShown={!statusHead}
+          rulesOf={onDraft ? draft : undefined}
+          rulesAside={draft ? <Tabs<Version> className="bpd-ver" name="Rules version" value={version} onChange={setVersion} options={VERSIONS} /> : undefined}
+        />
         {PAST_IN_DETAILS && !HIDE_CHECKS && policy && mine.length > 0 && (
           /* Modelled sign-ins say so wherever they are drawn (test-dock.ts), here too, though the cards above the list are gone. */
           /* Folded: a week of rows at the foot made the slider read as a log. One press unfolds it (owner, 7 Oct 2026). */

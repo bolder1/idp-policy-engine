@@ -53,6 +53,16 @@ export function lastActivity(p: Pick<Policy, 'id' | 'lastModified' | 'addedOn'>,
   return null
 }
 
+/** "Draft saved 1 min ago": when a policy's saved draft was saved, from its stamp (relative or a date), or else the
+ *  policy's last activity (rollout `draftOffPill`). */
+export function draftSavedLabel(savedAt: string, fallback: Activity | null, now: number): string {
+  const ago = stampAgo(savedAt)
+  const parsed = Date.parse(savedAt)
+  const at = ago !== null ? now - ago : !Number.isNaN(parsed) ? parsed : fallback?.at
+  if (at === undefined) return 'Draft saved'
+  return activityLabel({ kind: 'edited', at }, now).replace(/^Edited/, 'Draft saved')
+}
+
 const VERB: Record<ActivityKind, string> = { added: 'Added', edited: 'Edited', opened: 'Opened' }
 
 /** "Edited 2 hours ago"; a week or more ago, the date. "—" when there is nothing to say. */

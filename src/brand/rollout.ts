@@ -54,6 +54,10 @@ export const ROLLOUT = {
   emptyTenant: ['design'],
   /** Every page-level empty state drawn like Zones and Device profiles (20 Nov, empty-art.tsx). Design only. */
   emptyArt: ['design'],
+  /** An application's Policies tab with no policy and no Global Default to show draws the page empty state (drawing,
+   *  "No policy on <app>", Create new policy orange + Add existing policy), not a heading over a blank page (26 Nov,
+   *  app-policy-view.tsx `AppNoPolicyView`). Design only. */
+  appPoliciesEmpty: ['design'],
   /** Authentication methods: Make default on all seven methods the live console's default list names (OTP over SMS,
    *  Email, Alternate Email, Display Token, SMS Link, Email Link, OTP over SMS and Email), whatever their SMS balance
    *  (20 Nov, auth-panel.ts `LIVE_DEFAULT_METHODS`). Every line, on the owner's word ("push this directly to all 3"). */
@@ -81,6 +85,13 @@ export const ROLLOUT = {
    *  into white in dark mode"). The lifted copy and its name chip open outside the page, so they take the night tokens
    *  from the document mark. Design only until the owner has checked it. */
   dashboardNightLift: ['design'],
+  /** Dashboard interface review, the four HIGH findings (25 Nov): a visible focus ring on every board control, the
+   *  full text of a cut-off row or label on hover and to screen readers, words beside colour-only states, and the
+   *  row menu and remove button kept when the board stacks at narrow widths. Then the MEDIUM ones: Add widgets is
+   *  neutral (Done is the dock's one orange), warning amber and sky/teal series 3:1 on white, Cancel offers Undo, the
+   *  widget and layout popups hold focus, Customize tags' reasons reach screen readers, the row-layout picker is
+   *  pressed buttons, and the two sentences explaining Customize are gone. Design only until the owner checks. */
+  dashboardA11y: ['design'],
   /** Deny in the policy builder carries the live console's email alerts: send to administrators and end users, the
    *  administrator address, and the four events, above the Deny message (23 Nov). Every line, on the owner's word
    *  ("change this globally ... update all 3 roles"). */
@@ -276,6 +287,16 @@ export const ROLLOUT = {
    *  not active because Save policy is"). Filled (23 Sep), never a second orange (board.css `.bb__inspfoot.is-slate`).
    *  Design only. */
   saveRuleLook: ['design'],
+  /** Builder: one filled button at a time. While the rule panel is open on a rule (or "Nothing else matched") with
+   *  unsaved changes, the bar's primary (Activate policy in Simple) drops to secondary and its solid Save rule leads;
+   *  the orange returns once the rule is saved. Save rule then closes the panel and focus goes back to the card
+   *  (26 Nov 2026, owner: "two different types of active buttons … Both try to draw attention", chose "Bar quiets while
+   *  editing"; then "after saving the rule, the right side panel should be automatically closed"). BoardBuilder.tsx
+   *  `RULE_SAVE_FOCUS`. Same day, owner: with the bar muted, Save rule is the view's one orange while it has something to
+   *  save (Inspector.tsx `saveLeads`; quiet grey when there is nothing), and in Simple a Save rule stores the policy's
+   *  draft without leaving, so the head reads Active + Draft ("after saving rule I can't see any draft state").
+   *  Design only. */
+  ruleSaveFocus: ['design'],
   /** More filters: no summary chip beside the button; the button itself lights in the active chip's colours while a
    *  filter is applied, and its title names them (25 Nov evening, owner: "can remove, and just make the More filters
    *  button active somehow with color"; more-filters.tsx). Clearing stays in the dropdown. Design only. */
@@ -298,6 +319,10 @@ export const ROLLOUT = {
    *  no policy covers is Blocked, said "No policy · Blocked" (25 Nov evening, owner: "remove global policy, completely
    *  not a concept any more", then "Blocked", "everywhere on Design"). Design only. */
   noGlobalDefault: ['design'],
+  /** Policy details drawer: a policy with a saved draft gets a Draft / Live switch on its Rules, Draft picked first, and
+   *  a Draft tag in the head while Draft shows (25 Nov night, owner: the drawer showed only the live rules of an active
+   *  policy with a draft; kit Tabs, rules only, the card keeps the live applications and audience). Design only. */
+  drawerDraftRules: ['design'],
   /** Simple's Activate policy says what it does after the press too: the confirm reads "Activate this policy?" (was "Save
    *  this policy?" above an Activate policy button) and the toast "<name> is active" (was "<name> saved"). Found in the
    *  26 Nov capture run; owner: "fix both". Design only. */
@@ -308,6 +333,11 @@ export const ROLLOUT = {
    *  row still counts as a rule (23 Nov ruling). Found in the 26 Nov Tester run: Save policy put a policy with no rules
    *  live, "Now allowed 288" of 360 sign-ins. Owner: "Yes, block it". Design only. */
   noEmptyLive: ['design'],
+  /** A saved draft is no longer a pill beside Active (26 Nov, owner: "active and draft feels confusing", on the builder
+   *  bar, the Policy details drawer and the Policies row). The status pill is the only pill: the builder's disabled Save
+   *  draft reads "Draft saved" with a check, the row's Last activity reads "Draft saved <when>", and the drawer's head
+   *  drops it (its Rules Draft / Live switch and Continue editing already say so). Design only. */
+  draftOffPill: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

@@ -44,6 +44,7 @@ import { tagsOf, type Mark } from './tags'
 import { applySplit } from './splits'
 import { SplitPicker } from './SplitPicker'
 import { shows } from '../rollout'
+import { A11Y } from './a11y'
 
 /* -----------------------------------------------------------------------------
    The board: rows of widgets, and in Customize the controls that shape them
@@ -94,6 +95,9 @@ const LIVE = shows('dashboardGrid')
 const NIGHT_LIFT = shows('dashboardNightLift')
 /* 23 Nov (rollout.ts dashboardPolish): a row's tools are one handle beside it, and its menu does more. */
 const POLISH = shows('dashboardPolish')
+/* 25 Nov (rollout.ts dashboardA11y): a stacked board in Customize keeps each row's menu, so moving and removing a row
+   need no width. Only dragging and sizing wait for a wider window. */
+const NARROW_MENU = A11Y && POLISH
 /** How long the pointer rests on a place before the board makes room there: long enough that sweeping across the board
     does not shuffle it, short enough to feel immediate. */
 const DWELL_MS = 90
@@ -1036,6 +1040,22 @@ export function Board({
     >
       {/* Each row's grip, in the margin beside it; pointing at it outlines the row it moves. Not while a bar is held:
           nothing else is pressed then, and the grips would be drawn again on every frame. */}
+      {editing &&
+        stacked &&
+        NARROW_MENU &&
+        geo.rows.map((rb, ri) => {
+          const row = shown[ri]
+          if (row.id === pinnedRow) return null
+          return (
+            <div key={row.id} data-band={row.id} className="bdash-band" style={{ transform: `translateY(${rb.y}px)`, height: rb.h }}>
+              <div className="bdash-row__tools" role="group" aria-label={`Row ${ri + 1}`}>
+                <span className="bdash-row__grip" data-chrome>
+                  <RowMenu label={`Row ${ri + 1}`} icon={GripVertical} items={rowMenu(row, ri)} onSelect={onRowMenu(row, ri)} align="start" />
+                </span>
+              </div>
+            </div>
+          )
+        })}
       {edit &&
         !sizing &&
         geo.rows.map((rb, ri) => {
@@ -1106,7 +1126,7 @@ export function Board({
           2026: "if something can't move, let the user know"). */}
       {editing && stacked && LIVE && (
         <p className="bdash-narrow" role="status">
-          Widen the window to move and size widgets
+          {NARROW_MENU ? 'Widen the window to drag and size widgets' : 'Widen the window to move and size widgets'}
         </p>
       )}
 

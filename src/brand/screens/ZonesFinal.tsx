@@ -83,6 +83,8 @@ import { TESTER } from '../tester'
 import { ZonesArt } from '../empty-art'
 import { shows } from '../rollout'
 import { CharCount } from '../CharCount'
+import { MANAGE_COLUMNS, libraryColumns, useColumns } from '../columns'
+import { ManageColumns } from '../manage-columns'
 
 /** The place results open over the sticky save bar (rollout `zonesHitsOverBar`). */
 const HITS_OVER_BAR = shows('zonesHitsOverBar')
@@ -174,6 +176,8 @@ export function ZonesFinal() {
   const store = useBrand()
   const [width] = usePageWidth()
   const [q, setQ] = useState('')
+  /* Which columns the table draws (rollout `manageColumns`). */
+  const zoneCols = useColumns('zones', ZONE_COLUMNS)
   const [openId, setOpenId] = useState<string | null>(null)
   /* A zone that has a name and nothing else yet. Held here, not in the store,
      until the zone page saves it. */
@@ -398,6 +402,7 @@ export function ZonesFinal() {
                 right={
                   <>
                     {!SHOWCASE && <ViewSwitch value={view} onChange={setView} label="Zone view" />}
+                    {MANAGE_COLUMNS && view === 'table' && <ManageColumns columns={zoneCols} />}
                     <Button variant="brand" icon={Plus} onClick={() => setNaming(true)}>
                       New zone
                     </Button>
@@ -431,6 +436,7 @@ export function ZonesFinal() {
                 <>
                   <ZoneList
                     view={view}
+                    shownColumn={zoneCols.shown}
                     zones={paged.pageRows}
                     listRef={paged.listRef}
                     onOpen={openZone}
@@ -513,7 +519,10 @@ function ZoneList({
   usesId,
   onUses,
   onDelete,
+  shownColumn,
 }: {
+  /** Which columns the table draws (rollout `manageColumns`). */
+  shownColumn?: (column: string) => boolean
   view: LibView
   zones: Zone[]
   listRef: (el: HTMLElement | null) => void
@@ -560,8 +569,12 @@ function ZoneList({
       ),
     }
   })
-  return <LibraryRows view={view} rows={rows} columns={['Networks', 'Locations']} listRef={listRef} nameColumn="Zone" />
+  return <LibraryRows view={view} rows={rows} columns={ZONE_COLUMN_HEADS} listRef={listRef} nameColumn="Zone" shownColumn={shownColumn} />
 }
+
+/** The Zones table's fact columns, and with the name, what Manage columns lists (rollout `manageColumns`). */
+const ZONE_COLUMN_HEADS = ['Networks', 'Locations']
+const ZONE_COLUMNS = libraryColumns('Zone', ZONE_COLUMN_HEADS)
 
 /* --- Zone page ---------------------------------------------------------------------- */
 

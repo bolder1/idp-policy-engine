@@ -97,6 +97,12 @@ import { SHOWCASE } from '../showcase'
 import { TESTER } from '../tester'
 import { DevicesArt } from '../empty-art'
 import { shows } from '../rollout'
+import { MANAGE_COLUMNS, libraryColumns, useColumns } from '../columns'
+import { ManageColumns } from '../manage-columns'
+
+/** The Device profiles table's fact columns, and with the name, what Manage columns lists (rollout `manageColumns`). */
+const PROFILE_COLUMN_HEADS = ['Type', 'Includes']
+const PROFILE_COLUMNS = libraryColumns('Profile', PROFILE_COLUMN_HEADS)
 
 /* Create and Save end on the Device profiles list, with their toast (rollout `backAfterSave`). */
 const BACK_AFTER_SAVE: boolean = shows('backAfterSave')
@@ -504,6 +510,8 @@ function ProfileList({
      bring a hidden one back; `useLibView` still describes storage, and flipping
      SHOWCASE gives the switch and the saved preference back. */
   const [savedView, setView] = useLibView('device-profiles')
+  /* Which columns the table draws (rollout `manageColumns`). */
+  const profileCols = useColumns('device-profiles', PROFILE_COLUMNS)
   const view = SHOWCASE ? 'list' : savedView
   const paged = usePagedList(shown, {
     rowHeight: libRowHeight(view),
@@ -640,6 +648,7 @@ function ProfileList({
           right={
             <>
               {!SHOWCASE && <ViewSwitch value={view} onChange={setView} label="Device profile view" />}
+              {MANAGE_COLUMNS && view === 'table' && <ManageColumns columns={profileCols} />}
               {/* The span is what focus finds on the way back from a create
                   flow — the kit's Button takes no ref. */}
               <span className="bfp2__create">
@@ -683,7 +692,8 @@ function ProfileList({
             view={view}
             listRef={listRef}
             nameColumn="Profile"
-            columns={['Type', 'Includes']}
+            columns={PROFILE_COLUMN_HEADS}
+            shownColumn={profileCols.shown}
             rows={paged.pageRows.map(
               (p): LibRow => ({
                 id: p.id,

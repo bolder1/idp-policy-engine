@@ -437,6 +437,11 @@ export const ROLLOUT = {
    *  something might go wrong … if he wants he can go, up to user"). Show details and the fixes wait for a later round.
    *  Design only. */
   guardHero: ['design'],
+  /** Manage columns on the list tables: a Columns button on the bar opens a tick per column — the name always there,
+   *  the defaults on, and extras to add (Policies: Who, Rules, Modified by) — kept per table in the browser, with Reset
+   *  to default (26 Nov, owner: "for every table … add Manage columns so the user can select what the user wanted to
+   *  showcase in the table"; columns.ts, manage-columns.tsx). Design only. */
+  manageColumns: ['design'],
   /** The whole console in dark, the Dashboard night board's way (26 Nov, owner: "go through the whole product and fix
    *  the dark mode, just like we did for the dashboard"). dark-theme.css says every token again in the `--night-*`
    *  palette, over the light-only rebrand, plus the screens that hard-code a light colour. Dark is reachable only where

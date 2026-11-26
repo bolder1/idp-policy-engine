@@ -91,11 +91,14 @@ export function LibraryRows({
   columns,
   listRef,
   nameColumn = 'Name',
+  shownColumn,
 }: {
   view: LibView
   rows: LibRow[]
   /** The table's column heads, positional against `facts`. */
   columns: string[]
+  /** Which of `columns` the table draws (rollout `manageColumns`, columns.ts); absent, all of them. */
+  shownColumn?: (column: string) => boolean
   /** The pages hand focus back to a row after a drawer closes. */
   listRef?: (el: HTMLElement | null) => void
   nameColumn?: string
@@ -108,11 +111,13 @@ export function LibraryRows({
             <thead>
               <tr>
                 <th scope="col">{nameColumn}</th>
-                {columns.map((c) => (
-                  <th scope="col" key={c}>
-                    {c}
-                  </th>
-                ))}
+                {columns.map((c) =>
+                  shownColumn && !shownColumn(c) ? null : (
+                    <th scope="col" key={c}>
+                      {c}
+                    </th>
+                  ),
+                )}
                 <th scope="col" className="btable__actions btable__col-actions">
                   Actions
                 </th>
@@ -134,9 +139,7 @@ export function LibraryRows({
                   </td>
                   {/* Positional against `columns`, so a page with fewer facts
                       than heads still lines up rather than shifting left. */}
-                  {columns.map((c, i) => (
-                    <td key={c}>{r.facts[i]?.value ?? <span className="blib__none">—</span>}</td>
-                  ))}
+                  {columns.map((c, i) => (shownColumn && !shownColumn(c) ? null : <td key={c}>{r.facts[i]?.value ?? <span className="blib__none">—</span>}</td>))}
                   <td className="btable__actions">{r.menu}</td>
                 </tr>
               ))}

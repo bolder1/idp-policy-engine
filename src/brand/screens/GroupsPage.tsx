@@ -50,6 +50,17 @@ import { RowCheck, SelectAll, SliderActions } from './select-rows'
 import { PEOPLE_ROW_H } from './sign-in-tests/library'
 import { GroupsArt, UsersArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
+import { MANAGE_COLUMNS, useColumns, type ColumnDef } from '../columns'
+import { ManageColumns } from '../manage-columns'
+
+/** The Groups list's columns (rollout.ts `manageColumns`): the defaults, and the console's dates as extras. */
+const GROUP_COLUMNS: ColumnDef[] = [
+  { id: 'name', label: 'Group name', locked: true },
+  { id: 'users', label: 'Users' },
+  { id: 'apps', label: 'Applications' },
+  { id: 'created', label: 'Created', on: false },
+  { id: 'modified', label: 'Last modified', on: false },
+]
 
 /* -----------------------------------------------------------------------------
    Manage > Groups: the list, and one group's page as the live console has it
@@ -121,6 +132,8 @@ function GroupList() {
       )
   }, [store.groups, store.users, store.apps, store.policies, q, sort])
   const paged = usePagedList(rows, { rowHeight: PEOPLE_ROW_H, resetKey: [q, sort] })
+  /* Which columns the table draws (rollout `manageColumns`). */
+  const cols = useColumns('groups', GROUP_COLUMNS)
 
   /* With a tab, so the move is a page of its own rather than the rail's
      revisit of the list (revisit.ts). */
@@ -155,7 +168,19 @@ function GroupList() {
         <EmptyState art={NEW_EMPTY_ART && <GroupsArt />} icon={UsersIcon} title="No groups yet" action={addButton} />
       ) : (
         <>
-          <PageBar left={<SearchBox value={q} onChange={setQ} placeholder="Search groups…" label="Search groups" />} right={addButton} />
+          <PageBar
+            left={<SearchBox value={q} onChange={setQ} placeholder="Search groups…" label="Search groups" />}
+            right={
+              MANAGE_COLUMNS ? (
+                <>
+                  <ManageColumns columns={cols} />
+                  {addButton}
+                </>
+              ) : (
+                addButton
+              )
+            }
+          />
 
           {rows.length === 0 ? (
             <NoMatches noun="groups" query={q} onClear={() => setQ('')} />
@@ -166,8 +191,10 @@ function GroupList() {
                   <thead>
                     <tr>
                       {head('name', 'Group name')}
-                      {head('users', 'Users')}
-                      <th scope="col">Applications</th>
+                      {cols.shown('users') && head('users', 'Users')}
+                      {cols.shown('apps') && <th scope="col">Applications</th>}
+                      {cols.shown('created') && <th scope="col">Created</th>}
+                      {cols.shown('modified') && <th scope="col">Last modified</th>}
                       <th scope="col" className="btable__actions btable__col-actions">
                         Actions
                       </th>
@@ -184,8 +211,10 @@ function GroupList() {
                             </button>
                           </div>
                         </td>
-                        <td className="u-muted">{users.toLocaleString()}</td>
-                        <td className="u-muted">{apps.length > 0 ? listNames(apps, 2) : '—'}</td>
+                        {cols.shown('users') && <td className="u-muted">{users.toLocaleString()}</td>}
+                        {cols.shown('apps') && <td className="u-muted">{apps.length > 0 ? listNames(apps, 2) : '—'}</td>}
+                        {cols.shown('created') && <td className="u-muted">{group.created?.replace(/:\d\d$/, '') ?? '—'}</td>}
+                        {cols.shown('modified') && <td className="u-muted">{group.lastModified?.replace(/:\d\d$/, '') ?? '—'}</td>}
                         <td className="btable__actions">
                           <RowMenu
                             label={`Actions for ${group.name}`}

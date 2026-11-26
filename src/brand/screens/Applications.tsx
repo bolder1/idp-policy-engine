@@ -19,6 +19,17 @@ import { LIB_VIEWS } from './library-view-state'
 import { SHOWCASE } from '../showcase'
 import { AppsArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
+import { MANAGE_COLUMNS, useColumns, type ColumnDef, type Columns } from '../columns'
+import { ManageColumns } from '../manage-columns'
+
+/** The Applications table's columns (rollout.ts `manageColumns`): the defaults, and the protocol as an extra. */
+const APP_COLUMNS: ColumnDef[] = [
+  { id: 'name', label: 'Application name', locked: true },
+  { id: 'type', label: 'App type' },
+  { id: 'protocol', label: 'Protocol', on: false },
+  { id: 'protection', label: 'Policy' },
+  { id: 'updated', label: 'Last updated' },
+]
 
 /* -----------------------------------------------------------------------------
    Applications — the console's own Apps page, and the one place an application
@@ -96,6 +107,8 @@ export function Applications() {
      current page shows its last page rather than an empty one — both are the
      hook's. */
   const paged = usePagedList(rows, { rowHeight: ROW_H, resetKey: [query, sort] })
+  /* Which columns the table draws (rollout `manageColumns`). */
+  const cols = useColumns('applications', APP_COLUMNS)
   const total = rows.length
   const shown = paged.pageRows
 
@@ -158,6 +171,7 @@ export function Applications() {
                     so they are disabled rather than guessed at. */}
                 {/* One live view, so no switch in the showcase build (see showcase.ts). */}
                 {!SHOWCASE && <ViewSwitch value="table" onChange={() => {}} label="Application view" views={APP_VIEWS} />}
+                {MANAGE_COLUMNS && <ManageColumns columns={cols} />}
                 <Button variant="brand" onClick={addApp}>
                   <Plus size={15} strokeWidth={2.2} aria-hidden />
                   Add application
@@ -179,9 +193,10 @@ export function Applications() {
                   <thead>
                     <tr>
                       {head('name', 'Application name')}
-                      {head('type', 'App type')}
-                      {head('protection', 'Policy')}
-                      {head('updated', 'Last updated')}
+                      {cols.shown('type') && head('type', 'App type')}
+                      {cols.shown('protocol') && <th scope="col">Protocol</th>}
+                      {cols.shown('protection') && head('protection', 'Policy')}
+                      {cols.shown('updated') && head('updated', 'Last updated')}
                       <th scope="col" className="btable__actions btable__col-actions btable__col-actions--pair">
                         Actions
                       </th>
@@ -189,7 +204,7 @@ export function Applications() {
                   </thead>
                   <tbody ref={paged.listRef}>
                     {shown.map((a) => (
-                      <AppRow key={a.id} app={a} summary={summaries.get(a.id)!} onOpen={() => setPanelFor(a.id)} />
+                      <AppRow key={a.id} app={a} summary={summaries.get(a.id)!} onOpen={() => setPanelFor(a.id)} cols={cols} />
                     ))}
                   </tbody>
                 </table>
@@ -210,7 +225,7 @@ export function Applications() {
   )
 }
 
-function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpen: () => void }) {
+function AppRow({ app, summary, onOpen, cols }: { app: App; summary: AppSummary; onOpen: () => void; /** The columns drawn (rollout `manageColumns`). */ cols: Columns }) {
   const store = useBrand()
   return (
     <tr>
@@ -228,14 +243,19 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
           </span>
         </div>
       </td>
-      <td className="u-muted">{app.type}</td>
-      <td>
-        <ProtectionCell app={app} summary={summary} policyName={ownerOf(app.id, store.policies)?.name} onOpen={onOpen} />
-      </td>
+      {cols.shown('type') && <td className="u-muted">{app.type}</td>}
+      {cols.shown('protocol') && <td className="u-muted">{app.protocol}</td>}
+      {cols.shown('protection') && (
+        <td>
+          <ProtectionCell app={app} summary={summary} policyName={ownerOf(app.id, store.policies)?.name} onOpen={onOpen} />
+        </td>
+      )}
       {/* Without the seconds; the full stamp is on hover. */}
-      <td className="u-muted" title={app.lastUpdated}>
-        {app.lastUpdated.replace(/:\d\d$/, '')}
-      </td>
+      {cols.shown('updated') && (
+        <td className="u-muted" title={app.lastUpdated}>
+          {app.lastUpdated.replace(/:\d\d$/, '')}
+        </td>
+      )}
       <td className="btable__actions btable__actions--pair">
         <IconButton icon={Pencil} label={`Edit ${app.name}`} onClick={() => store.go({ name: 'application', appId: app.id, tab: 'basic' })} size="sm" tone="ghost" />
         <IconButton

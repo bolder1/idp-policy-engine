@@ -100,6 +100,12 @@ import { RiskArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
 import './risk-signals.css'
 import { shows } from '../rollout'
+import { MANAGE_COLUMNS, libraryColumns, useColumns } from '../columns'
+import { ManageColumns } from '../manage-columns'
+
+/** The Risk signal profiles table's fact columns, and with the name, what Manage columns lists (rollout `manageColumns`). */
+const RISK_COLUMN_HEADS = ['Signals', 'High risk score']
+const RISK_COLUMNS = libraryColumns('Profile', RISK_COLUMN_HEADS)
 
 /* Save ends on the Risk signal profile list, with its toast (rollout `backAfterSave`). */
 const BACK_AFTER_SAVE: boolean = shows('backAfterSave')
@@ -331,6 +337,8 @@ function RiskProfileList({
      bring a hidden one back; `useLibView` still describes storage, and flipping
      SHOWCASE gives the switch and the saved preference back. */
   const [savedView, setView] = useLibView('risk-profiles')
+  /* Which columns the table draws (rollout `manageColumns`). */
+  const riskCols = useColumns('risk-profiles', RISK_COLUMNS)
   const view = SHOWCASE ? 'list' : savedView
   /* By name, as on every other list page. */
   const [q, setQ] = useState('')
@@ -464,6 +472,7 @@ function RiskProfileList({
         right={
           <>
             {!SHOWCASE && <ViewSwitch value={view} onChange={setView} label="Risk profile view" />}
+            {MANAGE_COLUMNS && view === 'table' && <ManageColumns columns={riskCols} />}
             <Button variant="brand" onClick={onCreate}>
               <Plus size={14} strokeWidth={2.2} aria-hidden />
               Create profile
@@ -480,7 +489,8 @@ function RiskProfileList({
             view={view}
             listRef={setList}
             nameColumn="Profile"
-            columns={['Signals', 'High risk score']}
+            columns={RISK_COLUMN_HEADS}
+            shownColumn={riskCols.shown}
             rows={paged.pageRows.map((p): LibRow => {
               const inUse = p.id === activeId
               return {

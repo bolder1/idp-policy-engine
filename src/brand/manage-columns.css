@@ -1,0 +1,33 @@
+/* Manage columns (manage-columns.tsx, rollout.ts `manageColumns`). Tokens only; every rule hangs off `.bcols`. The ticks
+   are the Policies table's drawn checkbox (screens.css `.bpol__pick.is-look`), so every tick in the console is one. */
+.bcols__anchor { display: inline-flex; }
+.bcols .bcols__in { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-3); }
+.bcols__head { margin: 0; padding: 0 var(--space-2); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bcols__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bcols__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--space-9);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.bcols__row:hover { background: var(--state-hover-bg); }
+.bcols__row.is-locked { cursor: default; color: var(--text-secondary); }
+.bcols__row.is-locked:hover { background: none; }
+.bcols__row.is-locked .bpol__pick { opacity: 0.55; }
+.bcols__name { flex: 1; min-width: 0; }
+.bcols__meta { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bcols__foot { display: flex; justify-content: flex-end; padding-top: var(--space-2); border-top: var(--bw-thin) solid var(--border-subtle); }
+
+/* The extra columns a table offers (Who, Rules, Modified by on Policies): quiet text, one line, cut with an ellipsis. */
+.btable__dim { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-secondary); }
+.btable__col-who { width: 180px; }
+.btable__col-rules { width: 96px; }
+.btable__col-by { width: 150px; }
+/* The names keep their room: each extra column adds its own width to the table's floor (`--cols-extra`, set by the
+   table), so the table scrolls sideways rather than squeezing the name column to nothing. */
+.btable.btable--names.has-cols { min-width: calc(900px + var(--cols-extra, 0px)); }

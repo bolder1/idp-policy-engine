@@ -22,6 +22,16 @@ import { formOf } from './testing/sign-in-form'
 import { UserDrawer } from './UserDrawer'
 import { RolesArt, UsersArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
+import { MANAGE_COLUMNS, useColumns, type ColumnDef } from '../columns'
+import { ManageColumns } from '../manage-columns'
+
+/** The User list's columns (rollout.ts `manageColumns`). */
+const USER_COLUMNS: ColumnDef[] = [
+  { id: 'user', label: 'User', locked: true },
+  { id: 'groups', label: 'Groups' },
+  { id: 'type', label: 'Type' },
+  { id: 'role', label: 'Role' },
+]
 
 /* -----------------------------------------------------------------------------
    Manage > Users: the User list and User roles, the two the console's rail
@@ -116,6 +126,8 @@ export function UsersPage({ role: routeRole }: { role?: string }) {
   }, [store.users, store.groups, q, group, role, sort])
 
   const paged = usePagedList(rows, { rowHeight: PEOPLE_ROW_H, resetKey: [q, group, role, sort] })
+  /* Which columns the table draws (rollout `manageColumns`). */
+  const cols = useColumns('users', USER_COLUMNS)
   const filtered = group !== 'all' || role !== 'all'
 
   const addUser = () => store.showToast(notBuilt('Adding users', SHOWCASE))
@@ -154,7 +166,16 @@ export function UsersPage({ role: routeRole }: { role?: string }) {
                 </span>
               </>
             }
-            right={addButton}
+            right={
+              MANAGE_COLUMNS ? (
+                <>
+                  <ManageColumns columns={cols} />
+                  {addButton}
+                </>
+              ) : (
+                addButton
+              )
+            }
           />
 
           {rows.length === 0 ? (
@@ -175,9 +196,9 @@ export function UsersPage({ role: routeRole }: { role?: string }) {
                   <thead>
                     <tr>
                       <SortHead k="user" label="User" sort={sort} onSort={setSort} />
-                      <th scope="col">Groups</th>
-                      <SortHead k="type" label="Type" sort={sort} onSort={setSort} />
-                      <SortHead k="role" label="Role" sort={sort} onSort={setSort} />
+                      {cols.shown('groups') && <th scope="col">Groups</th>}
+                      {cols.shown('type') && <SortHead k="type" label="Type" sort={sort} onSort={setSort} />}
+                      {cols.shown('role') && <SortHead k="role" label="Role" sort={sort} onSort={setSort} />}
                       <th scope="col" className="btable__actions btable__col-actions">
                         Actions
                       </th>
@@ -189,11 +210,13 @@ export function UsersPage({ role: routeRole }: { role?: string }) {
                         <td>
                           <UserCell user={u} onOpen={() => setOpen(u.id)} />
                         </td>
-                        <td className="u-muted">{groupNamesOf(u, store.groups) || '—'}</td>
-                        <td className="u-muted">{u.userType}</td>
-                        <td>
-                          <Badge tone="neutral">{u.role}</Badge>
-                        </td>
+                        {cols.shown('groups') && <td className="u-muted">{groupNamesOf(u, store.groups) || '—'}</td>}
+                        {cols.shown('type') && <td className="u-muted">{u.userType}</td>}
+                        {cols.shown('role') && (
+                          <td>
+                            <Badge tone="neutral">{u.role}</Badge>
+                          </td>
+                        )}
                         <td className="btable__actions">
                           <RowMenu label={`Actions for ${u.name}`} items={USER_MENU} onSelect={onMenu(u)} />
                         </td>

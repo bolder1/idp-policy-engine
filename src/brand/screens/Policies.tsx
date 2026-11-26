@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { MIGRATION_FIRST, MIGRATION_PICKERS } from '../migrate/phase'
 import { OldPoliciesTab } from '../migrate/old-tab'
 import { BANNER_VARIANTS, setBannerVariant, useBannerVariant, type BannerVariant } from '../migrate/banner-variant'
@@ -55,7 +55,10 @@ import { useNewPolicy } from '../create/use-new-policy'
 import { useMarkedAsTemplate, useSaveAsTemplate } from './save-template'
 import { ConfirmDelete } from './confirm-delete'
 import { AppTransfer } from './app-transfer'
-import { decidesFor, deleteFacts, ownerOf, withAppsViewEdit } from './app-policies'
+import { decidesFor, deleteFacts, ownerOf, rulesLabel, withAppsViewEdit } from './app-policies'
+import { whoLabel } from './app-standing'
+import { MANAGE_COLUMNS, useColumns, type ColumnDef, type Columns } from '../columns'
+import { ManageColumns } from '../manage-columns'
 import { ONLY_APP_TITLE, useSimpleDraft, useViewEdit } from './board/draft-model'
 import { AppFacts, DeleteFactsLine, PolicyFact } from './app-facts'
 import { runGauntlet, type GauntletResult } from './gauntlet'
@@ -373,6 +376,8 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
      outside as well"). Publish acts on the moved drafts among them. */
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const clearPicked = useCallback(() => setPicked(new Set()), [])
+  /* Which columns the table draws (columns.ts, rollout `manageColumns`): the bar's Columns button sets them. */
+  const cols = useColumns('policies', POLICY_COLUMNS)
   /* The moved drafts a Publish press is about: the bulk bar's ticked ones, or one row's. */
   const [publishAsk, setPublishAsk] = useState<string[] | null>(null)
   /* Roll back a migrated policy (owner, 17 Nov 2026): the new one goes inactive, the old one decides again. */
@@ -732,7 +737,11 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
           </h3>
         )}
         <div className="btable__scroll">
-          <table className={TABLE_CLASS}>
+          {/* With extra columns, the table's floor grows by their widths (manage-columns.css `.has-cols`). */}
+          <table
+            className={MANAGE_COLUMNS ? `${TABLE_CLASS} has-cols` : TABLE_CLASS}
+            style={MANAGE_COLUMNS ? ({ '--cols-extra': `${EXTRA_WIDTH.filter(([id]) => cols.shown(id)).reduce((n, [, w]) => n + w, 0)}px` } as CSSProperties) : undefined}
+          >
             <thead>
               <tr>
                 <th scope="col" className="btable__col-pick">
@@ -754,18 +763,25 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   />
                 </th>
                 {head('name', 'Policy name')}
-                <th scope="col" className="btable__col-apps">Applications</th>
+                {/* Each column drawn only while it is picked (rollout `manageColumns`; the defaults elsewhere). */}
+                {cols.shown('apps') && <th scope="col" className="btable__col-apps">Applications</th>}
+                {cols.shown('who') && <th scope="col" className="btable__col-who">Who</th>}
+                {cols.shown('rules') && <th scope="col" className="btable__col-rules">Rules</th>}
                 {showExposure && !review && head('exposure', 'Exposure')}
-                {review ? (
-                  <th scope="col" className="btable__col-activity">
-                    From
+                {cols.shown('activity') &&
+                  (review ? (
+                    <th scope="col" className="btable__col-activity">
+                      From
+                    </th>
+                  ) : (
+                    head('activity', 'Last activity', 'btable__col-activity')
+                  ))}
+                {cols.shown('by') && <th scope="col" className="btable__col-by">Modified by</th>}
+                {cols.shown('status') && (
+                  <th scope="col" className={DRAFT_TAG ? 'btable__col-status is-tagged' : 'btable__col-status'}>
+                    Status
                   </th>
-                ) : (
-                  head('activity', 'Last activity', 'btable__col-activity')
                 )}
-                <th scope="col" className={DRAFT_TAG ? 'btable__col-status is-tagged' : 'btable__col-status'}>
-                  Status
-                </th>
                 {next && (
                   <th scope="col" className="btable__col-next">
                     Next step
@@ -793,6 +809,8 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                   nextStep={next}
                   picked={picked.has(p.id)}
                   onPick={p.isSystem ? undefined : () => togglePick(p.id)}
+                  cols={cols}
+                  who={cols.shown('who') ? whoLabel(p, store.groups, store.users) : undefined}
                 />
               ))}
             </tbody>
@@ -851,6 +869,8 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
         }
         right={
           <>
+            {/* Which columns the table draws (rollout `manageColumns`), first among the bar's tools. */}
+            {MANAGE_COLUMNS && !isCoverage && libView === 'table' && <ManageColumns columns={cols} />}
             {/* No table/list/card switch — the table is the only view. The switch
                 is drawn only where there is a second thing to switch to. */}
             {store.features.coverage && (
@@ -1176,6 +1196,8 @@ function PostSignInPolicies() {
   const [status, setStatus] = useState<PostStatusFilter>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: PostSortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
+  /* Which columns the table draws (rollout `manageColumns`). */
+  const postCols = useColumns('post-sign-in', POST_COLUMNS)
   /* Kept while the confirmation animates out, including after the delete. */
   const [deleting, setDeleting] = useState<Policy | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -1253,16 +1275,22 @@ function PostSignInPolicies() {
           </>
         }
         right={
-          <Button variant="brand" icon={Plus} onClick={startDraft}>
-            New policy
-          </Button>
+          <>
+            {MANAGE_COLUMNS && <ManageColumns columns={postCols} />}
+            <Button variant="brand" icon={Plus} onClick={startDraft}>
+              New policy
+            </Button>
+          </>
         }
       />
 
       <div className="btable-wrap">
         {rows.length > 0 && (
           <div className="btable__scroll">
-            <table className={TABLE_CLASS}>
+            <table
+              className={MANAGE_COLUMNS ? `${TABLE_CLASS} has-cols` : TABLE_CLASS}
+              style={MANAGE_COLUMNS ? ({ '--cols-extra': `${EXTRA_WIDTH.filter(([id]) => postCols.shown(id)).reduce((n, [, w]) => n + w, 0)}px` } as CSSProperties) : undefined}
+            >
               <thead>
                 <tr>
                   <SortHead
@@ -1271,10 +1299,14 @@ function PostSignInPolicies() {
                     dir={sort.dir}
                     onSort={() => setSort((s) => ({ key: 'name', dir: s.key === 'name' && s.dir === 1 ? -1 : 1 }))}
                   />
-                  <th scope="col" className="btable__col-apps">Applications</th>
-                  <th scope="col" className={DRAFT_TAG ? 'btable__col-status is-tagged' : 'btable__col-status'}>
-                    Status
-                  </th>
+                  {postCols.shown('apps') && <th scope="col" className="btable__col-apps">Applications</th>}
+                  {postCols.shown('rules') && <th scope="col" className="btable__col-rules">Rules</th>}
+                  {postCols.shown('by') && <th scope="col" className="btable__col-by">Modified by</th>}
+                  {postCols.shown('status') && (
+                    <th scope="col" className={DRAFT_TAG ? 'btable__col-status is-tagged' : 'btable__col-status'}>
+                      Status
+                    </th>
+                  )}
                   <th scope="col" className="btable__actions btable__col-actions">
                     Actions
                   </th>
@@ -1293,20 +1325,26 @@ function PostSignInPolicies() {
                         </button>
                       </div>
                     </td>
-                    <td>
-                      <LinkedApps policy={p} />
-                    </td>
-                    <td>
-                      {/* A draft waits beside what is live (rollout `draftTag`). */}
-                      {DRAFT_TAG ? (
-                        <span className="btable__marks">
+                    {postCols.shown('apps') && (
+                      <td>
+                        <LinkedApps policy={p} />
+                      </td>
+                    )}
+                    {postCols.shown('rules') && <td className="btable__dim">{rulesLabel(p)}</td>}
+                    {postCols.shown('by') && <td className="btable__dim">{p.modifiedBy}</td>}
+                    {postCols.shown('status') && (
+                      <td>
+                        {/* A draft waits beside what is live (rollout `draftTag`). */}
+                        {DRAFT_TAG ? (
+                          <span className="btable__marks">
+                            <StatusPill status={p.status} />
+                            {p.pendingDraft && <DraftTag />}
+                          </span>
+                        ) : (
                           <StatusPill status={p.status} />
-                          {p.pendingDraft && <DraftTag />}
-                        </span>
-                      ) : (
-                        <StatusPill status={p.status} />
-                      )}
-                    </td>
+                        )}
+                      </td>
+                    )}
                     <td className="btable__actions">
                       <RowMenu label={`Actions for ${p.name}`} items={postSignInMenu(p)} onSelect={(id) => act(p, id as PostRowAction)} />
                     </td>
@@ -1480,6 +1518,32 @@ function policyMenu(
 const SWITCH_IDS: ReadonlySet<RowMenuId> = new Set<RowMenuId>(['active', 'inactive', 'monitor'])
 /** Read as text leaves the row's menu (rollout.ts `noRowReadText`). */
 const NO_ROW_READ_TEXT: boolean = shows('noRowReadText')
+/** The sign-in policies table's columns (rollout.ts `manageColumns`): the defaults as the table has always drawn, and
+ *  three extras to add — who the policy covers, how many rules, who changed it last. */
+const POLICY_COLUMNS: ColumnDef[] = [
+  { id: 'name', label: 'Policy name', locked: true },
+  { id: 'apps', label: 'Applications' },
+  { id: 'who', label: 'Who', on: false },
+  { id: 'rules', label: 'Rules', on: false },
+  { id: 'activity', label: 'Last activity' },
+  { id: 'by', label: 'Modified by', on: false },
+  { id: 'status', label: 'Status' },
+]
+/** The Post sign-in table's columns (rollout.ts `manageColumns`): the defaults, and how many rules and who changed it. */
+const POST_COLUMNS: ColumnDef[] = [
+  { id: 'name', label: 'Policy name', locked: true },
+  { id: 'apps', label: 'Applications' },
+  { id: 'rules', label: 'Rules', on: false },
+  { id: 'by', label: 'Modified by', on: false },
+  { id: 'status', label: 'Status' },
+]
+/** Each extra column's width, as manage-columns.css sets it, so the table's floor can grow by what is shown. */
+const EXTRA_WIDTH: readonly (readonly [string, number])[] = [
+  ['who', 180],
+  ['rules', 96],
+  ['by', 150],
+]
+
 /** Live policies' bulk bar: Mark as template and Delete (rollout.ts `bulkLive`). */
 const BULK_LIVE: boolean = shows('bulkLive')
 /** The table's checkboxes, drawn (rollout.ts `checkLook`, screens.css `.bpol__pick.is-look`). */
@@ -1651,8 +1715,14 @@ function PolicyRow({
   onPublish,
   onRollBack,
   nextStep = false,
+  cols,
+  who,
 }: {
   policy: Policy
+  /** The columns the table draws (rollout `manageColumns`); absent, the defaults. */
+  cols?: Columns
+  /** Who the policy covers, in words, when the Who column is drawn. */
+  who?: string
   /** The Next step column is drawn: this row's cell is its Publish, or empty. */
   nextStep?: boolean
   /** A moved draft's quick Publish, beside the row menu (owner, 6 Nov 2026). */
@@ -1715,20 +1785,28 @@ function PolicyRow({
           {migrated && !review && <Badge tone="neutral">Migrated</Badge>}
         </div>
       </td>
-      <td>
-        <PolicyApps policy={policy} onAssign={() => onAction('assign')} />
-      </td>
+      {/* Each cell drawn only while its column is (rollout `manageColumns`; all the defaults without it). */}
+      {(cols?.shown('apps') ?? true) && (
+        <td>
+          <PolicyApps policy={policy} onAssign={() => onAction('assign')} />
+        </td>
+      )}
+      {cols?.shown('who') && <td className="btable__dim">{who}</td>}
+      {cols?.shown('rules') && <td className="btable__dim">{rulesLabel(policy)}</td>}
       {showExposure && (
         <td>
           <PolicyExposure policy={policy} gauntlet={gauntlet} />
         </td>
       )}
-      <td className="btable__activity">{activity}</td>
-      <td>
-        <span className="btable__marks">
-          <PolicyStatus policy={policy} />
-        </span>
-      </td>
+      {(cols?.shown('activity') ?? true) && <td className="btable__activity">{activity}</td>}
+      {cols?.shown('by') && <td className="btable__dim">{policy.modifiedBy}</td>}
+      {(cols?.shown('status') ?? true) && (
+        <td>
+          <span className="btable__marks">
+            <PolicyStatus policy={policy} />
+          </span>
+        </td>
+      )}
       {nextStep && (
         <td className="btable__next">
           {/* Rejected cannot be published until it is approved again inside (owner, 17 Nov 2026); Contact support lives

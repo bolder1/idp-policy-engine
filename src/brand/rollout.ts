@@ -77,6 +77,10 @@ export const ROLLOUT = {
    *  stay in reach below 1120px instead of slipping under the rail, and initials on the board meet the 12px floor.
    *  Design only until the owner has checked it. */
   dashboardPolish: ['design'],
+  /** The widget picked up in Customize stays dark on the night board (26 Nov, owner: "when I pick any widget it turns
+   *  into white in dark mode"). The lifted copy and its name chip open outside the page, so they take the night tokens
+   *  from the document mark. Design only until the owner has checked it. */
+  dashboardNightLift: ['design'],
   /** Deny in the policy builder carries the live console's email alerts: send to administrators and end users, the
    *  administrator address, and the four events, above the Deny message (23 Nov). Every line, on the owner's word
    *  ("change this globally ... update all 3 roles"). */

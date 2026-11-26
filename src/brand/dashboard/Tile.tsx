@@ -6,6 +6,7 @@ import type { Cell } from './layout'
 import type { CellBox } from './geometry'
 import type { ThemeId } from './themes'
 import { DASHBOARD_THEMES } from './phase'
+import { shows } from '../rollout'
 import { ColourList } from './ThemeMenus'
 import { WidgetBody } from './widgets'
 import { tagKey, type TileTag } from './tags'
@@ -26,6 +27,9 @@ import { tagKey, type TileTag } from './tags'
    its face on what it draws, so a bar held, a widget dragged past or a row
    moving redraws no chart (owner, 19 Nov 2026: "laggy … jittery").
    -------------------------------------------------------------------------- */
+
+/* The lifted copy opens outside the page; marked, it takes the night board's tokens (rollout.ts). */
+const NIGHT_LIFT = shows('dashboardNightLift')
 
 export interface CellHandlers {
   onGrab: (c: Cell, e: PointerEvent<HTMLElement>) => void
@@ -212,6 +216,7 @@ export const CellLift = memo(function CellLift({
     <div
       ref={ref}
       className={`bdash-lift bdash-vars is-${WIDGETS[cell.widget].kind}`}
+      data-night={NIGHT_LIFT ? '' : undefined}
       data-dash-theme={DASHBOARD_THEMES ? (cell.color ?? theme) : 'mono'}
       style={{ width, height, ['--dash-brand' as string]: brand }}
       aria-hidden

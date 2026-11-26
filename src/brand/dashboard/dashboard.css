@@ -2804,7 +2804,8 @@ button.bdw-bar__row:hover .bdw-bar {
 /* The popups the board opens (Add widgets, Layouts, the Theme menu, row menus, dialogs, toasts) are drawn outside the page,
    so while the night board shows, the page marks the document (Dashboard.tsx data-dash-look) and they take its tokens too. */
 .bdash[data-look='dark'],
-:root[data-dash-look='dark'] :is(.bdash-market, .bx-modal, .bx-apop, .bx-menu, .bshell__toast) {
+:root[data-dash-look='dark'] :is(.bdash-market, .bx-modal, .bx-apop, .bx-menu, .bshell__toast),
+:root[data-dash-look='dark'] :is(.bdash-lift, .bdash-chip)[data-night] {
   --surface-page: var(--night-page);
   --surface-raised: var(--night-card);
   --surface-sunken: var(--night-sunken);
@@ -2904,6 +2905,18 @@ button.bdw-bar__row:hover .bdw-bar {
   box-shadow: var(--night-shadow);
 }
 .bdash[data-look='dark'] .bdash-tile.is-stat .bdash-tile__card {
+  background-image:
+    linear-gradient(to top, color-mix(in srgb, var(--dash-hue) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--night-card-top), var(--night-card) 42%);
+}
+/* The picked-up copy, outside the page, wears the same night face (rollout.ts dashboardNightLift). */
+:root[data-dash-look='dark'] .bdash-lift[data-night] {
+  color: var(--text-body);
+}
+:root[data-dash-look='dark'] .bdash-lift[data-night] .bdash-tile__card {
+  background-image: linear-gradient(180deg, var(--night-card-top), var(--night-card) 42%);
+}
+:root[data-dash-look='dark'] .bdash-lift[data-night].is-stat .bdash-tile__card {
   background-image:
     linear-gradient(to top, color-mix(in srgb, var(--dash-hue) 12%, transparent), transparent 70%),
     linear-gradient(180deg, var(--night-card-top), var(--night-card) 42%);

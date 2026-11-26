@@ -91,6 +91,7 @@ interface Drop {
 /** The drop previews live: once the pointer rests on a place, the board makes room there and the widget's slot moves to
     it, so what is let go is what was seen (owner, 20 Nov 2026: "like a preview"). Design only (rollout.ts). */
 const LIVE = shows('dashboardGrid')
+const NIGHT_LIFT = shows('dashboardNightLift')
 /* 23 Nov (rollout.ts dashboardPolish): a row's tools are one handle beside it, and its menu does more. */
 const POLISH = shows('dashboardPolish')
 /** How long the pointer rests on a place before the board makes room there: long enough that sweeping across the board
@@ -1225,7 +1226,7 @@ export function Board({
               />
             )}
             {chip && (
-              <span ref={setChipEl} className="bdash-chip bdash-vars" aria-hidden>
+              <span ref={setChipEl} className="bdash-chip bdash-vars" data-night={NIGHT_LIFT ? '' : undefined} aria-hidden>
                 {WIDGETS[chip].name}
               </span>
             )}

@@ -591,7 +591,9 @@ export function Shell({ children }: { children: ReactNode }) {
         </Tip>
 
         <a className="bshell__logo" href="#" onClick={(e) => e.preventDefault()} aria-label="Xecurify by miniOrange">
-          <img src="/xecurify-logo.png" alt="Xecurify by miniOrange" />
+          {/* In dark the wordmark's ink is re-drawn light (tools/rigs/dark-sweep/logo-dark.cjs); the orange mark is as drawn.
+              Dark exists only where rollout.ts darkSweep shows (theme-mode.ts), so no other line sees the second file. */}
+          <img src={theme === 'dark' ? '/xecurify-logo-dark.png' : '/xecurify-logo.png'} alt="Xecurify by miniOrange" />
         </a>
 
         <div className="bshell__topright">

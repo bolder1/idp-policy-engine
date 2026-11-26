@@ -338,6 +338,11 @@ export const ROLLOUT = {
    *  draft reads "Draft saved" with a check, the row's Last activity reads "Draft saved <when>", and the drawer's head
    *  drops it (its Rules Draft / Live switch and Continue editing already say so). Design only. */
   draftOffPill: ['design'],
+  /** The whole console in dark, the Dashboard night board's way (26 Nov, owner: "go through the whole product and fix
+   *  the dark mode, just like we did for the dashboard"). dark-theme.css says every token again in the `--night-*`
+   *  palette, over the light-only rebrand, plus the screens that hard-code a light colour. Dark is reachable only where
+   *  this and `topBarTools` both show (theme-mode.ts); everywhere else the page is light. Design only. */
+  darkSweep: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

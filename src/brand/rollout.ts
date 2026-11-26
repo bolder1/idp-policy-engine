@@ -56,8 +56,8 @@ export const ROLLOUT = {
   emptyArt: ['design'],
   /** An application's Policies tab with no policy and no Global Default to show draws the page empty state (drawing,
    *  "No policy on <app>", Create new policy orange + Add existing policy), not a heading over a blank page (26 Nov,
-   *  app-policy-view.tsx `AppNoPolicyView`). Design only. */
-  appPoliciesEmpty: ['design'],
+   *  app-policy-view.tsx `AppNoPolicyView`). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  appPoliciesEmpty: ALL,
   /** Authentication methods: Make default on all seven methods the live console's default list names (OTP over SMS,
    *  Email, Alternate Email, Display Token, SMS Link, Email Link, OTP over SMS and Email), whatever their SMS balance
    *  (20 Nov, auth-panel.ts `LIVE_DEFAULT_METHODS`). Every line, on the owner's word ("push this directly to all 3"). */
@@ -161,8 +161,8 @@ export const ROLLOUT = {
    *  where Make active sits beside Open policy until the policy is active. Applications join the draft. A policy with
    *  no application can only be saved as a draft. A first publish arrives Inactive. Show published policy opens the
    *  live version in a right-hand panel. Removing the only application, or deleting, is refused while active. Built on
-   *  Fix (draft-model.ts `useViewEdit`). Design only. */
-  viewEdit: ['design'],
+   *  Fix (draft-model.ts `useViewEdit`). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  viewEdit: ALL,
   /** A rule with an empty part cannot be saved (board/rule-gaps.ts): Save policy and Save rule refuse and say why under
    *  the field; a new rule's Then starts unanswered. Every line, on the owner's word (23 Nov: "this specific part is for
    *  everywhere, for all three roles … a global change"). */
@@ -193,8 +193,8 @@ export const ROLLOUT = {
   hideSwitches: ['design'],
   /** View and edit's Show published policy wears the published colour: the Active pill's green drifting between its two
    *  tints, a broadcast mark for the eye, and on hover a light across it and the signal going out (25 Nov, owner: "make it
-   *  color animated, should feel like published, add a better icon, give the hover a cool interaction"). Design only. */
-  publishedLook: ['design'],
+   *  color animated, should feel like published, add a better icon, give the hover a cool interaction"). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  publishedLook: ALL,
   /** Mark as template only for a policy with something to hand on: no rule yet, or a rule not finished, greys the row in
    *  every ⋯ (builder, Policies row, application's Policies tab) with why in its pill, and the row's star stays away
    *  (25 Nov, owner: "this cannot be a template … maybe disable it … let the user know"). Narrows `draftTemplates` on
@@ -202,27 +202,27 @@ export const ROLLOUT = {
   templateNeedsRules: ALL,
   /** View and edit's mode buttons: "Edit policy" in the view, always secondary, and "Exit edit mode" in place of Done
    *  (25 Nov, owner: "don't call it Edit, call it something related to mode … Edit should be secondary in both ways",
-   *  then "we can call it Edit Policy"; Make active unchanged). Design only. */
-  modeButtons: ['design'],
+   *  then "we can call it Edit Policy"; Make active unchanged). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  modeButtons: ALL,
   /** Show published policy opens on the left, in the board's leading track, and stays open while a rule's editor opens
    *  on the right: read the live version while editing the draft (25 Nov, owner: "this live policy should come from the
-   *  left … the user can edit while checking the previous policy"). Design only. */
-  publishedLeft: ['design'],
+   *  left … the user can edit while checking the previous policy"). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  publishedLeft: ALL,
   /** All Policies: a policy's name opens the builder directly, with no Policy details slider, and the details card moves
    *  onto the builder bar's name, shown on hover or focus (25 Nov, owner: "I don't think we need this any more, go
    *  inside directly, and the policy card should move inside with the top bar, where on hover on the name we can see
-   *  the card details"; BoardBar.tsx `PolicyCard`). The slider stays for an application's page. Design only. */
-  directOpen: ['design'],
+   *  the card details"; BoardBar.tsx `PolicyCard`). The slider stays for an application's page. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  directOpen: ALL,
   /** "Nothing else matched" turns with the first rule: Allow while a policy has no rules, Deny once it has one, Allow
    *  again when the last is deleted, only while nobody has chosen it by hand. The card's colour changes in place, a ring
    *  runs round it, and a note beside it says what changed and why, with Allow instead (25 Nov, owner: "whenever I add my
    *  first rule … goes to Deny by default … the user should know why it's happening and how the transition works";
-   *  board/default-flip.ts). Design only. */
-  defaultFlips: ['design'],
+   *  board/default-flip.ts). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  defaultFlips: ALL,
   /** View and edit: a policy never published opens in draft mode; Active and the other published policies open in their
    *  view with Edit policy (25 Nov, owner: "Draft policy should open in draft mode. Active policy should open in view only
-   *  with edit button"). Migrated drafts keep their review. Design only. */
-  draftOpensEditing: ['design'],
+   *  with edit button"). Migrated drafts keep their review. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  draftOpensEditing: ALL,
   /** Zones → Locations: the Add location results open over the sticky Discard / Review & save bar, not under it
    *  (25 Nov, zones-final.css `.is-over-bar`). Every line, on the owner's word (25 Nov: "Groups A and B"). */
   zonesHitsOverBar: ALL,
@@ -232,41 +232,41 @@ export const ROLLOUT = {
   generalSave: ALL,
   /** Device profiles → Download agent opens a centred pop-up with three large cards, Windows, macOS and Linux, and no
    *  mobile agents (25 Nov, owner: "We only have three options, so give it a big pop-up", "Remove the mobile part";
-   *  agent-download.tsx). Design only. */
-  agentDownloadDialog: ['design'],
+   *  agent-download.tsx). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  agentDownloadDialog: ALL,
   /** Device profile wizard, step 4 Review: the always-on signals (Device type and the rest) are listed with the chosen
    *  ones; the live preview beside the other steps still leaves them out (25 Nov, owner: "This should also showcase in
-   *  review. the disabled one as well. not every time but here only in step 4"). Design only. */
-  reviewAlwaysOn: ['design'],
+   *  review. the disabled one as well. not every time but here only in step 4"). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  reviewAlwaysOn: ALL,
   /** Zones → IP addresses → What you can add: IPv4 and IPv6 each get their own row and example, for an address and for
    *  a network, rather than one "IPv4 or IPv6" row (25 Nov, owner: "IPv4 and IPv6 can have their own examples, don't
-   *  merge"; zone-notes-model.ts). Design only. */
-  zoneIpExamples: ['design'],
+   *  merge"; zone-notes-model.ts). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  zoneIpExamples: ALL,
   /** Zones → Locations: a city's Range is 1 or more, never 0, and a city added without one reads 1; a city range also
    *  matches a sign-in from that city by name, so 1 km never matches less than the city did (25 Nov, owner: "This
    *  should be one by default. can't have zero. for cities"; zone-entries.ts `CITY_RANGE_ONE`). Supersedes the 22 Sep
-   *  "set to zero by default". Design only. */
-  cityRangeOne: ['design'],
+   *  "set to zero by default". Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  cityRangeOne: ALL,
   /** Zones: the page head's Note style switch (Note / Sticky note) is gone, and the Note is the one drawn (25 Nov,
-   *  owner: "Hide this completely, this is not the part of the build"; zone-notes-model.ts). Design only. */
-  hideNoteStyle: ['design'],
+   *  owner: "Hide this completely, this is not the part of the build"; zone-notes-model.ts). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  hideNoteStyle: ALL,
   /** Every free-text field (names, descriptions, messages, reasons) has a character limit and shows its count under
    *  it, "12/50" (25 Nov, owner: "Add character limit to all of the needed places"; char-limits.ts, CharCount.tsx).
-   *  Design only. */
-  charCounts: ['design'],
+   *  Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  charCounts: ALL,
   /** Trusted device signals: every attribute in the product's risk parameter list (42, from the dev's payload) is in
    *  the catalogue; the ones it lacked are added with the payload's category, priority and description, off until
    *  picked. Existing signals keep their values (25 Nov, owner: "don't need to change any values. Just check the name
-   *  and add all of this"; fingerprint.ts). Design only. */
-  allRiskParameters: ['design'],
+   *  and add all of this"; fingerprint.ts). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  allRiskParameters: ALL,
   /** The toast after a status switch says "… is active" / "… is inactive", never "is on" / "is off", in the words of
    *  `activeWords`' confirms (25 Nov, owner: yes to fixing "… is off" after Make inactive; status-options.ts
-   *  `statusToast`). Design only. */
-  activeToasts: ['design'],
+   *  `statusToast`). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  activeToasts: ALL,
   /** Builder: saving the policy saves its rules too, so a rule card's "Unsaved" tag goes with Save policy / Save and
    *  publish, and with Save draft for every rule that has no empty part (25 Nov, noticed in the morning's builder
-   *  review: the tag stayed after Save and publish; BoardBuilder.tsx `markRulesSaved`). Design only. */
-  rulesSaveWithPolicy: ['design'],
+   *  review: the tag stayed after Save and publish; BoardBuilder.tsx `markRulesSaved`). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  rulesSaveWithPolicy: ALL,
   /** The Draft model switch's fifth choice, "Simple" (25 Nov evening, owner: "the goal is to make things short and
    *  simple"; draft-model.ts `useSimpleDraft`). View and edit with two saves only: Save draft keeps a draft and changes
    *  nothing live; Save policy makes the policy active, an Inactive one too, through Before making it active. With no
@@ -275,18 +275,18 @@ export const ROLLOUT = {
    *  same evening (owner): no Edit policy / Exit edit mode, the builder always edits; no Make active / Make inactive
    *  anywhere ("save means active"; Inactive is only a policy saved with no application), so removing the last
    *  application makes it inactive and delete needs no step first; Show live version waits for a change as the saves
-   *  do; no Draft chip on the canvas. Design only. */
-  simpleDraft: ['design'],
+   *  do; no Draft chip on the canvas. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  simpleDraft: ALL,
   /** Policies: a policy's name opens the Policy details drawer again, with the status in its head (not again on its
    *  card) and Open in builder as its one button, no ⋯ (25 Nov evening, owner: "Bring back the drawer … include a
    *  dedicated status and button", then "3 dot can be removed"). Reverses `directOpen`'s row for the list; the builder
-   *  bar's name card stays. Design only. */
-  policyDrawer: ['design'],
+   *  bar's name card stays. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  policyDrawer: ALL,
   /** Builder: the rule panel's Save rule in the solid accent (blue in the rebrand look, slate in the console look),
    *  where the light grey read as disabled (25 Nov evening, owner: "looks disabled … add another type of button here,
    *  not active because Save policy is"). Filled (23 Sep), never a second orange (board.css `.bb__inspfoot.is-slate`).
-   *  Design only. */
-  saveRuleLook: ['design'],
+   *  Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  saveRuleLook: ALL,
   /** Builder: one filled button at a time. While the rule panel is open on a rule (or "Nothing else matched") with
    *  unsaved changes, the bar's primary (Activate policy in Simple) drops to secondary and its solid Save rule leads;
    *  the orange returns once the rule is saved. Save rule then closes the panel and focus goes back to the card
@@ -295,63 +295,63 @@ export const ROLLOUT = {
    *  `RULE_SAVE_FOCUS`. Same day, owner: with the bar muted, Save rule is the view's one orange while it has something to
    *  save (Inspector.tsx `saveLeads`; quiet grey when there is nothing), and in Simple a Save rule stores the policy's
    *  draft without leaving, so the head reads Active + Draft ("after saving rule I can't see any draft state").
-   *  Design only. */
-  ruleSaveFocus: ['design'],
+   *  Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  ruleSaveFocus: ALL,
   /** More filters: no summary chip beside the button; the button itself lights in the active chip's colours while a
    *  filter is applied, and its title names them (25 Nov evening, owner: "can remove, and just make the More filters
    *  button active somehow with color"; more-filters.tsx). Clearing stays in the dropdown. Design only. */
   filtersOnButton: ['design'],
   /** Builder: "Nothing else matched"'s Save rule saves that row only, as every rule's does, never the whole policy
    *  (25 Nov evening, owner: changing it and pressing Save rule opened the make-active popup). A policy save marks it
-   *  saved with the rules (`rulesSaveWithPolicy`). Design only. */
-  fallbackSavesRule: ['design'],
+   *  saved with the rules (`rulesSaveWithPolicy`). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  fallbackSavesRule: ALL,
   /** Builder, a rule's Who: a "Default" group stands for everyone the policy covers, in place of the "Applies to everyone
    *  by default" empty state. It starts ticked; ticking another group unticks it and the rule covers just those;
    *  unticking every group brings it back (25 Nov evening, owner: "Default, or pick groups"; WhoEditor.tsx). Stored as
-   *  it always was: no groups named means everyone. Design only. */
-  whoDefaultGroup: ['design'],
+   *  it always was: no groups named means everyone. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  whoDefaultGroup: ALL,
   /** A big action ends on its list, with its toast: the builder's Save draft and main save go back to where the board
    *  was opened from (Policies, or the application's page); library pages' create and save close back to their list
    *  (25 Nov evening, owner: "don't let the user stay in the details page, they should be redirected to its main page
-   *  with a toast"). Design only. */
-  backAfterSave: ['design'],
+   *  with a toast"). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  backAfterSave: ALL,
   /** The Global Default Policy is no longer a concept: not seeded, not listed, not named; a sign-in to an application
    *  no policy covers is Blocked, said "No policy · Blocked" (25 Nov evening, owner: "remove global policy, completely
-   *  not a concept any more", then "Blocked", "everywhere on Design"). Design only. */
-  noGlobalDefault: ['design'],
+   *  not a concept any more", then "Blocked", "everywhere on Design"). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  noGlobalDefault: ALL,
   /** Policy details drawer: a policy with a saved draft gets a Draft / Live switch on its Rules, Draft picked first, and
    *  a Draft tag in the head while Draft shows (25 Nov night, owner: the drawer showed only the live rules of an active
-   *  policy with a draft; kit Tabs, rules only, the card keeps the live applications and audience). Design only. */
-  drawerDraftRules: ['design'],
+   *  policy with a draft; kit Tabs, rules only, the card keeps the live applications and audience). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  drawerDraftRules: ALL,
   /** Simple's Activate policy says what it does after the press too: the confirm reads "Activate this policy?" (was "Save
    *  this policy?" above an Activate policy button) and the toast "<name> is active" (was "<name> saved"). Found in the
-   *  26 Nov capture run; owner: "fix both". Design only. */
-  simpleActivateWords: ['design'],
+   *  26 Nov capture run; owner: "fix both". Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  simpleActivateWords: ALL,
   /** No policy goes live, or is saved as a policy, with no rule of its own: a policy whose only row is "Nothing else
    *  matched" as the product left it is refused with "Add a rule first" by the builder's main save (Save policy,
    *  Activate policy, Save and publish, Publish) and by every Make active. Save draft still works. An admin-edited last
    *  row still counts as a rule (23 Nov ruling). Found in the 26 Nov Tester run: Save policy put a policy with no rules
-   *  live, "Now allowed 288" of 360 sign-ins. Owner: "Yes, block it". Design only. */
-  noEmptyLive: ['design'],
+   *  live, "Now allowed 288" of 360 sign-ins. Owner: "Yes, block it". Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  noEmptyLive: ALL,
   /** A saved draft is no longer a pill beside Active (26 Nov, owner: "active and draft feels confusing", on the builder
    *  bar, the Policy details drawer and the Policies row). The status pill is the only pill: the builder's disabled Save
    *  draft reads "Draft saved" with a check, the row's Last activity reads "Draft saved <when>", and the drawer's head
-   *  drops it (its Rules Draft / Live switch and Continue editing already say so). Design only. */
-  draftOffPill: ['design'],
+   *  drops it (its Rules Draft / Live switch and Continue editing already say so). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  draftOffPill: ALL,
   /** Simple is the Draft model from now on: a first landing finds Simple picked in the Draft model dropdown (the pick is
    *  kept under a new key, so an older pick doesn't hold it), and a locked builder is Simple rather than Today (26 Nov,
-   *  owner: "the simple will be the version that we are going for now on", and Simple while locked too). Design only. */
-  simpleFirst: ['design'],
+   *  owner: "the simple will be the version that we are going for now on", and Simple while locked too). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  simpleFirst: ALL,
   /** A saved draft has its own tag again, "Has draft" with a pencil, beside the status pill rather than in its place:
    *  the status says what is live, the tag says a draft waits (26 Nov, owner: "I cannot see the draft part anywhere …
    *  active but also have draft"). On the Policies and Post sign-in tables, wherever PolicyStatus draws (application
-   *  page, dialogs, Used by), the Policy details drawer's head and the builder's bar. Design only. */
-  draftTag: ['design'],
+   *  page, dialogs, Used by), the Policy details drawer's head and the builder's bar. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  draftTag: ALL,
   /** Simple's Save rule saves the rule on the board only, never a draft: Save draft is the one way to store a draft, and
    *  leaving with rules saved this way asks Keep editing / Discard (26 Nov, owner: "when I click Save rule you save as
    *  draft automatically, that shouldn't happen … just save the rule and then let it be"). Reverses that part of
-   *  `ruleSaveFocus`. Design only. */
-  ruleSaveOnly: ['design'],
+   *  `ruleSaveFocus`. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  ruleSaveOnly: ALL,
   /** Sign-in time's picker opens on Per day: a row per day, Monday to Sunday, each with its tick, its own hours and All
    *  day, under the Every day / Weekdays / Weekends picks. The week strip is gone and the picker scrolls inside its
    *  popover when the screen is short (26 Nov, owner: "Monday … Sunday should have their own time-based hours … by
@@ -362,25 +362,25 @@ export const ROLLOUT = {
    *  (a saved draft, edits not saved, or a policy never active): the canvas takes a cool tint (owner, the same day:
    *  "instead of changing the color of the top header … change the color of the canvas"), the bar's status pill gives
    *  way to a Draft tag, and "Show live version" is "Show active version". The active version with nothing changed: the
-   *  plain canvas, the status pill and no version button. Design only. */
-  draftLook: ['design'],
+   *  plain canvas, the status pill and no version button. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  draftLook: ALL,
   /** An application's Policies tab with no policy draws the application's own logo, a broken link and the outline of a
    *  policy, titled "No policy attached to <app>" (26 Nov, owner: "something related to the logo … the logo is not
-   *  attached to any policy … think in a creative way"). Replaces `appPoliciesEmpty`'s generic drawing. Design only. */
-  appEmptyLogo: ['design'],
+   *  attached to any policy … think in a creative way"). Replaces `appPoliciesEmpty`'s generic drawing. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  appEmptyLogo: ALL,
   /** All Policies rows: no Read as text in the row's ⋯ (26 Nov, owner: "No need"). The drawer it opened stays in the
    *  code for the other lines. Design only. */
   noRowReadText: ['design'],
   /** Add existing policy lists Active and Inactive sign-in policies only, as cards: the applications' logos (or the
    *  unlinked mark), the name and status, and "where · rules · who" (26 Nov, owner: "only showcase the Active and
    *  Inactive part … headless policies with no application and the policies which have some applications … redo the
-   *  card layout and the content"). Drafts and Monitoring are not offered. Replace keeps its list. Design only. */
-  addExistingCards: ['design'],
+   *  card layout and the content"). Drafts and Monitoring are not offered. Replace keeps its list. Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  addExistingCards: ALL,
   /** The "Nothing else matched is now Deny" note, in colour: a band in the new outcome's tint with the old outcome struck
    *  and the new one arriving with its shield and a ping, the word coloured in the title, and one primary — Keep Deny in
    *  the solid accent — over Allow instead (26 Nov, owner: "add some colors … focus on the allow and deny part … both
-   *  have the same hierarchy"). Design only. */
-  flipNoteLook: ['design'],
+   *  have the same hierarchy"). Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  flipNoteLook: ALL,
   /** The canvas's sticky notes as pinned cards, coloured by purpose (26 Nov, owner: "the note should have some purpose
    *  … distinguished by color based on need … some of them have shared policies, and some of them have some issues", with
    *  pinned-card references): a white card with a glossy pin and a tinted panel. Shared policy peach, a copy lavender, an
@@ -394,8 +394,8 @@ export const ROLLOUT = {
   whoCount: ['design'],
   /** The Unsaved changes ask has a subheading, as the no-application ask does: "Your changes here are not saved yet.
    *  Save as draft to keep them, or discard them." (the save's own label in it). 26 Nov, owner: "add the subheading as
-   *  we have for when we have no application and try to activate". Every screen that asks; Design only. */
-  leaveSubhead: ['design'],
+   *  we have for when we have no application and try to activate". Every screen that asks; Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  leaveSubhead: ALL,
   /** All Policies → Live policies: the selection bar offers Mark as template and Delete for the ticked rows, where it
    *  offered the review tab's Approve and Publish, greyed (26 Nov, owner: "we don't have any bulk option in live policy …
    *  they can bulk mark as template, and they can bulk delete"). One toast with Undo for the marks; one typed-DELETE
@@ -435,8 +435,8 @@ export const ROLLOUT = {
    *  title says "Some checks did not pass", the line says which, and the admin picks Keep editing or "<Activate policy>
    *  anyway" (26 Nov, owner: "make this similar like we did for discard and application popups … let the user know
    *  something might go wrong … if he wants he can go, up to user"). Show details and the fixes wait for a later round.
-   *  Design only. */
-  guardHero: ['design'],
+   *  Every line on the owner's word (26 Nov, "update all 3 roles"). */
+  guardHero: ALL,
   /** The whole console in dark, the Dashboard night board's way (26 Nov, owner: "go through the whole product and fix
    *  the dark mode, just like we did for the dashboard"). dark-theme.css says every token again in the `--night-*`
    *  palette, over the light-only rebrand, plus the screens that hard-code a light colour. Dark is reachable only where

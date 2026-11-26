@@ -65,6 +65,7 @@ import { useStatusChange } from './use-status-change'
 import { BulkBar } from '../bulk-bar'
 import { SHOWCASE } from '../showcase'
 import { TESTER } from '../tester'
+import { NO_GLOBAL_DEFAULT } from '../no-global-default'
 import { screenOffered } from '../edition-screens'
 import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
 import { ACCESS_CHECK } from './sign-in-tests/names'
@@ -539,8 +540,9 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
   /* Two tabs, empty (owner, 9 Nov 2026: "a dedicated banner for migration and an empty state for new policies"): the page
      is laid out as it is with policies, the migration banner on top and New policies' own empty state under it. */
   /* The phase 1 tester build (tester.ts) never shows Policies empty: the Global Default is a policy, so it is listed
-     (owner, 18 Nov 2026: "policy can't be empty, showcase the Global only"). */
-  const noPolicies = !TESTER && origin !== 'moved' && !q && !filtered && signIn.every((p) => p.isSystem)
+     (owner, 18 Nov 2026: "policy can't be empty, showcase the Global only"). With no Global Default (rollout.ts
+     `noGlobalDefault`) there is nothing to list, so Tester gets the empty state too (owner, 26 Nov 2026). */
+  const noPolicies = (!TESTER || NO_GLOBAL_DEFAULT) && origin !== 'moved' && !q && !filtered && signIn.every((p) => p.isSystem)
   /* Two tabs: with nothing of its own, the one list starts at the migrate card, New policy beside Migrate. */
   const nothingMoved = origin === 'moved' && !q && !filtered && signIn.length === 0
   /* Old policies that can still move: with nothing moved yet, the empty state below is the one way in (owner, 9 Nov
@@ -665,7 +667,8 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
   /* No matches, or no policies at all — the same two states in every view. */
   const empty = (
     <>
-      {rows.length === 0 && !nothingMoved && (
+      {/* Not under "No policies yet": with no Global Default nothing is listed there, and nothing was filtered out. */}
+      {rows.length === 0 && !nothingMoved && !noPolicies && (
         <NoMatches
           noun="policies"
           query={query}
@@ -691,7 +694,11 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
         <EmptyState
           art={NEW_EMPTY_ART && <PoliciesArt />} icon={ShieldPlus}
           title="No policies yet"
-          blurb={`Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
+          blurb={
+            NO_GLOBAL_DEFAULT && !systemPolicy
+              ? 'Sign-ins to an application with no policy are blocked.'
+              : `Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`
+          }
           action={
             <Button variant="brand" icon={Plus} onClick={startDraft}>
               New policy

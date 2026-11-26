@@ -8,8 +8,8 @@ import pageSrc from './sign-in-tests/InspectPanel.tsx?raw'
    head while Draft shows (owner, 25 Nov 2026). Design only. The drawer is clicked through in the browser; these pin
    the wiring the static suite can read. */
 describe('Policy details drawer: Draft / Live rules', () => {
-  it('is Design only, read once as a module constant', () => {
-    expect(ROLLOUT.drawerDraftRules).toEqual(['design'])
+  it('is on every line (26 Nov), read once as a module constant', () => {
+    expect(ROLLOUT.drawerDraftRules).toEqual(['design', 'handoff', 'tester'])
     expect(drawerSrc).toContain("const DRAFT_RULES = shows('drawerDraftRules')")
   })
 

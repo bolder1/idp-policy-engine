@@ -192,8 +192,8 @@ describe('Simple on the board', () => {
     expect(boardCss).toMatch(/\.bb__inspfoot\.is-slate \.bx-btn--neutral \{\s*background: var\(--accent\);/)
   })
 
-  it('quiets the bar while a lit Save rule leads, and closes the panel after Save rule (Design only)', () => {
-    expect(ROLLOUT.ruleSaveFocus).toEqual(['design'])
+  it('quiets the bar while a lit Save rule leads, and closes the panel after Save rule (every line since 26 Nov)', () => {
+    expect(ROLLOUT.ruleSaveFocus).toEqual(['design', 'handoff', 'tester'])
     expect(builderSrc).toContain("const RULE_SAVE_FOCUS: boolean = shows('ruleSaveFocus')")
     expect(builderSrc).toContain("quietSave={(testOn && checkPanel === 'form') || ruleSaveLeads}")
     expect(builderSrc).toContain('if (RULE_SAVE_FOCUS) closeAfterRuleSave(byId(`bb-rule-${id}-title`))')

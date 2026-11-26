@@ -109,8 +109,9 @@ export const DRAFT_MODEL_OPTIONS: { value: DraftModel; label: string }[] = [
 /* Simple first (owner, 26 Nov 2026: "the simple will be the version that we are going for now on … whenever the policy
    lands for the first time, make sure the simple version will be activated from the dropdown", and Simple while locked
    too). A first landing finds Simple picked in the dropdown, and a locked builder is Simple, where both were Today.
-   Design only (rollout.ts `simpleFirst`); elsewhere the base stays Today. */
-const SIMPLE_FIRST: boolean = shows('simpleFirst') && DRAFT_MODELS && VIEW_EDIT && SIMPLE_DRAFT
+   Every line since 26 Nov (rollout.ts `simpleFirst`; owner: Simple with no switch for Dev handoff and Tester): where the
+   switch is not drawn (`draftModels` off, or the builder locked) the builder is Simple. */
+const SIMPLE_FIRST: boolean = shows('simpleFirst') && VIEW_EDIT && SIMPLE_DRAFT
 
 /** The model with nothing picked yet, and the model while the switch is not shown. */
 const BASE: DraftModel = SIMPLE_FIRST ? 'simple' : 'today'

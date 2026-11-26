@@ -28,6 +28,7 @@ import { policyOption } from './policy-option'
 import { fallbackOf } from './simulate'
 import { portalRoot } from './status-options'
 import { PolicyStatus } from '../migrate/moved-status'
+import { BLOCKED_UNTIL_POLICY, EMPTY_NO_DEFAULT } from '../empty-no-default'
 
 /* -----------------------------------------------------------------------------
    What protects one application, and the form for adding to it.
@@ -290,7 +291,8 @@ export function AppProtection({
                   tone="notice"
                   title={rows.length === 1 ? `The policy on ${app.name} decides nothing.` : `None of the policies on ${app.name} decides anything.`}
                 >
-                  {everyoneElse ? `Sign-ins fall through to ${everyoneElse.name}.` : 'Sign-ins fall through to the tenant default.'}
+                  {/* With no Global Default (rollout `emptyNoDefault`) there is nothing to fall through to: they are blocked. */}
+                  {everyoneElse ? `Sign-ins fall through to ${everyoneElse.name}.` : EMPTY_NO_DEFAULT ? BLOCKED_UNTIL_POLICY : 'Sign-ins fall through to the tenant default.'}
                 </Callout>
               )}
 
@@ -304,7 +306,7 @@ export function AppProtection({
                     compact
                     icon={ShieldPlus}
                     title="No policies on this application"
-                    blurb="Sign-ins fall through to the tenant default below."
+                    blurb={EMPTY_NO_DEFAULT ? BLOCKED_UNTIL_POLICY : 'Sign-ins fall through to the tenant default below.'}
                     action={
                       <Button
                         variant="secondary"
@@ -409,7 +411,8 @@ export function AppProtection({
                       </p>
                     )}
 
-                    <p className="bapr__nodefault">The tenant default isn't listed. It already applies to every application.</p>
+                    {/* No tenant default to explain away on Design (rollout `emptyNoDefault`). */}
+                    {!EMPTY_NO_DEFAULT && <p className="bapr__nodefault">The tenant default isn't listed. It already applies to every application.</p>}
 
                     {note && <p className="bapr__note">{note}</p>}
                     {picked && alsoOn && <AlsoNote picked={picked} />}

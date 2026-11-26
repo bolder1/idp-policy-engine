@@ -3,6 +3,7 @@ import { useBrand } from '../store'
 import type { App, Policy } from '../data'
 import { AppFacts, PolicyFact, PolicyFacts } from './app-facts'
 import { replaceFacts, replaceTitle, replaceTone, type ReplaceFacts } from './applications-model'
+import { EMPTY_NO_DEFAULT } from '../empty-no-default'
 
 /* -----------------------------------------------------------------------------
    Replace policy's one confirm (owner, 24 Oct 2026, option A: "pick a policy in
@@ -76,6 +77,13 @@ const WHY_NOT: Record<'draft' | 'inactive' | 'monitor', string> = {
 }
 
 function Until({ until }: { until: NonNullable<ReplaceFacts['until']> }) {
+  /* No Global Default on Design (rollout `emptyNoDefault`): with nothing after it, the sign-ins are blocked meanwhile,
+     said in place of who decides. */
+  if (!until.next && EMPTY_NO_DEFAULT) {
+    if (until.state === 'never') return <p>It never decides here, so sign-ins are blocked.</p>
+    if (until.state === 'not-app-access') return <p>It is not an app access policy, so sign-ins here are blocked.</p>
+    return <p>{WHY_NOT[until.state]}, so sign-ins here are blocked until it is turned on.</p>
+  }
   const next = until.next ? <PolicyFact name={until.next.name} /> : <b>the tenant default</b>
   /* "Decides first" only of a policy that does stand in front of it (`ahead`). One naming nobody the directory has
      is shadowed by nothing, and the policy that decides is the fall-through — never "first". */

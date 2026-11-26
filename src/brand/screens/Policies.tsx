@@ -90,6 +90,7 @@ import { PolicyStatus } from '../migrate/moved-status'
 import { MARK_LABEL, UNMARK_LABEL } from '../tester'
 import { PoliciesArt } from '../empty-art'
 import { NEW_EMPTY_ART } from '../empty-art-phase'
+import { EMPTY_NO_DEFAULT, NO_POLICY_BLURB } from '../empty-no-default'
 import { Pager } from '../pager'
 import { PAGE_SIZES, PAGINATION, usePaged } from '../pager-state'
 
@@ -670,7 +671,9 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
   /* No matches, or no policies at all — the same two states in every view. */
   const empty = (
     <>
-      {rows.length === 0 && !nothingMoved && (
+      {/* Not over "No policies yet": with no Global Default (rollout `emptyNoDefault`) an empty tenant has no pinned row
+          either, so the list is empty and this said "No policies match these filters" above the page's own empty state. */}
+      {rows.length === 0 && !nothingMoved && !(EMPTY_NO_DEFAULT && noPolicies) && (
         <NoMatches
           noun="policies"
           query={query}
@@ -696,7 +699,8 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
         <EmptyState
           art={NEW_EMPTY_ART && <PoliciesArt />} icon={ShieldPlus}
           title="No policies yet"
-          blurb={`Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
+          /* No Global Default on Design: with no policy, sign-ins are blocked (rollout `emptyNoDefault`). */
+          blurb={EMPTY_NO_DEFAULT ? NO_POLICY_BLURB : `Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
           action={
             <Button variant="brand" icon={Plus} onClick={startDraft}>
               New policy
@@ -1355,8 +1359,11 @@ function PostSignInPolicies() {
           </div>
         )}
         {all.length === 0 ? (
+          /* The full page empty state, with its drawing, as every policy page has (rollout `emptyNoDefault`). The bar
+             keeps the orange New policy, so this one stays secondary. */
           <EmptyState
-            compact
+            compact={!EMPTY_NO_DEFAULT}
+            art={EMPTY_NO_DEFAULT && NEW_EMPTY_ART ? <PoliciesArt badge="shield" /> : undefined}
             icon={ShieldPlus}
             title="No post sign-in policies yet"
             action={

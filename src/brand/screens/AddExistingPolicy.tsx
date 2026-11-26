@@ -19,6 +19,7 @@ import { SliderActions } from './select-rows'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
 import { useViewEdit } from './board/draft-model'
 import { PolicyPickCard } from './add-existing-cards'
+import { EMPTY_NO_DEFAULT } from '../empty-no-default'
 import { shows } from '../rollout'
 
 /* Add existing policy's cards: Active and Inactive policies only (rollout.ts `addExistingCards`). */
@@ -238,7 +239,13 @@ export function AddExistingPolicy({
        policies named (replace-dialog.tsx). */
     if (replacing) {
       if (row.state === 'decides') return { pill: 'Decides', text: 'Takes effect on the next sign-in', tip: null }
-      const next = ((row.state === 'never' ? row.lostTo[0]?.to : undefined) ?? standing.everyoneElse ?? standing.fallback)?.name ?? 'the tenant default'
+      const nextPolicy = ((row.state === 'never' ? row.lostTo[0]?.to : undefined) ?? standing.everyoneElse ?? standing.fallback)?.name
+      /* No Global Default on Design (rollout `emptyNoDefault`): with nothing after it, sign-ins are blocked meanwhile. */
+      if (!nextPolicy && EMPTY_NO_DEFAULT) {
+        if (row.state === 'never') return { pill: 'Never decides', text: 'Sign-ins are blocked', tip: rowTip(row, groups, users) }
+        return { pill: OFF_PILL[row.state], text: `Sign-ins are blocked until it is ${viewEdit ? 'active' : 'turned on'}`, tip: null }
+      }
+      const next = nextPolicy ?? 'the tenant default'
       if (row.state === 'never') return { pill: 'Never decides', text: `Sign-ins go to ${next}`, tip: rowTip(row, groups, users) }
       return { pill: OFF_PILL[row.state], text: `Sign-ins go to ${next} until it is ${viewEdit ? 'active' : 'turned on'}`, tip: null }
     }

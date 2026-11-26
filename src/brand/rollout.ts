@@ -442,6 +442,13 @@ export const ROLLOUT = {
    *  to default (26 Nov, owner: "for every table … add Manage columns so the user can select what the user wanted to
    *  showcase in the table"; columns.ts, manage-columns.tsx). Design only. */
   manageColumns: ['design'],
+  /** Empty states and their lines for a console with no Global Default (`noGlobalDefault`): no policy means sign-ins
+   *  are blocked, never "fall through to the tenant default". All Policies' "No policies yet", the Applications list's
+   *  "No policy" (was "Default only"), the protection slider's empty list and its callout, and the replace flow's
+   *  meanwhile line say so; the slider's "tenant default isn't listed" note goes. Post sign-in gets the full page empty
+   *  state with its drawing, as every policy page has (26 Nov, owner: "update the empty states … now we don't have any
+   *  global default policies … all policies can have their own empty state"). Design only. */
+  emptyNoDefault: ['design'],
   /** The whole console in dark, the Dashboard night board's way (26 Nov, owner: "go through the whole product and fix
    *  the dark mode, just like we did for the dashboard"). dark-theme.css says every token again in the `--night-*`
    *  palette, over the light-only rebrand, plus the screens that hard-code a light colour. Dark is reachable only where

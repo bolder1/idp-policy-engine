@@ -7,6 +7,7 @@ import { listNames } from '../rule-who'
    and `summarise` and the delete lines below read `appStanding` from there,
    all inside function bodies, never while either module is still loading. */
 import { appStanding, deciderChanges, type StandRow } from './app-standing'
+import { EMPTY_NO_DEFAULT, NO_POLICY_LABEL, NO_POLICY_TITLE } from '../empty-no-default'
 
 /* -----------------------------------------------------------------------------
    What protects an application, and what attaching one more would mean.
@@ -533,11 +534,12 @@ export function summarise(appId: string, policies: readonly Policy[], users: rea
     return {
       own: 0,
       decides: 0,
-      /* Not "Not protected": the tenant default still decides these sign-ins. */
-      label: 'Default only',
+      /* Not "Not protected": the tenant default still decides these sign-ins. With no Global Default (rollout
+         `emptyNoDefault`), nothing does: the cell says there is no policy, and its hover that sign-ins are blocked. */
+      label: EMPTY_NO_DEFAULT ? NO_POLICY_LABEL : 'Default only',
       tag: null,
       tone: 'off',
-      title: 'No policy of its own. Sign-ins use the default policy.',
+      title: EMPTY_NO_DEFAULT ? NO_POLICY_TITLE : 'No policy of its own. Sign-ins use the default policy.',
     }
   }
 

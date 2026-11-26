@@ -30,3 +30,23 @@ export function riskBand(score: number): RiskLevel {
 
 /** "High risk", for the summary and the card. */
 export const riskWords = (level: RiskLevel): string => `${RISK_LEVELS.find((l) => l.value === level)?.label ?? level} risk`
+
+/* Per profile (owner, 26 Nov 2026: "multiple risk levels for multiple device profiles"): each chosen profile carries its
+   own level, or none. */
+
+/** One profile's level on a condition, if it has one. */
+export const riskOf = (c: { risks?: Record<string, RiskLevel> }, profileId: string): RiskLevel | undefined => c.risks?.[profileId]
+
+/** The map with one profile's level set, or taken off for Any; undefined once it holds nothing, so it is never stored empty. */
+export function withRisk(risks: Record<string, RiskLevel> | undefined, profileId: string, level: RiskLevel | undefined): Record<string, RiskLevel> | undefined {
+  const next = { ...(risks ?? {}) }
+  if (level) next[profileId] = level
+  else delete next[profileId]
+  return Object.keys(next).length ? next : undefined
+}
+
+/** The one level every chosen profile shares, for a single tag on the field; undefined when they differ or none has one. */
+export function sharedRisk(c: { risks?: Record<string, RiskLevel>; values: string[] }): RiskLevel | undefined {
+  const levels = c.values.filter(Boolean).map((v) => c.risks?.[v])
+  return levels.length > 0 && levels[0] && levels.every((l) => l === levels[0]) ? levels[0] : undefined
+}

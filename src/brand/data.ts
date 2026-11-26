@@ -560,9 +560,11 @@ export interface Condition {
   typeId: string
   operator: string
   values: string[]
-  /* Device profile only (risk-level.ts, rollout `profileRisk`, 26 Nov 2026): the one risk level the device's risk score
-     must also fall in — Low below 40, Medium 40 to 69, High 70 and up. Absent is any risk: the profile alone. */
-  risk?: 'low' | 'medium' | 'high'
+  /* Device profile only (risk-level.ts, rollout `profileRisk`, 26 Nov 2026): per chosen profile, the risk level the
+     device's risk score must also fall in when that profile is the one matched — Low below 40, Medium 40 to 69, High 70
+     and up. A profile with no entry is any risk: the profile alone. Per profile since the owner's "multiple risk levels
+     for multiple device profiles", the same day. */
+  risks?: Record<string, 'low' | 'medium' | 'high'>
   /* Which half of EACH named zone to test, by zone id. Zone conditions only; a
      zone with no entry is tested whole (both halves), and so is a condition
      with no map at all.

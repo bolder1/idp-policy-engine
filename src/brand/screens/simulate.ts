@@ -28,7 +28,7 @@ import {
 } from '../fingerprint'
 import type { AuthMethod } from '../methods'
 import { sameName, type PlaceKind } from '../places'
-import { riskBand, riskWords } from '../risk-level'
+import { riskBand, riskOf, riskWords, type RiskLevel } from '../risk-level'
 import { allOf, anyOf, blame, cardJoin, cardName, credit, leaves, notState, predicatePasses, predicateState, topJoin, type CondState } from '../predicate'
 import { hasWho, normaliseWho, whoPasses, type WhoPerson } from '../rule-who'
 import { WEEKDAYS, holdsAt, holdsAtSomeDay, readSchedule, scheduleSummary, type Weekday } from '../schedule'
@@ -488,11 +488,13 @@ function legacyCond(c: Condition, ctx: SimContext, env?: SimEnv): CondVerdict {
     case 'fingerprint': {
       if (env?.hasFingerprint && vals.some((v) => !env.hasFingerprint!(v)))
         return unknown('this rule names a device profile that no longer exists')
-      /* With a risk level (rollout `profileRisk`): the simulated risk signal must be that level too. */
-      const riskOk = !c.risk || ctx.risk.toLowerCase() === c.risk
+      /* With risk levels (rollout `profileRisk`): some chosen profile with no level, or one whose level is the simulated
+         risk signal's. */
+      const levels = vals.map((v) => riskOf(c, v))
+      const riskOk = levels.some((l) => !l || ctx.risk.toLowerCase() === l)
       return decide(
         device.recognised && riskOk,
-        `the device fingerprint ${device.recognised ? 'matches the profile' : 'does not match the profile'}${c.risk ? `, and the risk signal is ${ctx.risk}` : ''}`,
+        `the device fingerprint ${device.recognised ? 'matches the profile' : 'does not match the profile'}${levels.some(Boolean) ? `, and the risk signal is ${ctx.risk}` : ''}`,
       )
     }
     case 'mdm':
@@ -1413,19 +1415,21 @@ export function evalCondition(c: Condition, facts: SignInFacts, env: SimEnv, car
         const p = profiles.find((x) => x.id === v)!
         return { p, m: profileMatches(p, facts.device, { ...env.deviceMatch, personKnown }) }
       })
-      const profileStatus = flip(anyOf(graded.map((g) => g.m.status)))
-      /* With a risk level (risk-level.ts, rollout `profileRisk`): the profile AND the device's risk score in that band.
-         No score stated is unknown, never a fail: the risk is part of what was asked. */
-      const band = c.risk && facts.risk ? riskBand(facts.risk.score) : null
-      const riskStatus: CondState = !c.risk ? 'pass' : !facts.risk ? 'unknown' : band === c.risk ? 'pass' : 'fail'
-      const status = allOf([profileStatus, riskStatus])
-      const riskLine = c.risk ? (facts.risk ? `; the device risk score is ${facts.risk.score} (${riskWords(band!)})` : '; no device risk score was given') : ''
+      /* With risk levels (risk-level.ts, rollout `profileRisk`), per profile: each profile AND the device's risk score in
+         that profile's band, the profiles still alternatives. No score stated is unknown, never a fail: the risk is part
+         of what was asked. */
+      const asksRisk = vals.some((v) => !!riskOf(c, v))
+      const band = asksRisk && facts.risk ? riskBand(facts.risk.score) : null
+      const riskState = (level: RiskLevel | undefined): CondState => (!level ? 'pass' : !facts.risk ? 'unknown' : band === level ? 'pass' : 'fail')
+      const status = flip(anyOf(graded.map((g) => allOf([g.m.status, riskState(riskOf(c, g.p.id))]))))
+      const riskUnknown = asksRisk && !facts.risk
+      const riskLine = asksRisk ? (facts.risk ? `; the device risk score is ${facts.risk.score} (${riskWords(band!)})` : '; no device risk score was given') : ''
       return result(status, deviceWords(facts.device), graded.map((g) => profileWords(g.p, g.m, facts.device)).join('; ') + riskLine, {
         checks: graded.flatMap((g) => g.m.checks),
         profiles: graded.map((g) => ({ profileId: g.p.id, profileName: g.p.name, status: g.m.status, checks: g.m.checks })),
         missing:
           status === 'unknown'
-            ? dedupeKeys([...graded.filter((g) => g.m.status === 'unknown').flatMap((g) => g.m.missing), ...(riskStatus === 'unknown' ? (['risk'] as FactKey[]) : [])])
+            ? dedupeKeys([...graded.filter((g) => g.m.status === 'unknown').flatMap((g) => g.m.missing), ...(riskUnknown ? (['risk'] as FactKey[]) : [])])
             : [],
       })
     }

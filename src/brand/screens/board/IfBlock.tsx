@@ -5,7 +5,7 @@ import { ArrowRight, Braces, CornerDownRight, Split, Users } from 'lucide-react'
 import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
 import { FaceStack, type FaceItem } from '../../faces'
 import { WHO_COUNT, whoCountWords } from '../../who-count'
-import { PROFILE_RISK, riskWords } from '../../risk-level'
+import { PROFILE_RISK, riskOf, riskWords } from '../../risk-level'
 import { CARD_PEEKS } from './card-peek-store'
 import { PeekTrigger } from './card-peek'
 import { CondPeek, ThenPeek, WhoPeek } from './card-peek-content'
@@ -274,18 +274,24 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
       {(() => {
         const values = (
           <>
-            {shown.map((v, i) => (
-              <IfChip key={i} variant="val" unset={v.unset}>
-                {v.text}
-              </IfChip>
-            ))}
+            {shown.map((v, i) => {
+              /* Each profile's own risk level, its chip right after it (rollout `profileRisk`, per profile). The chips
+                 are the condition's values in order, so `i` names the profile. */
+              const level = PROFILE_RISK && t.valueKind === 'fingerprint' ? riskOf(c, c.values.filter(Boolean)[i] ?? '') : undefined
+              return (
+                <Fragment key={i}>
+                  <IfChip variant="val" unset={v.unset}>
+                    {v.text}
+                  </IfChip>
+                  {level && <span className={`bb__ifrisk is-${level}`}>{riskWords(level)}</span>}
+                </Fragment>
+              )
+            })}
             {rest > 0 && (
               <IfChip variant="val" title={chips.map((v) => v.text).join(', ')}>
                 +{rest}
               </IfChip>
             )}
-            {/* The profile's risk level, its own chip after the profile (rollout `profileRisk`). */}
-            {PROFILE_RISK && t.valueKind === 'fingerprint' && c.risk && <span className={`bb__ifrisk is-${c.risk}`}>{riskWords(c.risk)}</span>}
           </>
         )
         /* What is behind the values, on hover or a click (rollout `cardPeeks`): the zone's entries, the profile's

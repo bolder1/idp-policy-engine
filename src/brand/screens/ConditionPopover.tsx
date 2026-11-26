@@ -113,7 +113,7 @@ import {
   attrLabel,
 } from '../data'
 import { SIGN_IN_TIME, scheduleSummary } from '../schedule'
-import { PROFILE_RISK, RISK_LEVELS, riskWords, type RiskLevel } from '../risk-level'
+import { PROFILE_RISK, RISK_LEVELS, riskOf, riskWords, sharedRisk, type RiskLevel } from '../risk-level'
 import { SchedulePicker } from './schedule-picker'
 
 import './condition-popover.css'
@@ -363,7 +363,7 @@ export function ConditionPopover({
   stacked,
 }: {
   /** Device profile's risk level (risk-level.ts, rollout `profileRisk`); undefined is any risk. */
-  onRisk?: (r: RiskLevel | undefined) => void
+  onRisk?: (profileId: string, r: RiskLevel | undefined) => void
   c: Condition
   /** The chosen values, summarised for the pill's third segment. */
   summary: string
@@ -481,9 +481,10 @@ export function ConditionPopover({
   const scopeTag =
     shared !== 'both' ? (
       <i className="cp__scopetag">{shared === 'ip' ? 'IP only' : 'Location only'}</i>
-    ) : PROFILE_RISK && t.valueKind === 'fingerprint' && c.risk ? (
-      /* Device profile's risk level, beside the profile on the field (rollout `profileRisk`). */
-      <i className={`cp__scopetag cp__risktag is-${c.risk}`}>{riskWords(c.risk)}</i>
+    ) : PROFILE_RISK && t.valueKind === 'fingerprint' && sharedRisk(c) ? (
+      /* The risk level every chosen profile shares, beside them on the field (rollout `profileRisk`). Levels that differ
+         are said profile by profile, in the menu and on the card. */
+      <i className={`cp__scopetag cp__risktag is-${sharedRisk(c)}`}>{riskWords(sharedRisk(c)!)}</i>
     ) : null
 
   /* A window and a threshold are TYPED, not chosen from a list, and stacked
@@ -1713,6 +1714,39 @@ function List({
    own line under the zone (22 Sep 2026). It was one switch under the whole list
    that answered for every zone at once. Arrows move within it, as a radio group
    does; the list's own arrows skip it. */
+/** A chosen device profile's risk level: Any, Low, Medium or High, in ZoneScopePick's shape (rollout `profileRisk`). */
+function RiskPick({ profile, value, onChange }: { profile: string; value: RiskLevel | undefined; onChange: (l: RiskLevel | undefined) => void }) {
+  const opts: { value: RiskLevel | undefined; label: string }[] = [{ value: undefined, label: 'Any' }, ...RISK_LEVELS]
+  return (
+    <div className="cp__zscope cp__riskpick">
+      <span className="cp__zscope__label" aria-hidden>
+        Risk
+      </span>
+      <div className="cp__zscope__opts" role="radiogroup" aria-label={`Risk level for ${profile}`}>
+        {opts.map((o) => {
+          const on = o.value === value
+          return (
+            <button
+              key={o.label}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              className={`${on ? 'is-on' : ''}${o.value ? ` is-${o.value}` : ''}`}
+              /* Inside the profile's row: a pick here sets the level, never the row's tick. */
+              onClick={(e) => {
+                e.stopPropagation()
+                onChange(o.value)
+              }}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ZoneScopePick({
   zone,
   value,
@@ -1789,7 +1823,7 @@ function ValueBody({
   /** The zone a Sign-in time is read in; `''` is the tenant's. */
   onTz?: (tz: string) => void
   /** Device profile's one risk level (rollout `profileRisk`). */
-  onRisk?: (r: RiskLevel | undefined) => void
+  onRisk?: (profileId: string, r: RiskLevel | undefined) => void
   footer?: string
   onFooter?: () => void
   close: () => void
@@ -1929,33 +1963,14 @@ function ValueBody({
                 if (!both && now === 'both') return null
                 return <ZoneScopePick zone={o.label} value={now} onChange={(h) => onScope(o.value, h)} />
               }
-            : undefined
+            : PROFILE_RISK && t.valueKind === 'fingerprint' && onRisk
+              ? (o, on) =>
+                  /* Under each CHOSEN profile, its own risk level (rollout `profileRisk`; owner, 26 Nov 2026: "multiple
+                     risk levels for multiple device profiles"), as a zone has its own Match on. Any is the profile alone. */
+                  on ? <RiskPick profile={o.label} value={riskOf(c, o.value)} onChange={(l) => onRisk(o.value, l)} /> : null
+              : undefined
         }
       />
-
-      {/* Device profile's risk level, under the profiles (rollout `profileRisk`; owner, 26 Nov 2026: "select device
-          profile and also … its high, medium, low risk … together", "One level only"). Any is the profile alone. */}
-      {PROFILE_RISK && t.valueKind === 'fingerprint' && onRisk && (
-        <div className="cp__risk">
-          <span className="cp__risk__label" id={`cp-risk-${c.id}`}>
-            Risk level
-          </span>
-          <div className="cp__risk__seg" role="radiogroup" aria-labelledby={`cp-risk-${c.id}`}>
-            {[{ value: undefined, label: 'Any' }, ...RISK_LEVELS].map((l) => (
-              <button
-                key={l.label}
-                type="button"
-                role="radio"
-                aria-checked={c.risk === l.value}
-                className={`cp__risk__opt${c.risk === l.value ? ' is-on' : ''}${l.value ? ` is-${l.value}` : ''}`}
-                onClick={() => onRisk(l.value)}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* The footer only. No "3 of 24" beside it: the rows are the count. */}
       {footer && (
@@ -2001,7 +2016,7 @@ export function condSummary(t: ConditionType, c: Condition, names: string[]): st
     return values[0] ? `${values[0]} ${t.id === 'trust-age' ? 'days' : t.id === 'coords' ? 'km' : ''}`.trim() : 'Choose…'
   if (t.valueKind === 'number') return values[0] ? `${values[0]} ${t.unit ?? ''}`.trim() : 'Choose…'
   /* "Corporate devices · High risk" (rollout `profileRisk`). */
-  if (PROFILE_RISK && t.valueKind === 'fingerprint' && c.risk && values.length > 0) return `${summarise(names.length ? names : values, 'Choose…')} · ${riskWords(c.risk)}`
+  if (PROFILE_RISK && t.valueKind === 'fingerprint' && sharedRisk(c) && values.length > 0) return `${summarise(names.length ? names : values, 'Choose…')} · ${riskWords(sharedRisk(c)!)}`
   return summarise(names.length ? names : values, 'Choose…')
 }
 

@@ -3,7 +3,7 @@ import { ArrowRight, Globe, MonitorSmartphone, UserRound, Users, Webhook } from 
 
 import { DENY_ALERT_EVENTS, conditionName, conditionType, type Condition, type Rule } from '../../data'
 import { attrOf, modeLabel, reachLabel } from '../../fingerprint'
-import { riskWords } from '../../risk-level'
+import { riskOf, riskWords } from '../../risk-level'
 import { normaliseWho } from '../../rule-who'
 import { daysWords, hoursWords, scheduleGroups, zoneWords } from '../../schedule'
 import { useBrand } from '../../store'
@@ -144,6 +144,8 @@ export function CondPeek({ c, post = false }: { c: Condition; post?: boolean }) 
           const p = fingerprints.find((x) => x.id === id)
           if (!p) return <p key={id} className="bpeek__line">A device profile that no longer exists.</p>
           const checks = p.enabled.map((a) => attrOf(p.mode, a)?.name).filter((l): l is string => !!l)
+          /* This profile's own risk level (rollout `profileRisk`, per profile). */
+          const level = riskOf(c, id)
           return (
             <Section key={id} title={vals.length > 1 ? p.name : `${modeLabel(p)} · ${reachLabel(p.reach)}`}>
               <Rows more={checks.length - LIST}>
@@ -151,14 +153,10 @@ export function CondPeek({ c, post = false }: { c: Condition; post?: boolean }) 
                   <Row key={l} icon={<MonitorSmartphone size={13} strokeWidth={2} />} name={l} />
                 ))}
               </Rows>
+              {level && <p className={`bpeek__risk is-${level}`}>{riskWords(level)}</p>}
             </Section>
           )
         })}
-        {c.risk && (
-          <Section title="Risk level">
-            <p className={`bpeek__risk is-${c.risk}`}>{riskWords(c.risk)}</p>
-          </Section>
-        )}
       </>
     )
 

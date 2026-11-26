@@ -950,3 +950,8 @@
 .bb__insp .cp__risktag.is-medium { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
 .bb__insp .cp__risktag.is-high { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 .cp__stackrow > .cp__fld.is-idle.is-fixed { color: var(--text-secondary); }
+/* A chosen profile's own risk level (ConditionPopover.tsx `RiskPick`, per profile): the zone's Match on row, its picked
+   level in that level's tint. */
+.cp__riskpick .cp__zscope__opts > button.is-on.is-low { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.cp__riskpick .cp__zscope__opts > button.is-on.is-medium { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.cp__riskpick .cp__zscope__opts > button.is-on.is-high { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }

@@ -67,10 +67,11 @@ function filled(on: Map<Weekday, Hours | null>, day: Weekday): [number, number][
 }
 
 /** A day's hours, or All day: two times and a toggle that stands in for them. */
-function HoursLine({ name, hours, onChange }: { name: string; hours: Hours | null; onChange: (h: Hours | null) => void }) {
+function HoursLine({ name, hours, onChange, allDayWords }: { name: string; hours: Hours | null; onChange: (h: Hours | null) => void; /** Said where the times stand while All day is on, so the row keeps its shape (Per day first). */ allDayWords?: string }) {
   return (
     <>
       <span className="sp__times">
+        {!hours && allDayWords && <span className="sp__muted">{allDayWords}</span>}
         {hours && (
           <>
             <input
@@ -197,6 +198,8 @@ export function SchedulePicker({
   if (PER_DAY_FIRST) {
     return (
       <div className="sp sp--rows">
+        {/* The time zone first (owner, 26 Nov 2026: "zone at the very top and then the days"): every hour below is read in it. */}
+        {timeZone}
         <div className="sp__field">
           <div className="sp__labelrow">
             <span className="sp__label" id={daysId}>
@@ -206,12 +209,20 @@ export function SchedulePicker({
           </div>
           {presets}
           {showRows ? (
-            /* Every day, Monday to Sunday: its tick, then its hours while it is in. */
+            /* Every day, Monday to Sunday, in three steady columns (owner, 26 Nov 2026: All day and the unticked days
+               "feel very off and very disaligned"): the tick, then the hours — or "Any time" while All day is on, or "Not
+               included" for a day that is out — then All day, so no row leaves a hole where the others have fields. */
             <div className="sp__dayrows" role="group" aria-labelledby={daysId}>
               {WEEKDAYS.map((day) => (
                 <div key={day} className={`sp__row${on.has(day) ? '' : ' is-out'}`}>
                   {dayTick(day)}
-                  {on.has(day) && <HoursLine name={day} hours={on.get(day) ?? null} onChange={(h) => setOne(day, h)} />}
+                  {on.has(day) ? (
+                    <HoursLine name={day} hours={on.get(day) ?? null} onChange={(h) => setOne(day, h)} allDayWords="Any time" />
+                  ) : (
+                    <span className="sp__times">
+                      <span className="sp__muted">Not included</span>
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -225,11 +236,10 @@ export function SchedulePicker({
           <div className="sp__field">
             <span className="sp__label">Hours</span>
             <div className="sp__row is-one">
-              <HoursLine name="Hours" hours={common} onChange={setAll} />
+              <HoursLine name="Hours" hours={common} onChange={setAll} allDayWords="Any time" />
             </div>
           </div>
         )}
-        {timeZone}
       </div>
     )
   }

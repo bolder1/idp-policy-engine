@@ -20,6 +20,7 @@ import { useBrand, useNameLookup } from '../../store'
 import { ConditionDraft, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
 import { conditionTone } from './tones'
 import { gapText, useRuleGaps } from './rule-gaps'
+import { withRisk } from '../../risk-level'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -918,8 +919,8 @@ function ConditionRow({
           onScope={onScope}
           onKey={onKey}
           onTz={onTz}
-          /* Device profile's risk level (rollout `profileRisk`): a field of the condition, patched like its values. */
-          onRisk={(risk) => onChange({ ...c, risk })}
+          /* A device profile's risk level, per profile (rollout `profileRisk`): a field of the condition, patched like its values. */
+          onRisk={(profileId, level) => onChange({ ...c, risks: withRisk(c.risks, profileId, level) })}
           onRemove={onRemove}
           footer={footer}
           onFooter={onFooter}

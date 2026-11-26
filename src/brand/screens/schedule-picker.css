@@ -104,6 +104,20 @@
 .sp--rows .sp__dayrows { display: flex; flex-direction: column; gap: var(--space-2); }
 .sp--rows .sp__row:not(.is-one) { grid-template-columns: var(--space-14) minmax(0, 1fr) auto; }
 .sp--rows .sp__row.is-out .sp__day { color: var(--text-tertiary); }
+/* Every row the same height and the same three columns: the times slot holds a quiet word while there are no times to
+   type — "Any time" under All day, "Not included" for a day that is out — at the inputs' height, so the rows line up. */
+.sp--rows .sp__row { min-height: var(--space-9); }
+.sp--rows .sp__times { min-height: var(--space-9); }
+.sp--rows .sp__muted {
+  display: inline-flex;
+  align-items: center;
+  height: var(--space-9);
+  padding: 0 var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}
+/* An unticked day's word runs to the row's end: it has no All day. */
+.sp--rows .sp__row.is-out > .sp__times { grid-column: 2 / -1; }
 
 /* The week, drawn: when sign-ins match, day by day, an overnight window landing on the next morning. A line height of 1,
    so the bar sets the row and the strip stays a glance, not a second list. */

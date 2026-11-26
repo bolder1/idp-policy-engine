@@ -6,8 +6,6 @@ import { shows } from './rollout'
 
 export const EMPTY_NO_DEFAULT: boolean = shows('emptyNoDefault')
 
-/** Under "No policies yet" on All Policies. */
-export const NO_POLICY_BLURB = 'An application with no policy blocks every sign-in.'
 /** The Applications list's Policy cell for an application with none, and its hover line. */
 export const NO_POLICY_LABEL = 'No policy'
 export const NO_POLICY_TITLE = 'No policy: sign-ins to this application are blocked.'

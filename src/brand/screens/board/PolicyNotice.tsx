@@ -1,9 +1,26 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
+import { CircleAlert, Copy, Network, NotebookPen, type LucideIcon } from 'lucide-react'
 
 import { appsOf, type App, type Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
+import { shows } from '../../rollout'
 import { useBrand } from '../../store'
+import './sticky-kinds.css'
+
+/* Pinned cards, coloured by purpose (rollout.ts `stickyKinds`; owner, 26 Nov 2026: "the note should have some purpose …
+   distinguished by color based on need … some of them have shared policies, and some of them have some issues", with
+   references of pinned cards: a white card, a glossy pin, a soft tinted panel inside, set at a slight tilt).
+     shared  peach    a save reaches several applications
+     copy    lavender a copy of another policy, its other applications left behind
+     issue   rose     something to fix before it can do its job (no application yet), with the button that fixes it
+     note    blue     a plain note, the template preview's
+   The unroll and the tilt stay Motion's; the pin drops in once the card is down. */
+const KINDS: boolean = shows('stickyKinds')
+type Kind = 'shared' | 'copy' | 'issue' | 'note'
+const KIND_ICON: Record<Kind, LucideIcon> = { shared: Network, copy: Copy, issue: CircleAlert, note: NotebookPen }
+/** What kind of note, in the card's corner: a noun, as a label is. */
+const KIND_WORD: Record<Kind, string> = { shared: 'Shared', copy: 'Copy', issue: 'To fix', note: 'Note' }
 
 /* -----------------------------------------------------------------------------
    WHAT THE ADMIN SHOULD KNOW BEFORE CHANGING THIS (owner, 23 Oct 2026: "after
@@ -85,18 +102,69 @@ function scatter(id: string): { tilt: number; nudge: number } {
   return { tilt: -3.4 + a * 6, nudge: Math.round(-14 + b * 40) }
 }
 
-function Sticky({ id, title, logos, children }: { id: string; title: string; logos?: App[]; children: ReactNode }) {
+function Sticky({
+  id,
+  title,
+  logos,
+  kind = 'note',
+  action,
+  children,
+}: {
+  id: string
+  title: string
+  logos?: App[]
+  kind?: Kind
+  /** An issue's fix, on the card itself (`stickyKinds`). */
+  action?: { label: string; icon?: LucideIcon; onClick: () => void }
+  children: ReactNode
+}) {
   const reduce = useReducedMotion()
   const { tilt, nudge } = scatter(id)
+  const unroll = {
+    initial: reduce ? (false as const) : { clipPath: FURLED, rotate: 0 },
+    animate: { clipPath: ROLLED, rotate: tilt },
+    transition: { clipPath: { duration: 0.42, ease: [0.2, 0, 0, 1] as const }, rotate: { duration: 0.5, ease: [0.3, 0, 0.2, 1] as const } },
+  }
+  if (KINDS) {
+    const Icon = KIND_ICON[kind]
+    return (
+      <div className="bb__notice" style={{ '--bb-nudge': `${nudge}px` } as CSSProperties}>
+        {/* A digital note, not a paper one (owner, 26 Nov 2026: "the main goal is to make the thing digital … there is no
+            sticky note, actually, just a visual", with the Docket and editorial-card references): a solid colour card that
+            rises into place at its small tilt. No pin, clip or tape. */}
+        <motion.div
+          className={`bbs bbs--${kind}`}
+          role="note"
+          aria-label={title}
+          initial={reduce ? false : { opacity: 0, y: 14, scale: 0.96, rotate: 0 }}
+          animate={{ opacity: 1, y: 0, scale: 1, rotate: tilt }}
+          transition={{ type: 'spring', stiffness: 320, damping: 26, mass: 0.9 }}
+        >
+          {/* The editorial reference's head: the kind's line drawing at the left, what kind of note at the right. */}
+          <div className="bbs__head" aria-hidden>
+            <Icon className="bbs__mark" size={22} strokeWidth={1.6} />
+            <span className="bbs__kind">{KIND_WORD[kind]}</span>
+          </div>
+          <h3 className="bbs__label">{title}</h3>
+          <p className="bbs__text">{children}</p>
+          {/* Docket's foot: the applications at the left, the note's one action as a round dark button at the right. */}
+          {((logos && logos.length > 1) || action) && (
+            <div className="bbs__foot">
+              {logos && logos.length > 1 ? <Logos apps={logos} /> : <span />}
+              {action && (
+                <button type="button" className="bbs__act" aria-label={action.label} title={action.label} onClick={action.onClick}>
+                  {action.icon ? <action.icon size={16} strokeWidth={2.4} aria-hidden /> : action.label}
+                </button>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    )
+  }
   return (
     <div className="bb__notice" style={{ '--bb-nudge': `${nudge}px` } as CSSProperties}>
-      <motion.div
-        className="bz7n-sticky"
-        role="note"
-        initial={reduce ? false : { clipPath: FURLED, rotate: 0 }}
-        animate={{ clipPath: ROLLED, rotate: tilt }}
-        transition={{ clipPath: { duration: 0.42, ease: [0.2, 0, 0, 1] }, rotate: { duration: 0.5, ease: [0.3, 0, 0.2, 1] } }}
-      >
+      <motion.div className="bz7n-sticky" role="note" {...unroll}>
         <span className="bz7n-sticky__tape" aria-hidden />
         <h3 className="bz7n-sticky__label">{title}</h3>
         {logos && logos.length > 1 && <Logos apps={logos} />}
@@ -109,7 +177,7 @@ function Sticky({ id, title, logos, children }: { id: string; title: string; log
 /** The board's sticky note, for a page that is not the board: the template preview says what Use will do on one (owner, 3 Nov 2026). */
 export function StickyNote({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <Sticky id={id} title={title}>
+    <Sticky id={id} title={title} kind="note">
       {children}
     </Sticky>
   )
@@ -124,7 +192,7 @@ export function PolicyNotice({ policy, audience }: { policy: Policy; audience?: 
 
   if (policy.copiedFrom && policy.status === 'draft') {
     return (
-      <Sticky id={policy.id} title={`A copy of ${policy.copiedFrom}`} logos={on}>
+      <Sticky id={policy.id} title={`A copy of ${policy.copiedFrom}`} logos={on} kind="copy">
         {on.length === 1 ? <>Only <AppInline app={on[0]} /> is on this copy.</> : on.length > 1 ? 'Only these applications are on this copy.' : 'No application is on this copy yet.'}{' '}
         The rules are the same; the original keeps its other applications.
       </Sticky>
@@ -133,11 +201,14 @@ export function PolicyNotice({ policy, audience }: { policy: Policy; audience?: 
 
   if (on.length > 1) {
     return (
-      <Sticky id={policy.id} title="Shared policy" logos={on}>
+      <Sticky id={policy.id} title="Shared policy" logos={on} kind="shared">
         {`A save reaches all of these applications, and ${whoText(audience)} on them.`}
       </Sticky>
     )
   }
 
+  /* "No application yet" stood here as an issue note (`stickyKinds`), taken out the same day (owner, 26 Nov 2026: "we
+     don't need this"): the start node and the bar already say a policy has no application. The issue kind's colour
+     stays for a note that needs it. */
   return null
 }

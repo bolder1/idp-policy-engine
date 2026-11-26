@@ -180,6 +180,8 @@
 }
 /* Fixed-content columns, sized to their content rather than to their share. */
 .btable__col-status { width: 128px; }
+/* Room for the status and "Has draft" side by side (rollout `draftTag`): the tag was cut at 128. */
+.btable__col-status.is-tagged { width: 204px; }
 /* "Opened 12 min ago" and "Added Sep 22, 2026" both fit on one line. */
 .btable__col-activity { width: 176px; }
 .btable__activity { color: var(--text-secondary); white-space: nowrap; }
@@ -1077,6 +1079,51 @@ tr:hover .bpol__template-mark,
 /* Policies: pick rows, act on several (6 Nov 2026). */
 .btable__col-pick { width: 40px; padding-right: 0 !important; }
 .bpol__pick { width: 16px; height: 16px; margin: 0; accent-color: var(--blue, var(--text-primary)); cursor: pointer; vertical-align: middle; }
+
+/* The checkbox, drawn (rollout.ts `checkLook`; owner, 26 Nov 2026: "a better new one which looks pretty"). Still the
+   native input, so keyboard, label and screen reader are unchanged; `appearance: none` hands its look to these rules. The
+   tick and the dash are one mask on `::before`, drawn in white over the blue fill, and scale in on the fast duration
+   token, which is 0ms under reduced motion. Selection is blue, never orange. */
+.bpol__pick.is-look {
+  --pick-on: var(--blue, var(--accent));
+  appearance: none;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--text-primary) 6%, transparent);
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bpol__pick.is-look::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  background: var(--text-inverse);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  transform: scale(0.4);
+  opacity: 0;
+  transition: transform var(--dur-normal) cubic-bezier(0.34, 1.56, 0.64, 1), opacity var(--dur-fast) var(--ease-standard);
+}
+.bpol__pick.is-look:hover { border-color: var(--pick-on); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pick-on) 14%, transparent); }
+.bpol__pick.is-look:checked,
+.bpol__pick.is-look:indeterminate { border-color: var(--pick-on); background: var(--pick-on); box-shadow: 0 1px 2px color-mix(in srgb, var(--pick-on) 40%, transparent); }
+.bpol__pick.is-look:checked::before { transform: scale(1); opacity: 1; }
+/* Part of the list ticked: a dash in place of the tick. */
+.bpol__pick.is-look:indeterminate::before {
+  -webkit-mask: none;
+  mask: none;
+  width: 8px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  transform: scale(1);
+  opacity: 1;
+}
+.bpol__pick.is-look:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--focus-ring); }
 /* Next step (Policies.tsx): a moved draft's Publish, in a column of its own (owner, 6 Nov 2026). */
 .btable__col-next { width: 128px; }
 

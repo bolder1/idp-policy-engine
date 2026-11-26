@@ -1,0 +1,56 @@
+/* Card peeks (card-peek.tsx, rollout.ts `cardPeeks`). Tokens only; every rule hangs off `.bpeek`, the popover, or
+   `.bpeek-t`, the chip that opens it. */
+
+/* The chip: the card's own chip, with a dotted underline that says there is more behind it, and a quiet wash while
+   its peek is open. A condition's values are one trigger over a run of chips. */
+.bpeek-t {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  outline: none;
+}
+.bpeek-t.is-wide { flex-wrap: nowrap; }
+.bpeek-t:hover,
+.bpeek-t.is-open { background: color-mix(in srgb, var(--blue, var(--accent)) 8%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue, var(--accent)) 8%, transparent); }
+.bpeek-t.is-pinned { box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue, var(--accent)) 35%, transparent); }
+.bpeek-t:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* The peek: the popover's card, a heading, short rows. */
+.bpeek .bpeek__in { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
+.bpeek__head { display: flex; flex-direction: column; gap: var(--space-1); }
+.bpeek__kicker { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bpeek__title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bpeek__sec { display: flex; flex-direction: column; gap: var(--space-2); }
+.bpeek__sectitle { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bpeek__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.bpeek__row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
+.bpeek__row:not(:has(.bpeek__ico)) { grid-template-columns: minmax(0, 1fr) auto; }
+.bpeek__ico { display: grid; place-items: center; color: var(--text-tertiary); }
+.bpeek__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+.bpeek__meta { color: var(--text-tertiary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bpeek__more { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bpeek__line { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary); }
+.bpeek__quote {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--fb-negative-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.bpeek__risk { margin: 0; align-self: flex-start; padding: 0 var(--space-3); border-radius: var(--radius-md); font-size: var(--fs-sm); font-weight: var(--fw-medium); line-height: 22px; }
+.bpeek__risk.is-low { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bpeek__risk.is-medium { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bpeek__risk.is-high { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+/* Then's steps, in order, one under the next. */
+.bpeek__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.bpeek__step { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-primary); }
+.bpeek__step em { margin-left: var(--space-2); font-style: normal; color: var(--text-tertiary); }
+.bpeek__step.is-stop { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
+.bpeek__arrow { flex: none; color: var(--text-tertiary); }

@@ -12,12 +12,17 @@ import { listNames } from '../rule-who'
 import { AlsoNote } from './AppProtection'
 import { policyOption } from './policy-option'
 import { REPLACE_IN_POPUP, REPLACE_MAKES_DRAFT, attachKind, attachTo, detachFrom, type AttachKind } from './app-policies'
-import { appStanding, deciderChanges, rowTip, takenFrom, type RowState } from './app-standing'
+import { appStanding, deciderChanges, rowTip, takenFrom, whoLabel, type RowState } from './app-standing'
 import { replaceFacts, replaceTone } from './applications-model'
 import { ReplaceCard } from './replace-dialog'
 import { SliderActions } from './select-rows'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
 import { useViewEdit } from './board/draft-model'
+import { PolicyPickCard } from './add-existing-cards'
+import { shows } from '../rollout'
+
+/* Add existing policy's cards: Active and Inactive policies only (rollout.ts `addExistingCards`). */
+const CARDS: boolean = shows('addExistingCards')
 
 /* -----------------------------------------------------------------------------
    Add existing policy, from an application's Policies tab.
@@ -183,6 +188,27 @@ export function AddExistingPolicy({
     return k ? options.filter((o) => (o.label + ' ' + (o.meta ?? '')).toLowerCase().includes(k)) : options
   }, [options, q])
 
+  /* The cards (`addExistingCards`, Add only): what can be added and decides something once it is here — Active or
+     Inactive sign-in policies, not on this application. No application first (nothing else is using them), then the ones
+     on other applications. Searched by name and by the applications they are on. */
+  const cardGroups = useMemo(() => {
+    if (!CARDS || replacing) return null
+    const k = q.trim().toLowerCase()
+    const fits = policies.filter(
+      (p) =>
+        !p.isSystem &&
+        !isPostSignIn(p) &&
+        p.type === 'App Access' &&
+        (p.status === 'active' || p.status === 'inactive') &&
+        attachKind(p, app.id) !== 'already-here' &&
+        (!k || [p.name, ...appsOf(p, apps).map((a) => a.name)].join(' ').toLowerCase().includes(k)),
+    )
+    return [
+      { title: 'No application', items: fits.filter((p) => p.appIds.length === 0) },
+      { title: 'On other applications', items: fits.filter((p) => p.appIds.length > 0) },
+    ].filter((g) => g.items.length > 0)
+  }, [policies, app.id, apps, q, replacing])
+
   const picked = pickId ? (policies.find((p) => p.id === pickId) ?? null) : null
   /* Deleted since it was picked, or found gone when Add re-read it. */
   const lost = gone || (pickId !== null && !picked)
@@ -341,6 +367,38 @@ export function AddExistingPolicy({
           >
             Change policy
           </Button>
+        </div>
+      ) : cardGroups ? (
+        <div className="bapp__pick" ref={pickList}>
+          <SearchBox block value={q} onChange={setQ} placeholder="Search policies" label="Search policies" />
+          {cardGroups.length === 0 &&
+            (q.trim() ? (
+              <NoMatches compact noun="policies" query={q} onClear={() => setQ('')} />
+            ) : (
+              <p className="bapp__pickgroup">No active or inactive policies to add</p>
+            ))}
+          {cardGroups.map((g) => (
+            <Fragment key={g.title}>
+              <h3 className="bapp__pickgroup">{g.title}</h3>
+              <div className="bpk-list">
+                {g.items.map((p) => (
+                  <PolicyPickCard
+                    key={p.id}
+                    policy={p}
+                    apps={apps}
+                    audience={whoLabel(p, groups, users)}
+                    onPick={() => {
+                      refocus.current = 'picked'
+                      setPickId(p.id)
+                      setGone(false)
+                      setRulesOpen(false)
+                    }}
+                  />
+                ))}
+              </div>
+            </Fragment>
+          ))}
+          {tried && !picked && <p className="bz7__fielderr" role="alert">Choose a policy.</p>}
         </div>
       ) : (
         <div className="bapp__pick" ref={pickList}>

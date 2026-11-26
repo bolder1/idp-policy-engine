@@ -906,3 +906,47 @@
 
 /* The v1/v2 preview switch at the head of the attribute menu (9 Oct 2026). */
 .cp__attrver { padding: var(--space-3) var(--space-4) 0; }
+
+/* --- Device profile's risk level (rollout.ts `profileRisk`, ConditionPopover.tsx) -----------------------------------
+   Under the profile list: a label and one row of four, Any / Low / Medium / High. The chosen one fills in its level's
+   tint (Low green, Medium amber, High red) so the level reads before the word; Any fills in the neutral step. On the
+   field, the same tint on the tag beside the profile. The fixed "is" reads at the field's own weight, not greyed. */
+.cp__risk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+}
+.cp__risk__label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.cp__risk__seg {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.cp__risk__opt {
+  height: var(--space-8);
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.cp__risk__opt:hover { color: var(--text-primary); }
+.cp__risk__opt:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.cp__risk__opt.is-on { background: var(--surface-raised); border-color: var(--border-default); color: var(--text-primary); font-weight: var(--fw-medium); box-shadow: var(--el-low); }
+.cp__risk__opt.is-on.is-low { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.cp__risk__opt.is-on.is-medium { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.cp__risk__opt.is-on.is-high { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+.cp__risktag.is-low { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.cp__risktag.is-medium { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.cp__risktag.is-high { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bb__insp .cp__risktag.is-low { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bb__insp .cp__risktag.is-medium { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bb__insp .cp__risktag.is-high { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.cp__stackrow > .cp__fld.is-idle.is-fixed { color: var(--text-secondary); }

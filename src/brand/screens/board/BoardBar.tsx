@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { DemoButton } from '../../tour/DemoButton'
 import { Button, IconButton, NameField, RowMenu, type MenuItem } from '../../kit'
 import type { Policy } from '../../data'
-import { ChangeState } from '../../leave-guard'
+import { ChangeState, DraftTag } from '../../leave-guard'
+import { DRAFT_TAG } from '../../draft-tag'
 import { isUntitled, type RuleSet } from '../../policy-draft'
 import { POLICY_NAME_MAX, policyNameIssue } from '../../policy-name'
 import { isPostSignIn } from '../../post-sign-in'
@@ -305,7 +306,7 @@ export function BoardBar({
         {!hideStatus && !(NEW_POLICY_UNSAVED && (store.policyById(policy.id) ?? policy).provisional) && (
           <StatusControl still={STATUS_IN_MENU} policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} turnOnAsk={turnOnAsk} />
         )}
-        {chip !== undefined ? chip : <ChangeState unsaved={unsaved} draft={draftSaved} />}
+        {chip !== undefined ? chip : DRAFT_TAG && draftSaved && !unsaved ? <DraftTag /> : <ChangeState unsaved={unsaved} draft={draftSaved} />}
         {beside}
       </nav>
 

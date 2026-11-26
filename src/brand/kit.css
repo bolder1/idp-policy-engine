@@ -1616,6 +1616,8 @@ html[data-theme='dark'] {
   --badge-max: 24ch;
   flex: none;
 }
+/* A badge's mark (Badge `icon`; only the draft tag draws one, rollout `draftTag`): never squeezed by a long word. */
+.bx-badge__icon { flex: none; }
 
 /* --- The one delete confirmation (screens/confirm-delete.tsx) ------------------
 

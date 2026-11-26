@@ -10,6 +10,7 @@ import { useBrand, useNameLookup } from '../../store'
 import { outsideAudience } from '../../audience-ops'
 import { normaliseWho, type WhoKind, type WhoList } from '../../rule-who'
 import { shows } from '../../rollout'
+import { WHO_COUNT, countWord } from '../../who-count'
 import { useShows } from './builder-version'
 import { gapText, useRuleGaps } from './rule-gaps'
 
@@ -331,7 +332,14 @@ function WhoRow({
       </span>
       <span className="bb__whorow__label">{word.many}</span>
       <span className="bb__whorow__val">
-        <FaceStack faces={faces} />
+        {/* Counts (rollout.ts `whoCount`): the number in link blue, and a press on it is the review the eye opened. */}
+        {WHO_COUNT ? (
+          <button type="button" className="bb__whorow__count" aria-label={`View ${word.noun}: ${countWord(kind, faces.length)}`} onClick={() => onOpen('chosen')}>
+            {countWord(kind, faces.length)}
+          </button>
+        ) : (
+          <FaceStack faces={faces} />
+        )}
       </span>
       {outside > 0 && (
         <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
@@ -339,7 +347,7 @@ function WhoRow({
         </span>
       )}
       <span className="bb__whorow__acts">
-        <IconButton size="sm" tone="ghost" icon={Eye} label={`View ${word.noun}`} onClick={() => onOpen('chosen')} />
+        {!WHO_COUNT && <IconButton size="sm" tone="ghost" icon={Eye} label={`View ${word.noun}`} onClick={() => onOpen('chosen')} />}
         <IconButton size="sm" tone="ghost" icon={Pencil} label={`Edit ${word.noun}`} onClick={() => onOpen('all')} />
       </span>
     </div>

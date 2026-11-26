@@ -86,7 +86,8 @@ import { boardShortcuts, chord, isMacPlatform } from './shortcuts'
 
 import { boardTourSeen } from '../../tour/board-tour'
 
-import { ChangeState, useLeaveGuard } from '../../leave-guard'
+import { ChangeState, DraftTag, useLeaveGuard } from '../../leave-guard'
+import { DRAFT_TAG } from '../../draft-tag'
 import { shows } from '../../rollout'
 
 /* Leaving a canvas that holds no rule asks first (owner, 20 Nov 2026). rollout.ts `noRuleAlert`. */
@@ -107,6 +108,9 @@ const FALLBACK_SAVES_RULE: boolean = shows('fallbackSavesRule')
 /* A rule with unsaved changes open in the panel quiets the bar's primary; Save rule closes the panel (rollout.ts
    `ruleSaveFocus`). */
 const RULE_SAVE_FOCUS: boolean = shows('ruleSaveFocus')
+/* Simple's Save rule keeps the rule on the board and stores no draft: Save draft is the one way to store one (rollout.ts
+   `ruleSaveOnly`; owner, 26 Nov 2026: "just save the rule and then let it be"). */
+const RULE_SAVE_ONLY: boolean = shows('ruleSaveOnly')
 /* Nothing being said: one array, so the context does not change identity on every render. */
 const NO_GAPS: readonly RuleGap[] = []
 const NO_TRIED: ReadonlySet<string> = new Set()
@@ -125,7 +129,7 @@ import { CondTagsContext } from './cond-tags'
 import { markRolledBack, useExperience, useMovedState } from '../../migrate/experience'
 import { RolledBackNote } from '../../migrate/moved-status'
 import { useWalkPublished } from '../../migrate/walk-published'
-import { FIX_SAVE_AND_PUBLISH, FIX_VERSION_BAR, FIX_VIEW_ON_CANVAS, LIVE_PANEL, NOTHING_LIVE, NO_APP_ASK, NO_APP_BODY, NO_APP_REASON, NO_CHANGE_YET, PUBLISH_ASK, SAVE_AND_ACTIVATE, SAVE_AND_PUBLISH, SAVE_ASK, SIMPLE_DRAFT_TOAST, draftAppsOf, isPublished, liveConfirmBody, offersLiveView, opensInDraftMode, publishToast, reachesSignIns, simpleSaveToast, useDraftModel } from './draft-model'
+import { DRAFT_LOOK, FIX_SAVE_AND_PUBLISH, FIX_VERSION_BAR, FIX_VIEW_ON_CANVAS, LIVE_PANEL, NOTHING_LIVE, NO_APP_ASK, NO_APP_BODY, NO_APP_REASON, NO_CHANGE_YET, PUBLISH_ASK, SAVE_AND_ACTIVATE, SAVE_AND_PUBLISH, SAVE_ASK, SIMPLE_DRAFT_TOAST, draftAppsOf, isPublished, liveConfirmBody, offersLiveView, opensInDraftMode, publishToast, reachesSignIns, simpleSaveToast, useDraftModel } from './draft-model'
 import { DraftModeChip, LiveVersionPopup, PublishedPanel, ViewEditActions } from './view-edit'
 import { DEFAULT_FLIPS, adminFallback, defaultFlip, withFlip, type DefaultFlip } from './default-flip'
 import { DefaultFlipNote } from './default-flip-note'
@@ -763,7 +767,7 @@ export function BoardBuilder({
       setSavedFallback(JSON.stringify(f))
       setSavingRule(null)
       store.showToast(`${f.name.trim() || 'Nothing else matched'} saved`)
-      if (RULE_SAVE_FOCUS && simple && !post) saveRuleToPolicy()
+      if (RULE_SAVE_FOCUS && !RULE_SAVE_ONLY && simple && !post) saveRuleToPolicy()
       if (RULE_SAVE_FOCUS) closeAfterRuleSave(byId('bb-terminal-title'))
     }, RULE_SAVE_MS)
   }
@@ -779,7 +783,7 @@ export function BoardBuilder({
       setSavedRules((all) => ({ ...all, [id]: JSON.stringify(r) }))
       setSavingRule(null)
       store.showToast(`${r.name.trim() || 'Rule'} saved`)
-      if (RULE_SAVE_FOCUS && simple && !post) saveRuleToPolicy()
+      if (RULE_SAVE_FOCUS && !RULE_SAVE_ONLY && simple && !post) saveRuleToPolicy()
       if (RULE_SAVE_FOCUS) closeAfterRuleSave(byId(`bb-rule-${id}-title`))
     }, RULE_SAVE_MS)
   }
@@ -1046,6 +1050,12 @@ export function BoardBuilder({
      exists for inactive"): Save rule stores onto the policy itself, with no Draft tag and no Show live version
      (rollout.ts `ruleSaveFocus`). */
   const oneVersion = RULE_SAVE_FOCUS && simple && !post && saved?.status === 'inactive'
+  /* Simple's draft mode, by look (rollout.ts `draftLook`; owner, 26 Nov 2026: "whatever you can see is in draft mode …
+     distinguish it by the top bar", then "change the color of the canvas" instead): the board is not what people sign
+     in with — a saved draft, edits not saved, or a policy never active. The canvas takes the draft tint (board.css
+     `.bb.is-draft-look`), the bar a Draft tag in place of the status pill, and Show active version stands. Otherwise the board IS the active version: the pill, and no version button. An Inactive policy has
+     one version (`oneVersion`), so it never wears the draft look. */
+  const draftLook = DRAFT_LOOK && simple && !post && !!saved && !oneVersion && (hasDraft || live || !isPublished(saved))
   /* "View and edit": draft mode once Edit is pressed, or from the start on a new policy; the view otherwise. The view
      is read only and carries the status; draft mode has no status at all. */
   /* A post sign-in policy is outside the mode: its board is as in Today. */
@@ -2904,13 +2914,15 @@ export function BoardBuilder({
             : undefined
         }
         /* No status on the start chooser either (owner, 23 Nov 2026), with `statusInMenu`. */
-        hideStatus={(STATUS_IN_MENU && onChooser) || statusHidden}
+        hideStatus={(STATUS_IN_MENU && onChooser) || statusHidden || draftLook}
         noRename={viewShown}
         unsaved={unsaved}
         draftSaved={hasDraft}
         /* "View and edit": the view keeps the bar's own "Draft not published" pill while a saved draft waits (undefined
            draws it); draft mode says itself on the canvas (DraftModeChip). */
-        chip={v3s.on ? v3s.chip : RULE_SAVE_FOCUS && simple && !post ? (hasDraft && !oneVersion ? <ChangeState unsaved={false} draft /> : null) : viewEdit ? (viewShown && hasDraft ? undefined : null) : viewOnCanvas ? null : fix ? <FixChip unsaved={unsaved} draft={saved?.pendingDraft} /> : undefined}
+        /* Simple under `draftLook`: the Draft tag in draft mode, nothing on the active version. Under `draftTag` alone: Has
+           draft beside the status while a saved draft waits. */
+        chip={v3s.on ? v3s.chip : DRAFT_LOOK && simple && !post ? (draftLook ? <DraftTag mode /> : null) : DRAFT_TAG && simple && !post ? (hasDraft && !oneVersion ? <DraftTag /> : null) : RULE_SAVE_FOCUS && simple && !post ? (hasDraft && !oneVersion ? <ChangeState unsaved={false} draft /> : null) : viewEdit ? (viewShown && hasDraft ? undefined : null) : viewOnCanvas ? null : fix ? <FixChip unsaved={unsaved} draft={saved?.pendingDraft} /> : undefined}
         beside={liveOffered && !v3s.historyOpen && !viewOnCanvas ? <LiveDraftSwitch value={canvasView} onChange={setCanvasView} inUse={reachesSignIns(saved)} /> : undefined}
         edits={boardEdits}
         onEditsFix={(next, toast) => {
@@ -2963,7 +2975,8 @@ export function BoardBuilder({
                   publishedOpen={PUBLISHED_LEFT && !simple ? pubPanel : pubOpen}
                   /* Simple: "Show live version" in every edit state, greyed while nothing is live (owner, 25 Nov 2026). */
                   simple={simple}
-                  hideLive={oneVersion}
+                  /* `draftLook`: the version button stands in draft mode only; on the active version there is nothing else to show. */
+                  hideLive={oneVersion || (DRAFT_LOOK && simple && !draftLook)}
                   /* Simple: greyed until the board differs from what is live, as Save draft and Save policy wait. */
                   liveOff={!isPublished(saved) ? NOTHING_LIVE : NO_CHANGE_YET}
                   onTogglePublished={
@@ -3101,7 +3114,7 @@ export function BoardBuilder({
          under Check access is only hidden (check-access.css). */
       /* Describe it opens its own leading track and keeps the right one
          closed (V4 §4.1): the inspector never stands beside it. */
-      className={`bb ${testOn ? 'is-checking' : ''}${movedDraft ? ' is-moved-view' : ''}${liveView ? ' is-live-view' : ''}${viewOnCanvas || viewShown ? ' is-view-pick' : ''}${movedRing ? ' is-moved-hi' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : movedOpen ? ' is-guided is-guided-left' : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown || v3Panel || (pubPanel && !pubLeft)) ? '' : 'is-insp-closed'}${pubLeft ? ' is-pub-left' : ''}${flipNote ? ' is-default-flip' : ''} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
+      className={`bb ${testOn ? 'is-checking' : ''}${movedDraft ? ' is-moved-view' : ''}${liveView ? ' is-live-view' : ''}${viewOnCanvas || viewShown ? ' is-view-pick' : ''}${movedRing ? ' is-moved-hi' : ''} ${describeOpen && !GUIDED_SETUP ? 'is-left-open' : ''}${guidedOpen ? ` is-guided is-guided-${guidedSide}${canvasLocked ? ' is-guided-locked' : ''}` : movedOpen ? ' is-guided is-guided-left' : ''} ${(testOn ? checkPanel !== null : guidedRight || panelShown || readOpen || fixesShown || v3Panel || (pubPanel && !pubLeft)) ? '' : 'is-insp-closed'}${pubLeft ? ' is-pub-left' : ''}${flipNote ? ' is-default-flip' : ''}${draftLook ? ' is-draft-look' : ''} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}${cooking && describeOpen ? ' is-cooking' : ''}`}
       style={{ '--bb-insp': `${guidedRight ? GUIDED_W : colW}px` } as React.CSSProperties}
       data-cond-link={condLink ?? undefined}
     >

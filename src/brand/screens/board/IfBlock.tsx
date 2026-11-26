@@ -4,6 +4,15 @@ import { ArrowRight, Braces, CornerDownRight, Split, Users } from 'lucide-react'
 
 import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
 import { FaceStack, type FaceItem } from '../../faces'
+import { WHO_COUNT, whoCountWords } from '../../who-count'
+import { PROFILE_RISK, riskWords } from '../../risk-level'
+import { CARD_PEEKS } from './card-peek-store'
+import { PeekTrigger } from './card-peek'
+import { CondPeek, ThenPeek, WhoPeek } from './card-peek-content'
+import { shows } from '../../rollout'
+
+/* Nobody named is the Default group on this line (rollout.ts `whoDefaultGroup`), so the card counts it as one. */
+const WHO_DEFAULT_GROUP: boolean = shows('whoDefaultGroup')
 import { conditionName, conditionType, zoneScopeOf, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import { postActionLabel } from '../../post-sign-in'
@@ -223,7 +232,8 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
 export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup }) {
   const t = conditionType(c.typeId)
   /* "Event hours", not "Sign-in hours", on a post sign-in policy (data.ts `postLabel`). */
-  const name = conditionName(c, usePostBoard().on)
+  const post = usePostBoard().on
+  const name = conditionName(c, post)
   const Ico = conditionIcon(t.id, t.group)
   const tone = conditionTone(t.id, t.group)
   /* Which half of each zone (per zone since 22 Sep 2026). One half shared by
@@ -252,7 +262,8 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
       <IfChip tone={tone} variant="attr" icon={<Ico size={11} strokeWidth={2.2} />} title={t.group}>
         {name}
       </IfChip>
-      <IfKw tone="op">{c.operator}</IfKw>
+      {/* Device profile reads "is" (rollout `profileRisk`), as its panel field does. */}
+      <IfKw tone="op">{PROFILE_RISK && t.valueKind === 'fingerprint' && c.operator === 'matches' ? 'is' : c.operator}</IfKw>
       {/* As many names as the line holds, then how many more.
 
           Every value was a chip, so a condition naming eleven zones drew
@@ -260,16 +271,33 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
           size. The overflow is honest about being a count: it says how many are
           not shown rather than trailing off, and the full list is on the
           chip's title and in the panel — which is where a list belongs. */}
-      {shown.map((v, i) => (
-        <IfChip key={i} variant="val" unset={v.unset}>
-          {v.text}
-        </IfChip>
-      ))}
-      {rest > 0 && (
-        <IfChip variant="val" title={chips.map((v) => v.text).join(', ')}>
-          +{rest}
-        </IfChip>
-      )}
+      {(() => {
+        const values = (
+          <>
+            {shown.map((v, i) => (
+              <IfChip key={i} variant="val" unset={v.unset}>
+                {v.text}
+              </IfChip>
+            ))}
+            {rest > 0 && (
+              <IfChip variant="val" title={chips.map((v) => v.text).join(', ')}>
+                +{rest}
+              </IfChip>
+            )}
+            {/* The profile's risk level, its own chip after the profile (rollout `profileRisk`). */}
+            {PROFILE_RISK && t.valueKind === 'fingerprint' && c.risk && <span className={`bb__ifrisk is-${c.risk}`}>{riskWords(c.risk)}</span>}
+          </>
+        )
+        /* What is behind the values, on hover or a click (rollout `cardPeeks`): the zone's entries, the profile's
+           checks, the days and hours, the people. Not for a value nobody has set. */
+        return CARD_PEEKS && chips.length > 0 && !chips.every((v) => v.unset) ? (
+          <PeekTrigger id={`cond:${c.id}`} label={`${name}: ${chips.map((v) => v.text).join(', ')}`} wide content={() => <CondPeek c={c} post={post} />}>
+            {values}
+          </PeekTrigger>
+        ) : (
+          values
+        )
+      })()}
       {/* Which half of the zone, when it is narrower than the zone as written.
 
           A zone is an AND of a network section and a geographic one, and a
@@ -340,7 +368,16 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
       ) : (
       <IfSub className="bb__ifaction">
         {token}
-        {control ?? <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>}
+        {control ??
+          /* The outcome, behind its chip on hover or a click (rollout `cardPeeks`): the steps in order, what is remembered,
+             and on a Deny its message, next step and alerts. */
+          (CARD_PEEKS ? (
+            <PeekTrigger id={`then:${rule.id}`} label={`Then: ${DECISION_NAME[rule.decision]}`} content={() => <ThenPeek rule={rule} />}>
+              <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
+            </PeekTrigger>
+          ) : (
+            <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
+          ))}
         <span className="bb__ifjourney" aria-label="The sign-in journey this produces">
           {journey.map((s, i) => (
             <Fragment key={s.id}>
@@ -460,6 +497,16 @@ export function IfBlock({
       ]
     : []
   const whoFull = whoSummary(rule.who, whoName, Infinity)
+  /* Who the rule is about, behind its words on hover or a click (rollout `cardPeeks`): the groups with their sizes,
+     the people with their emails, the exceptions. */
+  const peekWho = (chip: ReactNode, label: string) =>
+    CARD_PEEKS ? (
+      <PeekTrigger id={`who:${rule.id}`} label={label} content={() => <WhoPeek rule={rule} />}>
+        {chip}
+      </PeekTrigger>
+    ) : (
+      chip
+    )
 
   /* Nothing is drawn until it has been ANSWERED.
 
@@ -496,10 +543,20 @@ export function IfBlock({
             <span className="bb__ifkw">who</span>
           </div>
           <IfSub className="bb__ifwho">
-            <span className="bb__ifchip bb__ifwho__all">
-              <Users size={12} strokeWidth={2} aria-hidden />
-              Everyone
-            </span>
+            {peekWho(
+              WHO_COUNT && WHO_DEFAULT_GROUP ? (
+                /* Counts (rollout.ts `whoCount`): nobody named is the Default group, as the panel's Groups row says. */
+                <span className="bb__ifwho__count" title={CARD_PEEKS ? undefined : 'Default: everyone this policy covers'}>
+                  {whoCountWords(1, 0)}
+                </span>
+              ) : (
+                <span className="bb__ifchip bb__ifwho__all">
+                  <Users size={12} strokeWidth={2} aria-hidden />
+                  Everyone
+                </span>
+              ),
+              'Who: everyone this policy covers',
+            )}
             {mark?.('who')}
           </IfSub>
         </>
@@ -529,7 +586,21 @@ export function IfBlock({
             <span className="bb__ifkw">who</span>
           </div>
           <IfSub className="bb__ifwho">
-            {whoFaces.length > 0 ? <FaceStack faces={whoFaces} max={6} /> : <span className="bb__ifwho__text">Everyone</span>}
+            {whoFaces.length > 0 ? (
+              peekWho(
+                WHO_COUNT ? (
+                  /* Counts (rollout.ts `whoCount`): the same words the panel's rows say. */
+                  <span className="bb__ifwho__count" title={CARD_PEEKS ? undefined : whoFull}>
+                    {whoCountWords(whoFaces.filter((f) => f.kind === 'group').length, whoFaces.filter((f) => f.kind === 'user').length)}
+                  </span>
+                ) : (
+                  <FaceStack faces={whoFaces} max={6} />
+                ),
+                `Who: ${whoFull}`,
+              )
+            ) : (
+              <span className="bb__ifwho__text">Everyone</span>
+            )}
             {whoExcept.length > 0 && (
               <span className="bb__ifwho__text" title={whoFull}>
                 except {whoExcept.join(', ')}

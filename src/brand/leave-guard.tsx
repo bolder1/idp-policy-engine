@@ -1,12 +1,30 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { FilePen } from 'lucide-react'
 
 import { Badge, Confirm } from './kit'
 import { useBrand, type LeaveGuard } from './store'
 import { useSimpleDraft } from './screens/board/draft-model'
 import { shows } from './rollout'
+import { HAS_DRAFT } from './draft-tag'
 
 /** A saved draft is said where saving and activity live, not as a pill beside the status (rollout `draftOffPill`). */
 const DRAFT_OFF_PILL: boolean = shows('draftOffPill')
+/** Unsaved changes says what is at stake under its title (rollout `leaveSubhead`). */
+const LEAVE_SUBHEAD: boolean = shows('leaveSubhead')
+
+
+/* The draft's tag (owner, 26 Nov 2026: "active but also have draft … the user should be distinguished between 'my thing
+   is activated' and 'one thing is already inside the draft that I can go through'"). The status pill says what is live;
+   this says a draft waits. Its own words and a pencil, so it never reads as a second status: "Draft" alone did, because
+   Draft is also a status (owner, earlier the same day: "active and draft feels confusing"). */
+export function DraftTag({ mode = false }: { mode?: boolean }) {
+  /* `mode`: the builder's bar in draft mode (rollout `draftLook`), where the board on screen IS the draft: "Draft". */
+  return (
+    <Badge tone="info" icon={FilePen} className="bx-change bx-draft-tag">
+      {mode ? 'Draft' : HAS_DRAFT}
+    </Badge>
+  )
+}
 
 /* --- Leaving a screen with unsaved work ---------------------------------------
 
@@ -141,7 +159,16 @@ export function LeaveDialog() {
           as a sentence. A body earns its place here only when it says something
           they cannot — why saving is blocked, or that there is no way to keep
           this work. */}
-      {reason ? `This can't be saved yet. ${reason}` : p?.canSave ? undefined : 'Leaving discards your changes.'}
+      {/* With Save on offer, a subheading under the title as the no-application ask has one (rollout `leaveSubhead`;
+          owner, 26 Nov 2026: "add the subheading as we have for when we have no application"): what is at stake, then
+          the two ways out, in the buttons' own words. */}
+      {reason
+        ? `This can't be saved yet. ${reason}`
+        : p?.canSave
+          ? LEAVE_SUBHEAD
+            ? `Your changes here are not saved yet. ${p.saveLabel} to keep them, or discard them.`
+            : undefined
+          : 'Leaving discards your changes.'}
     </Confirm>
   )
 }

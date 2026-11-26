@@ -4,7 +4,8 @@ import { ChevronDown, RefreshCw, ShieldAlert } from 'lucide-react'
 
 import { ChangeList, ChangeSection, type ChangeBlock, type ChangeItem } from '../change-list'
 import { DECISION_WORDS } from '../decision-words'
-import { Badge, Button, Callout, Drawer, Field, Modal, TipDot } from '../kit'
+import { Badge, Button, Callout, Confirm, Drawer, Field, Modal, TipDot } from '../kit'
+import { shows } from '../rollout'
 import { CharCount } from '../CharCount'
 import { listNames } from '../rule-who'
 import { CRITICAL_GUARD, TESTER } from '../tester'
@@ -70,6 +71,9 @@ const TITLE: Record<GuardKind, string> = {
   'turn-off': ACTIVE_WORDS ? 'Before making it inactive' : 'Before turning off',
   'to-monitor': 'Before switching to monitoring',
 }
+
+/* The critical popup as the hero ask, and a failed check as a warning the admin may go past (rollout.ts `guardHero`). */
+const GUARD_HERO: boolean = shows('guardHero')
 
 /* The critical popup's titles (CRITICAL_GUARD): the question it asks, in active / inactive words (owner, 5 Nov 2026). */
 const POPUP_TITLE: Record<GuardKind, string> = {
@@ -652,6 +656,28 @@ export function GuardDrawer({
         : starts.length
           ? `It starts deciding sign-ins for ${listNames(starts, 3)} as soon as you confirm.`
           : decidingSummary(r.deciding)
+    /* The hero shape the Discard and "No application chosen" asks have (rollout `guardHero`; owner, 26 Nov 2026: "make
+       this similar like we did for discard and application popups", then "let the user know something might go wrong
+       … if he wants he can go, up to user"). A failed check no longer stops the save: it is said, and the admin
+       chooses — Keep editing, or go ahead anyway. The version choice keeps the full popup below. */
+    if (GUARD_HERO && !version) {
+      const more = r && r.blocking.length > 1 ? ` ${r.blocking.length - 1} more ${r.blocking.length === 2 ? 'check' : 'checks'} did not pass.` : ''
+      return (
+        <Confirm
+          open={open}
+          onClose={onClose}
+          tone="warning"
+          shape="hero"
+          title={blocked ? 'Some checks did not pass' : POPUP_TITLE[kind]}
+          cancelLabel={cancelWord}
+          confirmLabel={blocked ? `${primaryLabel} anyway` : primaryLabel}
+          destructive={false}
+          onConfirm={onConfirm}
+        >
+          {blocked ? `${first ? blockLine(first) : blockedReason}${more}` : lead}
+        </Confirm>
+      )
+    }
     return (
       <Modal open={open} onClose={onClose} title={POPUP_TITLE[kind]} width={560} footer={actions}>
         <div className="bgd bgd--popup">

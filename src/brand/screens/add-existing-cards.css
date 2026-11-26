@@ -1,0 +1,50 @@
+/* Add existing policy's cards (add-existing-cards.tsx, rollout.ts `addExistingCards`). Tokens only; every rule hangs off
+   `.bpk`, which only those cards use. */
+.bpk {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard);
+}
+.bpk:hover { border-color: var(--border-default); background: var(--state-hover-bg); }
+.bpk:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* The applications, overlapping a little, each on its own white disc so a light logo still has an edge. */
+.bpk__art { display: inline-flex; align-items: center; min-width: var(--space-9); }
+.bpk__logo {
+  display: grid;
+  place-items: center;
+  width: var(--space-9);
+  height: var(--space-9);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+}
+.bpk__logo + .bpk__logo { margin-left: calc(var(--space-4) * -1); }
+/* No application: the unlinked mark on a dashed disc, quiet. */
+.bpk__art.is-none {
+  justify-content: center;
+  width: var(--space-9);
+  height: var(--space-9);
+  border: var(--bw-thin) dashed var(--border-strong);
+  border-radius: var(--radius-full);
+  color: var(--text-tertiary);
+}
+
+.bpk__main { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bpk__top { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.bpk__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bpk__meta { display: flex; flex-wrap: wrap; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bpk__go { color: var(--text-tertiary); }
+.bpk:hover .bpk__go { color: var(--text-primary); }
+
+.bpk-list { display: flex; flex-direction: column; gap: var(--space-3); }

@@ -204,14 +204,17 @@ describe('Simple on the board', () => {
     expect(inspectorSrc).toContain("const SAVE_RULE_ORANGE: boolean = shows('ruleSaveFocus')")
     expect(inspectorSrc).toContain("variant={SAVE_RULE_ORANGE && saveLeads ? 'brand' : 'secondary'}")
     expect(builderSrc).toContain('saveLeads={ruleSaveLeads}')
-    expect(builderSrc.match(/if \(RULE_SAVE_FOCUS && simple && !post\) saveRuleToPolicy\(\)/g)).toHaveLength(2)
+    /* Unless `ruleSaveOnly` (26 Nov 2026, owner: "just save the rule and then let it be"): then Save rule stores no draft. */
+    expect(builderSrc.match(/if \(RULE_SAVE_FOCUS && !RULE_SAVE_ONLY && simple && !post\) saveRuleToPolicy\(\)/g)).toHaveLength(2)
+    expect(builderSrc).toContain("const RULE_SAVE_ONLY: boolean = shows('ruleSaveOnly')")
     expect(builderSrc).toContain('const saveRuleToPolicy = () => saveDraft({ stay: true })')
     expect(builderSrc).toContain('RULE_SAVE_FOCUS && simple && !post ? (hasDraft && !oneVersion ? <ChangeState unsaved={false} draft /> : null)')
   })
 
   it("keeps an Inactive policy to one version in Simple: Save rule stores onto it, no Draft tag, no Show live version", () => {
     expect(builderSrc).toContain("const oneVersion = RULE_SAVE_FOCUS && simple && !post && saved?.status === 'inactive'")
-    expect(builderSrc).toContain('hideLive={oneVersion}')
+    /* And under `draftLook` the version button stands in draft mode only. */
+    expect(builderSrc).toContain('hideLive={oneVersion || (DRAFT_LOOK && simple && !draftLook)}')
     /* Save draft too saves onto the policy: no pending draft, so no second version. */
     expect(builderSrc).toContain('if (oneVersion) store.savePolicy({ ...latest, ...facts, ...changes, pendingDraft: undefined })')
     expect(builderSrc).toContain('else store.saveDraft(saved.id, changes)')

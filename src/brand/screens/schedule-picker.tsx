@@ -17,8 +17,15 @@ import {
   type Hours,
   type Weekday,
 } from '../schedule'
+import { shows } from '../rollout'
 import { TENANT_TZ } from './sign-in-facts'
 import './schedule-picker.css'
+
+/* Per day first (rollout.ts `perDayFirst`; owner, 26 Nov 2026: "Monday, Tuesday to Saturday, and Sunday should have their
+   own time-based hours … by default, activate the per day … simplify the widget"). The picker opens on Per day, and Per
+   day is a row for EVERY day, Monday to Sunday: the row's tick puts the day in or takes it out, so the separate line of
+   ticks, the Hours label and the week strip go (each row already says its day's hours, "next day" says an overnight). */
+const PER_DAY_FIRST: boolean = shows('perDayFirst')
 
 /* Sign-in time's picker (schedule.ts; owner, 24 Nov 2026: "check Google Calendar how they add meetings … combine these
    two into one"). It opens from the condition's one-line summary, in the value dropdown of the inspector row and of the
@@ -117,8 +124,9 @@ export function SchedulePicker({
      day's, else 09:00 to 18:00. */
   const common: Hours | null = days.length ? days[0].hours : DEFAULT_HOURS
   const differ = days.some((d) => !sameHours(d.hours, common))
-  /* Per day is open by itself only when the days already differ; ticked, it stays open until it is unticked. */
-  const [perDay, setPerDay] = useState(differ)
+  /* Per day is open by itself only when the days already differ; ticked, it stays open until it is unticked. Under
+     `perDayFirst` it opens ticked. */
+  const [perDay, setPerDay] = useState(PER_DAY_FIRST || differ)
   const showRows = perDay || differ
   const daysId = useId()
 
@@ -129,36 +137,112 @@ export function SchedulePicker({
   const setOne = (day: Weekday, h: Hours | null) => write(days.map((d) => ({ day: d.day, hours: d.day === day ? h : d.hours })))
   const isPicked = (pick: readonly Weekday[]) => pick.length === days.length && pick.every((d) => on.has(d))
 
+  /* A day's tick: in the line of seven, and (Per day first) at the start of its own row. */
+  const dayTick = (day: Weekday) => (
+    <button
+      key={day}
+      type="button"
+      role="checkbox"
+      aria-checked={on.has(day)}
+      aria-label={day}
+      className={`sp__day${on.has(day) ? ' is-on' : ''}`}
+      onClick={() => toggleDay(day)}
+    >
+      <span className="bx-tick" aria-hidden>
+        <Check size={11} strokeWidth={3.2} />
+      </span>
+      {SHORT_DAY[day]}
+    </button>
+  )
+  const presets = (
+    <div className="sp__presets" role="group" aria-label="Quick picks">
+      {PRESETS.map((p) => (
+        <button key={p.label} type="button" className={isPicked(p.days) ? 'is-on' : ''} aria-pressed={isPicked(p.days)} onClick={() => setDays(p.days)}>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  )
+  const perDayTick = (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={showRows}
+      className={`sp__perday${showRows ? ' is-on' : ''}`}
+      onClick={() => {
+        /* Back to one range: every day takes the first day's hours, which is what one range means. */
+        if (showRows) setAll(common)
+        setPerDay(!showRows)
+      }}
+    >
+      <span className="bx-tick" aria-hidden>
+        <Check size={11} strokeWidth={3.2} />
+      </span>
+      Per day
+    </button>
+  )
+  const timeZone = (
+    <Picker
+      label="Time zone"
+      size="sm"
+      width="fill"
+      prefix="Time zone"
+      value={tz ?? ''}
+      summary={tz || TENANT_LABEL}
+      options={[{ value: '', label: TENANT_LABEL }, ...TIMEZONES.map((z) => ({ value: z, label: z }))]}
+      onChange={onTz}
+    />
+  )
+
+  if (PER_DAY_FIRST) {
+    return (
+      <div className="sp sp--rows">
+        <div className="sp__field">
+          <div className="sp__labelrow">
+            <span className="sp__label" id={daysId}>
+              Days
+            </span>
+            {perDayTick}
+          </div>
+          {presets}
+          {showRows ? (
+            /* Every day, Monday to Sunday: its tick, then its hours while it is in. */
+            <div className="sp__dayrows" role="group" aria-labelledby={daysId}>
+              {WEEKDAYS.map((day) => (
+                <div key={day} className={`sp__row${on.has(day) ? '' : ' is-out'}`}>
+                  {dayTick(day)}
+                  {on.has(day) && <HoursLine name={day} hours={on.get(day) ?? null} onChange={(h) => setOne(day, h)} />}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="sp__days" role="group" aria-labelledby={daysId}>
+              {WEEKDAYS.map(dayTick)}
+            </div>
+          )}
+        </div>
+        {!showRows && days.length > 0 && (
+          <div className="sp__field">
+            <span className="sp__label">Hours</span>
+            <div className="sp__row is-one">
+              <HoursLine name="Hours" hours={common} onChange={setAll} />
+            </div>
+          </div>
+        )}
+        {timeZone}
+      </div>
+    )
+  }
+
   return (
     <div className="sp">
       <div className="sp__field">
         <span className="sp__label" id={daysId}>
           Days
         </span>
-        <div className="sp__presets" role="group" aria-label="Quick picks">
-          {PRESETS.map((p) => (
-            <button key={p.label} type="button" className={isPicked(p.days) ? 'is-on' : ''} aria-pressed={isPicked(p.days)} onClick={() => setDays(p.days)}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+        {presets}
         <div className="sp__days" role="group" aria-labelledby={daysId}>
-          {WEEKDAYS.map((day) => (
-            <button
-              key={day}
-              type="button"
-              role="checkbox"
-              aria-checked={on.has(day)}
-              aria-label={day}
-              className={`sp__day${on.has(day) ? ' is-on' : ''}`}
-              onClick={() => toggleDay(day)}
-            >
-              <span className="bx-tick" aria-hidden>
-                <Check size={11} strokeWidth={3.2} />
-              </span>
-              {SHORT_DAY[day]}
-            </button>
-          ))}
+          {WEEKDAYS.map(dayTick)}
         </div>
       </div>
 
@@ -166,24 +250,7 @@ export function SchedulePicker({
         <div className="sp__field">
           <div className="sp__labelrow">
             <span className="sp__label">Hours</span>
-            {days.length > 1 && (
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={showRows}
-                className={`sp__perday${showRows ? ' is-on' : ''}`}
-                onClick={() => {
-                  /* Back to one range: every day takes the first day's hours, which is what one range means. */
-                  if (showRows) setAll(common)
-                  setPerDay(!showRows)
-                }}
-              >
-                <span className="bx-tick" aria-hidden>
-                  <Check size={11} strokeWidth={3.2} />
-                </span>
-                Per day
-              </button>
-            )}
+            {days.length > 1 && perDayTick}
           </div>
           {showRows ? (
             days.map((d) => (
@@ -202,16 +269,7 @@ export function SchedulePicker({
         </div>
       )}
 
-      <Picker
-        label="Time zone"
-        size="sm"
-        width="fill"
-        prefix="Time zone"
-        value={tz ?? ''}
-        summary={tz || TENANT_LABEL}
-        options={[{ value: '', label: TENANT_LABEL }, ...TIMEZONES.map((z) => ({ value: z, label: z }))]}
-        onChange={onTz}
-      />
+      {timeZone}
 
       <div className="sp__week" aria-hidden>
         {WEEKDAYS.map((day) => (

@@ -29,6 +29,7 @@ import {
 import { TemplateIcon } from '../template-icon'
 import { EmptyState } from '../empty'
 import { PoliciesArt } from '../empty-art'
+import { AppUnlinkedArt } from './app-unlinked-art'
 import { shows } from '../rollout'
 
 import { appsOf, enforces, memberGroupIds, ruleExpired, type App, type Policy } from '../data'
@@ -404,6 +405,8 @@ const GLANCE = APP_POLICY_GLANCE && RULES_CANVAS
 /* No policy and no Global Default to draw (Design has none, ROLLOUT.noGlobalDefault): the page empty state, not a
    heading over a blank page (26 Nov 2026). Design only (ROLLOUT.appPoliciesEmpty). */
 const EMPTY_TAB: boolean = shows('appPoliciesEmpty')
+/* That empty state draws the application's own logo, calling for a policy (app-unlinked-art.tsx, ROLLOUT.appEmptyLogo). */
+const APP_EMPTY_LOGO: boolean = shows('appEmptyLogo')
 
 /* The tab on the policy alone (owner, 21 Oct 2026: "they want to remove the sign-in activity from here, so focus on the
    policy; move the sign-in activity into a button"). The rules canvas takes the room, a details card and the post
@@ -1558,11 +1561,12 @@ export function AppNoPolicyView({
     return (
       /* The same block as the unsaved application's Policies tab (ApplicationPage.tsx `NewAppPolicies`) and the library
          pages. The wrapper takes `data-tab-head` so a Remove or a Delete draft still lands focus here (`focusHead`). */
-      <div className="apol is-empty" tabIndex={-1} data-tab-head aria-label={`No policy on ${app.name}`}>
+      <div className="apol is-empty" tabIndex={-1} data-tab-head aria-label={APP_EMPTY_LOGO ? `No policy attached to ${app.name}` : `No policy on ${app.name}`}>
         <EmptyState
-          art={<PoliciesArt badge="shield" />}
+          /* The application's own logo, its link to a policy broken (rollout.ts `appEmptyLogo`). */
+          art={APP_EMPTY_LOGO ? <AppUnlinkedArt appId={app.id} name={app.name} /> : <PoliciesArt badge="shield" />}
           icon={ShieldPlus}
-          title={`No policy on ${app.name}`}
+          title={APP_EMPTY_LOGO ? `No policy attached to ${app.name}` : `No policy on ${app.name}`}
           action={
             <>
               <Button variant={saving ? 'secondary' : 'brand'} icon={Plus} onClick={onNew}>

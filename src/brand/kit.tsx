@@ -762,10 +762,13 @@ export function Badge({
   children,
   tone = 'neutral',
   className,
+  icon: Icon,
 }: {
   children: ReactNode
   className?: string
   tone?: 'neutral' | 'brand' | 'positive' | 'positive-strong' | 'negative' | 'notice' | 'info' | 'accent' | 'lime' | 'magenta' | 'system'
+  /** A mark before the word, for a tag that must not read as a status (leave-guard.tsx `DraftTag`). */
+  icon?: LucideIcon
 }) {
   /* The label is its own element rather than a bare text node because
      text-overflow does not reach an anonymous flex item — the badge stays a
@@ -774,6 +777,7 @@ export function Badge({
   const [ref, full] = useClipped(children)
   return (
     <span className={`bx-badge bx-badge--${tone}${className ? ` ${className}` : ''}`}>
+      {Icon && <Icon size={12} strokeWidth={2.2} aria-hidden className="bx-badge__icon" />}
       <span className="bx-badge__label" ref={ref} title={full ?? undefined}>
         {children}
       </span>

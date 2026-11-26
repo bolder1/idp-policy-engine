@@ -48,10 +48,14 @@ export const SIMPLE_DRAFT: boolean = shows('simpleDraft')
  *  evening "call it activate policy or something instead of save and activate"). */
 export const SAVE_AND_ACTIVATE = 'Activate policy'
 
-/** Simple's words: the green button, its panel, the button while nothing is live, the ask before a save reaches sign-ins. */
-export const LIVE_BUTTON = 'Show live version'
-export const LIVE_PANEL = 'Live version'
-export const NOTHING_LIVE = 'Nothing is live yet'
+/** Simple's builder shows draft mode by its look, and names what people sign in with "active" (rollout.ts `draftLook`). */
+export const DRAFT_LOOK: boolean = shows('draftLook')
+
+/** Simple's words: the green button, its panel, the button while nothing is live, the ask before a save reaches sign-ins.
+ *  Under `draftLook` the version people sign in with is the active one (owner, 26 Nov 2026: "show active version"). */
+export const LIVE_BUTTON = DRAFT_LOOK ? 'Show active version' : 'Show live version'
+export const LIVE_PANEL = DRAFT_LOOK ? 'Active version' : 'Live version'
+export const NOTHING_LIVE = DRAFT_LOOK ? 'Nothing is active yet' : 'Nothing is live yet'
 /** Show live version waits for a change, as Save draft and Save policy do (owner, 25 Nov 2026). */
 export const NO_CHANGE_YET = 'No changes yet'
 /** Activate policy's confirm and toast name the press, not a save (rollout.ts `simpleActivateWords`, 26 Nov 2026). */
@@ -102,15 +106,26 @@ export const DRAFT_MODEL_OPTIONS: { value: DraftModel; label: string }[] = [
   ...(VIEW_EDIT && SIMPLE_DRAFT ? [{ value: 'simple' as const, label: 'Simple' }] : []),
 ]
 
-const KEY = 'idp.builder.draft-model'
+/* Simple first (owner, 26 Nov 2026: "the simple will be the version that we are going for now on … whenever the policy
+   lands for the first time, make sure the simple version will be activated from the dropdown", and Simple while locked
+   too). A first landing finds Simple picked in the dropdown, and a locked builder is Simple, where both were Today.
+   Design only (rollout.ts `simpleFirst`); elsewhere the base stays Today. */
+const SIMPLE_FIRST: boolean = shows('simpleFirst') && DRAFT_MODELS && VIEW_EDIT && SIMPLE_DRAFT
+
+/** The model with nothing picked yet, and the model while the switch is not shown. */
+const BASE: DraftModel = SIMPLE_FIRST ? 'simple' : 'today'
+
+/* Under Simple first the pick is kept under a new key, so a pick stored before 26 Nov (Today, most often) does not hold
+   the first landing. Every pick after that sticks as before. */
+const KEY = SIMPLE_FIRST ? 'idp.builder.draft-model.2' : 'idp.builder.draft-model'
 const listeners = new Set<() => void>()
 
 function read(): DraftModel {
   try {
     const v = localStorage.getItem(KEY)
-    return v === 'fix' || v === 'v3' || (v === 'view' && VIEW_EDIT) || (v === 'simple' && VIEW_EDIT && SIMPLE_DRAFT) ? v : 'today'
+    return v === 'today' || v === 'fix' || v === 'v3' || (v === 'view' && VIEW_EDIT) || (v === 'simple' && VIEW_EDIT && SIMPLE_DRAFT) ? v : BASE
   } catch {
-    return 'today'
+    return BASE
   }
 }
 
@@ -141,15 +156,19 @@ export function useDraftModelsShown(): boolean {
   return useBuilderUnlocked() && DRAFT_MODELS
 }
 
-/** The model in force: Today wherever the switch is not shown. Server render is Today, so tests see the builder as it is. */
+/** The model in force: the base (Today, or Simple under Simple first) wherever the switch is not shown. Server render
+ *  is Today, so tests see the builder as it is. */
 export function useDraftModel(): DraftModel {
   const m = useSyncExternalStore(
     subscribe,
     () => current,
     () => 'today' as DraftModel,
   )
-  return useDraftModelsShown() ? m : 'today'
+  return useDraftModelsShown() ? m : BASE
 }
+
+/** The same, outside React. */
+const inForce = (): DraftModel => (DRAFT_MODELS && isBuilderUnlocked() ? current : BASE)
 
 /** "View and edit" is the model in force (rollout.ts `viewEdit`): the builder, the application page and the Policies
  *  list all read it, so one choice changes the three together. Server render is Today. */
@@ -159,9 +178,10 @@ export function useViewEdit(): boolean {
   return m === 'view' || m === 'simple'
 }
 
-/** The same, outside React (a store write, a model function): unlocked, on the Design line, with "View and edit" chosen. */
+/** The same, outside React (a store write, a model function): on the Design line, with "View and edit" or Simple in force. */
 export function viewEditOn(): boolean {
-  return DRAFT_MODELS && VIEW_EDIT && isBuilderUnlocked() && (current === 'view' || (SIMPLE_DRAFT && current === 'simple'))
+  const m = inForce()
+  return VIEW_EDIT && (m === 'view' || (SIMPLE_DRAFT && m === 'simple'))
 }
 
 /** "Simple" is the model in force (rollout.ts `simpleDraft`). Server render is Today. */
@@ -171,7 +191,7 @@ export function useSimpleDraft(): boolean {
 
 /** The same, outside React: the Policies page's Applications dialog and an application's Remove read it. */
 export function simpleDraftOn(): boolean {
-  return DRAFT_MODELS && VIEW_EDIT && SIMPLE_DRAFT && isBuilderUnlocked() && current === 'simple'
+  return VIEW_EDIT && SIMPLE_DRAFT && inForce() === 'simple'
 }
 
 /* --- View and edit's rules, pure ---------------------------------------------------- */

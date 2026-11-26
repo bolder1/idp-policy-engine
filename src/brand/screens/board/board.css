@@ -122,6 +122,19 @@
      region as a whole. */
   position: relative;
 }
+/* Draft mode (rollout.ts `draftLook`; owner, 26 Nov 2026: "change the color of the canvas a little … so the user can
+   know the difference between a rest mode and an editable mode"). Grey, one step darker than the rest ground (owner,
+   the same day: "they don't like this blue … go for a gray … go subtle"): the board you are
+   editing is not the active one. The bar says Draft in words. Eases in as the first edit lands; the duration token is
+   0ms under reduced motion (tokens.css). */
+/* `--surface-inset`, not `--surface-page`: the page is white in the rebrand look, which made draft mode the lighter of
+   the two. Inset is one step under the stage in both looks; the dots stay as they are. */
+/* Then lighter again (owner, the same day: "you can go lighter as well"): half a step, the inset grey mixed into the
+   rest ground. */
+.bb.is-draft-look {
+  background-color: color-mix(in srgb, var(--surface-inset) 55%, var(--bb-stage));
+  transition: background-color var(--dur-normal) var(--ease-standard);
+}
 /* Placed, not auto-placed. The grip is an explicit grid item in the panel's
    own column — see the note where it is styled — and sparse auto-placement
    would then push the panel it belongs to onto a second row. */
@@ -3107,6 +3120,33 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   color: var(--text-muted);
 }
 .bb__whorow.is-set .bb__whorow__val { color: var(--text-primary); }
+/* Who as counts (rollout.ts `whoCount`): the number in link blue; a press is the review. */
+.bb__whorow__count {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  cursor: pointer;
+}
+.bb__whorow__count:hover { text-decoration: underline; text-underline-offset: 2px; }
+.bb__whorow__count:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__ifwho__count { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-link); }
+/* A device profile's risk level on the card (rollout.ts `profileRisk`): a small chip in its level's tint. */
+.bb__ifrisk {
+  flex: none;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 22px;
+  white-space: nowrap;
+}
+.bb__ifrisk.is-low { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bb__ifrisk.is-medium { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bb__ifrisk.is-high { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 /* The empty kind's line, quieter than a value: it reports an absence. */
 .bb__whorow.is-empty .bb__whorow__val { font-size: var(--fs-sm); color: var(--text-tertiary); }
 /* Faces now, not a line of names: laid out right-aligned, and not clipped, so the

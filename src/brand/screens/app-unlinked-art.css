@@ -1,0 +1,40 @@
+/* An application with no policy (app-unlinked-art.tsx, rollout.ts `appEmptyLogo`). Tokens only; every rule hangs off
+   `.bunl`, which only that drawing uses. Sizes come from the component, which also draws the SVG to them. Everything is
+   placed by left/top and negative margins, never a CSS transform: the orbit and the shield are Motion elements, and
+   Motion owns their transforms. */
+.bunl {
+  position: relative;
+  display: block;
+  margin: 0 auto;
+}
+.bunl__rings { position: absolute; inset: 0; overflow: visible; }
+
+/* The logo's disc: the one solid thing in the picture. */
+.bunl__disc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+
+/* The orbit the shield rides: a square on the outer ring, turned about its centre. */
+.bunl__orbit { position: absolute; left: 50%; top: 50%; }
+.bunl__shield {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  margin: calc(var(--space-8) / -2) 0 0 calc(var(--space-8) / -2);
+  border-radius: var(--radius-full);
+  background: var(--blue);
+  color: var(--surface-raised);
+  box-shadow: var(--el-low);
+}

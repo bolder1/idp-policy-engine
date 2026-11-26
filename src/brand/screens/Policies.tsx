@@ -47,7 +47,8 @@ import { NO_FILTERS, anySet, policyMatches, type PolicyFilters } from './more-fi
 import { Picker } from '../picker'
 import { appsOf, blankPolicy, enforces, evaluates, type Policy } from '../data'
 import { useBrand } from '../store'
-import { ChangeState } from '../leave-guard'
+import { ChangeState, DraftTag } from '../leave-guard'
+import { DRAFT_TAG } from '../draft-tag'
 import { EmptyState, NoMatches } from '../empty'
 import { newPolicy, withoutApps } from '../policy-draft'
 import { useNewPolicy } from '../create/use-new-policy'
@@ -566,6 +567,10 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
   /* Today (owner, 17 Nov 2026): bulk Approve, and Publish only what is approved; Yesterday published any moved draft. */
   const pickedToApprove = pickedMoved.filter((p) => !store.moved[p.id]?.reviewed)
   const pickedDrafts = pickedMoved.filter((p) => !reviewFacts[p.id]?.rejected && (bulkExperience !== 'today' || !!store.moved[p.id]?.reviewed))
+  /* Live policies' bulk bar (`bulkLive`): the ticked rows, and the ones a Delete press is about. */
+  const pickedLive = pickable.filter((p) => picked.has(p.id) && !p.isSystem)
+  const [bulkDelete, setBulkDelete] = useState<string[] | null>(null)
+  const bulkDeleting = (bulkDelete ?? []).map((id) => store.policies.find((p) => p.id === id)).filter((p): p is Policy => !!p)
 
   const { setBody, searchRef, markLeaving } = useLeavingFocus(rows)
 
@@ -733,7 +738,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                 <th scope="col" className="btable__col-pick">
                   <input
                     type="checkbox"
-                    className="bpol__pick"
+                    className={PICK_CLASS}
                     aria-label={review ? 'Select every migrated policy' : 'Select every policy'}
                     checked={pick.length > 0 && pick.every((p) => picked.has(p.id))}
                     ref={(el) => {
@@ -758,7 +763,7 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
                 ) : (
                   head('activity', 'Last activity', 'btable__col-activity')
                 )}
-                <th scope="col" className="btable__col-status">
+                <th scope="col" className={DRAFT_TAG ? 'btable__col-status is-tagged' : 'btable__col-status'}>
                   Status
                 </th>
                 {next && (
@@ -890,7 +895,21 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
         count={!isCoverage && libView === 'table' ? picked.size : 0}
         label="Selected policies"
         onClear={clearPicked}
-        actions={[
+        actions={
+          /* Live policies (rollout.ts `bulkLive`; owner, 26 Nov 2026: "we don't have any bulk option in live policy … they
+             can bulk mark as template, and they can bulk delete"). Approve and Publish are the review tab's. */
+          BULK_LIVE && origin === 'new'
+            ? [
+                { label: 'Mark as template', icon: TemplateIcon, onClick: () => markTemplate.markMany(pickedLive) },
+                {
+                  label: 'Delete',
+                  icon: Trash2,
+                  /* As the row's Delete: outside Simple a policy that decides sign-ins is made inactive first. */
+                  disabledReason: viewEdit && !simple && pickedLive.some((p) => evaluates(p)) ? 'Make the active ones inactive first' : undefined,
+                  onClick: () => setBulkDelete(pickedLive.map((p) => p.id)),
+                },
+              ]
+            : [
           ...(bulkExperience === 'today'
             ? [
                 {
@@ -916,6 +935,25 @@ function SignInPolicies({ origin, sectioned = false }: { origin: 'new' | 'moved'
           },
         ]}
       />
+      {/* Bulk Delete (`bulkLive`): the one delete dialog, for several. The typed DELETE, as the row's asks, since any of
+          them may decide sign-ins; the names are listed so the admin sees what goes. */}
+      {bulkDeleting.length > 0 && (
+        <ConfirmDelete
+          open={bulkDelete !== null}
+          name={bulkDeleting.length === 1 ? bulkDeleting[0].name : `${bulkDeleting.length} policies`}
+          noun={bulkDeleting.length === 1 ? 'policy' : 'policies'}
+          requireTyped
+          detail={bulkDeleting.length > 1 ? bulkDeleting.map((p) => p.name).join(', ') : undefined}
+          onCancel={() => setBulkDelete(null)}
+          onConfirm={() => {
+            const gone = bulkDeleting
+            setBulkDelete(null)
+            clearPicked()
+            gone.forEach((p) => store.deletePolicy(p.id))
+            store.showToast(gone.length === 1 ? `${gone[0].name} deleted` : `${gone.length} policies deleted`)
+          }}
+        />
+      )}
       <PublishMovedConfirm
         ids={publishAsk}
         onClose={() => setPublishAsk(null)}
@@ -1234,7 +1272,7 @@ function PostSignInPolicies() {
                     onSort={() => setSort((s) => ({ key: 'name', dir: s.key === 'name' && s.dir === 1 ? -1 : 1 }))}
                   />
                   <th scope="col" className="btable__col-apps">Applications</th>
-                  <th scope="col" className="btable__col-status">
+                  <th scope="col" className={DRAFT_TAG ? 'btable__col-status is-tagged' : 'btable__col-status'}>
                     Status
                   </th>
                   <th scope="col" className="btable__actions btable__col-actions">
@@ -1259,7 +1297,15 @@ function PostSignInPolicies() {
                       <LinkedApps policy={p} />
                     </td>
                     <td>
-                      <StatusPill status={p.status} />
+                      {/* A draft waits beside what is live (rollout `draftTag`). */}
+                      {DRAFT_TAG ? (
+                        <span className="btable__marks">
+                          <StatusPill status={p.status} />
+                          {p.pendingDraft && <DraftTag />}
+                        </span>
+                      ) : (
+                        <StatusPill status={p.status} />
+                      )}
                     </td>
                     <td className="btable__actions">
                       <RowMenu label={`Actions for ${p.name}`} items={postSignInMenu(p)} onSelect={(id) => act(p, id as PostRowAction)} />
@@ -1419,7 +1465,8 @@ function policyMenu(
   const items = rowMenu(policy, { monitor, trySignIn, trail: !SHOWCASE, marked })
   /* Simple has no Make active / Make inactive (owner, 25 Nov 2026: "save means active"): Save policy decides. */
   const shown = simple ? items.filter((i) => !SWITCH_IDS.has(i.id)) : viewEdit ? withViewEditSwitches(items, policy, monitor) : items
-  return shown.map((item) => ({
+  /* No Read as text on the row (rollout.ts `noRowReadText`; owner, 26 Nov 2026: "No need"). */
+  return shown.filter((item) => !(NO_ROW_READ_TEXT && item.id === 'text')).map((item) => ({
     ...item,
     /* "View and edit": the builder opens view-only, with Edit inside it (owner, 24 Nov 2026: "only the Edit button"),
        so the row's door only opens it. */
@@ -1431,6 +1478,12 @@ function policyMenu(
 }
 
 const SWITCH_IDS: ReadonlySet<RowMenuId> = new Set<RowMenuId>(['active', 'inactive', 'monitor'])
+/** Read as text leaves the row's menu (rollout.ts `noRowReadText`). */
+const NO_ROW_READ_TEXT: boolean = shows('noRowReadText')
+/** Live policies' bulk bar: Mark as template and Delete (rollout.ts `bulkLive`). */
+const BULK_LIVE: boolean = shows('bulkLive')
+/** The table's checkboxes, drawn (rollout.ts `checkLook`, screens.css `.bpol__pick.is-look`). */
+const PICK_CLASS: string = shows('checkLook') ? 'bpol__pick is-look' : 'bpol__pick'
 
 /* "View and edit" (draft-model.ts, owner 24 Nov 2026): the row's switches, in rowMenu's place for them. A sign-in draft
    on an application offers Active, which publishes it and makes it active in one confirm (use-status-change.tsx
@@ -1645,7 +1698,7 @@ function PolicyRow({
           a table cell: it sized to its own content instead of the row, so its
           bottom rule sat 5px above every other column's on each row. */}
       <td className="btable__col-pick">
-        {onPick && <input type="checkbox" className="bpol__pick" aria-label={`Select ${policy.name}`} checked={picked} onChange={onPick} />}
+        {onPick && <input type="checkbox" className={PICK_CLASS} aria-label={`Select ${policy.name}`} checked={picked} onChange={onPick} />}
       </td>
       <td>
         <div className="btable__primary">

@@ -76,6 +76,8 @@ type Naming = { kind: 'rename' | 'template'; value: string }
 
 /** The Light / Dark switch for the board itself, and the check of every layout kept (rollout.ts dashboardGrid). */
 const GRID = shows('dashboardGrid')
+/* The board's Dark board switch is gone; the top bar's theme switch is the one (rollout.ts `noDashDarkButton`). */
+const NO_DASH_DARK_BUTTON: boolean = shows('noDashDarkButton')
 /** The 22 Nov audit fixes (rollout.ts dashboardPolish): the page carries `data-polish` and dashboard.css scopes them to it. */
 const POLISH = shows('dashboardPolish')
 type Snap = { rows: Row[]; theme: ThemeId }
@@ -393,7 +395,9 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
   const onBoard = useCallback((w: WidgetId) => hasWidget(rows, w), [rows])
   /* The console's own dark theme makes the board dark too; then the board's switch has nothing to do and is not shown. */
   const [consoleTheme] = useTheme()
-  const night = GRID && (prefs.look === 'dark' || consoleTheme === 'dark')
+  /* With the board's own switch gone (rollout `noDashDarkButton`), the board follows the console's theme alone: a board
+     left dark by the old switch is not stranded there. */
+  const night = GRID && ((!NO_DASH_DARK_BUTTON && prefs.look === 'dark') || consoleTheme === 'dark')
   /* Popups open outside the page: while the night board shows, the document says so and they follow (dashboard.css). */
   useEffect(() => {
     if (!night) return
@@ -401,8 +405,9 @@ export function Dashboard({ switches }: { switches?: ReactNode }) {
     root.setAttribute('data-dash-look', 'dark')
     return () => root.removeAttribute('data-dash-look')
   }, [night])
+  /* One dark-mode control, the top bar's (rollout `noDashDarkButton`; owner, 26 Nov 2026: "one dark mode button is enough"). */
   const lookSwitch =
-    GRID && consoleTheme !== 'dark' ? (
+    GRID && consoleTheme !== 'dark' && !NO_DASH_DARK_BUTTON ? (
       <IconButton
         icon={prefs.look === 'dark' ? Sun : Moon}
         label={prefs.look === 'dark' ? 'Light board' : 'Dark board'}

@@ -1,0 +1,85 @@
+/* The canvas's notes as digital cards, coloured by purpose (PolicyNotice.tsx, rollout.ts `stickyKinds`). After the
+   owner's references (26 Nov 2026: Docket's solid notes, the editorial cards with a line drawing and a corner label,
+   and "the main goal is to make the thing digital … the digital persona of a sticky note"): no pin, clip or tape. A
+   solid soft colour, a generous radius, the kind's line icon and its name at the head, a bold title, the line, and at
+   the foot the applications and a round dark action. Tokens only; every rule hangs off `.bbs`. The rise and the tilt
+   are Motion's, so nothing here transforms the card.
+
+   Each kind sets one fill, a light mix of a mid-tone token into the page's white so the page's primary ink reads on it
+   at well over 4.5:1, and the ink its icon and corner label take. */
+.bbs {
+  --bbs-fill: color-mix(in srgb, var(--fb-lime-border) 70%, var(--surface-raised));
+  --bbs-ink: var(--fb-lime-fg);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: calc(var(--space-16) * 2);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--bbs-fill);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--text-primary) 6%, transparent),
+    0 18px 32px -20px color-mix(in srgb, var(--text-primary) 34%, transparent);
+  pointer-events: auto;
+}
+/* Shared: lavender. A save goes further than this application. */
+.bbs--shared {
+  --bbs-fill: color-mix(in srgb, var(--fb-accent-border) 75%, var(--surface-raised));
+  --bbs-ink: var(--fb-accent-fg);
+}
+/* A copy: sky. */
+.bbs--copy {
+  --bbs-fill: color-mix(in srgb, var(--fb-info-border) 80%, var(--surface-raised));
+  --bbs-ink: var(--tint-blue-fg);
+}
+/* Something to fix: warm peach, never the red of an error. */
+.bbs--issue {
+  --bbs-fill: color-mix(in srgb, var(--brand) 32%, var(--surface-raised));
+  --bbs-ink: var(--tint-amber-fg);
+}
+
+.bbs__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-2); }
+.bbs__mark { flex: none; color: var(--text-primary); }
+.bbs__kind {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bbs-ink);
+}
+.bbs__label {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.bbs__text { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-primary); }
+
+.bbs__foot { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); margin-top: auto; padding-top: var(--space-3); }
+.bbs .bb__sticky__logos { margin: 0; }
+/* The applications sit on small white discs so a pale logo still has an edge on the colour. */
+.bbs .bb__sticky__logos li {
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+/* The note's one action: Docket's round dark button. Never orange: the bar has the view's one orange. */
+.bbs__act {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--space-9);
+  height: var(--space-9);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--text-primary);
+  color: var(--text-inverse);
+  cursor: pointer;
+  box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--text-primary) 60%, transparent);
+}
+.bbs__act:hover { background: color-mix(in srgb, var(--text-primary) 82%, var(--bbs-ink)); }
+.bbs__act:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bbs-fill), 0 0 0 4px var(--focus-ring); }

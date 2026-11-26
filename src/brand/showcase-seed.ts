@@ -18,6 +18,7 @@ import {
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
 import { linkApp, type PostAction } from './post-sign-in'
+import { shows } from './rollout'
 import type { SavedSignIn } from './saved-sign-ins'
 import { devicePreset } from './screens/testing/device-presets'
 import { TENANT_TZ, type SignInDevice, type SignInFacts } from './screens/sign-in-facts'
@@ -246,6 +247,153 @@ function denyAll(denyMessage: string): Rule {
    so the bands are 0–39, 40–70 and 71 up, and every one names the device
    profile too — a device that is not a corporate one falls to the last row. */
 const onCorporateDevice = () => cond('fingerprint', 'matches', ['fp-corp-devices'])
+
+/* More states for the Live policies list (rollout.ts `seedVariety`; owner, 26 Nov 2026: "some should be inactive with no
+   application, and some should be in draft. Have some more variation for the data so I can go better for all the edge
+   cases"). Design only, after the seven above:
+     Contractor access      Inactive, no application
+     Partner sign-in        Inactive, no application, two rules
+     Workday for HR         Draft, never active, on Workday
+     Zoom meetings          Draft, never active, no application
+     Salesforce for Sales   Active, with a saved draft that adds a rule */
+const SEED_VARIETY: boolean = shows('seedVariety')
+/* Built only when asked for, and only after the seven above: `rule()` numbers rules from one counter, so minting these
+   at load moved every later rule's id on every line, and the recorded markup (board-markup.test) with it. */
+function varietyPolicies(): Policy[] {
+  const SALES_RULE = rule({
+    name: 'Sales, where we operate',
+    who: { groupIds: ['sales'], userIds: [] },
+    when: when(card(cond('zone', 'in zone', ['operating-countries']))),
+    decision: '1fa',
+    firstFactor: 'Password',
+    matchEstimate: 120,
+  })
+  return [
+  {
+    id: 'sc-contractor-access',
+    name: 'Contractor access',
+    type: 'App Access',
+    appIds: [],
+    audience: audienceOf(['contractors']),
+    status: 'inactive',
+    lastModified: '5 days ago',
+    modifiedBy: 'Jaspreet Toor',
+    rules: [
+      rule({
+        name: 'Contractors on a corporate device',
+        who: { groupIds: ['contractors'], userIds: [] },
+        when: when(card(onCorporateDevice())),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['OTP over Email'],
+        matchEstimate: 40,
+      }),
+    ],
+    fallback: denyAll('Contractors sign in from a corporate device.'),
+  },
+  {
+    id: 'sc-partner-signin',
+    name: 'Partner sign-in',
+    type: 'App Access',
+    appIds: [],
+    audience: EVERYONE,
+    status: 'inactive',
+    lastModified: '1 week ago',
+    modifiedBy: 'Jaspreet Toor',
+    rules: [
+      rule({
+        name: 'Partners, where we operate',
+        who: { groupIds: [], userIds: [], exceptGroupIds: ['employees'] },
+        when: when(card(cond('zone', 'in zone', ['operating-countries']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['OTP over Email'],
+        matchEstimate: 18,
+      }),
+      rule({
+        name: 'Employees',
+        who: { groupIds: ['employees'], userIds: [] },
+        decision: '1fa',
+        firstFactor: 'Password',
+        matchEstimate: 600,
+      }),
+    ],
+    fallback: denyAll('Partner sign-ins come from the countries we work in.'),
+  },
+  {
+    id: 'sc-workday-hr',
+    name: 'Workday for HR',
+    type: 'App Access',
+    appIds: ['workday'],
+    audience: audienceOf(['hr']),
+    status: 'draft',
+    lastModified: 'Yesterday',
+    modifiedBy: 'Jaspreet Toor',
+    rules: [
+      rule({
+        name: 'HR on a corporate device',
+        who: { groupIds: ['hr'], userIds: [] },
+        when: when(card(onCorporateDevice())),
+        decision: '1fa',
+        firstFactor: 'Password',
+        matchEstimate: 30,
+      }),
+    ],
+    fallback: denyAll('Workday opens for HR on a corporate device.'),
+  },
+  {
+    id: 'sc-zoom-meetings',
+    name: 'Zoom meetings',
+    type: 'App Access',
+    appIds: [],
+    audience: EVERYONE,
+    status: 'draft',
+    lastModified: '3 hours ago',
+    modifiedBy: 'Jaspreet Toor',
+    rules: [
+      rule({
+        name: 'Everyone, where we operate',
+        who: { groupIds: [], userIds: [] },
+        when: when(card(cond('zone', 'in zone', ['operating-countries']))),
+        decision: '1fa',
+        firstFactor: 'Password',
+        matchEstimate: 900,
+      }),
+    ],
+    fallback: denyAll('Zoom opens from the countries we work in.'),
+  },
+  {
+    id: 'sc-salesforce-sales',
+    name: 'Salesforce for Sales',
+    type: 'App Access',
+    appIds: ['salesforce'],
+    audience: audienceOf(['sales']),
+    status: 'active',
+    lastModified: '2 days ago',
+    modifiedBy: 'Jaspreet Toor',
+    rules: [SALES_RULE],
+    fallback: denyAll('Salesforce opens for Sales from the countries we work in.'),
+    /* A draft waits: it adds a rule for Sales on a corporate device, ahead of the live one. */
+    pendingDraft: {
+      rules: [
+        rule({
+          name: 'Sales on a corporate device',
+          who: { groupIds: ['sales'], userIds: [] },
+          when: when(card(onCorporateDevice())),
+          decision: '1fa',
+          firstFactor: 'Password',
+          matchEstimate: 70,
+        }),
+        SALES_RULE,
+      ],
+      savedAt: '2026-11-25T17:40:00+05:30',
+      savedBy: 'Jaspreet Toor',
+    },
+  },
+  ]
+}
 
 export const showcasePolicies: Policy[] = [
   /* Where a sign-in lands when no application policy covers it, pinned to the
@@ -644,6 +792,8 @@ export const showcasePolicies: Policy[] = [
     ],
     fallback: denyAll('Box opens only from the countries we work in.'),
   },
+  /* Design only: the extra states the Live policies list needs to show (`seedVariety`, above). */
+  ...(SEED_VARIETY ? varietyPolicies() : []),
 ]
 
 // --- Post sign-in policies ----------------------------------------------------

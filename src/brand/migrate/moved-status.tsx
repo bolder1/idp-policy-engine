@@ -5,6 +5,8 @@ import { Badge, Button, StatusPill } from '../kit'
 import './moved-status.css'
 import type { Policy } from '../data'
 import { useBrand } from '../store'
+import { DraftTag } from '../leave-guard'
+import { DRAFT_TAG } from '../draft-tag'
 import { useExperience, useMovedState, type MovedReview } from './experience'
 
 /* -----------------------------------------------------------------------------
@@ -49,6 +51,8 @@ export function PolicyStatus({ policy }: { policy: Policy }) {
   return (
     <>
       <StatusPill status={policy.status} />
+      {/* A draft waits beside what is live (rollout `draftTag`). */}
+      {DRAFT_TAG && policy.pendingDraft && <DraftTag />}
       {rolledBack && <RolledBackBadge />}
     </>
   )

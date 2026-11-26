@@ -39,6 +39,9 @@ import { gapText, useRuleGaps } from './rule-gaps'
 
 /* Deny's email alerts (rollout.ts `denyAlerts`), read once. */
 const DENY_ALERTS = shows('denyAlerts')
+/* Deny signs the person in with the rule's factors first, then denies; switching keeps the factors (rollout.ts
+   `denyFactors`, 26 Nov 2026). */
+const DENY_FACTORS: boolean = shows('denyFactors')
 
 /* -----------------------------------------------------------------------------
    THEN — what happens when the rule matches.
@@ -158,7 +161,10 @@ export function WhatEditor({
   /* Does this outcome walk the person through factors? Allow and the
      second-factor tile do; Deny does not. */
   const walksFactors = rule.decision !== 'deny'
-  const twoStep = rule.decision === '2fa'
+  /* Deny signs the person in first (rollout `denyFactors`): its factors are asked as Allow's are, then it denies. */
+  const denying = rule.decision === 'deny'
+  const factorsShown = walksFactors || DENY_FACTORS
+  const twoStep = rule.decision === '2fa' || (DENY_FACTORS && denying && rule.denyAfter === '2fa')
 
   /* Push can also be the FIRST factor (a rule signing people in with a tap alone). The rule holds one pair of Push
      options, so they are drawn once: under the First factor when it is Push, otherwise with the second factor that
@@ -218,6 +224,18 @@ export function WhatEditor({
   /* Pressing an outcome answers it: the new rule's open Then is closed with the same patch (rule-gaps.ts). */
   const answer = rule.outcomeOpen ? { outcomeOpen: undefined } : {}
   const pick = (id: AccessDecision) => {
+    /* Deny keeps Allow's factors and asks them before it denies (rollout `denyFactors`; owner, 26 Nov 2026: "when they
+       switch to deny, the allow configuration should be as it is … the same configuration for first factor and second
+       factor in deny as well"). Nothing is cleared either way, so Allow comes back as it was left. */
+    if (DENY_FACTORS) {
+      if (id === 'deny') {
+        if (denying) return
+        return onPatch({ decision: 'deny', denyAfter: answered && rule.decision === '2fa' ? '2fa' : '1fa', ...answer })
+      }
+      if (denying) return onPatch({ decision: rule.denyAfter ?? lastAllow.current, denyAfter: undefined, ...answer })
+      if (!answered) return onPatch({ decision: '1fa', ...answer })
+      return onPatch({ decision: lastAllow.current, ...answer })
+    }
     if (id === 'deny') {
       /* Nothing chosen yet, so nothing to come back to: Allow afterwards is Allow. */
       if (!answered) {
@@ -382,7 +400,7 @@ export function WhatEditor({
           Deny is complete the moment it is chosen: there is nothing to ask and
           nothing to prove, so the panel says so in a line instead of showing
           controls that cannot run. */}
-      {!answered ? null : !walksFactors ? (
+      {!answered ? null : !factorsShown ? (
         /* The card above already says what Deny does; the message is what is
            left to set. */
         <DenyMessage rule={rule} onPatch={onPatch} at={at} />
@@ -464,9 +482,14 @@ export function WhatEditor({
                 ...SECOND.map((x) => ({ value: x.value as string, label: x.label, meta: x.meta, icon: x.icon })),
               ]}
               onChange={(v) =>
-                v === 'none'
-                  ? onPatch({ decision: '1fa', ...noSecondStep })
-                  : onPatch({ decision: '2fa', secondFactor: v as Rule['secondFactor'], ...(v === 'specific' ? {} : dropPush) })
+                /* On Deny the step count is `denyAfter`, so the rule stays a Deny (rollout `denyFactors`). */
+                DENY_FACTORS && denying
+                  ? v === 'none'
+                    ? onPatch({ denyAfter: '1fa', ...noSecondStep })
+                    : onPatch({ denyAfter: '2fa', secondFactor: v as Rule['secondFactor'], ...(v === 'specific' ? {} : dropPush) })
+                  : v === 'none'
+                    ? onPatch({ decision: '1fa', ...noSecondStep })
+                    : onPatch({ decision: '2fa', secondFactor: v as Rule['secondFactor'], ...(v === 'specific' ? {} : dropPush) })
               }
             />
 
@@ -520,8 +543,10 @@ export function WhatEditor({
           )}
 
           {/* Only with a second factor, because that is all they are about: a
-              single-factor rule has nothing to remember. */}
-          {twoStep && <RememberBlock rule={rule} onPatch={onPatch} />}
+              single-factor rule has nothing to remember. Not on a Deny: nothing is remembered before a denial. */}
+          {twoStep && !denying && <RememberBlock rule={rule} onPatch={onPatch} />}
+          {/* Deny, after its factors: the message and the email alerts (rollout `denyFactors`). */}
+          {denying && <DenyMessage rule={rule} onPatch={onPatch} at={at} />}
         </>
       )}
     </div>

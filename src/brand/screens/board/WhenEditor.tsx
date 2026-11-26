@@ -918,6 +918,8 @@ function ConditionRow({
           onScope={onScope}
           onKey={onKey}
           onTz={onTz}
+          /* Device profile's risk level (rollout `profileRisk`): a field of the condition, patched like its values. */
+          onRisk={(risk) => onChange({ ...c, risk })}
           onRemove={onRemove}
           footer={footer}
           onFooter={onFooter}

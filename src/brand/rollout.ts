@@ -338,6 +338,105 @@ export const ROLLOUT = {
    *  draft reads "Draft saved" with a check, the row's Last activity reads "Draft saved <when>", and the drawer's head
    *  drops it (its Rules Draft / Live switch and Continue editing already say so). Design only. */
   draftOffPill: ['design'],
+  /** Simple is the Draft model from now on: a first landing finds Simple picked in the Draft model dropdown (the pick is
+   *  kept under a new key, so an older pick doesn't hold it), and a locked builder is Simple rather than Today (26 Nov,
+   *  owner: "the simple will be the version that we are going for now on", and Simple while locked too). Design only. */
+  simpleFirst: ['design'],
+  /** A saved draft has its own tag again, "Has draft" with a pencil, beside the status pill rather than in its place:
+   *  the status says what is live, the tag says a draft waits (26 Nov, owner: "I cannot see the draft part anywhere …
+   *  active but also have draft"). On the Policies and Post sign-in tables, wherever PolicyStatus draws (application
+   *  page, dialogs, Used by), the Policy details drawer's head and the builder's bar. Design only. */
+  draftTag: ['design'],
+  /** Simple's Save rule saves the rule on the board only, never a draft: Save draft is the one way to store a draft, and
+   *  leaving with rules saved this way asks Keep editing / Discard (26 Nov, owner: "when I click Save rule you save as
+   *  draft automatically, that shouldn't happen … just save the rule and then let it be"). Reverses that part of
+   *  `ruleSaveFocus`. Design only. */
+  ruleSaveOnly: ['design'],
+  /** Sign-in time's picker opens on Per day: a row per day, Monday to Sunday, each with its tick, its own hours and All
+   *  day, under the Every day / Weekdays / Weekends picks. The week strip is gone and the picker scrolls inside its
+   *  popover when the screen is short (26 Nov, owner: "Monday … Sunday should have their own time-based hours … by
+   *  default activate the per day … the widget cannot be scrolled … simplify"). Design only. */
+  perDayFirst: ['design'],
+  /** Simple's builder says by its look which version is on the board (26 Nov, owner: "Active … and Show live version
+   *  both serve the same purpose … whatever you can see is in draft mode … distinguish it by the top bar"). Draft mode
+   *  (a saved draft, edits not saved, or a policy never active): the canvas takes a cool tint (owner, the same day:
+   *  "instead of changing the color of the top header … change the color of the canvas"), the bar's status pill gives
+   *  way to a Draft tag, and "Show live version" is "Show active version". The active version with nothing changed: the
+   *  plain canvas, the status pill and no version button. Design only. */
+  draftLook: ['design'],
+  /** An application's Policies tab with no policy draws the application's own logo, a broken link and the outline of a
+   *  policy, titled "No policy attached to <app>" (26 Nov, owner: "something related to the logo … the logo is not
+   *  attached to any policy … think in a creative way"). Replaces `appPoliciesEmpty`'s generic drawing. Design only. */
+  appEmptyLogo: ['design'],
+  /** All Policies rows: no Read as text in the row's ⋯ (26 Nov, owner: "No need"). The drawer it opened stays in the
+   *  code for the other lines. Design only. */
+  noRowReadText: ['design'],
+  /** Add existing policy lists Active and Inactive sign-in policies only, as cards: the applications' logos (or the
+   *  unlinked mark), the name and status, and "where · rules · who" (26 Nov, owner: "only showcase the Active and
+   *  Inactive part … headless policies with no application and the policies which have some applications … redo the
+   *  card layout and the content"). Drafts and Monitoring are not offered. Replace keeps its list. Design only. */
+  addExistingCards: ['design'],
+  /** The "Nothing else matched is now Deny" note, in colour: a band in the new outcome's tint with the old outcome struck
+   *  and the new one arriving with its shield and a ping, the word coloured in the title, and one primary — Keep Deny in
+   *  the solid accent — over Allow instead (26 Nov, owner: "add some colors … focus on the allow and deny part … both
+   *  have the same hierarchy"). Design only. */
+  flipNoteLook: ['design'],
+  /** The canvas's sticky notes as pinned cards, coloured by purpose (26 Nov, owner: "the note should have some purpose
+   *  … distinguished by color based on need … some of them have shared policies, and some of them have some issues", with
+   *  pinned-card references): a white card with a glossy pin and a tinted panel. Shared policy peach, a copy lavender, an
+   *  issue rose — a new note, "No application yet", with Add application — and the template preview's note blue.
+   *  Design only. */
+  stickyKinds: ['design'],
+  /** Who, as counts: the panel's Groups and People rows say "1 group", "3 people" in link blue, and a press on the count
+   *  opens the chosen list (the review) — the eye goes, the pencil stays; a rule card's who reads the same counts
+   *  (26 Nov, owner: "just showcase the number … in blue text. On click, they showcase the review … the same goes
+   *  inside the card … for both user and group"). Design only. */
+  whoCount: ['design'],
+  /** The Unsaved changes ask has a subheading, as the no-application ask does: "Your changes here are not saved yet.
+   *  Save as draft to keep them, or discard them." (the save's own label in it). 26 Nov, owner: "add the subheading as
+   *  we have for when we have no application and try to activate". Every screen that asks; Design only. */
+  leaveSubhead: ['design'],
+  /** All Policies → Live policies: the selection bar offers Mark as template and Delete for the ticked rows, where it
+   *  offered the review tab's Approve and Publish, greyed (26 Nov, owner: "we don't have any bulk option in live policy …
+   *  they can bulk mark as template, and they can bulk delete"). One toast with Undo for the marks; one typed-DELETE
+   *  dialog naming the policies for the delete. Under review keeps Approve and Publish. Design only. */
+  bulkLive: ['design'],
+  /** Five more seed policies for the edge cases (26 Nov, owner: "some should be inactive with no application, and some
+   *  should be in draft"): two Inactive with no application, a never-active Draft on Workday, one with no application,
+   *  and an Active policy on Salesforce with a saved draft (showcase-seed.ts `varietyPolicies`). Design only. */
+  seedVariety: ['design'],
+  /** The Policies table's checkboxes, drawn: an 18px rounded box, a blue fill with a white tick that scales in, a dash for
+   *  a partial select-all, a hover halo and a focus ring; still the native input underneath (26 Nov, owner: "change the
+   *  experience for the check box component, give me a better new one which looks pretty"). Design only. */
+  checkLook: ['design'],
+  /** Device profile reads "is" (no operator to pick) and carries one risk level, Any / Low / Medium / High, picked in its
+   *  value menu: "Device profile is Corporate devices · High risk". The engine ANDs the profile with the device's risk
+   *  score band (Low < 40, Medium 40–69, High ≥ 70). Device risk score leaves the attribute menu; conditions already
+   *  written with it still read and run (26 Nov, owner: "device profile … =", "high, medium, low … together", "One level
+   *  only", "is"). Design only. */
+  profileRisk: ['design'],
+  /** Then: Deny keeps the rule's factors and asks them before it denies — First factor, Second factor and its methods,
+   *  then the deny message and email alerts — and switching Allow ↔ Deny clears nothing, so each side comes back as it
+   *  was left. A Deny's step count is `Rule.denyAfter` (26 Nov, owner: "the allow configuration should be as it is and
+   *  switch to deny … the same configuration for first factor and second factor in deny as well", then "Sign in, then
+   *  deny"). Remember MFA stays with Allow. Design only. */
+  denyFactors: ['design'],
+  /** Card peeks: a rule card's who, each condition's values and its outcome open a small read-only peek on the canvas —
+   *  the groups with their sizes and the people with their emails; a zone's entries, a device profile's checks and risk
+   *  level, the days and hours; the steps in order and a Deny's message and alerts. Hover previews after a beat, a click
+   *  pins it until Esc or a click elsewhere, Enter pins from the keyboard, one at a time (26 Nov, owner: "a small widget
+   *  will open in the canvas and showcase what's inside", "Hover previews, click pins"). Design only. */
+  cardPeeks: ['design'],
+  /** The Dashboard's own Dark board / Light board button goes: the top bar's theme switch is the one dark-mode control
+   *  (26 Nov, owner: "no need this any more, one dark mode button is enough"). Design only. */
+  noDashDarkButton: ['design'],
+  /** The checks before a save or an activation ("Save your edits?") take the hero shape of the Discard and "No
+   *  application chosen" asks: rings and badge, a title, one line, two buttons. A failed check no longer stops it: the
+   *  title says "Some checks did not pass", the line says which, and the admin picks Keep editing or "<Activate policy>
+   *  anyway" (26 Nov, owner: "make this similar like we did for discard and application popups … let the user know
+   *  something might go wrong … if he wants he can go, up to user"). Show details and the fixes wait for a later round.
+   *  Design only. */
+  guardHero: ['design'],
 } as const satisfies Record<string, readonly Line[]>
 
 export type Change = keyof typeof ROLLOUT

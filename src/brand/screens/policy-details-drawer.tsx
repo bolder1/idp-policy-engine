@@ -4,7 +4,8 @@ import { ArrowUpRight, Power, type LucideIcon } from 'lucide-react'
 import { Badge, Button, Drawer, StatusPill, Tabs } from '../kit'
 import './policy-details-drawer.css'
 import { useBrand } from '../store'
-import { ChangeState } from '../leave-guard'
+import { ChangeState, DraftTag } from '../leave-guard'
+import { DRAFT_TAG } from '../draft-tag'
 import { shows } from '../rollout'
 import { loadAndGo } from './guarded-moves'
 import { PolicyPage } from './sign-in-tests/InspectPanel'
@@ -112,12 +113,13 @@ export function PolicyDetailsDrawer({
       title="Policy details"
       width={680}
       head={
-        (statusHead || onDraft) && policy ? (
+        (statusHead || onDraft || (DRAFT_TAG && !!policy?.pendingDraft)) && policy ? (
           <div className="bpd-head">
             <h2>Policy details</h2>
             {statusHead && <StatusPill status={policy.status} />}
             {/* Which version the Rules show, in the row's own Draft words (owner, 25 Nov 2026: a Draft tag in the head). */}
-            {onDraft && <ChangeState unsaved={false} draft />}
+            {/* Under `draftTag` the head says a draft waits whichever version the Rules show, as the row does. */}
+            {DRAFT_TAG ? !!policy.pendingDraft && <DraftTag /> : onDraft && <ChangeState unsaved={false} draft />}
           </div>
         ) : undefined
       }

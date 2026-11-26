@@ -26,6 +26,7 @@ describe('Policy details drawer: Draft / Live rules', () => {
   })
 
   it("tags the head in the row's own Draft words while Draft shows", () => {
-    expect(drawerSrc).toContain('{onDraft && <ChangeState unsaved={false} draft />}')
+    /* Under `draftTag` (26 Nov 2026) the head says Has draft whenever a draft waits, whichever version the Rules show. */
+    expect(drawerSrc).toContain('{DRAFT_TAG ? !!policy.pendingDraft && <DraftTag /> : onDraft && <ChangeState unsaved={false} draft />}')
   })
 })

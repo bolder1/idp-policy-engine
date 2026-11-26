@@ -26,34 +26,59 @@ const DRAFT_TEMPLATES: boolean = shows('draftTemplates')
    render it need no change.
    -------------------------------------------------------------------------- */
 
-export function useSaveAsTemplate(): { open: (policy: Policy) => void; marked: (policyId: string) => boolean; unmark: (policy: Policy) => void; dialog: ReactNode } {
+export function useSaveAsTemplate(): {
+  open: (policy: Policy) => void
+  /** Several at once (the Policies bulk bar, rollout.ts `bulkLive`): one toast for the lot, with one Undo. */
+  markMany: (policies: Policy[]) => void
+  marked: (policyId: string) => boolean
+  unmark: (policy: Policy) => void
+  dialog: ReactNode
+} {
   const store = useBrand()
   const resolve = useNameLookup()
 
-  const open = (policy: Policy) => {
+  /** Why a policy cannot be marked, in the dialog's words, or null when it can. */
+  const refusal = (policy: Policy): string | null => {
     const already = store.scenarios.find((s) => !s.provided && s.fromPolicy === policy.id)
-    if (already) {
-      store.showToast(`${already.name} is already a template`)
-      return
-    }
+    if (already) return `${already.name} is already a template`
     /* A template whose rules apply to nobody would offer nothing to use, so it is refused here in the dialog's words. */
     const emptyDraft = DRAFT_TEMPLATES && isDraftPolicy(policy) && policy.rules.length === 0
-    if (policy.rules.length === 0 && !emptyDraft) {
-      store.showToast('Add a rule before marking this policy as a template.')
-      return
-    }
-    if (!emptyDraft && !policy.rules.some((r) => narrowToAudience(r, policy.audience, store.users) !== null)) {
-      store.showToast('None of these rules apply to anyone in this policy.')
-      return
-    }
-    const names = new Set(store.scenarios.map((s) => s.name.toLowerCase()))
+    if (policy.rules.length === 0 && !emptyDraft) return 'Add a rule before marking this policy as a template.'
+    if (!emptyDraft && !policy.rules.some((r) => narrowToAudience(r, policy.audience, store.users) !== null)) return 'None of these rules apply to anyone in this policy.'
+    return null
+  }
+  /** Marks one; `taken` holds the names already used, this batch's included. */
+  const mark = (policy: Policy, taken: Set<string>): { id: string; name: string } => {
     let name = policy.name
-    for (let n = 2; names.has(name.toLowerCase()); n++) name = `${policy.name} (${n})`
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${policy.name} (${n})`
+    taken.add(name.toLowerCase())
     const id = store.addScenario({
       ...scenarioFromPolicy(policy, { name, description: '', category: 'Uncategorized' }, Date.now(), resolve),
       fromPolicy: policy.id,
     })
+    return { id, name }
+  }
+
+  const open = (policy: Policy) => {
+    const why = refusal(policy)
+    if (why) {
+      store.showToast(why)
+      return
+    }
+    const { id, name } = mark(policy, new Set(store.scenarios.map((s) => s.name.toLowerCase())))
     store.showToast(`${name} marked as a template`, { label: 'Undo', run: () => store.removeScenario(id) })
+  }
+
+  const markMany = (policies: Policy[]) => {
+    const taken = new Set(store.scenarios.map((s) => s.name.toLowerCase()))
+    const ids = policies.filter((p) => refusal(p) === null).map((p) => mark(p, taken).id)
+    const skipped = policies.length - ids.length
+    if (ids.length === 0) {
+      store.showToast(skipped === 1 ? (refusal(policies[0]) ?? 'Nothing to mark') : 'None of these can be marked as templates')
+      return
+    }
+    const done = ids.length === 1 ? '1 policy marked as a template' : `${ids.length} policies marked as templates`
+    store.showToast(skipped > 0 ? `${done}. ${skipped} skipped.` : done, { label: 'Undo', run: () => ids.forEach((id) => store.removeScenario(id)) })
   }
 
   /* Marked from the row and unmarked from the same row (owner, 18 Nov 2026: "add an icon in the row … and the user can
@@ -67,7 +92,7 @@ export function useSaveAsTemplate(): { open: (policy: Policy) => void; marked: (
     store.showToast(`${policy.name} removed from templates`, { label: 'Undo', run: () => gone.forEach((s) => store.addScenario(s)) })
   }
 
-  return { open, marked, unmark, dialog: null }
+  return { open, markMany, marked, unmark, dialog: null }
 }
 
 /* Whether a policy is marked as a template: the row's mark reads it. */

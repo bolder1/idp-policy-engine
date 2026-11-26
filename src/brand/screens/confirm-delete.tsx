@@ -173,7 +173,8 @@ export function ConfirmDelete({
       typeLabel={
         typeToConfirm ? (
           <>
-            Type <strong>{DELETE_WORD}</strong> to delete this {noun} for good
+            {/* "these policies" for the Live policies bulk delete (rollout.ts `bulkLive`), which passes the plural. */}
+            Type <strong>{DELETE_WORD}</strong> to delete {noun === 'policies' ? 'these' : 'this'} {noun} for good
           </>
         ) : undefined
       }

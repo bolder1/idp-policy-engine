@@ -29,3 +29,80 @@
 .bdf__title { margin: 0 0 var(--space-2); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bdf__line { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--text-secondary); }
 .bdf__acts { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5); }
+
+/* --- In colour (rollout.ts `flipNoteLook`, default-flip-note.tsx `FlipLook`) ----------------------------------------
+   The band takes the NEW outcome's tint; the body sits under it. Every rule hangs off `.bdf.is-look`. No CSS transform
+   on the Motion spans: the arrow, the new badge and its ping are placed by flex and inset, and Motion moves them. */
+.bdf.is-look { --flip-glow: var(--fb-negative-fg); padding: 0; }
+.bdf.is-look.is-to-allow { --flip-glow: var(--fb-positive-fg); }
+/* The hero (owner, 26 Nov 2026: "bigger, as we have in … the popups"): the confirm hero's band at this card's size — a
+   fixed height so the rings have a frame to be centred in, a spotlight in the new outcome's colour fading to the card,
+   and a glow that breathes on the confirm's own keyframes (kit.css `bx-hero-glow`). */
+.bdf.is-look .bdf__band {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 132px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle 120px at 50% 52%, color-mix(in oklab, var(--flip-glow) 12%, transparent) 0%, transparent 72%),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--flip-glow) 9%, var(--surface-raised)) 0%,
+      color-mix(in oklab, var(--flip-glow) 3%, var(--surface-raised)) 55%,
+      var(--surface-raised) 92%
+    );
+}
+.bdf.is-look .bdf__band::before {
+  content: '';
+  position: absolute;
+  inset: -25%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 52%, color-mix(in oklab, var(--flip-glow) 18%, transparent) 0%, transparent 58%);
+  animation: bx-hero-glow 4.8s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) { .bdf.is-look .bdf__band::before { animation: none; opacity: 0.7; } }
+/* `inset: 0; margin: auto` centres each ring without a transform: Motion owns their scale. */
+.bdf.is-look .bdf__rings { position: absolute; inset: 0; }
+.bdf.is-look .bdf__rings i { position: absolute; inset: 0; margin: auto; border-radius: var(--radius-full); border: var(--bw-thin) solid transparent; }
+.bdf.is-look .bdf__rings i:nth-child(1) { border-color: color-mix(in oklab, var(--flip-glow) 16%, var(--surface-raised)); }
+.bdf.is-look .bdf__rings i:nth-child(2) { border-color: color-mix(in oklab, var(--flip-glow) 10%, var(--surface-raised)); }
+.bdf.is-look .bdf__rings i:nth-child(3) { border-color: color-mix(in oklab, var(--flip-glow) 5%, var(--surface-raised)); }
+/* The swap on a white pill, lit in the outcome's colour as the confirm's badge is. */
+.bdf.is-look .bdf__swaprow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--flip-glow) 18%, transparent), var(--el-low);
+}
+.bdf.is-look .bdf__swaprow .bx-badge { font-size: var(--fs-md); }
+.bdf.is-look .bdf__arrowwrap { display: inline-flex; }
+.bdf.is-look .bdf__now { position: relative; display: inline-flex; }
+.bdf.is-look .bdf__nowbadge { position: relative; display: inline-flex; }
+.bdf.is-look .bdf__nowbadge .bx-badge { font-weight: var(--fw-semibold); }
+/* One ring out from the new outcome as it lands, in its own colour. */
+.bdf.is-look .bdf__ping {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background: var(--fb-negative-border);
+}
+.bdf.is-look.is-to-allow .bdf__ping { background: var(--fb-positive-border); }
+
+.bdf.is-look .bdf__body { padding: var(--space-5); }
+.bdf.is-look .bdf__word { color: var(--fb-negative-fg); }
+.bdf.is-look.is-to-allow .bdf__word { color: var(--fb-positive-fg); }
+
+/* The note's one primary, the last button: the solid accent (blue in the rebrand look), never a second orange. */
+.bdf.is-look .bdf__acts .bx-btn:last-child {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-inverse);
+}
+.bdf.is-look .bdf__acts .bx-btn:last-child:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+/* Allow instead keeps the secondary's ground, with Allow's green on its shield. */
+.bdf.is-look .bdf__acts .bx-btn:not(:last-child) svg { color: var(--fb-positive-fg); }

@@ -560,6 +560,9 @@ export interface Condition {
   typeId: string
   operator: string
   values: string[]
+  /* Device profile only (risk-level.ts, rollout `profileRisk`, 26 Nov 2026): the one risk level the device's risk score
+     must also fall in — Low below 40, Medium 40 to 69, High 70 and up. Absent is any risk: the profile alone. */
+  risk?: 'low' | 'medium' | 'high'
   /* Which half of EACH named zone to test, by zone id. Zone conditions only; a
      zone with no entry is tested whole (both halves), and so is a condition
      with no map at all.
@@ -815,6 +818,10 @@ export interface Rule {
      an empty string is never stored. Kept while the rule is an Allow, so
      switching back to Deny brings the message back. */
   denyMessage?: string
+  /* A Deny rule's sign-in before the denial (rollout `denyFactors`, 26 Nov 2026, owner: "sign in, then deny"): the person
+     proves who they are with the rule's first factor, and its second when '2fa', then gets the deny message. The factor
+     fields are the rule's own, kept from the Allow it was switched from. Absent: deny at once, as before. */
+  denyAfter?: '1fa' | '2fa'
   /* What the user can do next, and who to ask (DENIAL-REASONS.md): shown under the message on the deny page. ABSENT means
      nothing is added; an empty string is never stored. */
   denyAction?: string

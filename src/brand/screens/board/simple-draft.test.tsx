@@ -205,13 +205,17 @@ describe('Simple on the board', () => {
     expect(inspectorSrc).toContain("variant={SAVE_RULE_ORANGE && saveLeads ? 'brand' : 'secondary'}")
     expect(builderSrc).toContain('saveLeads={ruleSaveLeads}')
     expect(builderSrc.match(/if \(RULE_SAVE_FOCUS && simple && !post\) saveRuleToPolicy\(\)/g)).toHaveLength(2)
-    expect(builderSrc).toContain('if (!oneVersion || !saved) return saveDraft({ stay: true })')
+    expect(builderSrc).toContain('const saveRuleToPolicy = () => saveDraft({ stay: true })')
     expect(builderSrc).toContain('RULE_SAVE_FOCUS && simple && !post ? (hasDraft && !oneVersion ? <ChangeState unsaved={false} draft /> : null)')
   })
 
   it("keeps an Inactive policy to one version in Simple: Save rule stores onto it, no Draft tag, no Show live version", () => {
     expect(builderSrc).toContain("const oneVersion = RULE_SAVE_FOCUS && simple && !post && saved?.status === 'inactive'")
     expect(builderSrc).toContain('hideLive={oneVersion}')
+    /* Save draft too saves onto the policy: no pending draft, so no second version. */
+    expect(builderSrc).toContain('if (oneVersion) store.savePolicy({ ...latest, ...facts, ...changes, pendingDraft: undefined })')
+    expect(builderSrc).toContain('else store.saveDraft(saved.id, changes)')
+    expect(builderSrc).toMatch(/oneVersion\s+\? 'Policy saved'/)
     const html = renderToStaticMarkup(<ViewEditActions editing onEdit={() => {}} publishedOpen={false} onTogglePublished={() => {}} simple hideLive />)
     expect(html).not.toContain(LIVE_BUTTON)
   })

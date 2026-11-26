@@ -785,22 +785,7 @@ export function BoardBuilder({
   }
   /* Simple, after Save rule (rollout.ts `ruleSaveFocus`): an Inactive policy has one version, so the rules go onto the
      policy itself; any other policy keeps them as its draft, the head says Draft and Activate policy puts it live. */
-  const saveRuleToPolicy = () => {
-    if (!oneVersion || !saved) return saveDraft({ stay: true })
-    const latest = store.policyById(saved.id) ?? saved
-    const facts = saveFacts(latest)
-    store.savePolicy({
-      ...latest,
-      ...facts,
-      rules: draft.rules,
-      fallback: draft.fallback,
-      checks: draft.checks,
-      ...(draftHoldsName ? { name: draft.name } : null),
-      pendingDraft: undefined,
-    })
-    markRulesSaved(draft.rules.filter((r) => !gaps.some((g) => g.at === r.id)))
-    afterSave({ ...latest, ...facts })
-  }
+  const saveRuleToPolicy = () => saveDraft({ stay: true })
   /* Save rule ends the edit: the panel slides away and focus lands on the card it saved, as its close button does. */
   const closeAfterRuleSave = (card: () => HTMLElement | null) => {
     setInspOpen(false)
@@ -1134,15 +1119,18 @@ export function BoardBuilder({
     const facts = saveFacts(latest)
     /* Applications Guided setup chose are a standing fact, not a rule: a saved draft holds rules only, so they are
        saved to the policy itself, past the checks the Add rule already ran. */
-    if (pending) store.savePolicy({ ...latest, ...facts, appIds: [...pending] })
-    /* "View and edit": the draft's applications are saved with it (policy-draft.ts `withSavedDraft`). */
-    store.saveDraft(saved.id, {
+    if (pending && !oneVersion) store.savePolicy({ ...latest, ...facts, appIds: [...pending] })
+    const changes = {
       rules: draft.rules,
       fallback: draft.fallback,
       checks: draft.checks,
-      ...(viewEdit ? { appIds: [...draft.appIds] } : null),
+      ...(viewEdit ? { appIds: [...draft.appIds] } : oneVersion && pending ? { appIds: [...pending] } : null),
       ...(draftHoldsName ? { name: draft.name } : null),
-    })
+    }
+    /* Simple, Inactive (rollout.ts `ruleSaveFocus`): one version, so Save draft and Save rule save onto the policy. */
+    if (oneVersion) store.savePolicy({ ...latest, ...facts, ...changes, pendingDraft: undefined })
+    /* "View and edit": the draft's applications are saved with it (policy-draft.ts `withSavedDraft`). */
+    else store.saveDraft(saved.id, changes)
     /* A new policy loses its "new" mark with this save; it stays in draft mode all the same. */
     if (viewEdit && !post) setEditMode(true)
     markRulesSaved(draft.rules.filter((r) => !gaps.some((g) => g.at === r.id)))
@@ -1152,13 +1140,15 @@ export function BoardBuilder({
     if (stay) return true
     /* Fix: a draft beside a live policy says that live did not move (draft-model.ts). */
     store.showToast(
-      fix && isPublished(latest)
-        ? simple
-          ? SIMPLE_DRAFT_TOAST
-          : byVersion || viewEdit
-            ? 'Draft saved. The published version is unchanged.'
-            : 'Draft saved. Live is unchanged.'
-        : 'Draft saved',
+      oneVersion
+        ? 'Policy saved'
+        : fix && isPublished(latest)
+          ? simple
+            ? SIMPLE_DRAFT_TOAST
+            : byVersion || viewEdit
+              ? 'Draft saved. The published version is unchanged.'
+              : 'Draft saved. Live is unchanged.'
+          : 'Draft saved',
     )
     if (BACK_AFTER_SAVE) setLeaveSaved(true)
     return true
